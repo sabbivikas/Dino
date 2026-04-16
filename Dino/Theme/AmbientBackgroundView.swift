@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import CoreMotion
 
 // MARK: - Ambient Style
 
@@ -68,6 +69,32 @@ private struct FireflyParticle: Identifiable {
     var driftY: CGFloat
     var color: Color
     var pulseDuration: Double
+    var depthLayer: CGFloat  // 0.0 = far background, 1.0 = near foreground
+}
+
+// MARK: - Motion Manager (parallax tilt)
+
+private class TiltManager: ObservableObject {
+    @Published var xTilt: CGFloat = 0
+    @Published var yTilt: CGFloat = 0
+
+    private let motionManager = CMMotionManager()
+
+    func start() {
+        guard motionManager.isDeviceMotionAvailable else { return }
+        motionManager.deviceMotionUpdateInterval = 1.0 / 30.0
+        motionManager.startDeviceMotionUpdates(to: .main) { [weak self] motion, _ in
+            guard let self = self, let attitude = motion?.attitude else { return }
+            withAnimation(.easeOut(duration: 0.15)) {
+                self.xTilt = CGFloat(attitude.roll) * 12
+                self.yTilt = CGFloat(attitude.pitch) * 12
+            }
+        }
+    }
+
+    func stop() {
+        motionManager.stopDeviceMotionUpdates()
+    }
 }
 
 // MARK: - Firefly View (Night / Storm)
@@ -76,27 +103,50 @@ private struct FireflyView: View {
     @State private var particles: [FireflyParticle] = []
     @State private var driftAnimate = false
     @State private var pulseAnimate = false
+    @State private var twinkleIndex: Int? = nil
+    @State private var gradientPhase: CGFloat = 0
+    @StateObject private var tilt = TiltManager()
 
     var body: some View {
         GeometryReader { geo in
             ZStack {
-                ForEach(particles) { p in
+                // Ambient gradient shift (deep navy ↔ deep indigo)
+                LinearGradient(
+                    colors: [
+                        Color(hex: "#0D1321").opacity(gradientPhase),
+                        Color(hex: "#1A1040").opacity(1.0 - gradientPhase * 0.5),
+                        Color(hex: "#0D1321").opacity(0.8 + gradientPhase * 0.2)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                .ignoresSafeArea()
+                .animation(.easeInOut(duration: 25).repeatForever(autoreverses: true), value: gradientPhase)
+
+                // Firefly particles
+                ForEach(Array(particles.enumerated()), id: \.element.id) { index, p in
+                    let parallaxMultiplier = 0.4 + p.depthLayer * 0.6
+                    let isTwinkling = twinkleIndex == index
+
                     ZStack {
                         // Outer soft glow halo
                         Circle()
                             .fill(
                                 RadialGradient(
                                     colors: [
-                                        p.color.opacity(0.35),
-                                        p.color.opacity(0.12),
+                                        p.color.opacity(isTwinkling ? 0.7 : 0.35),
+                                        p.color.opacity(isTwinkling ? 0.3 : 0.12),
                                         p.color.opacity(0.0)
                                     ],
                                     center: .center,
                                     startRadius: 0,
-                                    endRadius: p.glowRadius
+                                    endRadius: p.glowRadius * (isTwinkling ? 1.8 : 1.0)
                                 )
                             )
-                            .frame(width: p.glowRadius * 2.5, height: p.glowRadius * 2.5)
+                            .frame(
+                                width: p.glowRadius * (isTwinkling ? 4.0 : 2.5),
+                                height: p.glowRadius * (isTwinkling ? 4.0 : 2.5)
+                            )
                             .opacity(pulseAnimate ? p.peakOpacity : p.peakOpacity * 0.15)
                             .animation(
                                 .easeInOut(duration: p.pulseDuration)
@@ -108,20 +158,44 @@ private struct FireflyView: View {
                         // Inner bright core
                         Circle()
                             .fill(p.color)
-                            .frame(width: p.size, height: p.size)
+                            .frame(
+                                width: p.size * (isTwinkling ? 1.6 : 1.0),
+                                height: p.size * (isTwinkling ? 1.6 : 1.0)
+                            )
                             .blur(radius: p.size * 0.4)
-                            .shadow(color: p.color.opacity(0.8), radius: p.size * 1.5)
-                            .opacity(pulseAnimate ? p.opacity : p.opacity * 0.2)
+                            .shadow(color: p.color.opacity(isTwinkling ? 1.0 : 0.8), radius: p.size * (isTwinkling ? 3.0 : 1.5))
+                            .opacity(pulseAnimate ? (isTwinkling ? 1.0 : p.opacity) : p.opacity * 0.2)
                             .animation(
                                 .easeInOut(duration: p.pulseDuration)
                                 .repeatForever(autoreverses: true)
                                 .delay(p.delay),
                                 value: pulseAnimate
                             )
+
+                        // Trailing glow (faint echo behind the drift direction)
+                        Circle()
+                            .fill(p.color.opacity(0.08))
+                            .frame(width: p.size * 3, height: p.size * 3)
+                            .blur(radius: p.size * 2)
+                            .offset(
+                                x: driftAnimate ? -p.driftX * 0.3 : 0,
+                                y: driftAnimate ? -p.driftY * 0.3 : 0
+                            )
+                            .animation(
+                                .easeInOut(duration: p.duration * 1.2)
+                                .repeatForever(autoreverses: true)
+                                .delay(p.delay * 0.5 + 0.5),
+                                value: driftAnimate
+                            )
                     }
+                    // Scale by depth layer (far = small, near = big)
+                    .scaleEffect(0.5 + p.depthLayer * 0.5)
+                    .opacity(0.4 + p.depthLayer * 0.6)
+                    // Twinkle burst animation
+                    .animation(.easeInOut(duration: 0.4), value: isTwinkling)
                     .position(
-                        x: driftAnimate ? p.x + p.driftX : p.x,
-                        y: driftAnimate ? p.y + p.driftY : p.y
+                        x: (driftAnimate ? p.x + p.driftX : p.x) + tilt.xTilt * parallaxMultiplier,
+                        y: (driftAnimate ? p.y + p.driftY : p.y) + tilt.yTilt * parallaxMultiplier
                     )
                     .animation(
                         .easeInOut(duration: p.duration)
@@ -133,11 +207,36 @@ private struct FireflyView: View {
             }
             .onAppear {
                 particles = Self.generateParticles(in: geo.size)
+                tilt.start()
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                     driftAnimate = true
                     pulseAnimate = true
+                    gradientPhase = 1.0
+                }
+                startTwinkleTimer()
+            }
+            .onDisappear {
+                tilt.stop()
+            }
+        }
+    }
+
+    // Random twinkle burst every 3-6 seconds
+    private func startTwinkleTimer() {
+        let interval = Double.random(in: 3...6)
+        DispatchQueue.main.asyncAfter(deadline: .now() + interval) {
+            guard !particles.isEmpty else { return }
+            let idx = Int.random(in: 0..<particles.count)
+            withAnimation(.easeIn(duration: 0.3)) {
+                twinkleIndex = idx
+            }
+            // Fade twinkle back after a moment
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+                withAnimation(.easeOut(duration: 0.6)) {
+                    twinkleIndex = nil
                 }
             }
+            startTwinkleTimer()
         }
     }
 
@@ -147,24 +246,26 @@ private struct FireflyView: View {
         Color(hex: "#FFEEBB"),  // pale amber
         Color(hex: "#E8D5A3"),  // muted honey
         Color(hex: "#C8E6C9"),  // faint green (rare)
+        Color(hex: "#B8D4E3"),  // cool blue (very rare)
     ]
 
     private static func generateParticles(in size: CGSize) -> [FireflyParticle] {
-        (0..<20).map { _ in
-            let spread = CGFloat.random(in: 0.15...0.95)
+        (0..<24).map { _ in
+            let depth = CGFloat.random(in: 0...1)
             return FireflyParticle(
                 x: CGFloat.random(in: 20...(size.width - 20)),
-                y: spread * size.height,
+                y: CGFloat.random(in: 40...(size.height - 40)),
                 size: CGFloat.random(in: 2...5),
-                glowRadius: CGFloat.random(in: 8...18),
+                glowRadius: CGFloat.random(in: 8...20),
                 opacity: Double.random(in: 0.4...0.9),
                 peakOpacity: Double.random(in: 0.5...1.0),
-                duration: Double.random(in: 8...16),
+                duration: Double.random(in: 8...18),
                 delay: Double.random(in: 0...6),
-                driftX: CGFloat.random(in: -45...45),
-                driftY: CGFloat.random(in: -35...35),
+                driftX: CGFloat.random(in: -50...50),
+                driftY: CGFloat.random(in: -40...40),
                 color: warmColors.randomElement() ?? Color(hex: "#FFD966"),
-                pulseDuration: Double.random(in: 3...7)
+                pulseDuration: Double.random(in: 3...8),
+                depthLayer: depth
             )
         }
     }
