@@ -298,6 +298,7 @@ final class SharedDataManager: ObservableObject {
         moodEntries.insert(entry, at: 0)
         addXP(10)
         recordActivity()
+        NotificationManager.shared.userDidLogMood()
     }
 
     // MARK: - Journal

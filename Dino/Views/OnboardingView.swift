@@ -733,6 +733,8 @@ private struct StepNotificationsPage: View {
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound]) { granted, _ in
             DispatchQueue.main.async {
                 permissionRequested = true
+                NotificationManager.shared.rescheduleAll()
+                NotificationManager.shared.scheduleReEngagementIfNeeded()
             }
         }
     }

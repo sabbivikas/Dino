@@ -11,12 +11,11 @@ struct SettingsView: View {
     @EnvironmentObject var dataManager: SharedDataManager
     @Environment(\.dismiss) private var dismiss
 
+    @ObservedObject private var notifManager = NotificationManager.shared
+
     @State private var showClearConfirm = false
     @State private var showSignOutConfirm = false
     @State private var showDeleteAccountConfirm = false
-    @State private var notifyMorning = true
-    @State private var notifyEvening = false
-    @State private var notifyStreak = true
 
     private var appVersion: String {
         Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0"
@@ -28,23 +27,67 @@ struct SettingsView: View {
                 // Notifications
                 Section {
                     SettingsToggle(
-                        icon: "sun.max.fill",
-                        label: "morning reminder",
-                        color: DinoTheme.peach,
-                        isOn: $notifyMorning
+                        icon: "bell.fill",
+                        label: "notifications",
+                        color: DinoTheme.sageGreen,
+                        isOn: $notifManager.notificationsEnabled
                     )
-                    SettingsToggle(
-                        icon: "moon.fill",
-                        label: "evening check-in",
-                        color: DinoTheme.lavender,
-                        isOn: $notifyEvening
-                    )
-                    SettingsToggle(
-                        icon: "flame.fill",
-                        label: "streak reminders",
-                        color: .orange,
-                        isOn: $notifyStreak
-                    )
+
+                    if notifManager.notificationsEnabled {
+                        SettingsToggle(
+                            icon: "sun.max.fill",
+                            label: "daily check-in",
+                            color: DinoTheme.peach,
+                            isOn: $notifManager.dailyCheckInEnabled
+                        )
+
+                        // Check-in time picker
+                        if notifManager.dailyCheckInEnabled {
+                            HStack(spacing: 14) {
+                                Image(systemName: "clock")
+                                    .font(DinoTheme.dinoFont(size: 16))
+                                    .foregroundColor(DinoTheme.skyBlue)
+                                    .frame(width: 32, height: 32)
+                                    .background(DinoTheme.skyBlue.opacity(0.12))
+                                    .cornerRadius(8)
+
+                                Text("check-in time")
+                                    .font(DinoTheme.bodyFont())
+                                    .foregroundColor(DinoTheme.textPrimary)
+
+                                Spacer()
+
+                                DatePicker("", selection: Binding(
+                                    get: {
+                                        var components = DateComponents()
+                                        components.hour = notifManager.checkInHour
+                                        components.minute = notifManager.checkInMinute
+                                        return Calendar.current.date(from: components) ?? Date()
+                                    },
+                                    set: { date in
+                                        let components = Calendar.current.dateComponents([.hour, .minute], from: date)
+                                        notifManager.checkInHour = components.hour ?? 19
+                                        notifManager.checkInMinute = components.minute ?? 0
+                                    }
+                                ), displayedComponents: .hourAndMinute)
+                                .labelsHidden()
+                            }
+                        }
+
+                        SettingsToggle(
+                            icon: "flame.fill",
+                            label: "streak reminders",
+                            color: .orange,
+                            isOn: $notifManager.streakReminderEnabled
+                        )
+
+                        SettingsToggle(
+                            icon: "moon.fill",
+                            label: "wind-down",
+                            color: DinoTheme.lavender,
+                            isOn: $notifManager.windDownEnabled
+                        )
+                    }
                 } header: {
                     Text("notifications")
                         .font(DinoTheme.captionFont())
