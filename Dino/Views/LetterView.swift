@@ -9,6 +9,7 @@ struct LetterView: View {
     var onContinue: () -> Void
 
     private static let customFont = "DinoInitiativeFont-Regular"
+    private let audioManager = AudioManager.shared
 
     @State private var displayedText = ""
     @State private var showCursor = true
@@ -74,11 +75,18 @@ struct LetterView: View {
             }
         }
         .onAppear {
+            // Start ambient music with fade in
+            audioManager.play(track: "letter_ambient")
+            audioManager.fadeIn(duration: 3.0)
+
             startTypewriter()
             // Blinking cursor
             Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { _ in
                 showCursor.toggle()
             }
+        }
+        .onDisappear {
+            audioManager.fadeOut(duration: 2.0)
         }
     }
 
