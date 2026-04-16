@@ -6,6 +6,8 @@
 import SwiftUI
 
 struct ProfileView: View {
+    @ObservedObject private var themeManager = ThemeManager.shared
+
     @EnvironmentObject var dataManager: SharedDataManager
     @State private var showAssessment = false
     @State private var showResources = false
@@ -25,21 +27,11 @@ struct ProfileView: View {
                 VStack(spacing: 24) {
                     // Avatar + name
                     VStack(spacing: 14) {
-                        ZStack {
-                            Circle()
-                                .fill(
-                                    LinearGradient(
-                                        colors: [DinoTheme.sageGreen, DinoTheme.skyBlue],
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    )
-                                )
-                                .frame(width: 90, height: 90)
-
-                            Text(initial.isEmpty ? "🦕" : initial)
-                                .font(.system(size: initial.isEmpty ? 36 : 38, weight: .bold, design: .rounded))
-                                .foregroundColor(.white)
-                        }
+                        Image("DinoMascot")
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: 90, height: 90)
+                            .clipShape(Circle())
                         .shadow(color: DinoTheme.sageGreen.opacity(0.3), radius: 12, y: 4)
 
                         VStack(spacing: 4) {
@@ -67,20 +59,28 @@ struct ProfileView: View {
                     .padding(.horizontal, DinoTheme.padding)
 
                     // Streak
-                    HStack {
-                        StreakBadge(streak: dataManager.streakData.currentStreak)
-                        Spacer()
-                        VStack(alignment: .trailing, spacing: 2) {
-                            Text("longest")
-                                .font(DinoTheme.captionFont())
-                                .foregroundColor(DinoTheme.textSecondary)
-                            Text("\(dataManager.streakData.longestStreak) days")
-                                .font(DinoTheme.headlineFont())
-                                .foregroundColor(DinoTheme.textPrimary)
+                    NavigationLink {
+                        StreakCalendarView().environmentObject(dataManager)
+                    } label: {
+                        HStack {
+                            StreakBadge(streak: dataManager.streakData.currentStreak)
+                            Spacer()
+                            VStack(alignment: .trailing, spacing: 2) {
+                                Text("longest")
+                                    .font(DinoTheme.captionFont())
+                                    .foregroundColor(DinoTheme.textSecondary)
+                                Text("\(dataManager.streakData.longestStreak) days")
+                                    .font(DinoTheme.headlineFont())
+                                    .foregroundColor(DinoTheme.textPrimary)
+                            }
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundColor(DinoTheme.textSecondary.opacity(0.5))
                         }
+                        .padding(DinoTheme.padding)
+                        .dinoCardWhite()
                     }
-                    .padding(DinoTheme.padding)
-                    .dinoCardWhite()
+                    .buttonStyle(.plain)
                     .padding(.horizontal, DinoTheme.padding)
 
                     // Navigation links
@@ -101,7 +101,7 @@ struct ProfileView: View {
                     Button(action: { showResources = true }) {
                         HStack(spacing: 12) {
                             Image(systemName: "heart.fill")
-                                .font(.system(size: 18))
+                                .font(DinoTheme.dinoFont(size: 18))
                             Text("need help now?")
                                 .font(DinoTheme.headlineFont())
                         }
@@ -116,7 +116,7 @@ struct ProfileView: View {
                     .padding(.bottom, 32)
                 }
             }
-            .background(Color.white.ignoresSafeArea())
+            .background(DinoTheme.background.ignoresSafeArea())
             .navigationTitle("profile")
             .navigationBarTitleDisplayMode(.large)
         }
@@ -161,7 +161,7 @@ struct ProfileNavRow: View {
         Button(action: action) {
             HStack(spacing: 14) {
                 Image(systemName: icon)
-                    .font(.system(size: 18))
+                    .font(DinoTheme.dinoFont(size: 18))
                     .foregroundColor(color)
                     .frame(width: 38, height: 38)
                     .background(color.opacity(0.12))
@@ -174,7 +174,7 @@ struct ProfileNavRow: View {
                 Spacer()
 
                 Image(systemName: "chevron.right")
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(DinoTheme.dinoFont(size: 13))
                     .foregroundColor(DinoTheme.textSecondary.opacity(0.5))
             }
             .padding(14)

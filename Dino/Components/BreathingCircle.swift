@@ -6,6 +6,8 @@
 import SwiftUI
 
 struct BreathingCircle: View {
+    @ObservedObject private var themeManager = ThemeManager.shared
+
     let scale: CGFloat
     let opacity: Double
     let phase: BreathingPhase
@@ -37,11 +39,11 @@ struct BreathingCircle: View {
             // Phase label & countdown
             VStack(spacing: 6) {
                 Text(phase.label)
-                    .font(.system(.headline, design: .rounded, weight: .semibold))
+                    .font(DinoTheme.dinoFont(size: 17))
                     .foregroundColor(.white)
 
                 Text("\(countdown)")
-                    .font(.system(.title, design: .rounded, weight: .bold))
+                    .font(DinoTheme.dinoFont(size: 28))
                     .foregroundColor(.white.opacity(0.9))
             }
         }

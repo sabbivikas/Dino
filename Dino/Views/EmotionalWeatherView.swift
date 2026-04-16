@@ -6,6 +6,8 @@
 import SwiftUI
 
 struct EmotionalWeatherView: View {
+    @ObservedObject private var themeManager = ThemeManager.shared
+
     @EnvironmentObject var dataManager: SharedDataManager
     @StateObject private var viewModel: MoodViewModel = MoodViewModel(dataManager: SharedDataManager.shared)
 
@@ -16,7 +18,7 @@ struct EmotionalWeatherView: View {
                     // Header
                     VStack(spacing: 6) {
                         Text("what's your emotional weather today?")
-                            .font(DinoTheme.titleFont())
+                            .font(DinoTheme.dinoDisplayFont(size: 22))
                             .foregroundColor(DinoTheme.textPrimary)
                             .multilineTextAlignment(.center)
                     }
@@ -105,7 +107,7 @@ struct EmotionalWeatherView: View {
                         .padding(.bottom, 20)
                 }
             }
-            .background(Color.white.ignoresSafeArea())
+            .background(DinoTheme.background.ignoresSafeArea())
             .navigationTitle("")
             .navigationBarHidden(true)
         }

@@ -6,273 +6,298 @@
 import SwiftUI
 
 struct HomeView: View {
+    @ObservedObject private var themeManager = ThemeManager.shared
+
     @EnvironmentObject var dataManager: SharedDataManager
     @StateObject private var viewModel: HomeViewModel = HomeViewModel(dataManager: SharedDataManager.shared)
 
-    @State private var showBreathing = false
-    @State private var showAffirmations = false
-    @State private var showGrowth = false
-    @State private var navigateToMood = false
-    @State private var navigateToJournal = false
-    @State private var navigateToGratitude = false
-
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(spacing: 20) {
-                    // Greeting
-                    HStack {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("\(viewModel.greeting),")
-                                .font(DinoTheme.subheadlineFont())
-                                .foregroundColor(DinoTheme.textSecondary)
-                            HStack(spacing: 8) {
-                                Text(dataManager.userName.isEmpty ? "friend" : dataManager.userName)
-                                    .font(DinoTheme.largeFont())
-                                    .foregroundColor(DinoTheme.textPrimary)
-                                Text("🦕")
-                                    .font(.system(size: 28))
-                            }
-                        }
-                        Spacer()
-                        StreakBadge(streak: dataManager.streakData.currentStreak)
+            ZStack {
+                DinoTheme.background.ignoresSafeArea()
+
+                ScrollView(showsIndicators: false) {
+                    VStack(spacing: 24) {
+                        // Today's Focus Card
+                        focusCard
+
+                        // 3x3 Action Grid
+                        actionGrid
+
+                        Spacer(minLength: 32)
                     }
                     .padding(.horizontal, DinoTheme.padding)
-                    .padding(.top, 8)
-
-                    // Mood check-in card
-                    Button(action: { navigateToMood = true }) {
-                        HStack(spacing: 16) {
-                            Text("🌤")
-                                .font(.system(size: 32))
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("how are you feeling today?")
-                                    .font(DinoTheme.headlineFont())
-                                    .foregroundColor(DinoTheme.textPrimary)
-                                Text("tap to log your emotional weather")
-                                    .font(DinoTheme.captionFont())
-                                    .foregroundColor(DinoTheme.textSecondary)
-                            }
-                            Spacer()
-                            Image(systemName: "chevron.right")
-                                .font(.system(size: 14, weight: .semibold))
-                                .foregroundColor(DinoTheme.textSecondary)
-                        }
-                        .padding(DinoTheme.padding)
-                        .dinoCard()
-                    }
-                    .buttonStyle(ScaleButtonStyle())
-                    .padding(.horizontal, DinoTheme.padding)
-
-                    // Quick actions grid
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("quick actions")
-                            .font(DinoTheme.captionFont())
-                            .fontWeight(.semibold)
-                            .foregroundColor(DinoTheme.textSecondary)
-                            .padding(.horizontal, DinoTheme.padding)
-
-                        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
-                            QuickActionCard(
-                                icon: "mic.circle.fill",
-                                label: "record journal",
-                                color: DinoTheme.lavender
-                            ) { navigateToJournal = true }
-
-                            QuickActionCard(
-                                icon: "cloud.sun.fill",
-                                label: "log mood",
-                                color: DinoTheme.skyBlue
-                            ) { navigateToMood = true }
-
-                            QuickActionCard(
-                                icon: "heart.fill",
-                                label: "add gratitude",
-                                color: DinoTheme.warmRose
-                            ) { navigateToGratitude = true }
-
-                            QuickActionCard(
-                                icon: "wind",
-                                label: "start breathing",
-                                color: DinoTheme.sageGreen
-                            ) { showBreathing = true }
-                        }
-                        .padding(.horizontal, DinoTheme.padding)
-                    }
-
-                    // Growth card
-                    Button(action: { showGrowth = true }) {
-                        HStack(spacing: 14) {
-                            Text("🦕")
-                                .font(.system(size: 30))
-
-                            VStack(alignment: .leading, spacing: 6) {
-                                HStack {
-                                    Text("level \(dataManager.growthStats.level)")
-                                        .font(DinoTheme.headlineFont())
-                                        .foregroundColor(DinoTheme.textPrimary)
-                                    Spacer()
-                                    Text("\(dataManager.growthStats.xpInCurrentLevel)/100 xp")
-                                        .font(DinoTheme.captionFont())
-                                        .foregroundColor(DinoTheme.textSecondary)
-                                }
-
-                                GeometryReader { geo in
-                                    ZStack(alignment: .leading) {
-                                        RoundedRectangle(cornerRadius: 4)
-                                            .fill(DinoTheme.sageGreen.opacity(0.2))
-                                            .frame(height: 6)
-                                        RoundedRectangle(cornerRadius: 4)
-                                            .fill(DinoTheme.sageGreen)
-                                            .frame(width: max(4, geo.size.width * dataManager.growthStats.xpProgress), height: 6)
-                                    }
-                                }
-                                .frame(height: 6)
-                            }
-
-                            Image(systemName: "chevron.right")
-                                .font(.system(size: 14, weight: .semibold))
-                                .foregroundColor(DinoTheme.textSecondary)
-                        }
-                        .padding(DinoTheme.padding)
-                        .dinoCard()
-                    }
-                    .buttonStyle(ScaleButtonStyle())
-                    .padding(.horizontal, DinoTheme.padding)
-
-                    // Affirmation card
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("today's affirmation")
-                            .font(DinoTheme.captionFont())
-                            .fontWeight(.semibold)
-                            .foregroundColor(DinoTheme.textSecondary)
-                            .padding(.horizontal, DinoTheme.padding)
-
-                        TabView(selection: .constant(viewModel.currentAffirmationIndex)) {
-                            ForEach(Array(AffirmationsData.all.enumerated()), id: \.offset) { i, text in
-                                AffirmationCard(
-                                    text: text,
-                                    index: i,
-                                    isSaved: dataManager.isAffirmationSaved(text),
-                                    onSave: {
-                                        if dataManager.isAffirmationSaved(text) {
-                                            dataManager.removeAffirmation(text)
-                                        } else {
-                                            dataManager.saveAffirmation(text)
-                                        }
-                                    }
-                                )
-                                .padding(.horizontal, DinoTheme.padding)
-                                .tag(i)
-                            }
-                        }
-                        .tabViewStyle(.page(indexDisplayMode: .never))
-                        .frame(height: 220)
-                        .onTapGesture { viewModel.nextAffirmation() }
-
-                        Button(action: { showAffirmations = true }) {
-                            Text("see all affirmations →")
-                                .font(DinoTheme.captionFont())
-                                .foregroundColor(DinoTheme.sageGreen)
-                        }
-                        .padding(.horizontal, DinoTheme.padding)
-                    }
-
-                    // Self-care reminders
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("self-care today")
-                            .font(DinoTheme.captionFont())
-                            .fontWeight(.semibold)
-                            .foregroundColor(DinoTheme.textSecondary)
-                            .padding(.horizontal, DinoTheme.padding)
-
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 12) {
-                                SelfCareButton(emoji: "💧", label: "drink water", isChecked: dataManager.selfCareWater) {
-                                    dataManager.toggleSelfCare(.water)
-                                }
-                                SelfCareButton(emoji: "🍎", label: "eat something", isChecked: dataManager.selfCareEat) {
-                                    dataManager.toggleSelfCare(.eat)
-                                }
-                                SelfCareButton(emoji: "😴", label: "rest", isChecked: dataManager.selfCareRest) {
-                                    dataManager.toggleSelfCare(.rest)
-                                }
-                                SelfCareButton(emoji: "💬", label: "connect", isChecked: dataManager.selfCareConnect) {
-                                    dataManager.toggleSelfCare(.connect)
-                                }
-                            }
-                            .padding(.horizontal, DinoTheme.padding)
-                        }
-                    }
-                    .padding(.bottom, 20)
+                    .padding(.top, 12)
                 }
             }
-            .background(Color.white.ignoresSafeArea())
-            .navigationTitle("")
-            .navigationBarHidden(true)
-        }
-        .sheet(isPresented: $showBreathing) {
-            BreathingView()
-                .environmentObject(dataManager)
-        }
-        .sheet(isPresented: $showAffirmations) {
-            AffirmationsView()
-                .environmentObject(dataManager)
-        }
-        .sheet(isPresented: $showGrowth) {
-            GrowthView()
-                .environmentObject(dataManager)
-        }
-        .sheet(isPresented: $navigateToMood) {
-            EmotionalWeatherView()
-                .environmentObject(dataManager)
-        }
-        .sheet(isPresented: $navigateToJournal) {
-            VoiceJournalView()
-                .environmentObject(dataManager)
-        }
-        .sheet(isPresented: $navigateToGratitude) {
-            GratitudeJarView()
-                .environmentObject(dataManager)
-        }
-        .onReceive(dataManager.$showBreathingFromDeepLink) { show in
-            if show {
-                showBreathing = true
-                dataManager.showBreathingFromDeepLink = false
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    headerLeading
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    headerTrailing
+                }
+            }
+            .navigationDestination(isPresented: $viewModel.showBreathing) {
+                BreathingView().environmentObject(dataManager)
+            }
+            .navigationDestination(isPresented: $viewModel.showMeditation) {
+                MeditationView().environmentObject(dataManager)
+            }
+            .navigationDestination(isPresented: $viewModel.showFocus) {
+                FocusView().environmentObject(dataManager)
+            }
+            .navigationDestination(isPresented: $viewModel.showAffirmations) {
+                AffirmationsView().environmentObject(dataManager)
+            }
+            .navigationDestination(isPresented: $viewModel.showGrowth) {
+                GrowthView().environmentObject(dataManager)
+            }
+            .navigationDestination(isPresented: $viewModel.showAssessment) {
+                AssessmentView().environmentObject(dataManager)
+            }
+            .navigationDestination(isPresented: $viewModel.showResources) {
+                ResourcesView().environmentObject(dataManager)
             }
         }
+    }
+
+    // MARK: - Header Leading (Avatar + Name)
+
+    private var headerLeading: some View {
+        HStack(spacing: 10) {
+            // Profile avatar
+            Image("DinoMascot")
+                .resizable()
+                .scaledToFill()
+                .frame(width: 38, height: 38)
+                .clipShape(Circle())
+
+            Text(displayName)
+                .font(DinoTheme.dinoDisplayFont(size: 20))
+                .foregroundColor(DinoTheme.textPrimary)
+        }
+    }
+
+    // MARK: - Header Trailing (Streak + Settings)
+
+    private var headerTrailing: some View {
+        HStack(spacing: 14) {
+            // Streak egg
+            NavigationLink {
+                StreakCalendarView().environmentObject(dataManager)
+            } label: {
+                ZStack {
+                    Image(systemName: "oval.fill")
+                        .font(DinoTheme.dinoFont(size: 22))
+                        .foregroundColor(DinoTheme.peach.opacity(0.5))
+                    Text("\(dataManager.streakData.currentStreak)")
+                        .font(DinoTheme.numericFont(size: 10))
+                        .foregroundColor(DinoTheme.textPrimary)
+                        .offset(y: 1)
+                }
+            }
+
+            NavigationLink {
+                SettingsView().environmentObject(dataManager)
+            } label: {
+                Image(systemName: "gearshape")
+                    .font(DinoTheme.dinoFont(size: 18))
+                    .foregroundColor(DinoTheme.textSecondary)
+            }
+        }
+    }
+
+    // MARK: - Today's Focus Card
+
+    private var focusCard: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            // Title row
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Today's Focus")
+                        .font(DinoTheme.dinoLabelFont(size: 14))
+                        .foregroundColor(DinoTheme.textSecondary)
+
+                    HStack(spacing: 8) {
+                        Text(viewModel.todaysFocusEmoji)
+                            .font(DinoTheme.dinoFont(size: 22))
+                        Text(viewModel.todaysFocus)
+                            .font(DinoTheme.dinoDisplayFont(size: 24))
+                            .foregroundColor(DinoTheme.textPrimary)
+                    }
+                }
+                Spacer()
+            }
+
+            // Weekly tracker
+            weeklyTracker
+        }
+        .padding(DinoTheme.padding)
+        .background(DinoTheme.surfacePrimary)
+        .clipShape(RoundedRectangle(cornerRadius: DinoTheme.largeCornerRadius, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: DinoTheme.largeCornerRadius, style: .continuous)
+                .strokeBorder(DinoTheme.cardBorder, lineWidth: 1)
+        )
+        .shadow(color: DinoTheme.shadowColor, radius: DinoTheme.shadowRadius, y: DinoTheme.shadowY)
+    }
+
+    // MARK: - Weekly Tracker
+
+    private var weeklyTracker: some View {
+        let days = viewModel.weeklyActivity()
+        return HStack(spacing: 0) {
+            ForEach(Array(days.enumerated()), id: \.offset) { index, day in
+                VStack(spacing: 6) {
+                    Text(day.label)
+                        .font(DinoTheme.dinoFont(size: 11))
+                        .foregroundColor(DinoTheme.textSecondary)
+
+                    ZStack {
+                        Circle()
+                            .fill(day.isCompleted ? DinoTheme.peach : DinoTheme.surfaceSecondary)
+                            .frame(width: day.isToday ? 32 : 28, height: day.isToday ? 32 : 28)
+
+                        if day.isToday {
+                            Circle()
+                                .strokeBorder(DinoTheme.peach, lineWidth: 2)
+                                .frame(width: 32, height: 32)
+                        }
+
+                        if day.isCompleted {
+                            Image(systemName: "checkmark")
+                                .font(DinoTheme.numericFont(size: 11))
+                                .foregroundColor(.white)
+                        }
+                    }
+                    .animation(.spring(response: 0.4, dampingFraction: 0.6), value: day.isCompleted)
+                }
+                .frame(maxWidth: .infinity)
+            }
+        }
+    }
+
+    // MARK: - 3x3 Action Grid
+
+    private var actionGrid: some View {
+        let rows = [
+            [
+                ActionItem(id: "journal", title: "Journal", icon: "mic.fill", color: DinoTheme.sageGreen, tab: 1),
+                ActionItem(id: "mood", title: "Mood", icon: "cloud.sun.fill", color: DinoTheme.skyBlue, tab: 2),
+                ActionItem(id: "gratitude", title: "Gratitude", icon: "archivebox.fill", color: DinoTheme.peach, tab: 3),
+            ],
+            [
+                ActionItem(id: "breathing", title: "Breathing", icon: "circle.circle", color: DinoTheme.lavender, tab: nil),
+                ActionItem(id: "meditation", title: "Meditation", icon: "leaf.fill", color: DinoTheme.sageGreen.opacity(0.8), tab: nil),
+                ActionItem(id: "affirmations", title: "Affirm", icon: "sparkles", color: DinoTheme.warmRose, tab: nil),
+            ],
+            [
+                ActionItem(id: "assessment", title: "Assess", icon: "chart.bar.fill", color: DinoTheme.skyBlue.opacity(0.8), tab: nil),
+                ActionItem(id: "growth", title: "Growth", icon: "tree.fill", color: DinoTheme.sageGreen, tab: nil),
+                ActionItem(id: "resources", title: "Help", icon: "heart.fill", color: DinoTheme.warmRose.opacity(0.8), tab: nil),
+            ]
+        ]
+
+        return VStack(spacing: 14) {
+            ForEach(Array(rows.enumerated()), id: \.offset) { rowIndex, row in
+                HStack(spacing: 14) {
+                    ForEach(row) { item in
+                        actionCard(item: item)
+                    }
+                }
+            }
+        }
+    }
+
+    // MARK: - Action Card
+
+    private func actionCard(item: ActionItem) -> some View {
+        let isPressed = viewModel.tappedCard == item.id
+
+        return Button {
+            viewModel.animateCardTap(item.id)
+            handleCardTap(item)
+        } label: {
+            VStack(spacing: 10) {
+                ZStack {
+                    Circle()
+                        .fill(item.color.opacity(0.20))
+                        .frame(width: 44, height: 44)
+
+                    Image(systemName: item.icon)
+                        .font(DinoTheme.dinoFont(size: 20))
+                        .foregroundColor(item.color)
+                }
+
+                Text(item.title)
+                    .font(DinoTheme.dinoLabelFont(size: 13))
+                    .foregroundColor(DinoTheme.textPrimary)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 18)
+            .background(DinoTheme.surfacePrimary)
+            .clipShape(RoundedRectangle(cornerRadius: DinoTheme.cornerRadius, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: DinoTheme.cornerRadius, style: .continuous)
+                    .strokeBorder(item.color.opacity(0.30), lineWidth: 1.5)
+            )
+            .shadow(color: isPressed ? item.color.opacity(0.15) : DinoTheme.shadowColor,
+                    radius: isPressed ? 16 : DinoTheme.shadowRadius,
+                    y: DinoTheme.shadowY)
+            .scaleEffect(isPressed ? 0.94 : 1.0)
+        }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: - Card Tap Handler
+
+    private func handleCardTap(_ item: ActionItem) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+            if let tab = item.tab {
+                dataManager.deepLinkTab = tab
+            } else {
+                switch item.id {
+                case "breathing":
+                    viewModel.showBreathing = true
+                case "meditation":
+                    viewModel.showMeditation = true
+                case "affirmations":
+                    viewModel.showAffirmations = true
+                case "growth":
+                    viewModel.showGrowth = true
+                case "assessment":
+                    viewModel.showAssessment = true
+                case "resources":
+                    viewModel.showResources = true
+                default:
+                    break
+                }
+            }
+        }
+    }
+
+    // MARK: - Helpers
+
+    private var displayName: String {
+        let name = dataManager.userName
+        if name.isEmpty { return viewModel.greeting }
+        return "\(viewModel.greeting), \(name)"
+    }
+
+    private var avatarInitial: String {
+        let name = dataManager.userName
+        if name.isEmpty { return "🦕" }
+        return String(name.prefix(1)).uppercased()
     }
 }
 
-// MARK: - Self-care Button
-struct SelfCareButton: View {
-    let emoji: String
-    let label: String
-    let isChecked: Bool
-    let action: () -> Void
+// MARK: - ActionItem Model
 
-    var body: some View {
-        Button(action: action) {
-            VStack(spacing: 6) {
-                ZStack {
-                    Circle()
-                        .fill(isChecked ? DinoTheme.sageGreen : DinoTheme.cardBackground)
-                        .frame(width: 52, height: 52)
-                        .overlay(
-                            Circle()
-                                .stroke(isChecked ? DinoTheme.sageGreen : DinoTheme.divider, lineWidth: 1.5)
-                        )
-
-                    Text(emoji)
-                        .font(.system(size: 22))
-                }
-
-                Text(label)
-                    .font(DinoTheme.caption2Font())
-                    .foregroundColor(isChecked ? DinoTheme.sageGreen : DinoTheme.textSecondary)
-                    .fontWeight(isChecked ? .semibold : .regular)
-            }
-        }
-        .buttonStyle(ScaleButtonStyle())
-    }
+private struct ActionItem: Identifiable {
+    let id: String
+    let title: String
+    let icon: String
+    let color: Color
+    let tab: Int? // if set, switches tab instead of navigation push
 }

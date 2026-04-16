@@ -6,12 +6,14 @@
 import SwiftUI
 
 struct StreakBadge: View {
+    @ObservedObject private var themeManager = ThemeManager.shared
+
     let streak: Int
 
     var body: some View {
         HStack(spacing: 6) {
             Text("🔥")
-                .font(.system(size: 20))
+                .font(DinoTheme.dinoFont(size: 20))
 
             VStack(alignment: .leading, spacing: 2) {
                 Text("\(streak) day\(streak == 1 ? "" : "s")")
@@ -25,13 +27,11 @@ struct StreakBadge: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
-        .background(
-            Color.orange.opacity(0.1)
-                .cornerRadius(DinoTheme.cornerRadius)
-        )
+        .background(DinoTheme.surfacePrimary)
+        .cornerRadius(DinoTheme.cornerRadius)
         .overlay(
             RoundedRectangle(cornerRadius: DinoTheme.cornerRadius)
-                .stroke(Color.orange.opacity(0.2), lineWidth: 1)
+                .strokeBorder(DinoTheme.cardBorder, lineWidth: 1)
         )
     }
 }

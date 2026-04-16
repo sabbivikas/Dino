@@ -1,0 +1,468 @@
+import Combine
+//
+//  MeditationView.swift
+//  Dino
+//
+//  Calming meditation screen with Live Activity integration.
+//
+
+import SwiftUI
+
+struct MeditationView: View {
+    @ObservedObject private var themeManager = ThemeManager.shared
+
+    @EnvironmentObject var dataManager: SharedDataManager
+    @StateObject private var viewModel: MeditationViewModel = MeditationViewModel(dataManager: SharedDataManager.shared)
+    @StateObject private var audio = AudioManager.shared
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                DinoTheme.background.ignoresSafeArea()
+
+                if viewModel.isDone {
+                    MeditationDoneScreen(viewModel: viewModel, onDismiss: { dismiss() })
+                        .transition(.opacity.combined(with: .scale(scale: 0.95)))
+                } else {
+                    VStack(spacing: 28) {
+                        // Header
+                        VStack(spacing: 6) {
+                            Text("meditate")
+                                .font(DinoTheme.dinoDisplayFont(size: 28))
+                                .foregroundColor(DinoTheme.textPrimary)
+                            Text(viewModel.isRunning ? viewModel.currentMessage : "be still. be here.")
+                                .font(DinoTheme.subheadlineFont())
+                                .foregroundColor(DinoTheme.textSecondary)
+                                .italic()
+                                .animation(.easeInOut, value: viewModel.currentMessage)
+                        }
+                        .padding(.top, 16)
+
+                        // Pulsing visual
+                        MeditationPulseView(isRunning: viewModel.isRunning, isPaused: viewModel.isPaused)
+
+                        // Timer (when running)
+                        if viewModel.isRunning {
+                            Text(viewModel.formattedTimeRemaining)
+                                .font(.system(size: 36, weight: .bold, design: .rounded))
+                                .foregroundColor(DinoTheme.textPrimary)
+                                .monospacedDigit()
+                                .transition(.opacity)
+                        }
+
+                        // Sound indicator
+                        if viewModel.isRunning {
+                            HStack(spacing: 6) {
+                                Image(systemName: "waveform")
+                                    .font(.system(size: 12))
+                                    .foregroundColor(DinoTheme.lavender)
+                                Text("ambient sounds")
+                                    .font(DinoTheme.captionFont())
+                                    .foregroundColor(DinoTheme.textSecondary)
+                            }
+                        }
+
+                        // Duration selector (before start)
+                        if !viewModel.isRunning {
+                            VStack(spacing: 12) {
+                                Text("session length")
+                                    .font(DinoTheme.captionFont())
+                                    .foregroundColor(DinoTheme.textSecondary)
+
+                                HStack(spacing: 8) {
+                                    ForEach(viewModel.durationOptions, id: \.seconds) { option in
+                                        Button(action: {
+                                            viewModel.selectedDuration = option.seconds
+                                        }) {
+                                            Text(option.label)
+                                                .font(DinoTheme.captionFont())
+                                                .fontWeight(.semibold)
+                                                .foregroundColor(viewModel.selectedDuration == option.seconds ? .white : DinoTheme.textPrimary)
+                                                .padding(.horizontal, 14)
+                                                .padding(.vertical, 10)
+                                                .background(
+                                                    viewModel.selectedDuration == option.seconds
+                                                        ? DinoTheme.lavender
+                                                        : DinoTheme.cardBackground
+                                                )
+                                                .cornerRadius(DinoTheme.cornerRadius)
+                                                .overlay(
+                                                    RoundedRectangle(cornerRadius: DinoTheme.cornerRadius)
+                                                        .stroke(
+                                                            viewModel.selectedDuration == option.seconds
+                                                                ? DinoTheme.lavender
+                                                                : DinoTheme.divider,
+                                                            lineWidth: 1
+                                                        )
+                                                )
+                                        }
+                                        .buttonStyle(ScaleButtonStyle())
+                                    }
+                                }
+                            }
+                        }
+
+                        Spacer()
+
+                        // Controls
+                        VStack(spacing: 12) {
+                            Button(action: {
+                                withAnimation {
+                                    if viewModel.isRunning {
+                                        viewModel.stop()
+                                    } else {
+                                        viewModel.start()
+                                    }
+                                }
+                            }) {
+                                Text(viewModel.isRunning ? "end session" : "begin")
+                                    .font(DinoTheme.headlineFont())
+                                    .foregroundColor(.white)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 18)
+                                    .background(viewModel.isRunning ? Color.red.opacity(0.7) : DinoTheme.lavender)
+                                    .cornerRadius(DinoTheme.largeCornerRadius)
+                            }
+                            .buttonStyle(ScaleButtonStyle())
+
+                            if viewModel.isRunning {
+                                Button(action: {
+                                    withAnimation {
+                                        if viewModel.isPaused {
+                                            viewModel.resume()
+                                        } else {
+                                            viewModel.pause()
+                                        }
+                                    }
+                                }) {
+                                    Text(viewModel.isPaused ? "resume" : "pause")
+                                        .font(DinoTheme.headlineFont())
+                                        .foregroundColor(DinoTheme.lavender)
+                                        .frame(maxWidth: .infinity)
+                                        .padding(.vertical, 16)
+                                        .background(DinoTheme.lavender.opacity(0.1))
+                                        .cornerRadius(DinoTheme.largeCornerRadius)
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: DinoTheme.largeCornerRadius)
+                                                .stroke(DinoTheme.lavender.opacity(0.4), lineWidth: 1.5)
+                                        )
+                                }
+                                .buttonStyle(ScaleButtonStyle())
+                            }
+                        }
+                        .padding(.horizontal, DinoTheme.padding)
+                        .padding(.bottom, 32)
+                    }
+                }
+            }
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button(action: { dismiss() }) {
+                        Image(systemName: "xmark")
+                            .font(DinoTheme.dinoFont(size: 16))
+                            .foregroundColor(DinoTheme.textSecondary)
+                    }
+                }
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    if viewModel.isRunning {
+                        Button(action: {
+                            if audio.isPlaying {
+                                audio.pause()
+                            } else {
+                                audio.resume()
+                            }
+                        }) {
+                            Image(systemName: audio.isPlaying ? "speaker.wave.2" : "speaker.slash")
+                                .font(.system(size: 14))
+                                .foregroundColor(DinoTheme.textSecondary.opacity(0.7))
+                        }
+                        .buttonStyle(ScaleButtonStyle())
+                    }
+                }
+            }
+        }
+        .onDisappear {
+            viewModel.stop()
+            AudioManager.shared.stop()
+        }
+    }
+}
+
+// MARK: - Pulsing Visual
+
+struct MeditationPulseView: View {
+    let isRunning: Bool
+    let isPaused: Bool
+
+    @State private var pulse: Bool = false
+
+    var body: some View {
+        ZStack {
+            // Outer pulse rings
+            ForEach(0..<3, id: \.self) { i in
+                Circle()
+                    .stroke(DinoTheme.lavender.opacity(0.15 - Double(i) * 0.04), lineWidth: 1.5)
+                    .frame(width: 160 + CGFloat(i * 30), height: 160 + CGFloat(i * 30))
+                    .scaleEffect(pulse && isRunning && !isPaused ? 1.15 : 1.0)
+                    .animation(
+                        isRunning && !isPaused
+                            ? .easeInOut(duration: 3.5).repeatForever(autoreverses: true).delay(Double(i) * 0.4)
+                            : .default,
+                        value: pulse
+                    )
+            }
+
+            // Core circle
+            Circle()
+                .fill(DinoTheme.lavender.opacity(0.2))
+                .frame(width: 140, height: 140)
+                .scaleEffect(pulse && isRunning && !isPaused ? 1.08 : 1.0)
+                .animation(
+                    isRunning && !isPaused
+                        ? .easeInOut(duration: 3.5).repeatForever(autoreverses: true)
+                        : .default,
+                    value: pulse
+                )
+
+            // Emoji
+            Text(isPaused ? "⏸" : "🧘")
+                .font(.system(size: isRunning ? 42 : 52))
+                .animation(.easeInOut(duration: 0.3), value: isRunning)
+        }
+        .frame(height: 220)
+        .onAppear {
+            pulse = true
+        }
+        .onChange(of: isRunning) { running in
+            pulse = running
+        }
+    }
+}
+
+// MARK: - Done Screen
+
+struct MeditationDoneScreen: View {
+    @ObservedObject var viewModel: MeditationViewModel
+    let onDismiss: () -> Void
+
+    var body: some View {
+        VStack(spacing: 28) {
+            Spacer()
+
+            Text("🧘")
+                .font(.system(size: 70))
+
+            VStack(spacing: 10) {
+                Text("well done")
+                    .font(DinoTheme.dinoDisplayFont(size: 28))
+                    .foregroundColor(DinoTheme.textPrimary)
+
+                Text("stillness found.")
+                    .font(DinoTheme.subheadlineFont())
+                    .foregroundColor(DinoTheme.textSecondary)
+                    .italic()
+            }
+
+            HStack(spacing: 20) {
+                StatPill(label: "meditated", value: viewModel.formattedElapsed, color: DinoTheme.lavender)
+                StatPill(label: "xp earned", value: "+20", color: DinoTheme.peach)
+            }
+
+            Spacer()
+
+            VStack(spacing: 12) {
+                Button(action: { viewModel.reset() }) {
+                    Text("meditate again")
+                        .font(DinoTheme.headlineFont())
+                        .foregroundColor(DinoTheme.lavender)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 16)
+                        .background(DinoTheme.lavender.opacity(0.1))
+                        .cornerRadius(DinoTheme.cornerRadius)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: DinoTheme.cornerRadius)
+                                .stroke(DinoTheme.lavender.opacity(0.4), lineWidth: 1.5)
+                        )
+                }
+                .buttonStyle(ScaleButtonStyle())
+
+                Button(action: onDismiss) {
+                    Text("done")
+                        .font(DinoTheme.headlineFont())
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 16)
+                        .background(DinoTheme.lavender)
+                        .cornerRadius(DinoTheme.cornerRadius)
+                }
+                .buttonStyle(ScaleButtonStyle())
+            }
+            .padding(.horizontal, DinoTheme.padding)
+            .padding(.bottom, 32)
+        }
+    }
+}
+
+// MARK: - MeditationViewModel
+
+@MainActor
+class MeditationViewModel: ObservableObject {
+    @Published var timeRemaining: Int = 300
+    @Published var selectedDuration: Int = 300
+    @Published var isRunning: Bool = false
+    @Published var isPaused: Bool = false
+    @Published var isDone: Bool = false
+    @Published var totalElapsed: Int = 0
+    @Published var currentMessage: String = "breathe and let go"
+
+    private var mainTimer: Timer?
+    private var messageTimer: Timer?
+    private var messageIndex: Int = 0
+
+    let durationOptions: [(label: String, seconds: Int)] = [
+        ("2 min", 120),
+        ("5 min", 300),
+        ("10 min", 600),
+        ("15 min", 900),
+        ("20 min", 1200)
+    ]
+
+    private let messages = DinoLiveActivityManager.calmingMessages
+    private let dataManager: SharedDataManager
+
+    init(dataManager: SharedDataManager) {
+        self.dataManager = dataManager
+    }
+
+    var sessionProgress: Double {
+        guard selectedDuration > 0 else { return 0 }
+        let elapsed = selectedDuration - timeRemaining
+        return min(1.0, Double(elapsed) / Double(selectedDuration))
+    }
+
+    var formattedTimeRemaining: String {
+        let m = timeRemaining / 60
+        let s = timeRemaining % 60
+        return String(format: "%02d:%02d", m, s)
+    }
+
+    var formattedElapsed: String {
+        let m = totalElapsed / 60
+        let s = totalElapsed % 60
+        return String(format: "%d min %02d sec", m, s)
+    }
+
+    func start() {
+        timeRemaining = selectedDuration
+        totalElapsed = 0
+        messageIndex = 0
+        currentMessage = messages.first ?? "breathe and let go"
+        isPaused = false
+        isDone = false
+        isRunning = true
+        startLiveActivity()
+        startMainTimer()
+        startMessageTimer()
+        AudioManager.shared.play(track: "meditation_ambient")
+        AudioManager.shared.fadeIn(duration: 2.0)
+    }
+
+    func stop() {
+        stopTimers()
+        isRunning = false
+        isPaused = false
+        endLiveActivity()
+        AudioManager.shared.stop()
+    }
+
+    func pause() {
+        guard isRunning && !isPaused else { return }
+        isPaused = true
+        stopTimers()
+        updateLiveActivity()
+        AudioManager.shared.pause()
+    }
+
+    func resume() {
+        guard isRunning && isPaused else { return }
+        isPaused = false
+        startMainTimer()
+        startMessageTimer()
+        AudioManager.shared.resume()
+    }
+
+    func reset() {
+        stop()
+        isDone = false
+        timeRemaining = selectedDuration
+        totalElapsed = 0
+    }
+
+    private func startMainTimer() {
+        mainTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                guard let self = self, !self.isPaused else { return }
+                self.timeRemaining -= 1
+                self.totalElapsed += 1
+                self.updateLiveActivity()
+                if self.timeRemaining <= 0 {
+                    self.finish()
+                }
+            }
+        }
+    }
+
+    private func startMessageTimer() {
+        messageTimer = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                guard let self = self, !self.isPaused else { return }
+                self.messageIndex = (self.messageIndex + 1) % self.messages.count
+                withAnimation(.easeInOut(duration: 0.8)) {
+                    self.currentMessage = self.messages[self.messageIndex]
+                }
+            }
+        }
+    }
+
+    private func stopTimers() {
+        mainTimer?.invalidate()
+        messageTimer?.invalidate()
+        mainTimer = nil
+        messageTimer = nil
+    }
+
+    private func finish() {
+        stopTimers()
+        isRunning = false
+        isPaused = false
+        isDone = true
+        endLiveActivity()
+        dataManager.logMeditationSession(MeditationSession(durationSeconds: totalElapsed, completed: true))
+    }
+
+    // MARK: - Live Activity
+
+    private func startLiveActivity() {
+        if #available(iOS 16.2, *) {
+            DinoLiveActivityManager.shared.startMeditationActivity(totalDuration: selectedDuration)
+        }
+    }
+
+    private func updateLiveActivity() {
+        if #available(iOS 16.2, *) {
+            DinoLiveActivityManager.shared.updateMeditationActivity(
+                secondsRemaining: timeRemaining,
+                message: currentMessage,
+                progress: sessionProgress,
+                isPaused: isPaused
+            )
+        }
+    }
+
+    private func endLiveActivity() {
+        if #available(iOS 16.2, *) {
+            DinoLiveActivityManager.shared.endMeditationActivity()
+        }
+    }
+}

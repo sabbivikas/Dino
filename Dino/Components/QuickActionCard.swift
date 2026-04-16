@@ -6,6 +6,8 @@
 import SwiftUI
 
 struct QuickActionCard: View {
+    @ObservedObject private var themeManager = ThemeManager.shared
+
     let icon: String
     let label: String
     let color: Color
@@ -14,9 +16,14 @@ struct QuickActionCard: View {
     var body: some View {
         Button(action: action) {
             VStack(spacing: 10) {
-                Image(systemName: icon)
-                    .font(.system(size: 26, weight: .medium))
-                    .foregroundColor(color)
+                ZStack {
+                    Circle()
+                        .fill(DinoTheme.iconCircleBackground)
+                        .frame(width: 48, height: 48)
+                    Image(systemName: icon)
+                        .font(DinoTheme.dinoFont(size: 22))
+                        .foregroundColor(color)
+                }
 
                 Text(label)
                     .font(DinoTheme.captionFont())
@@ -26,13 +33,11 @@ struct QuickActionCard: View {
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 18)
-            .background(
-                color.opacity(0.12)
-                    .cornerRadius(DinoTheme.cornerRadius)
-            )
+            .background(DinoTheme.surfacePrimary)
+            .cornerRadius(DinoTheme.cornerRadius)
             .overlay(
                 RoundedRectangle(cornerRadius: DinoTheme.cornerRadius)
-                    .stroke(color.opacity(0.25), lineWidth: 1)
+                    .strokeBorder(DinoTheme.cardBorder, lineWidth: 1)
             )
         }
         .buttonStyle(ScaleButtonStyle())

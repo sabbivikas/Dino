@@ -6,6 +6,8 @@
 import SwiftUI
 
 struct AssessmentView: View {
+    @ObservedObject private var themeManager = ThemeManager.shared
+
     @EnvironmentObject var dataManager: SharedDataManager
     @StateObject private var viewModel: AssessmentViewModel = AssessmentViewModel(dataManager: SharedDataManager.shared)
     @Environment(\.dismiss) private var dismiss
@@ -54,7 +56,7 @@ struct AssessmentView: View {
                     // Question
                     VStack(spacing: 32) {
                         Text(viewModel.currentQuestion.question)
-                            .font(.system(.title2, design: .rounded, weight: .semibold))
+                            .font(DinoTheme.dinoFont(size: 22))
                             .foregroundColor(DinoTheme.textPrimary)
                             .multilineTextAlignment(.center)
                             .padding(.horizontal, DinoTheme.largePadding)
@@ -155,7 +157,7 @@ struct AssessmentView: View {
                     .padding(.horizontal, DinoTheme.largePadding)
                     .padding(.bottom, 40)
                 }
-                .background(Color.white.ignoresSafeArea())
+                .background(DinoTheme.background.ignoresSafeArea())
                 .toolbar {
                     ToolbarItem(placement: .navigationBarTrailing) {
                         Button("cancel") { dismiss() }
@@ -192,7 +194,7 @@ struct AssessmentResultView: View {
                         .padding(.top, 24)
 
                     Text("check-in complete")
-                        .font(DinoTheme.largeFont())
+                        .font(DinoTheme.dinoDisplayFont(size: 28))
                         .foregroundColor(DinoTheme.textPrimary)
 
                     // Score ring
@@ -210,7 +212,7 @@ struct AssessmentResultView: View {
 
                         VStack(spacing: 2) {
                             Text("\(result.score)")
-                                .font(DinoTheme.largeFont())
+                                .font(DinoTheme.dinoDisplayFont(size: 28))
                                 .foregroundColor(DinoTheme.textPrimary)
                             Text("/ 25")
                                 .font(DinoTheme.captionFont())
@@ -279,6 +281,6 @@ struct AssessmentResultView: View {
                 .padding(.bottom, 32)
             }
         }
-        .background(Color.white.ignoresSafeArea())
+        .background(DinoTheme.background.ignoresSafeArea())
     }
 }

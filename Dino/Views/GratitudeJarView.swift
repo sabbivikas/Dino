@@ -5,109 +5,128 @@
 
 import SwiftUI
 
+// MARK: - Gratitude Icon Type
+// Each saved note becomes one of three cute icons inside the jar
+enum GratitudeIconType: Int, CaseIterable {
+    case heart = 0
+    case leaf = 1
+    case dino = 2
+    
+    var emoji: String {
+        switch self {
+        case .heart: return "🧡"
+        case .leaf: return "🍃"
+        case .dino: return "🦕"
+        }
+    }
+}
+
 struct GratitudeJarView: View {
+    @ObservedObject private var themeManager = ThemeManager.shared
+
     @EnvironmentObject var dataManager: SharedDataManager
     @StateObject private var viewModel: GratitudeViewModel = GratitudeViewModel(dataManager: SharedDataManager.shared)
+    @State private var newDropIndex: Int? = nil
 
     var body: some View {
         NavigationStack {
-            ZStack(alignment: .bottomTrailing) {
-                ScrollView {
-                    VStack(spacing: 24) {
-                        // Header
-                        VStack(spacing: 6) {
-                            Text("gratitude jar")
-                                .font(DinoTheme.largeFont())
-                                .foregroundColor(DinoTheme.textPrimary)
+            ZStack {
+                DinoTheme.background.ignoresSafeArea()
 
-                            HStack(spacing: 16) {
-                                Label("\(viewModel.totalCount) notes", systemImage: "note.text")
-                                    .font(DinoTheme.captionFont())
-                                    .foregroundColor(DinoTheme.textSecondary)
+                VStack(spacing: 0) {
+                    // Header
+                    VStack(spacing: 8) {
+                        Text("Gratitude Jar")
+                            .font(DinoTheme.dinoDisplayFont(size: 28))
+                            .foregroundColor(DinoTheme.textPrimary)
 
-                                Text("•")
-                                    .foregroundColor(DinoTheme.divider)
-
-                                Text("\(viewModel.todayCount) of \(viewModel.dailyGoal) today")
-                                    .font(DinoTheme.captionFont())
-                                    .foregroundColor(viewModel.todayCount >= viewModel.dailyGoal ? DinoTheme.sageGreen : DinoTheme.textSecondary)
-                                    .fontWeight(viewModel.todayCount >= viewModel.dailyGoal ? .semibold : .regular)
-                            }
-                        }
-                        .padding(.top, 8)
-
-                        // Congratulations banner
-                        if viewModel.showCongrats {
-                            HStack(spacing: 12) {
-                                Text("🎉")
-                                    .font(.system(size: 24))
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text("30 notes milestone!")
-                                        .font(DinoTheme.headlineFont())
-                                        .foregroundColor(DinoTheme.textPrimary)
-                                    Text("look how far you've come.")
-                                        .font(DinoTheme.captionFont())
-                                        .foregroundColor(DinoTheme.textSecondary)
-                                }
-                            }
-                            .padding(DinoTheme.padding)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(DinoTheme.peach.opacity(0.3))
-                            .cornerRadius(DinoTheme.cornerRadius)
-                            .padding(.horizontal, DinoTheme.padding)
-                        }
-
-                        // Jar illustration with slips
-                        JarIllustration(
-                            notes: viewModel.notes,
-                            fillRatio: viewModel.jarFillRatio,
-                            onNoteTap: { note in viewModel.selectNote(note) }
-                        )
-                        .padding(.horizontal, DinoTheme.padding)
-
-                        // Empty state
-                        if viewModel.notes.isEmpty {
-                            VStack(spacing: 12) {
-                                Text("add your first gratitude note")
-                                    .font(DinoTheme.bodyFont())
-                                    .foregroundColor(DinoTheme.textSecondary)
-                                Text("what are you grateful for today?")
-                                    .font(DinoTheme.captionFont())
-                                    .foregroundColor(DinoTheme.textSecondary.opacity(0.7))
-                            }
-                            .padding(.vertical, 8)
-                        }
-
-                        // Notes list
-                        if !viewModel.notes.isEmpty {
-                            VStack(alignment: .leading, spacing: 10) {
-                                Text("all notes")
-                                    .font(DinoTheme.headlineFont())
-                                    .foregroundColor(DinoTheme.textPrimary)
-                                    .padding(.horizontal, DinoTheme.padding)
-
-                                ForEach(Array(viewModel.notes.enumerated()), id: \.element.id) { i, note in
-                                    GratitudeNoteRow(note: note, index: i, onTap: {
-                                        viewModel.selectNote(note)
-                                    }, onDelete: {
-                                        viewModel.deleteNote(note)
-                                    })
-                                    .padding(.horizontal, DinoTheme.padding)
-                                }
-                            }
-                            .padding(.bottom, 80)
-                        }
+                        Text("Take a moment to reflect on grateful moments\nevery day. Let's bring positivity into our lives\nwith gratitude journaling!")
+                            .font(DinoTheme.dinoFont(size: 14))
+                            .foregroundColor(DinoTheme.textSecondary)
+                            .multilineTextAlignment(.center)
+                            .lineSpacing(3)
                     }
-                }
-                .background(Color.white.ignoresSafeArea())
-
-                // FAB
-                FloatingAddButton { viewModel.showAddSheet = true }
-                    .padding(.trailing, 20)
+                    .padding(.top, 16)
                     .padding(.bottom, 20)
+
+                    // Jar
+                    DinoJarView(
+                        notes: viewModel.notes,
+                        newDropIndex: newDropIndex,
+                        onNoteTap: { note in viewModel.selectNote(note) }
+                    )
+                    .frame(height: 340)
+                    .padding(.horizontal, 40)
+
+                    // Count badge
+                    ZStack {
+                        Circle()
+                            .fill(DinoTheme.surfacePrimary)
+                            .frame(width: 48, height: 48)
+                            .shadow(color: DinoTheme.shadowColor, radius: 8, y: 2)
+
+                        Text("\(viewModel.totalCount)")
+                            .font(DinoTheme.dinoFont(size: 18))
+                            .foregroundColor(DinoTheme.textPrimary)
+                    }
+                    .padding(.top, 12)
+
+                    // Today's progress
+                    HStack(spacing: 4) {
+                        Text("\(viewModel.todayCount)")
+                            .font(DinoTheme.dinoFont(size: 13))
+                            .foregroundColor(viewModel.todayCount >= viewModel.dailyGoal ? DinoTheme.sageGreen : DinoTheme.peach)
+                        Text("of \(viewModel.dailyGoal) today")
+                            .font(DinoTheme.dinoFont(size: 13))
+                            .foregroundColor(DinoTheme.textSecondary)
+                    }
+                    .padding(.top, 6)
+
+                    // Congratulations
+                    if viewModel.showCongrats {
+                        HStack(spacing: 8) {
+                            Text("🎉")
+                            Text("30 notes milestone!")
+                                .font(DinoTheme.dinoFont(size: 14))
+                                .foregroundColor(DinoTheme.peach)
+                        }
+                        .padding(.vertical, 10)
+                        .padding(.horizontal, 20)
+                        .background(DinoTheme.peach.opacity(0.15))
+                        .cornerRadius(20)
+                        .padding(.top, 10)
+                    }
+
+                    Spacer()
+
+                    // Write Gratitude button
+                    Button {
+                        viewModel.showAddSheet = true
+                    } label: {
+                        Text("Write Gratitude")
+                            .font(DinoTheme.dinoFont(size: 17))
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 16)
+                            .background(
+                                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                    .fill(DinoTheme.sageGreen)
+                            )
+                            .shadow(color: DinoTheme.sageGreen.opacity(0.3), radius: 8, y: 4)
+                    }
+                    .padding(.horizontal, DinoTheme.padding)
+                    .padding(.bottom, 16)
+                }
             }
             .sheet(isPresented: $viewModel.showAddSheet) {
-                AddGratitudeSheet(viewModel: viewModel)
+                AddGratitudeSheet(viewModel: viewModel, onSaved: {
+                    withAnimation(.spring(response: 0.6, dampingFraction: 0.7)) {
+                        newDropIndex = viewModel.notes.count - 1
+                    }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                        newDropIndex = nil
+                    }
+                })
             }
             .sheet(isPresented: $viewModel.showNoteDetail) {
                 if let note = viewModel.selectedNote {
@@ -120,141 +139,340 @@ struct GratitudeJarView: View {
     }
 }
 
-// MARK: - Jar Illustration
-struct JarIllustration: View {
+// MARK: - Dino Jar View (matching the sketch)
+
+struct DinoJarView: View {
     let notes: [GratitudeNote]
-    let fillRatio: Double
+    let newDropIndex: Int?
     let onNoteTap: (GratitudeNote) -> Void
 
     var body: some View {
-        ZStack(alignment: .bottom) {
-            // Jar body
-            ZStack(alignment: .bottom) {
-                // Jar background
-                RoundedRectangle(cornerRadius: 20)
-                    .fill(DinoTheme.skyBlue.opacity(0.08))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 20)
-                            .stroke(DinoTheme.skyBlue.opacity(0.3), lineWidth: 2)
+        GeometryReader { geo in
+            let jarWidth = geo.size.width
+            let jarHeight = geo.size.height
+
+            ZStack {
+                // Jar body
+                JarShape()
+                    .fill(DinoTheme.surfaceElevated.opacity(0.92))
+                
+                JarShape()
+                    .stroke(Color(hex: "#2C2C2C"), lineWidth: 3.5)
+
+                // Glass shine effect (left side)
+                Path { path in
+                    let x = jarWidth * 0.22
+                    path.move(to: CGPoint(x: x, y: jarHeight * 0.25))
+                    path.addCurve(
+                        to: CGPoint(x: x - 4, y: jarHeight * 0.65),
+                        control1: CGPoint(x: x - 8, y: jarHeight * 0.35),
+                        control2: CGPoint(x: x + 4, y: jarHeight * 0.55)
                     )
-
-                // Fill level
-                if fillRatio > 0 {
-                    VStack {
-                        Spacer()
-                        Rectangle()
-                            .fill(
-                                LinearGradient(
-                                    colors: [DinoTheme.sageGreen.opacity(0.12), DinoTheme.sageGreen.opacity(0.22)],
-                                    startPoint: .top,
-                                    endPoint: .bottom
-                                )
-                            )
-                            .frame(height: 260 * fillRatio)
-                            .cornerRadius(18)
-                    }
                 }
+                .stroke(Color.white.opacity(0.6), lineWidth: 3)
 
-                // Slips inside jar
-                ZStack {
-                    ForEach(Array(notes.prefix(12).enumerated()), id: \.element.id) { i, note in
-                        GratitudeSlip(note: note, index: i, onTap: { onNoteTap(note) })
-                            .offset(
-                                x: slipOffsetX(for: i),
-                                y: slipOffsetY(for: i, total: min(notes.count, 12))
-                            )
-                    }
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.bottom, 16)
-                .padding(.horizontal, 12)
+                // Green dotted fabric around neck
+                JarFabricView()
+                    .frame(width: jarWidth, height: jarHeight)
+
+                // Lid
+                JarLidView()
+                    .frame(width: jarWidth, height: jarHeight)
+
+                // Icons inside the jar
+                JarContentsView(
+                    notes: notes,
+                    jarWidth: jarWidth,
+                    jarHeight: jarHeight,
+                    newDropIndex: newDropIndex,
+                    onNoteTap: onNoteTap
+                )
             }
-            .frame(height: 260)
-
-            // Lid
-            VStack(spacing: 0) {
-                // Lid top
-                RoundedRectangle(cornerRadius: 6)
-                    .fill(DinoTheme.sageGreen.opacity(0.5))
-                    .frame(width: 60, height: 10)
-                    .offset(y: 5)
-
-                // Lid base
-                RoundedRectangle(cornerRadius: 4)
-                    .fill(DinoTheme.sageGreen.opacity(0.7))
-                    .frame(height: 16)
-            }
-            .offset(y: -260)
         }
-        .frame(height: 300)
-    }
-
-    private func slipOffsetX(for index: Int) -> CGFloat {
-        let positions: [CGFloat] = [-60, 30, -20, 50, -40, 10, -55, 40, -10, 60, -35, 20]
-        return index < positions.count ? positions[index] : CGFloat.random(in: -50...50)
-    }
-
-    private func slipOffsetY(for index: Int, total: Int) -> CGFloat {
-        let row = index / 3
-        let positions: [CGFloat] = [40, 0, -40, -80]
-        return row < positions.count ? positions[row] : CGFloat(row * -40)
     }
 }
 
-// MARK: - Note Row
-struct GratitudeNoteRow: View {
-    let note: GratitudeNote
-    let index: Int
-    let onTap: () -> Void
-    let onDelete: () -> Void
+// MARK: - Jar Shape
 
+struct JarShape: Shape {
+    func path(in rect: CGRect) -> Path {
+        let w = rect.width
+        let h = rect.height
+        
+        var path = Path()
+        
+        // Neck (top narrow part)
+        let neckLeft = w * 0.28
+        let neckRight = w * 0.72
+        let neckTop = h * 0.12
+        let shoulderY = h * 0.22
+        
+        // Body
+        let bodyLeft = w * 0.12
+        let bodyRight = w * 0.88
+        let bottomY = h * 0.88
+        let bottomRadius: CGFloat = 20
+        
+        path.move(to: CGPoint(x: neckLeft, y: neckTop))
+        
+        // Left side: neck → shoulder → body
+        path.addCurve(
+            to: CGPoint(x: bodyLeft, y: h * 0.35),
+            control1: CGPoint(x: neckLeft - 6, y: shoulderY),
+            control2: CGPoint(x: bodyLeft, y: h * 0.28)
+        )
+        
+        // Left body straight
+        path.addLine(to: CGPoint(x: bodyLeft, y: bottomY - bottomRadius))
+        
+        // Bottom left corner
+        path.addQuadCurve(
+            to: CGPoint(x: bodyLeft + bottomRadius, y: bottomY),
+            control: CGPoint(x: bodyLeft, y: bottomY)
+        )
+        
+        // Bottom
+        path.addLine(to: CGPoint(x: bodyRight - bottomRadius, y: bottomY))
+        
+        // Bottom right corner
+        path.addQuadCurve(
+            to: CGPoint(x: bodyRight, y: bottomY - bottomRadius),
+            control: CGPoint(x: bodyRight, y: bottomY)
+        )
+        
+        // Right body straight
+        path.addLine(to: CGPoint(x: bodyRight, y: h * 0.35))
+        
+        // Right side: body → shoulder → neck
+        path.addCurve(
+            to: CGPoint(x: neckRight, y: neckTop),
+            control1: CGPoint(x: bodyRight, y: h * 0.28),
+            control2: CGPoint(x: neckRight + 6, y: shoulderY)
+        )
+        
+        return path
+    }
+}
+
+// MARK: - Jar Fabric (green dotted band)
+
+struct JarFabricView: View {
     var body: some View {
-        Button(action: onTap) {
-            HStack(spacing: 12) {
-                RoundedRectangle(cornerRadius: 4)
-                    .fill(DinoTheme.pastel(for: index).opacity(0.5))
-                    .frame(width: 4, height: 44)
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(note.text)
-                        .font(DinoTheme.bodyFont())
-                        .foregroundColor(DinoTheme.textPrimary)
-                        .lineLimit(2)
-                    Text(note.createdAt.formatted(date: .abbreviated, time: .omitted))
-                        .font(DinoTheme.captionFont())
-                        .foregroundColor(DinoTheme.textSecondary)
+        GeometryReader { geo in
+            let w = geo.size.width
+            let h = geo.size.height
+            let fabricY = h * 0.17
+            
+            ZStack {
+                // Main fabric band
+                Path { path in
+                    let left = w * 0.22
+                    let right = w * 0.78
+                    path.move(to: CGPoint(x: left, y: fabricY))
+                    path.addLine(to: CGPoint(x: right, y: fabricY))
+                    path.addLine(to: CGPoint(x: right + 10, y: fabricY + 14))
+                    // Scalloped bottom edge
+                    let steps = 6
+                    let stepWidth = (right + 10 - (left - 10)) / CGFloat(steps)
+                    for i in 0..<steps {
+                        let xStart = right + 10 - CGFloat(i) * stepWidth
+                        let xEnd = xStart - stepWidth
+                        let midX = (xStart + xEnd) / 2
+                        path.addQuadCurve(
+                            to: CGPoint(x: xEnd, y: fabricY + 14),
+                            control: CGPoint(x: midX, y: fabricY + 24)
+                        )
+                    }
+                    path.closeSubpath()
                 }
-
-                Spacer()
-
-                Button(action: onDelete) {
-                    Image(systemName: "trash")
-                        .font(.system(size: 14))
-                        .foregroundColor(DinoTheme.textSecondary.opacity(0.5))
+                .fill(Color(hex: "#4CAF7D").opacity(0.75))
+                
+                // Dots pattern on fabric
+                ForEach(0..<8, id: \.self) { i in
+                    Circle()
+                        .fill(Color(hex: "#3D9669").opacity(0.5))
+                        .frame(width: 3, height: 3)
+                        .offset(
+                            x: -w * 0.2 + CGFloat(i) * (w * 0.5 / 8),
+                            y: fabricY - geo.size.height / 2 + 7
+                        )
                 }
             }
-            .padding(14)
-            .background(DinoTheme.cardBackground)
-            .cornerRadius(DinoTheme.cornerRadius)
         }
-        .buttonStyle(ScaleButtonStyle())
+    }
+}
+
+// MARK: - Jar Lid
+
+struct JarLidView: View {
+    var body: some View {
+        GeometryReader { geo in
+            let w = geo.size.width
+            let h = geo.size.height
+            let lidY = h * 0.06
+            
+            // Lid
+            ZStack {
+                // Lid body
+                RoundedRectangle(cornerRadius: 4, style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            colors: [Color(hex: "#A0A0A0"), Color(hex: "#888888"), Color(hex: "#A8A8A8")],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+                    .frame(width: w * 0.5, height: h * 0.07)
+                    .position(x: w * 0.5, y: lidY + h * 0.035)
+                
+                // Lid outline
+                RoundedRectangle(cornerRadius: 4, style: .continuous)
+                    .stroke(Color(hex: "#2C2C2C"), lineWidth: 2.5)
+                    .frame(width: w * 0.5, height: h * 0.07)
+                    .position(x: w * 0.5, y: lidY + h * 0.035)
+                
+                // Small bumps on lid edge
+                ForEach(0..<3, id: \.self) { i in
+                    Circle()
+                        .fill(Color(hex: "#2C2C2C"))
+                        .frame(width: 4, height: 4)
+                        .position(
+                            x: w * 0.35 + CGFloat(i) * w * 0.15,
+                            y: lidY + h * 0.065
+                        )
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Jar Contents (icons inside)
+
+struct JarContentsView: View {
+    let notes: [GratitudeNote]
+    let jarWidth: CGFloat
+    let jarHeight: CGFloat
+    let newDropIndex: Int?
+    let onNoteTap: (GratitudeNote) -> Void
+
+    var body: some View {
+        let displayNotes = Array(notes.prefix(30))
+        
+        ForEach(Array(displayNotes.enumerated()), id: \.element.id) { i, note in
+            let iconType = GratitudeIconType(rawValue: i % 3) ?? .heart
+            let pos = iconPosition(index: i, total: displayNotes.count)
+            let isNew = newDropIndex == i
+            
+            Button {
+                onNoteTap(note)
+            } label: {
+                JarIcon(type: iconType)
+            }
+            .buttonStyle(.plain)
+            .position(x: jarWidth * pos.x, y: jarHeight * pos.y)
+            .rotationEffect(.degrees(iconRotation(index: i)))
+            .offset(y: isNew ? -200 : 0)
+            .animation(
+                isNew ? .spring(response: 0.6, dampingFraction: 0.5).delay(0.1) : .default,
+                value: isNew
+            )
+        }
+    }
+
+    private func iconPosition(index: Int, total: Int) -> (x: CGFloat, y: CGFloat) {
+        // Fill from bottom up, scattered naturally
+        let row = index / 4
+        let col = index % 4
+        
+        let baseY: CGFloat = 0.82 - CGFloat(row) * 0.1
+        let yJitter = CGFloat.random(in: -0.02...0.02)
+        let y = max(0.35, min(baseY + yJitter, 0.85))
+        
+        let xPositions: [CGFloat] = [0.28, 0.42, 0.58, 0.72]
+        let xJitter = CGFloat.random(in: -0.04...0.04)
+        let x = xPositions[col] + xJitter
+        
+        return (x, y)
+    }
+
+    private func iconRotation(index: Int) -> Double {
+        let rotations: [Double] = [-15, 8, -5, 12, -10, 3, -8, 15, -3, 10, -12, 5]
+        return rotations[index % rotations.count]
+    }
+}
+
+// MARK: - Jar Icon (heart / leaf / dino)
+
+struct JarIcon: View {
+    let type: GratitudeIconType
+
+    var body: some View {
+        Group {
+            switch type {
+            case .heart:
+                HeartIcon()
+            case .leaf:
+                LeafIcon()
+            case .dino:
+                DinoIcon()
+            }
+        }
+        .frame(width: 32, height: 32)
+    }
+}
+
+// Orange heart with outline
+struct HeartIcon: View {
+    var body: some View {
+        ZStack {
+            Image(systemName: "heart.fill")
+                .font(DinoTheme.dinoFont(size: 24))
+                .foregroundColor(Color(hex: "#E8935A"))
+            Image(systemName: "heart")
+                .font(DinoTheme.dinoFont(size: 24))
+                .foregroundColor(Color(hex: "#C47840"))
+        }
+    }
+}
+
+// Green leaf
+struct LeafIcon: View {
+    var body: some View {
+        ZStack {
+            Image(systemName: "leaf.fill")
+                .font(DinoTheme.dinoFont(size: 22))
+                .foregroundColor(Color(hex: "#7DB86A"))
+            Image(systemName: "leaf")
+                .font(DinoTheme.dinoFont(size: 22))
+                .foregroundColor(Color(hex: "#5A9648"))
+        }
+    }
+}
+
+// Cute mini dino
+struct DinoIcon: View {
+    var body: some View {
+        Text("🦕")
+            .font(DinoTheme.dinoFont(size: 22))
     }
 }
 
 // MARK: - Add Gratitude Sheet
+
 struct AddGratitudeSheet: View {
     @ObservedObject var viewModel: GratitudeViewModel
     @FocusState private var focused: Bool
+    var onSaved: (() -> Void)? = nil
 
     var body: some View {
         NavigationStack {
             VStack(spacing: 24) {
                 VStack(spacing: 8) {
                     Text("add to your jar")
-                        .font(DinoTheme.titleFont())
+                        .font(DinoTheme.dinoFont(size: 22))
                         .foregroundColor(DinoTheme.textPrimary)
                     Text("what are you grateful for right now?")
-                        .font(DinoTheme.subheadlineFont())
+                        .font(DinoTheme.dinoFont(size: 15))
                         .foregroundColor(DinoTheme.textSecondary)
                 }
                 .padding(.top, 8)
@@ -287,20 +505,33 @@ struct AddGratitudeSheet: View {
                 )
 
                 HStack {
+                    // Icon preview
+                    HStack(spacing: 8) {
+                        HeartIcon().frame(width: 20, height: 20).scaleEffect(0.7)
+                        LeafIcon().frame(width: 20, height: 20).scaleEffect(0.7)
+                        DinoIcon().frame(width: 20, height: 20).scaleEffect(0.7)
+                    }
                     Spacer()
                     Text("\(viewModel.newNoteText.count)/200")
                         .font(DinoTheme.captionFont())
                         .foregroundColor(DinoTheme.textSecondary)
                 }
 
-                Button(action: { viewModel.addNote() }) {
+                Button(action: {
+                    viewModel.addNote()
+                    onSaved?()
+                }) {
                     Text("add to jar 🫙")
-                        .font(DinoTheme.headlineFont())
+                        .font(DinoTheme.dinoFont(size: 17))
                         .foregroundColor(.white)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 16)
-                        .background(viewModel.newNoteText.trimmingCharacters(in: .whitespaces).isEmpty ? DinoTheme.textSecondary : DinoTheme.sageGreen)
-                        .cornerRadius(DinoTheme.cornerRadius)
+                        .background(
+                            viewModel.newNoteText.trimmingCharacters(in: .whitespaces).isEmpty
+                                ? Color.gray.opacity(0.3)
+                                : DinoTheme.sageGreen
+                        )
+                        .cornerRadius(16)
                 }
                 .buttonStyle(ScaleButtonStyle())
                 .disabled(viewModel.newNoteText.trimmingCharacters(in: .whitespaces).isEmpty)
@@ -323,6 +554,7 @@ struct AddGratitudeSheet: View {
 }
 
 // MARK: - Note Detail Sheet
+
 struct GratitudeNoteDetail: View {
     let note: GratitudeNote
     @Environment(\.dismiss) private var dismiss
@@ -334,7 +566,7 @@ struct GratitudeNoteDetail: View {
                 .padding(.top, 32)
 
             Text(note.text)
-                .font(.system(.title3, design: .rounded))
+                .font(DinoTheme.dinoFont(size: 20))
                 .foregroundColor(DinoTheme.textPrimary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 32)

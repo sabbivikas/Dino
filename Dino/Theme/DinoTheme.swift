@@ -5,21 +5,37 @@
 
 import SwiftUI
 
+@MainActor
 struct DinoTheme {
-    // MARK: - Colors
-    static let background = Color.white
-    static let sageGreen = Color(hex: "#A8C5A0")
-    static let lavender = Color(hex: "#C4B8D4")
-    static let peach = Color(hex: "#F5C6AA")
-    static let skyBlue = Color(hex: "#A8D4E6")
+    // MARK: - Colors (reactive — delegate to ThemeManager)
+    private static var theme: ThemeColors { ThemeManager.shared.currentTheme.colors }
+
+    static var background: Color    { theme.background }
+    static var sageGreen: Color     { theme.accent }       // accent color
+    static var accent: Color        { theme.accent }
+    static var lavender: Color      { theme.secondary }    // secondary color
+    static var textPrimary: Color   { theme.textPrimary }
+    static var textSecondary: Color { theme.textSecondary }
+    static var cardBackground: Color { theme.cardBackground }
+    static var divider: Color       { theme.divider }
+
+    // Extended surface tokens
+    static var surfacePrimary: Color   { theme.surfacePrimary }
+    static var surfaceSecondary: Color { theme.surfaceSecondary }
+    static var surfaceElevated: Color  { theme.surfaceElevated }
+    static var cardBorder: Color       { theme.cardBorder }
+    static var navBackground: Color    { theme.navBackground }
+    static var navIconDefault: Color   { theme.navIconDefault }
+    static var navIconSelected: Color  { theme.navIconSelected }
+    static var iconCircleBackground: Color { theme.iconCircleBackground }
+
+    // Fixed accent colors (unchanged across themes)
+    static let peach    = Color(hex: "#F5C6AA")
+    static let skyBlue  = Color(hex: "#A8D4E6")
     static let warmRose = Color(hex: "#E8B4B8")
-    static let textPrimary = Color(hex: "#2D3142")
-    static let textSecondary = Color(hex: "#6B7280")
-    static let cardBackground = Color(hex: "#F9FAFB")
-    static let divider = Color(hex: "#E5E7EB")
 
     // MARK: - Pastel Array
-    static let pastels: [Color] = [sageGreen, lavender, peach, skyBlue, warmRose]
+    static var pastels: [Color] { [sageGreen, lavender, peach, skyBlue, warmRose] }
 
     static func pastel(for index: Int) -> Color {
         pastels[index % pastels.count]
@@ -30,7 +46,7 @@ struct DinoTheme {
         EmptyView()
     }
 
-    static let shadowColor = Color.black.opacity(0.04)
+    static var shadowColor: Color { theme.shadowColor }
     static let shadowRadius: CGFloat = 12
     static let shadowY: CGFloat = 4
 
@@ -42,33 +58,63 @@ struct DinoTheme {
     static let padding: CGFloat = 20
     static let largePadding: CGFloat = 24
 
-    // MARK: - Typography
+    // MARK: - Custom Font
+    // DinoInitiativeFont — custom handwritten font used app-wide
+    // Note: font has no digits, so numericFont() uses system rounded for numbers only
+    static let customFontName = "DinoInitiativeFont-Regular"
+
+    // MARK: - Typography (all Dino custom font)
+    static func largeFont() -> Font {
+        .custom(customFontName, size: 34)
+    }
+
     static func titleFont() -> Font {
-        .system(.title2, design: .rounded, weight: .bold)
+        .custom(customFontName, size: 22)
     }
 
     static func headlineFont() -> Font {
-        .system(.headline, design: .rounded, weight: .semibold)
+        .custom(customFontName, size: 17)
     }
 
     static func bodyFont() -> Font {
-        .system(.body, design: .rounded)
-    }
-
-    static func captionFont() -> Font {
-        .system(.caption, design: .rounded)
-    }
-
-    static func caption2Font() -> Font {
-        .system(.caption2, design: .rounded)
-    }
-
-    static func largeFont() -> Font {
-        .system(.largeTitle, design: .rounded, weight: .bold)
+        .custom(customFontName, size: 17)
     }
 
     static func subheadlineFont() -> Font {
-        .system(.subheadline, design: .rounded)
+        .custom(customFontName, size: 15)
+    }
+
+    static func captionFont() -> Font {
+        .custom(customFontName, size: 12)
+    }
+
+    static func caption2Font() -> Font {
+        .custom(customFontName, size: 11)
+    }
+
+    /// Convenience for arbitrary sizes
+    static func dinoFont(size: CGFloat) -> Font {
+        .custom(customFontName, size: size)
+    }
+
+    /// Display titles (large)
+    static func dinoDisplayFont(size: CGFloat = 28) -> Font {
+        .custom(customFontName, size: size)
+    }
+
+    /// Section headers
+    static func dinoHeaderFont(size: CGFloat = 22) -> Font {
+        .custom(customFontName, size: size)
+    }
+
+    /// Labels
+    static func dinoLabelFont(size: CGFloat = 16) -> Font {
+        .custom(customFontName, size: size)
+    }
+
+    /// For numeric-only content (digits, sliders, counts) — system rounded since custom font lacks digits
+    static func numericFont(size: CGFloat = 17) -> Font {
+        .system(size: size, weight: .semibold, design: .rounded)
     }
 }
 
@@ -76,15 +122,24 @@ struct DinoTheme {
 extension View {
     func dinoCard() -> some View {
         self
-            .background(DinoTheme.cardBackground)
+            .background(DinoTheme.surfacePrimary)
             .cornerRadius(DinoTheme.cornerRadius)
+            .overlay(
+                RoundedRectangle(cornerRadius: DinoTheme.cornerRadius)
+                    .strokeBorder(DinoTheme.cardBorder, lineWidth: 1)
+            )
             .shadow(color: DinoTheme.shadowColor, radius: DinoTheme.shadowRadius, y: DinoTheme.shadowY)
     }
 
     func dinoCardWhite() -> some View {
+        // Uses surfacePrimary instead of hard-coded white
         self
-            .background(Color.white)
+            .background(DinoTheme.surfacePrimary)
             .cornerRadius(DinoTheme.cornerRadius)
+            .overlay(
+                RoundedRectangle(cornerRadius: DinoTheme.cornerRadius)
+                    .strokeBorder(DinoTheme.cardBorder, lineWidth: 1)
+            )
             .shadow(color: DinoTheme.shadowColor, radius: DinoTheme.shadowRadius, y: DinoTheme.shadowY)
     }
 }

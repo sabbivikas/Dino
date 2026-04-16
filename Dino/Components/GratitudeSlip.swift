@@ -6,6 +6,8 @@
 import SwiftUI
 
 struct GratitudeSlip: View {
+    @ObservedObject private var themeManager = ThemeManager.shared
+
     let note: GratitudeNote
     let index: Int
     let onTap: () -> Void
@@ -32,7 +34,7 @@ struct GratitudeSlip: View {
             .frame(width: 90, height: 60)
             .background(color.opacity(0.6))
             .cornerRadius(6)
-            .shadow(color: .black.opacity(0.06), radius: 4, y: 2)
+            .shadow(color: DinoTheme.shadowColor, radius: 4, y: 2)
             .rotationEffect(.degrees(rotation))
         }
         .buttonStyle(ScaleButtonStyle())

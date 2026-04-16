@@ -45,6 +45,12 @@ final class SharedDataManager: ObservableObject {
     @Published var breathingSessions: [BreathingSession] {
         didSet { save(breathingSessions, forKey: "breathingSessions") }
     }
+    @Published var focusSessions: [FocusSession] {
+        didSet { save(focusSessions, forKey: "focusSessions") }
+    }
+    @Published var meditationSessions: [MeditationSession] {
+        didSet { save(meditationSessions, forKey: "meditationSessions") }
+    }
     @Published var assessmentResults: [AssessmentResult] {
         didSet { save(assessmentResults, forKey: "assessmentResults") }
     }
@@ -56,6 +62,18 @@ final class SharedDataManager: ObservableObject {
     }
     @Published var dinoSkin: String {
         didSet { defaults.set(dinoSkin, forKey: "dinoSkin") }
+    }
+    @Published var dinoName: String {
+        didSet { defaults.set(dinoName, forKey: "dinoName") }
+    }
+    @Published var userFeeling: String {
+        didSet { defaults.set(userFeeling, forKey: "userFeeling") }
+    }
+    @Published var userChallenge: String {
+        didSet { defaults.set(userChallenge, forKey: "userChallenge") }
+    }
+    @Published var referralSource: String {
+        didSet { defaults.set(referralSource, forKey: "referralSource") }
     }
 
     // MARK: - Deep Link State
@@ -87,6 +105,10 @@ final class SharedDataManager: ObservableObject {
         self.userName = ud.string(forKey: "userName") ?? ""
         self.userTimezone = ud.string(forKey: "userTimezone") ?? TimeZone.current.identifier
         self.dinoSkin = ud.string(forKey: "dinoSkin") ?? "default"
+        self.dinoName = ud.string(forKey: "dinoName") ?? "Dino"
+        self.userFeeling = ud.string(forKey: "userFeeling") ?? ""
+        self.userChallenge = ud.string(forKey: "userChallenge") ?? ""
+        self.referralSource = ud.string(forKey: "referralSource") ?? ""
 
         self.userIntentions = Self.load([String].self, from: ud, key: "userIntentions") ?? []
         self.moodEntries = Self.load([MoodEntry].self, from: ud, key: "moodEntries") ?? []
@@ -94,6 +116,8 @@ final class SharedDataManager: ObservableObject {
         self.gratitudeNotes = Self.load([GratitudeNote].self, from: ud, key: "gratitudeNotes") ?? []
         self.savedAffirmations = Self.load([SavedAffirmation].self, from: ud, key: "savedAffirmations") ?? []
         self.breathingSessions = Self.load([BreathingSession].self, from: ud, key: "breathingSessions") ?? []
+        self.focusSessions = Self.load([FocusSession].self, from: ud, key: "focusSessions") ?? []
+        self.meditationSessions = Self.load([MeditationSession].self, from: ud, key: "meditationSessions") ?? []
         self.assessmentResults = Self.load([AssessmentResult].self, from: ud, key: "assessmentResults") ?? []
         self.streakData = Self.load(StreakData.self, from: ud, key: "streakData") ?? StreakData()
         self.growthStats = Self.load(GrowthStats.self, from: ud, key: "growthStats") ?? GrowthStats()
@@ -116,12 +140,19 @@ final class SharedDataManager: ObservableObject {
     // MARK: - Activity Tracking
     func recordActivity() {
         updateStreak()
+        FirestoreSyncService.shared.scheduleSyncToCloud()
     }
 
     private func updateStreak() {
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: Date())
         let lastActive = calendar.startOfDay(for: streakData.lastActiveDate)
+
+        // Always record today as active
+        let todayKey = StreakData.dateKey(for: today)
+        if !streakData.activeDates.contains(todayKey) {
+            streakData.activeDates.insert(todayKey)
+        }
 
         if calendar.isDate(today, inSameDayAs: lastActive) {
             return
@@ -168,6 +199,7 @@ final class SharedDataManager: ObservableObject {
     func deleteJournalEntry(_ entry: JournalEntry) {
         journalEntries.removeAll { $0.id == entry.id }
         deleteAudioFile(named: entry.audioFileName)
+        FirestoreSyncService.shared.scheduleSyncToCloud()
     }
 
     func toggleFavoriteJournal(_ entry: JournalEntry) {
@@ -196,6 +228,7 @@ final class SharedDataManager: ObservableObject {
 
     func deleteGratitudeNote(_ note: GratitudeNote) {
         gratitudeNotes.removeAll { $0.id == note.id }
+        FirestoreSyncService.shared.scheduleSyncToCloud()
     }
 
     var todayGratitudeCount: Int {
@@ -207,11 +240,13 @@ final class SharedDataManager: ObservableObject {
     func saveAffirmation(_ text: String) {
         if !savedAffirmations.contains(where: { $0.text == text }) {
             savedAffirmations.insert(SavedAffirmation(text: text), at: 0)
+            FirestoreSyncService.shared.scheduleSyncToCloud()
         }
     }
 
     func removeAffirmation(_ text: String) {
         savedAffirmations.removeAll { $0.text == text }
+        FirestoreSyncService.shared.scheduleSyncToCloud()
     }
 
     func isAffirmationSaved(_ text: String) -> Bool {
@@ -222,6 +257,20 @@ final class SharedDataManager: ObservableObject {
     func logBreathingSession(_ session: BreathingSession) {
         breathingSessions.insert(session, at: 0)
         addXP(20)
+        recordActivity()
+    }
+
+    // MARK: - Focus
+    func logFocusSession(_ session: FocusSession) {
+        focusSessions.insert(session, at: 0)
+        if session.completed { addXP(25) }
+        recordActivity()
+    }
+
+    // MARK: - Meditation
+    func logMeditationSession(_ session: MeditationSession) {
+        meditationSessions.insert(session, at: 0)
+        if session.completed { addXP(20) }
         recordActivity()
     }
 
@@ -279,10 +328,16 @@ final class SharedDataManager: ObservableObject {
         gratitudeNotes = []
         savedAffirmations = []
         breathingSessions = []
+        focusSessions = []
+        meditationSessions = []
         assessmentResults = []
         streakData = StreakData()
         growthStats = GrowthStats()
         dinoSkin = "default"
+        dinoName = "Dino"
+        userFeeling = ""
+        userChallenge = ""
+        referralSource = ""
         selfCareWater = false
         selfCareEat = false
         selfCareRest = false

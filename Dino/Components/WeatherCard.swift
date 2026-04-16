@@ -6,6 +6,8 @@
 import SwiftUI
 
 struct WeatherCard: View {
+    @ObservedObject private var themeManager = ThemeManager.shared
+
     let weather: EmotionalWeather
     let isSelected: Bool
     let onTap: () -> Void
@@ -14,7 +16,7 @@ struct WeatherCard: View {
         Button(action: onTap) {
             VStack(spacing: 8) {
                 Text(weather.emoji)
-                    .font(.system(size: 32))
+                    .font(DinoTheme.dinoFont(size: 32))
 
                 Text(weather.label)
                     .font(DinoTheme.captionFont())
@@ -26,14 +28,14 @@ struct WeatherCard: View {
             .padding(.vertical, 16)
             .background(
                 isSelected
-                    ? Color(hex: weather.color).opacity(0.3)
-                    : DinoTheme.cardBackground
+                    ? Color(hex: weather.color).opacity(0.25)
+                    : DinoTheme.surfacePrimary
             )
             .cornerRadius(DinoTheme.cornerRadius)
             .overlay(
                 RoundedRectangle(cornerRadius: DinoTheme.cornerRadius)
-                    .stroke(
-                        isSelected ? Color(hex: weather.color) : DinoTheme.divider,
+                    .strokeBorder(
+                        isSelected ? Color(hex: weather.color) : DinoTheme.cardBorder,
                         lineWidth: isSelected ? 2 : 1
                     )
             )

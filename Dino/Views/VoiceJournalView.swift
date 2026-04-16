@@ -8,6 +8,8 @@ import UIKit
 import AVFoundation
 
 struct VoiceJournalView: View {
+    @ObservedObject private var themeManager = ThemeManager.shared
+
     @EnvironmentObject var dataManager: SharedDataManager
     @StateObject private var viewModel: JournalViewModel = JournalViewModel(dataManager: SharedDataManager.shared)
     @State private var pulseScale: CGFloat = 1.0
@@ -19,7 +21,7 @@ struct VoiceJournalView: View {
                 // Header
                 VStack(spacing: 4) {
                     Text("your voice journal")
-                        .font(DinoTheme.largeFont())
+                        .font(DinoTheme.dinoDisplayFont(size: 28))
                         .foregroundColor(DinoTheme.textPrimary)
                     Text("speak your thoughts freely")
                         .font(DinoTheme.subheadlineFont())
@@ -63,7 +65,7 @@ struct VoiceJournalView: View {
                                     )
 
                                 Image(systemName: viewModel.isRecording ? "stop.fill" : "mic.fill")
-                                    .font(.system(size: 30, weight: .semibold))
+                                    .font(DinoTheme.dinoFont(size: 30))
                                     .foregroundColor(.white)
                             }
                         }
@@ -79,7 +81,7 @@ struct VoiceJournalView: View {
 
                     if viewModel.isRecording {
                         Text(viewModel.formattedRecordingDuration)
-                            .font(.system(.title2, design: .monospaced, weight: .bold))
+                            .font(DinoTheme.numericFont(size: 22))
                             .foregroundColor(.red)
                             .transition(.opacity)
                     } else {
@@ -118,7 +120,7 @@ struct VoiceJournalView: View {
                             )
                             .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
                             .listRowSeparator(.hidden)
-                            .listRowBackground(Color.white)
+                            .listRowBackground(DinoTheme.surfacePrimary)
                             .swipeActions(edge: .leading) {
                                 Button {
                                     viewModel.toggleFavorite(entry)
@@ -140,7 +142,7 @@ struct VoiceJournalView: View {
                     .listStyle(.plain)
                 }
             }
-            .background(Color.white.ignoresSafeArea())
+            .background(DinoTheme.background.ignoresSafeArea())
             .alert("Microphone Access Needed", isPresented: $showPermissionAlert) {
                 Button("Open Settings") {
                     if let url = URL(string: UIApplication.openSettingsURLString) {
@@ -183,7 +185,7 @@ struct JournalEntryRow: View {
                         .frame(width: 46, height: 46)
 
                     Image(systemName: isPlaying ? "pause.fill" : "play.fill")
-                        .font(.system(size: 14, weight: .semibold))
+                        .font(DinoTheme.dinoFont(size: 14))
                         .foregroundColor(isPlaying ? .white : DinoTheme.sageGreen)
                 }
             }
@@ -223,7 +225,7 @@ struct JournalEntryRow: View {
 
             if entry.isFavorite {
                 Image(systemName: "star.fill")
-                    .font(.system(size: 14))
+                    .font(DinoTheme.dinoFont(size: 14))
                     .foregroundColor(.yellow)
             }
         }

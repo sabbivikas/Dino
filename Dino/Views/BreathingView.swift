@@ -6,14 +6,17 @@
 import SwiftUI
 
 struct BreathingView: View {
+    @ObservedObject private var themeManager = ThemeManager.shared
+
     @EnvironmentObject var dataManager: SharedDataManager
     @StateObject private var viewModel: BreathingViewModel = BreathingViewModel(dataManager: SharedDataManager.shared)
+    @StateObject private var audio = AudioManager.shared
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         NavigationStack {
             ZStack {
-                Color.white.ignoresSafeArea()
+                DinoTheme.background.ignoresSafeArea()
 
                 if viewModel.phase == .done {
                     DoneScreen(viewModel: viewModel, onDismiss: { dismiss() })
@@ -23,7 +26,7 @@ struct BreathingView: View {
                         // Header
                         VStack(spacing: 6) {
                             Text("breathe")
-                                .font(DinoTheme.largeFont())
+                                .font(DinoTheme.dinoDisplayFont(size: 28))
                                 .foregroundColor(DinoTheme.textPrimary)
                             Text("slow down, you're safe here")
                                 .font(DinoTheme.subheadlineFont())
@@ -42,9 +45,16 @@ struct BreathingView: View {
                         // Timer
                         if viewModel.isRunning {
                             Text(viewModel.formattedTimeRemaining)
-                                .font(.system(.title2, design: .monospaced, weight: .semibold))
+                                .font(DinoTheme.numericFont(size: 22))
                                 .foregroundColor(DinoTheme.textPrimary)
                                 .transition(.opacity)
+                        }
+
+                        // Cycle indicator while running
+                        if viewModel.isRunning {
+                            Text("cycle \(viewModel.currentCycle) of \(viewModel.totalCycles)")
+                                .font(DinoTheme.captionFont())
+                                .foregroundColor(DinoTheme.textSecondary)
                         }
 
                         // Duration selector (before start)
@@ -100,25 +110,54 @@ struct BreathingView: View {
 
                         Spacer()
 
-                        // Start / Stop button
-                        Button(action: {
-                            withAnimation {
-                                if viewModel.isRunning {
-                                    viewModel.stop()
-                                } else {
-                                    viewModel.start()
+                        // Controls
+                        VStack(spacing: 12) {
+                            // Start / Stop button
+                            Button(action: {
+                                withAnimation {
+                                    if viewModel.isRunning {
+                                        viewModel.stop()
+                                    } else {
+                                        viewModel.start()
+                                    }
                                 }
+                            }) {
+                                Text(viewModel.isRunning ? "stop" : "begin")
+                                    .font(DinoTheme.headlineFont())
+                                    .foregroundColor(.white)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 18)
+                                    .background(viewModel.isRunning ? Color.red.opacity(0.8) : DinoTheme.sageGreen)
+                                    .cornerRadius(DinoTheme.largeCornerRadius)
                             }
-                        }) {
-                            Text(viewModel.isRunning ? "stop" : "begin")
-                                .font(DinoTheme.headlineFont())
-                                .foregroundColor(.white)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 18)
-                                .background(viewModel.isRunning ? Color.red.opacity(0.8) : DinoTheme.sageGreen)
-                                .cornerRadius(DinoTheme.largeCornerRadius)
+                            .buttonStyle(ScaleButtonStyle())
+
+                            // Pause / Resume button (only when running)
+                            if viewModel.isRunning {
+                                Button(action: {
+                                    withAnimation {
+                                        if viewModel.isPaused {
+                                            viewModel.resume()
+                                        } else {
+                                            viewModel.pause()
+                                        }
+                                    }
+                                }) {
+                                    Text(viewModel.isPaused ? "resume" : "pause")
+                                        .font(DinoTheme.headlineFont())
+                                        .foregroundColor(DinoTheme.sageGreen)
+                                        .frame(maxWidth: .infinity)
+                                        .padding(.vertical, 16)
+                                        .background(DinoTheme.sageGreen.opacity(0.1))
+                                        .cornerRadius(DinoTheme.largeCornerRadius)
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: DinoTheme.largeCornerRadius)
+                                                .stroke(DinoTheme.sageGreen.opacity(0.4), lineWidth: 1.5)
+                                        )
+                                }
+                                .buttonStyle(ScaleButtonStyle())
+                            }
                         }
-                        .buttonStyle(ScaleButtonStyle())
                         .padding(.horizontal, DinoTheme.padding)
                         .padding(.bottom, 32)
                     }
@@ -128,14 +167,46 @@ struct BreathingView: View {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button(action: { dismiss() }) {
                         Image(systemName: "xmark")
-                            .font(.system(size: 16, weight: .medium))
+                            .font(DinoTheme.dinoFont(size: 16))
                             .foregroundColor(DinoTheme.textSecondary)
+                    }
+                }
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    if viewModel.isRunning {
+                        Button(action: {
+                            if audio.isPlaying {
+                                audio.pause()
+                            } else {
+                                audio.resume()
+                            }
+                        }) {
+                            Image(systemName: audio.isPlaying ? "speaker.wave.2" : "speaker.slash")
+                                .font(.system(size: 14))
+                                .foregroundColor(DinoTheme.textSecondary.opacity(0.7))
+                        }
+                        .buttonStyle(ScaleButtonStyle())
                     }
                 }
             }
         }
         .onDisappear {
             viewModel.stop()
+            AudioManager.shared.stop()
+        }
+        .onChange(of: viewModel.isRunning) { running in
+            if running {
+                AudioManager.shared.play(track: "breathing_ambient")
+                AudioManager.shared.fadeIn(duration: 2.0)
+            } else {
+                AudioManager.shared.stop()
+            }
+        }
+        .onChange(of: viewModel.isPaused) { paused in
+            if paused {
+                AudioManager.shared.pause()
+            } else if viewModel.isRunning {
+                AudioManager.shared.resume()
+            }
         }
     }
 }
@@ -154,7 +225,7 @@ struct DoneScreen: View {
 
             VStack(spacing: 10) {
                 Text("well done")
-                    .font(DinoTheme.largeFont())
+                    .font(DinoTheme.dinoDisplayFont(size: 28))
                     .foregroundColor(DinoTheme.textPrimary)
 
                 Text("you took time for yourself.")

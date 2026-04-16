@@ -7,6 +7,8 @@ import SwiftUI
 import UIKit
 
 struct ResourcesView: View {
+    @ObservedObject private var themeManager = ThemeManager.shared
+
     @Environment(\.dismiss) private var dismiss
 
     struct HotlineResource {
@@ -58,7 +60,7 @@ struct ResourcesView: View {
                             .font(.system(size: 52))
 
                         Text("you're not alone")
-                            .font(DinoTheme.largeFont())
+                            .font(DinoTheme.dinoDisplayFont(size: 28))
                             .foregroundColor(DinoTheme.textPrimary)
 
                         Text("reaching out is one of the bravest things you can do. these resources are here for you, any time.")
@@ -87,7 +89,7 @@ struct ResourcesView: View {
                         .padding(.bottom, 32)
                 }
             }
-            .background(Color.white.ignoresSafeArea())
+            .background(DinoTheme.background.ignoresSafeArea())
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("close") { dismiss() }
@@ -108,7 +110,7 @@ struct ResourceCard: View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(spacing: 12) {
                 Text(resource.emoji)
-                    .font(.system(size: 28))
+                    .font(DinoTheme.dinoFont(size: 28))
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(resource.name)
@@ -142,8 +144,12 @@ struct ResourceCard: View {
             .buttonStyle(ScaleButtonStyle())
         }
         .padding(DinoTheme.padding)
-        .background(Color.white)
+        .background(DinoTheme.surfacePrimary)
         .cornerRadius(DinoTheme.largeCornerRadius)
+        .overlay(
+            RoundedRectangle(cornerRadius: DinoTheme.largeCornerRadius)
+                .strokeBorder(DinoTheme.cardBorder, lineWidth: 1)
+        )
         .shadow(color: DinoTheme.shadowColor, radius: DinoTheme.shadowRadius, y: DinoTheme.shadowY)
     }
 }

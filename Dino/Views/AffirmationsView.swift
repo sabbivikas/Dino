@@ -6,6 +6,8 @@
 import SwiftUI
 
 struct AffirmationsView: View {
+    @ObservedObject private var themeManager = ThemeManager.shared
+
     @EnvironmentObject var dataManager: SharedDataManager
     @Environment(\.dismiss) private var dismiss
     @State private var currentIndex: Int = 0
@@ -17,7 +19,7 @@ struct AffirmationsView: View {
                     // Header
                     VStack(spacing: 6) {
                         Text("affirmations")
-                            .font(DinoTheme.largeFont())
+                            .font(DinoTheme.dinoDisplayFont(size: 28))
                             .foregroundColor(DinoTheme.textPrimary)
                         Text("swipe to explore • tap ⭐️ to save")
                             .font(DinoTheme.captionFont())
@@ -75,7 +77,7 @@ struct AffirmationsView: View {
                                 Spacer()
                                 VStack(spacing: 8) {
                                     Text("⭐️")
-                                        .font(.system(size: 32))
+                                        .font(DinoTheme.dinoFont(size: 32))
                                     Text("tap the star on any card to save it here")
                                         .font(DinoTheme.captionFont())
                                         .foregroundColor(DinoTheme.textSecondary)
@@ -97,7 +99,7 @@ struct AffirmationsView: View {
                     .padding(.bottom, 32)
                 }
             }
-            .background(Color.white.ignoresSafeArea())
+            .background(DinoTheme.background.ignoresSafeArea())
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("done") { dismiss() }
@@ -117,7 +119,7 @@ struct SavedAffirmationRow: View {
     var body: some View {
         HStack(spacing: 12) {
             Image(systemName: "star.fill")
-                .font(.system(size: 14))
+                .font(DinoTheme.dinoFont(size: 14))
                 .foregroundColor(.yellow)
 
             Text(text)
@@ -129,7 +131,7 @@ struct SavedAffirmationRow: View {
 
             Button(action: onRemove) {
                 Image(systemName: "xmark.circle.fill")
-                    .font(.system(size: 18))
+                    .font(DinoTheme.dinoFont(size: 18))
                     .foregroundColor(DinoTheme.textSecondary.opacity(0.4))
             }
         }

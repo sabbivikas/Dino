@@ -6,6 +6,8 @@
 import SwiftUI
 
 struct AffirmationCard: View {
+    @ObservedObject private var themeManager = ThemeManager.shared
+
     let text: String
     let index: Int
     let isSaved: Bool
@@ -14,19 +16,22 @@ struct AffirmationCard: View {
     var body: some View {
         ZStack {
             RoundedRectangle(cornerRadius: DinoTheme.largeCornerRadius)
-                .fill(DinoTheme.pastel(for: index).opacity(0.25))
+                .fill(DinoTheme.surfacePrimary)
                 .shadow(color: DinoTheme.shadowColor, radius: DinoTheme.shadowRadius, y: DinoTheme.shadowY)
+
+            RoundedRectangle(cornerRadius: DinoTheme.largeCornerRadius)
+                .fill(DinoTheme.pastel(for: index).opacity(0.15))
 
             VStack(spacing: 20) {
                 Text(text)
-                    .font(.system(.title3, design: .rounded, weight: .medium))
+                    .font(DinoTheme.dinoFont(size: 20))
                     .foregroundColor(DinoTheme.textPrimary)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 24)
 
                 Button(action: onSave) {
                     Image(systemName: isSaved ? "star.fill" : "star")
-                        .font(.system(size: 22))
+                        .font(DinoTheme.dinoFont(size: 22))
                         .foregroundColor(isSaved ? .yellow : DinoTheme.textSecondary)
                 }
             }
@@ -34,5 +39,9 @@ struct AffirmationCard: View {
         }
         .frame(maxWidth: .infinity)
         .frame(height: 200)
+        .overlay(
+            RoundedRectangle(cornerRadius: DinoTheme.largeCornerRadius)
+                .strokeBorder(DinoTheme.cardBorder, lineWidth: 1)
+        )
     }
 }

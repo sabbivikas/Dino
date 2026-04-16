@@ -6,6 +6,8 @@
 import SwiftUI
 
 struct SettingsView: View {
+    @ObservedObject private var themeManager = ThemeManager.shared
+
     @EnvironmentObject var dataManager: SharedDataManager
     @Environment(\.dismiss) private var dismiss
 
@@ -44,6 +46,18 @@ struct SettingsView: View {
                     )
                 } header: {
                     Text("notifications")
+                        .font(DinoTheme.captionFont())
+                        .foregroundColor(DinoTheme.textSecondary)
+                }
+                .listRowBackground(DinoTheme.cardBackground)
+
+                // Appearance
+                Section {
+                    NavigationLink(destination: ThemeSettingsView()) {
+                        SettingsRow(icon: "paintpalette", label: "theme", color: DinoTheme.lavender)
+                    }
+                } header: {
+                    Text("appearance")
                         .font(DinoTheme.captionFont())
                         .foregroundColor(DinoTheme.textSecondary)
                 }
@@ -94,7 +108,7 @@ struct SettingsView: View {
                 .listRowBackground(DinoTheme.cardBackground)
             }
             .listStyle(.insetGrouped)
-            .background(Color.white.ignoresSafeArea())
+            .background(DinoTheme.background.ignoresSafeArea())
             .scrollContentBackground(.hidden)
             .navigationTitle("settings")
             .navigationBarTitleDisplayMode(.large)
@@ -123,6 +137,7 @@ struct SettingsView: View {
                 titleVisibility: .visible
             ) {
                 Button("sign out", role: .destructive) {
+                    AuthManager.shared.signOut()
                     dataManager.signOut()
                     dismiss()
                 }
@@ -141,7 +156,7 @@ struct SettingsRow: View {
     var body: some View {
         HStack(spacing: 14) {
             Image(systemName: icon)
-                .font(.system(size: 16))
+                .font(DinoTheme.dinoFont(size: 16))
                 .foregroundColor(color)
                 .frame(width: 32, height: 32)
                 .background(color.opacity(0.12))
@@ -164,7 +179,7 @@ struct SettingsToggle: View {
     var body: some View {
         HStack(spacing: 14) {
             Image(systemName: icon)
-                .font(.system(size: 16))
+                .font(DinoTheme.dinoFont(size: 16))
                 .foregroundColor(color)
                 .frame(width: 32, height: 32)
                 .background(color.opacity(0.12))

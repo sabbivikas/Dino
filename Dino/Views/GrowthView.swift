@@ -6,9 +6,12 @@
 import SwiftUI
 
 struct GrowthView: View {
+    @ObservedObject private var themeManager = ThemeManager.shared
+
     @EnvironmentObject var dataManager: SharedDataManager
     @StateObject private var viewModel: GrowthViewModel = GrowthViewModel(dataManager: SharedDataManager.shared)
     @Environment(\.dismiss) private var dismiss
+    @State private var glowPulse: Bool = false
 
     var body: some View {
         NavigationStack {
@@ -52,10 +55,33 @@ struct GrowthView: View {
                                         )
                                     )
                                     .frame(width: max(8, geo.size.width * viewModel.xpProgress), height: 12)
+                                    .shadow(
+                                        color: viewModel.xpProgress < 0.5
+                                            ? DinoTheme.sageGreen.opacity(glowPulse ? 0.5 : 0.12)
+                                            : Color.clear,
+                                        radius: glowPulse ? 10 : 4,
+                                        y: 0
+                                    )
                                     .animation(.easeInOut(duration: 0.6), value: viewModel.xpProgress)
                             }
                         }
                         .frame(height: 12)
+                        .onAppear {
+                            if viewModel.xpProgress < 0.5 {
+                                withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
+                                    glowPulse = true
+                                }
+                            }
+                        }
+                        .onChange(of: viewModel.xpProgress) { _, newVal in
+                            if newVal >= 0.5 {
+                                withAnimation { glowPulse = false }
+                            } else if !glowPulse {
+                                withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
+                                    glowPulse = true
+                                }
+                            }
+                        }
 
                         Text("earn xp by logging moods, journaling, adding gratitude, and breathing")
                             .font(DinoTheme.captionFont())
@@ -112,7 +138,7 @@ struct GrowthView: View {
                             ], id: \.0) { level, emoji, title in
                                 HStack(spacing: 12) {
                                     Text(emoji)
-                                        .font(.system(size: 24))
+                                        .font(DinoTheme.dinoFont(size: 24))
 
                                     VStack(alignment: .leading, spacing: 2) {
                                         Text(title)
@@ -148,7 +174,7 @@ struct GrowthView: View {
                     .padding(.bottom, 32)
                 }
             }
-            .background(Color.white.ignoresSafeArea())
+            .background(DinoTheme.background.ignoresSafeArea())
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("done") { dismiss() }
@@ -168,11 +194,21 @@ struct GrowthStatCard: View {
     var body: some View {
         VStack(spacing: 8) {
             Text(stat.emoji)
-                .font(.system(size: 28))
+                .font(DinoTheme.dinoFont(size: 28))
 
-            Text("\(stat.value)")
-                .font(DinoTheme.titleFont())
-                .foregroundColor(DinoTheme.textPrimary)
+            if stat.value == 0 {
+                HStack(spacing: 4) {
+                    Image(systemName: "plus.circle")
+                        .font(DinoTheme.dinoFont(size: 13))
+                    Text("Log Now")
+                        .font(DinoTheme.dinoFont(size: 13))
+                }
+                .foregroundColor(Color(hex: stat.color).opacity(0.7))
+            } else {
+                Text("\(stat.value)")
+                    .font(DinoTheme.titleFont())
+                    .foregroundColor(DinoTheme.textPrimary)
+            }
 
             Text(stat.label)
                 .font(DinoTheme.captionFont())
@@ -180,7 +216,7 @@ struct GrowthStatCard: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 18)
-        .background(Color(hex: stat.color).opacity(0.15))
+        .background(Color(hex: stat.color).opacity(stat.value == 0 ? 0.08 : 0.15))
         .cornerRadius(DinoTheme.cornerRadius)
     }
 }
@@ -195,7 +231,7 @@ struct XPRow: View {
     var body: some View {
         HStack(spacing: 14) {
             Image(systemName: icon)
-                .font(.system(size: 18))
+                .font(DinoTheme.dinoFont(size: 18))
                 .foregroundColor(color)
                 .frame(width: 36, height: 36)
                 .background(color.opacity(0.12))
