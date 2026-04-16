@@ -115,6 +115,25 @@ class AuthManager: ObservableObject {
         isLoading = false
     }
 
+    // MARK: - Delete Account
+
+    func deleteAccount() async throws {
+        guard let user = Auth.auth().currentUser else {
+            print("[Auth] deleteAccount — no user")
+            return
+        }
+        print("[Auth] deleting account for \(user.email ?? "unknown")")
+        try await user.delete()
+        GIDSignIn.sharedInstance.signOut()
+        GIDSignIn.sharedInstance.disconnect()
+        isSignedIn = false
+        currentUser = nil
+        displayName = ""
+        email = ""
+        photoURL = nil
+        print("[Auth] account deleted")
+    }
+
     // MARK: - Sign Out
 
     func signOut() {

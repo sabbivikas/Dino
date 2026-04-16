@@ -13,6 +13,7 @@ struct SettingsView: View {
 
     @State private var showClearConfirm = false
     @State private var showSignOutConfirm = false
+    @State private var showDeleteAccountConfirm = false
     @State private var notifyMorning = true
     @State private var notifyEvening = false
     @State private var notifyStreak = true
@@ -84,6 +85,10 @@ struct SettingsView: View {
                     Button(action: { showClearConfirm = true }) {
                         SettingsRow(icon: "trash.fill", label: "clear all data", color: .red)
                     }
+
+                    Button(action: { showDeleteAccountConfirm = true }) {
+                        SettingsRow(icon: "person.crop.circle.badge.xmark", label: "delete account", color: .red)
+                    }
                 } header: {
                     Text("danger zone")
                         .font(DinoTheme.captionFont())
@@ -93,6 +98,10 @@ struct SettingsView: View {
 
                 // About
                 Section {
+                    NavigationLink(destination: PrivacyPolicyView()) {
+                        SettingsRow(icon: "lock.shield.fill", label: "privacy policy", color: DinoTheme.sageGreen)
+                    }
+
                     HStack {
                         SettingsRow(icon: "info.circle.fill", label: "version", color: DinoTheme.sageGreen)
                         Spacer()
@@ -144,7 +153,38 @@ struct SettingsView: View {
                 }
                 Button("cancel", role: .cancel) {}
             }
+            .confirmationDialog(
+                "delete your account?",
+                isPresented: $showDeleteAccountConfirm,
+                titleVisibility: .visible
+            ) {
+                Button("delete forever", role: .destructive) {
+                    Task {
+                        await deleteAccount()
+                    }
+                }
+                Button("cancel", role: .cancel) {}
+            } message: {
+                Text("this will permanently delete your account, all your data from the cloud, and sign you out. this cannot be undone. are you sure?")
+            }
         }
+    }
+
+    private func deleteAccount() async {
+        // Delete Firestore data first
+        await FirestoreSyncService.shared.deleteAllUserData()
+
+        // Delete Firebase Auth account
+        do {
+            try await AuthManager.shared.deleteAccount()
+        } catch {
+            print("[Settings] account deletion error: \(error)")
+        }
+
+        // Clear local data
+        dataManager.clearForSignOut()
+        UserDefaults.standard.set(false, forKey: "hasPassedAuth")
+        dismiss()
     }
 }
 

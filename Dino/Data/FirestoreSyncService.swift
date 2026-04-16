@@ -257,6 +257,37 @@ class FirestoreSyncService: ObservableObject {
         isSyncing = false
     }
 
+    // MARK: - Delete All User Data
+
+    /// Deletes all Firestore data for the current user
+    func deleteAllUserData() async {
+        guard let uid = Auth.auth().currentUser?.uid else {
+            print("[Firestore] deleteAllUserData skipped — no user")
+            return
+        }
+
+        print("[Firestore] deleting all data for \(uid)")
+        let userRef = db.collection("users").document(uid)
+
+        do {
+            // Delete subcollections
+            let subcollections = ["moods", "journals", "gratitude", "affirmations",
+                                  "breathing", "focus", "meditation", "assessments", "meta"]
+            for name in subcollections {
+                let snapshot = try await userRef.collection(name).getDocuments()
+                for doc in snapshot.documents {
+                    try await doc.reference.delete()
+                }
+            }
+
+            // Delete user document
+            try await userRef.delete()
+            print("[Firestore] all user data deleted")
+        } catch {
+            print("[Firestore] deleteAllUserData ERROR: \(error)")
+        }
+    }
+
     // MARK: - Helpers
 
     /// Sync an array of Identifiable & Codable items to a Firestore subcollection
