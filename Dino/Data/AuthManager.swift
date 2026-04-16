@@ -161,7 +161,7 @@ class AuthManager: ObservableObject {
         print("[Auth] deleting account for \(user.email ?? "unknown")")
         try await user.delete()
         GIDSignIn.sharedInstance.signOut()
-        GIDSignIn.sharedInstance.disconnect()
+        try? await GIDSignIn.sharedInstance.disconnect()
         isSignedIn = false
         currentUser = nil
         displayName = ""
@@ -176,7 +176,7 @@ class AuthManager: ObservableObject {
         do {
             try Auth.auth().signOut()
             GIDSignIn.sharedInstance.signOut()
-            GIDSignIn.sharedInstance.disconnect()
+            Task { try? await GIDSignIn.sharedInstance.disconnect() }
             isSignedIn = false
             currentUser = nil
             displayName = ""
