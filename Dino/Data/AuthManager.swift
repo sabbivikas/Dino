@@ -115,6 +115,42 @@ class AuthManager: ObservableObject {
         isLoading = false
     }
 
+    // MARK: - Email Sign Up
+
+    func signUpWithEmail(email: String, password: String) async {
+        isLoading = true
+        errorMessage = nil
+        print("[Auth] email sign-up started for \(email)")
+
+        do {
+            let result = try await Auth.auth().createUser(withEmail: email, password: password)
+            print("[Auth] email sign-up SUCCESS: \(result.user.email ?? "unknown")")
+        } catch {
+            errorMessage = error.localizedDescription
+            print("[Auth] email sign-up FAILED: \(error)")
+        }
+
+        isLoading = false
+    }
+
+    // MARK: - Email Sign In
+
+    func signInWithEmail(email: String, password: String) async {
+        isLoading = true
+        errorMessage = nil
+        print("[Auth] email sign-in started for \(email)")
+
+        do {
+            let result = try await Auth.auth().signIn(withEmail: email, password: password)
+            print("[Auth] email sign-in SUCCESS: \(result.user.email ?? "unknown")")
+        } catch {
+            errorMessage = error.localizedDescription
+            print("[Auth] email sign-in FAILED: \(error)")
+        }
+
+        isLoading = false
+    }
+
     // MARK: - Delete Account
 
     func deleteAccount() async throws {

@@ -16,6 +16,11 @@ struct SignInView: View {
     @State private var heartOffset2: CGFloat = 0
     @State private var heartOpacity1: Double = 0.7
     @State private var heartOpacity2: Double = 0.7
+    @State private var showEmailSignUp = false
+    @State private var emailText = ""
+    @State private var passwordText = ""
+    @State private var confirmPasswordText = ""
+    @State private var isSignUp = true
 
     var body: some View {
         ZStack {
@@ -126,15 +131,103 @@ struct SignInView: View {
                     .buttonStyle(ScaleButtonStyle())
                     .disabled(authManager.isLoading)
 
-                    // Continue without account (skip / guest mode)
+                    // Sign up with email
                     Button {
-                        hasPassedAuth = true
+                        withAnimation { showEmailSignUp.toggle() }
                     } label: {
-                        Text("continue without signing in")
-                            .font(DinoTheme.subheadlineFont())
-                            .foregroundColor(DinoTheme.textSecondary)
+                        HStack(spacing: 10) {
+                            Image(systemName: "envelope.fill")
+                                .font(DinoTheme.dinoFont(size: 14))
+                                .foregroundColor(DinoTheme.textSecondary)
+
+                            Text(showEmailSignUp ? "hide email sign up" : "sign up with email")
+                                .font(DinoTheme.headlineFont())
+                                .foregroundColor(DinoTheme.textPrimary)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 18)
+                        .background(DinoTheme.surfacePrimary)
+                        .cornerRadius(DinoTheme.cornerRadius)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: DinoTheme.cornerRadius)
+                                .stroke(DinoTheme.cardBorder, lineWidth: 1.5)
+                        )
                     }
                     .buttonStyle(ScaleButtonStyle())
+
+                    // Email form (expandable)
+                    if showEmailSignUp {
+                        VStack(spacing: 12) {
+                            // Toggle between sign up and sign in
+                            HStack(spacing: 0) {
+                                Button {
+                                    withAnimation { isSignUp = true }
+                                } label: {
+                                    Text("sign up")
+                                        .font(DinoTheme.subheadlineFont())
+                                        .foregroundColor(isSignUp ? DinoTheme.sageGreen : DinoTheme.textSecondary)
+                                        .padding(.vertical, 8)
+                                        .frame(maxWidth: .infinity)
+                                        .background(isSignUp ? DinoTheme.sageGreen.opacity(0.12) : Color.clear)
+                                        .cornerRadius(8)
+                                }
+
+                                Button {
+                                    withAnimation { isSignUp = false }
+                                } label: {
+                                    Text("sign in")
+                                        .font(DinoTheme.subheadlineFont())
+                                        .foregroundColor(!isSignUp ? DinoTheme.sageGreen : DinoTheme.textSecondary)
+                                        .padding(.vertical, 8)
+                                        .frame(maxWidth: .infinity)
+                                        .background(!isSignUp ? DinoTheme.sageGreen.opacity(0.12) : Color.clear)
+                                        .cornerRadius(8)
+                                }
+                            }
+                            .background(DinoTheme.cardBackground)
+                            .cornerRadius(8)
+
+                            DinoTextField(placeholder: "email", text: $emailText, icon: "envelope", isSecure: false)
+
+                            DinoTextField(placeholder: "password", text: $passwordText, icon: "lock", isSecure: true)
+
+                            if isSignUp {
+                                DinoTextField(placeholder: "confirm password", text: $confirmPasswordText, icon: "lock.fill", isSecure: true)
+                            }
+
+                            Button {
+                                Task {
+                                    if isSignUp {
+                                        guard passwordText == confirmPasswordText else {
+                                            authManager.errorMessage = "passwords don't match"
+                                            return
+                                        }
+                                        guard passwordText.count >= 6 else {
+                                            authManager.errorMessage = "password must be at least 6 characters"
+                                            return
+                                        }
+                                        await authManager.signUpWithEmail(email: emailText, password: passwordText)
+                                    } else {
+                                        await authManager.signInWithEmail(email: emailText, password: passwordText)
+                                    }
+                                    if authManager.isSignedIn {
+                                        hasPassedAuth = true
+                                    }
+                                }
+                            } label: {
+                                Text(isSignUp ? "create account" : "sign in")
+                                    .font(DinoTheme.headlineFont())
+                                    .foregroundColor(.white)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 16)
+                                    .background(DinoTheme.sageGreen)
+                                    .cornerRadius(DinoTheme.cornerRadius)
+                            }
+                            .buttonStyle(ScaleButtonStyle())
+                            .disabled(authManager.isLoading)
+                        }
+                        .transition(.opacity.combined(with: .move(edge: .bottom)))
+                    }
                 }
                 .padding(.horizontal, DinoTheme.padding)
                 .padding(.bottom, 48)
