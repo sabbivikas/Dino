@@ -59,63 +59,112 @@ private struct FireflyParticle: Identifiable {
     var x: CGFloat
     var y: CGFloat
     var size: CGFloat
+    var glowRadius: CGFloat
     var opacity: Double
+    var peakOpacity: Double
     var duration: Double
     var delay: Double
     var driftX: CGFloat
     var driftY: CGFloat
+    var color: Color
+    var pulseDuration: Double
 }
 
 // MARK: - Firefly View (Night / Storm)
 
 private struct FireflyView: View {
     @State private var particles: [FireflyParticle] = []
-    @State private var animate = false
+    @State private var driftAnimate = false
+    @State private var pulseAnimate = false
 
     var body: some View {
         GeometryReader { geo in
             ZStack {
                 ForEach(particles) { p in
-                    Circle()
-                        .fill(Color(hex: "#FFD966"))
-                        .frame(width: p.size, height: p.size)
-                        .blur(radius: p.size * 0.8)
-                        .shadow(color: Color(hex: "#FFD966").opacity(0.6), radius: p.size * 2)
-                        .opacity(animate ? p.opacity : p.opacity * 0.25)
-                        .position(
-                            x: animate ? p.x + p.driftX : p.x,
-                            y: animate ? p.y + p.driftY : p.y
-                        )
-                        .animation(
-                            .easeInOut(duration: p.duration)
-                            .repeatForever(autoreverses: true)
-                            .delay(p.delay),
-                            value: animate
-                        )
+                    ZStack {
+                        // Outer soft glow halo
+                        Circle()
+                            .fill(
+                                RadialGradient(
+                                    colors: [
+                                        p.color.opacity(0.35),
+                                        p.color.opacity(0.12),
+                                        p.color.opacity(0.0)
+                                    ],
+                                    center: .center,
+                                    startRadius: 0,
+                                    endRadius: p.glowRadius
+                                )
+                            )
+                            .frame(width: p.glowRadius * 2.5, height: p.glowRadius * 2.5)
+                            .opacity(pulseAnimate ? p.peakOpacity : p.peakOpacity * 0.15)
+                            .animation(
+                                .easeInOut(duration: p.pulseDuration)
+                                .repeatForever(autoreverses: true)
+                                .delay(p.delay),
+                                value: pulseAnimate
+                            )
+
+                        // Inner bright core
+                        Circle()
+                            .fill(p.color)
+                            .frame(width: p.size, height: p.size)
+                            .blur(radius: p.size * 0.4)
+                            .shadow(color: p.color.opacity(0.8), radius: p.size * 1.5)
+                            .opacity(pulseAnimate ? p.opacity : p.opacity * 0.2)
+                            .animation(
+                                .easeInOut(duration: p.pulseDuration)
+                                .repeatForever(autoreverses: true)
+                                .delay(p.delay),
+                                value: pulseAnimate
+                            )
+                    }
+                    .position(
+                        x: driftAnimate ? p.x + p.driftX : p.x,
+                        y: driftAnimate ? p.y + p.driftY : p.y
+                    )
+                    .animation(
+                        .easeInOut(duration: p.duration)
+                        .repeatForever(autoreverses: true)
+                        .delay(p.delay * 0.5),
+                        value: driftAnimate
+                    )
                 }
             }
             .onAppear {
                 particles = Self.generateParticles(in: geo.size)
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                    animate = true
+                    driftAnimate = true
+                    pulseAnimate = true
                 }
             }
         }
     }
 
+    private static let warmColors: [Color] = [
+        Color(hex: "#FFD966"),  // warm gold
+        Color(hex: "#FFE4A0"),  // soft cream
+        Color(hex: "#FFEEBB"),  // pale amber
+        Color(hex: "#E8D5A3"),  // muted honey
+        Color(hex: "#C8E6C9"),  // faint green (rare)
+    ]
+
     private static func generateParticles(in size: CGSize) -> [FireflyParticle] {
-        (0..<12).map { _ in
-            // Bias y toward bottom 60% of screen
-            let yBias = CGFloat.random(in: 0.4...1.0)
+        (0..<20).map { _ in
+            let spread = CGFloat.random(in: 0.15...0.95)
             return FireflyParticle(
                 x: CGFloat.random(in: 20...(size.width - 20)),
-                y: yBias * size.height,
-                size: CGFloat.random(in: 2...4),
-                opacity: Double.random(in: 0.3...0.8),
-                duration: Double.random(in: 6...12),
-                delay: Double.random(in: 0...4),
-                driftX: CGFloat.random(in: -30...30),
-                driftY: CGFloat.random(in: -20...20)
+                y: spread * size.height,
+                size: CGFloat.random(in: 2...5),
+                glowRadius: CGFloat.random(in: 8...18),
+                opacity: Double.random(in: 0.4...0.9),
+                peakOpacity: Double.random(in: 0.5...1.0),
+                duration: Double.random(in: 8...16),
+                delay: Double.random(in: 0...6),
+                driftX: CGFloat.random(in: -45...45),
+                driftY: CGFloat.random(in: -35...35),
+                color: warmColors.randomElement() ?? Color(hex: "#FFD966"),
+                pulseDuration: Double.random(in: 3...7)
             )
         }
     }
