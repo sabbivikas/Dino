@@ -4,6 +4,10 @@
 <dict>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Allow location to match Dino's theme to the weather around you and show local support resources.</string>
+	<key>NSMotionUsageDescription</key>
+	<string>Dino uses motion to create a gentle parallax effect in the ambient background.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Dino uses your microphone to record voice journal entries. Recordings are saved privately on your device.</string>
 	<key>UIAppFonts</key>
 	<array>
 		<string>DinoInitiativeFont-Regular.ttf</string>
