@@ -8,11 +8,14 @@ import SwiftUI
 struct LetterView: View {
     var onContinue: () -> Void
 
+    private static let customFont = "DinoInitiativeFont-Regular"
+
     @State private var displayedText = ""
     @State private var showCursor = true
     @State private var showButton = false
+    @State private var typewriterTask: Task<Void, Never>?
 
-    private let fullText = "hey, you.\n\nthe fact that you're here means something.\nmaybe things feel heavy. maybe you're just curious.\neither way — you showed up. that matters.\n\ndino is your space.\nno pressure. no judgment.\njust a place to breathe, reflect, and grow.\n\nlet's take this one step at a time."
+    private let fullText = "hey, you.\n\nthe fact that you're here means something.\nmaybe things feel heavy. maybe you're just curious.\neither way, you showed up. that matters.\n\ndino is your space.\nno pressure. no judgment.\njust a place to breathe, reflect, and grow.\n\nlet's take this one step at a time."
 
     var body: some View {
         ZStack {
@@ -25,12 +28,12 @@ struct LetterView: View {
                 HStack(alignment: .top) {
                     VStack(alignment: .leading, spacing: 0) {
                         (Text(displayedText)
-                            .font(.system(size: 18, weight: .regular, design: .serif))
+                            .font(.custom(Self.customFont, size: 18))
                             .foregroundColor(Color(hex: "2D3142"))
                         + Text(showCursor ? "|" : " ")
-                            .font(.system(size: 18, weight: .regular, design: .serif))
+                            .font(.custom(Self.customFont, size: 18))
                             .foregroundColor(Color(hex: "A8C5A0")))
-                        .lineSpacing(6)
+                        .lineSpacing(8)
                         .multilineTextAlignment(.leading)
                     }
                     Spacer()
@@ -43,7 +46,7 @@ struct LetterView: View {
                 if showButton {
                     Button(action: onContinue) {
                         Text("continue")
-                            .font(.system(size: 17, weight: .semibold, design: .rounded))
+                            .font(.custom(Self.customFont, size: 17))
                             .foregroundColor(.white)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 18)
@@ -58,12 +61,12 @@ struct LetterView: View {
                 // Skip button (visible immediately)
                 if !showButton {
                     Button {
-                        // Skip typewriter, show full text
+                        typewriterTask?.cancel()
                         displayedText = fullText
                         withAnimation { showButton = true }
                     } label: {
                         Text("skip")
-                            .font(.system(size: 15, design: .rounded))
+                            .font(.custom(Self.customFont, size: 15))
                             .foregroundColor(Color(hex: "6B7280"))
                     }
                     .padding(.bottom, 48)
@@ -80,14 +83,23 @@ struct LetterView: View {
     }
 
     private func startTypewriter() {
-        var index = 0
-        Timer.scheduledTimer(withTimeInterval: 0.03, repeats: true) { timer in
-            if index < fullText.count {
-                let i = fullText.index(fullText.startIndex, offsetBy: index)
-                displayedText.append(fullText[i])
-                index += 1
-            } else {
-                timer.invalidate()
+        typewriterTask = Task {
+            for (i, char) in fullText.enumerated() {
+                if Task.isCancelled { return }
+
+                displayedText.append(char)
+
+                // Natural pacing: pause longer on punctuation and line breaks
+                if char == "\n" {
+                    try? await Task.sleep(nanoseconds: 300_000_000) // 0.3s for line breaks
+                } else if char == "." || char == "," {
+                    try? await Task.sleep(nanoseconds: 200_000_000) // 0.2s for punctuation
+                } else {
+                    try? await Task.sleep(nanoseconds: 55_000_000)  // 0.055s per character
+                }
+            }
+
+            if !Task.isCancelled {
                 withAnimation(.easeInOut(duration: 0.5)) {
                     showButton = true
                 }
