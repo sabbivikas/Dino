@@ -24,14 +24,14 @@ struct LetterView: View {
                 // Letter text with typewriter effect
                 HStack(alignment: .top) {
                     VStack(alignment: .leading, spacing: 0) {
-                        Text(displayedText)
+                        (Text(displayedText)
                             .font(.system(size: 18, weight: .regular, design: .serif))
                             .foregroundColor(Color(hex: "2D3142"))
-                            .lineSpacing(6)
-                            .multilineTextAlignment(.leading)
                         + Text(showCursor ? "|" : " ")
                             .font(.system(size: 18, weight: .regular, design: .serif))
-                            .foregroundColor(Color(hex: "A8C5A0"))
+                            .foregroundColor(Color(hex: "A8C5A0")))
+                        .lineSpacing(6)
+                        .multilineTextAlignment(.leading)
                     }
                     Spacer()
                 }

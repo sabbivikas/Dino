@@ -124,16 +124,15 @@ final class SharedDataManager: ObservableObject {
         self.isSignedIn = ud.bool(forKey: "isSignedIn")
 
         // Load user-namespaced data using whatever userId we have (may be nil for guests)
-        self.onboardingComplete = ud.bool(forKey: self.userKeyStatic(self.currentUserId, "onboardingComplete"))
-        self.userName = ud.string(forKey: self.userKeyStatic(self.currentUserId, "userName")) ?? ""
-        self.userTimezone = ud.string(forKey: self.userKeyStatic(self.currentUserId, "userTimezone")) ?? TimeZone.current.identifier
-        self.dinoSkin = ud.string(forKey: self.userKeyStatic(self.currentUserId, "dinoSkin")) ?? "default"
-        self.dinoName = ud.string(forKey: self.userKeyStatic(self.currentUserId, "dinoName")) ?? "Dino"
-        self.userFeeling = ud.string(forKey: self.userKeyStatic(self.currentUserId, "userFeeling")) ?? ""
-        self.userChallenge = ud.string(forKey: self.userKeyStatic(self.currentUserId, "userChallenge")) ?? ""
-        self.referralSource = ud.string(forKey: self.userKeyStatic(self.currentUserId, "referralSource")) ?? ""
-
         let uid = self.currentUserId
+        self.onboardingComplete = ud.bool(forKey: Self.staticUserKey(uid, "onboardingComplete"))
+        self.userName = ud.string(forKey: Self.staticUserKey(uid, "userName")) ?? ""
+        self.userTimezone = ud.string(forKey: Self.staticUserKey(uid, "userTimezone")) ?? TimeZone.current.identifier
+        self.dinoSkin = ud.string(forKey: Self.staticUserKey(uid, "dinoSkin")) ?? "default"
+        self.dinoName = ud.string(forKey: Self.staticUserKey(uid, "dinoName")) ?? "Dino"
+        self.userFeeling = ud.string(forKey: Self.staticUserKey(uid, "userFeeling")) ?? ""
+        self.userChallenge = ud.string(forKey: Self.staticUserKey(uid, "userChallenge")) ?? ""
+        self.referralSource = ud.string(forKey: Self.staticUserKey(uid, "referralSource")) ?? ""
         self.userIntentions = Self.load([String].self, from: ud, key: Self.staticUserKey(uid, "userIntentions")) ?? []
         self.moodEntries = Self.load([MoodEntry].self, from: ud, key: Self.staticUserKey(uid, "moodEntries")) ?? []
         self.journalEntries = Self.load([JournalEntry].self, from: ud, key: Self.staticUserKey(uid, "journalEntries")) ?? []
@@ -149,12 +148,7 @@ final class SharedDataManager: ObservableObject {
         resetSelfCareIfNewDay()
     }
 
-    // Static helpers used before `self` is fully initialized
-    private func userKeyStatic(_ uid: String?, _ key: String) -> String {
-        guard let uid = uid else { return key }
-        return "\(uid)_\(key)"
-    }
-
+    // Static helper used before `self` is fully initialized
     private static func staticUserKey(_ uid: String?, _ key: String) -> String {
         guard let uid = uid else { return key }
         return "\(uid)_\(key)"
