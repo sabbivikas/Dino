@@ -138,7 +138,8 @@ struct SettingsView: View {
             ) {
                 Button("sign out", role: .destructive) {
                     AuthManager.shared.signOut()
-                    dataManager.signOut()
+                    dataManager.clearForSignOut()
+                    UserDefaults.standard.set(false, forKey: "hasPassedAuth")
                     dismiss()
                 }
                 Button("cancel", role: .cancel) {}

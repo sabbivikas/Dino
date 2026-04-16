@@ -7,16 +7,24 @@ import SwiftUI
 
 struct ContentView: View {
     @EnvironmentObject var dataManager: SharedDataManager
+    @EnvironmentObject var authManager: AuthManager
     @ObservedObject private var themeManager = ThemeManager.shared
+
+    @AppStorage("hasSeenLetter") private var hasSeenLetter = false
+    @AppStorage("hasPassedAuth") private var hasPassedAuth = false
 
     var body: some View {
         ZStack {
-            if dataManager.isSignedIn && dataManager.onboardingComplete {
+            if dataManager.onboardingComplete {
                 AmbientBackgroundView()
             }
 
             Group {
-                if !dataManager.isSignedIn {
+                if !hasSeenLetter {
+                    LetterView {
+                        withAnimation { hasSeenLetter = true }
+                    }
+                } else if !hasPassedAuth {
                     SignInView()
                 } else if !dataManager.onboardingComplete {
                     OnboardingView()
@@ -43,11 +51,11 @@ struct ContentView: View {
             dataManager.deepLinkTab = 0
             dataManager.showBreathingFromDeepLink = true
         case "affirmation":
-            dataManager.deepLinkTab = 2  // mood tab — affirmations live here
+            dataManager.deepLinkTab = 2
         case "streak":
-            dataManager.deepLinkTab = 4  // profile tab
+            dataManager.deepLinkTab = 4
         case "focus":
-            dataManager.deepLinkTab = 0  // home tab
+            dataManager.deepLinkTab = 0
         default:
             break
         }

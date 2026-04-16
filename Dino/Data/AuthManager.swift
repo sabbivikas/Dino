@@ -40,6 +40,10 @@ class AuthManager: ObservableObject {
                 self?.email = user?.email ?? ""
                 self?.photoURL = user?.photoURL
                 print("[Auth] state changed — signed in: \(user != nil), user: \(user?.email ?? "none")")
+
+                if let user = user {
+                    SharedDataManager.shared.loadDataForUser(user.uid)
+                }
             }
         }
     }

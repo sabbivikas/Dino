@@ -10,6 +10,8 @@ struct SignInView: View {
     @EnvironmentObject var dataManager: SharedDataManager
     @EnvironmentObject var authManager: AuthManager
 
+    @AppStorage("hasPassedAuth") private var hasPassedAuth = false
+
     @State private var heartOffset1: CGFloat = 0
     @State private var heartOffset2: CGFloat = 0
     @State private var heartOpacity1: Double = 0.7
@@ -87,11 +89,9 @@ struct SignInView: View {
                     Button {
                         Task {
                             await authManager.signInWithGoogle()
-                            // Small delay to let auth state listener fire
-                            try? await Task.sleep(nanoseconds: 500_000_000)
                             if authManager.isSignedIn {
                                 dataManager.userName = authManager.displayName
-                                dataManager.isSignedIn = true
+                                hasPassedAuth = true
                             }
                         }
                     } label: {
@@ -126,9 +126,9 @@ struct SignInView: View {
                     .buttonStyle(ScaleButtonStyle())
                     .disabled(authManager.isLoading)
 
-                    // Continue without account (skip)
+                    // Continue without account (skip / guest mode)
                     Button {
-                        dataManager.isSignedIn = true
+                        hasPassedAuth = true
                     } label: {
                         Text("continue without signing in")
                             .font(DinoTheme.subheadlineFont())
