@@ -76,7 +76,7 @@ struct LetterView: View {
         }
         .onAppear {
             // Start ambient music with fade in
-            audioManager.play(track: "letter_ambient")
+            audioManager.play(track: "letter_ambient", playback: false)
             audioManager.fadeIn(duration: 3.0)
 
             startTypewriter()

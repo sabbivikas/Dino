@@ -32,13 +32,18 @@ final class AudioManager: ObservableObject {
 
     // MARK: - Session Configuration
 
-    private func configureAudioSession() {
+    private func configureAudioSession(forPlayback: Bool = false) {
         do {
             let session = AVAudioSession.sharedInstance()
-            try session.setCategory(.ambient, mode: .default, options: [.mixWithOthers])
+            if forPlayback {
+                // .playback ignores silent mode — used for meditation/breathing/focus
+                try session.setCategory(.playback, mode: .default, options: [.mixWithOthers])
+            } else {
+                // .ambient respects silent mode — used for subtle background audio
+                try session.setCategory(.ambient, mode: .default, options: [.mixWithOthers])
+            }
             try session.setActive(true)
         } catch {
-            // Non-fatal — audio may simply not play if the session fails
             print("[AudioManager] Failed to configure AVAudioSession: \(error)")
         }
     }
@@ -49,10 +54,18 @@ final class AudioManager: ObservableObject {
     /// - Parameters:
     ///   - track: Filename without extension (e.g. "meditation_ambient")
     ///   - loop: Whether to loop continuously (default: true)
-    func play(track: String, loop: Bool = true) {
+    /// Load and play a named MP3 from the main bundle.
+    /// - Parameters:
+    ///   - track: Filename without extension (e.g. "meditation_ambient")
+    ///   - loop: Whether to loop continuously (default: true)
+    ///   - playback: If true, uses .playback category (ignores silent mode)
+    func play(track: String, loop: Bool = true, playback: Bool = true) {
         // Stop existing playback cleanly before switching tracks
         cancelFade()
         player?.stop()
+
+        // Configure audio session for the right mode
+        configureAudioSession(forPlayback: playback)
 
         guard let url = Bundle.main.url(forResource: track, withExtension: "mp3") else {
             print("[AudioManager] Could not find track: \(track).mp3")
@@ -67,6 +80,7 @@ final class AudioManager: ObservableObject {
             player?.play()
             currentTrack = track
             isPlaying = true
+            print("[AudioManager] playing: \(track) (playback: \(playback), vol: \(volume))")
         } catch {
             print("[AudioManager] Failed to create player for \(track): \(error)")
         }
