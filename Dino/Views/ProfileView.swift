@@ -74,7 +74,7 @@ struct ProfileView: View {
                                     .foregroundColor(DinoTheme.textPrimary)
                             }
                             Image(systemName: "chevron.right")
-                                .font(.system(size: 12, weight: .semibold))
+                                .font(DinoTheme.captionFont())
                                 .foregroundColor(DinoTheme.textSecondary.opacity(0.5))
                         }
                         .padding(DinoTheme.padding)

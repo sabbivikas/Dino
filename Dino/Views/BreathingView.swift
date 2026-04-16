@@ -181,7 +181,7 @@ struct BreathingView: View {
                             }
                         }) {
                             Image(systemName: audio.isPlaying ? "speaker.wave.2" : "speaker.slash")
-                                .font(.system(size: 14))
+                                .font(DinoTheme.subheadlineFont())
                                 .foregroundColor(DinoTheme.textSecondary.opacity(0.7))
                         }
                         .buttonStyle(ScaleButtonStyle())

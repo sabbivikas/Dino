@@ -29,5 +29,9 @@
 	<true/>
 	<key>NSSupportsLiveActivitiesFrequentUpdates</key>
 	<true/>
+	<key>UIAppFonts</key>
+	<array>
+		<string>DinoInitiativeFont-Regular.ttf</string>
+	</array>
 </dict>
 </plist>

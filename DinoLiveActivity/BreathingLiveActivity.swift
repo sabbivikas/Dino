@@ -33,7 +33,7 @@ struct BreathingLiveActivity: Widget {
                         .fill(BreathingColors.accent)
                         .frame(width: 8, height: 8)
                     Text(compactPhaseText(context.state.phase))
-                        .font(.system(size: 12, weight: .medium, design: .rounded))
+                        .font(.custom("DinoInitiativeFont-Regular", size: 12))
                         .foregroundColor(.white)
                 }
             } compactTrailing: {
@@ -142,18 +142,18 @@ struct BreathingLockScreenView: View {
                 if isComplete {
                     let text = completionText()
                     Text(text.title)
-                        .font(.system(size: 20, weight: .semibold, design: .rounded))
+                        .font(.custom("DinoInitiativeFont-Regular", size: 20))
                         .foregroundColor(BreathingColors.textPrimary)
                     Text(text.subtitle)
-                        .font(.system(size: 13, weight: .regular, design: .rounded))
+                        .font(.custom("DinoInitiativeFont-Regular", size: 13))
                         .foregroundColor(BreathingColors.textSecondary)
                 } else {
                     Text(phaseDisplayText(context.state.phase))
-                        .font(.system(size: 22, weight: .bold, design: .rounded))
+                        .font(.custom("DinoInitiativeFont-Regular", size: 22))
                         .foregroundColor(BreathingColors.textPrimary)
 
                     Text(phaseSubtext(context.state.phase, isPaused: context.state.isPaused))
-                        .font(.system(size: 13, weight: .regular, design: .rounded))
+                        .font(.custom("DinoInitiativeFont-Regular", size: 13))
                         .foregroundColor(BreathingColors.textSecondary)
                         .lineLimit(1)
                 }
@@ -169,7 +169,7 @@ struct BreathingLockScreenView: View {
                     .monospacedDigit()
 
                 Text("cycle \(context.state.currentCycle)/\(context.state.totalCycles)")
-                    .font(.system(size: 11, weight: .medium, design: .rounded))
+                    .font(.custom("DinoInitiativeFont-Regular", size: 11))
                     .foregroundColor(BreathingColors.textMuted)
             }
         }
@@ -260,16 +260,16 @@ struct BreathingIslandLeading: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(phaseDisplayText(context.state.phase))
-                    .font(.system(size: 14, weight: .semibold, design: .rounded))
+                    .font(.custom("DinoInitiativeFont-Regular", size: 14))
                     .foregroundColor(.white)
 
                 if context.state.isPaused {
                     Text("paused")
-                        .font(.system(size: 10, design: .rounded))
+                        .font(.custom("DinoInitiativeFont-Regular", size: 10))
                         .foregroundColor(.white.opacity(0.5))
                 } else {
                     Text(phaseSubtext(context.state.phase, isPaused: false))
-                        .font(.system(size: 10, design: .rounded))
+                        .font(.custom("DinoInitiativeFont-Regular", size: 10))
                         .foregroundColor(.white.opacity(0.6))
                         .lineLimit(1)
                 }
@@ -290,7 +290,7 @@ struct BreathingIslandTrailing: View {
                 .monospacedDigit()
 
             Text("cycle \(context.state.currentCycle)/\(context.state.totalCycles)")
-                .font(.system(size: 10, design: .rounded))
+                .font(.custom("DinoInitiativeFont-Regular", size: 10))
                 .foregroundColor(.white.opacity(0.5))
         }
         .padding(.trailing, 4)
@@ -318,7 +318,7 @@ struct BreathingIslandBottom: View {
             .padding(.horizontal, 4)
 
             Text("breathe with dino")
-                .font(.system(size: 10, weight: .medium, design: .rounded))
+                .font(.custom("DinoInitiativeFont-Regular", size: 10))
                 .foregroundColor(.white.opacity(0.4))
         }
         .padding(.bottom, 4)

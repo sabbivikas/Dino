@@ -55,7 +55,7 @@ struct MeditationView: View {
                         if viewModel.isRunning {
                             HStack(spacing: 6) {
                                 Image(systemName: "waveform")
-                                    .font(.system(size: 12))
+                                    .font(DinoTheme.captionFont())
                                     .foregroundColor(DinoTheme.lavender)
                                 Text("ambient sounds")
                                     .font(DinoTheme.captionFont())
@@ -174,7 +174,7 @@ struct MeditationView: View {
                             }
                         }) {
                             Image(systemName: audio.isPlaying ? "speaker.wave.2" : "speaker.slash")
-                                .font(.system(size: 14))
+                                .font(DinoTheme.subheadlineFont())
                                 .foregroundColor(DinoTheme.textSecondary.opacity(0.7))
                         }
                         .buttonStyle(ScaleButtonStyle())
@@ -182,9 +182,14 @@ struct MeditationView: View {
                 }
             }
         }
-        .onDisappear {
-            viewModel.stop()
-            AudioManager.shared.stop()
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)) { _ in
+            print("[Meditation] app going to background")
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
+            print("[Meditation] app returned to foreground")
+            if viewModel.isRunning {
+                viewModel.recalculateFromTimestamp()
+            }
         }
     }
 }
@@ -321,6 +326,11 @@ class MeditationViewModel: ObservableObject {
     private var messageIndex: Int = 0
     private var trackIndex: Int = 0
 
+    // Timestamp-based tracking for background accuracy
+    private var sessionStartDate: Date?
+    private var pauseAccumulated: TimeInterval = 0
+    private var lastPauseDate: Date?
+
     private let meditationTracks = ["meditation_ambient", "meditation_ambient_2"]
 
     let durationOptions: [(label: String, seconds: Int)] = [
@@ -364,6 +374,10 @@ class MeditationViewModel: ObservableObject {
         isPaused = false
         isDone = false
         isRunning = true
+        sessionStartDate = Date()
+        pauseAccumulated = 0
+        lastPauseDate = nil
+        print("[Meditation] session started — duration: \(selectedDuration)s")
         startLiveActivity()
         startMainTimer()
         startMessageTimer()
@@ -371,30 +385,54 @@ class MeditationViewModel: ObservableObject {
         trackIndex += 1
         AudioManager.shared.play(track: track)
         AudioManager.shared.fadeIn(duration: 2.0)
+        print("[Meditation] audio started: \(track)")
     }
 
     func stop() {
         stopTimers()
         isRunning = false
         isPaused = false
+        sessionStartDate = nil
         endLiveActivity()
         AudioManager.shared.stop()
+        print("[Meditation] session stopped")
     }
 
     func pause() {
         guard isRunning && !isPaused else { return }
         isPaused = true
+        lastPauseDate = Date()
         stopTimers()
         updateLiveActivity()
         AudioManager.shared.pause()
+        print("[Meditation] session paused")
     }
 
     func resume() {
         guard isRunning && isPaused else { return }
+        if let pauseStart = lastPauseDate {
+            pauseAccumulated += Date().timeIntervalSince(pauseStart)
+        }
+        lastPauseDate = nil
         isPaused = false
         startMainTimer()
         startMessageTimer()
         AudioManager.shared.resume()
+        print("[Meditation] session resumed")
+    }
+
+    /// Recalculate time from timestamps when returning from background
+    func recalculateFromTimestamp() {
+        guard let start = sessionStartDate, !isPaused else { return }
+        let elapsed = Date().timeIntervalSince(start) - pauseAccumulated
+        let elapsedInt = Int(elapsed)
+        totalElapsed = min(elapsedInt, selectedDuration)
+        timeRemaining = max(0, selectedDuration - elapsedInt)
+        print("[Meditation] recalculated from timestamp — elapsed: \(elapsedInt)s, remaining: \(timeRemaining)s")
+        updateLiveActivity()
+        if timeRemaining <= 0 {
+            finish()
+        }
     }
 
     func reset() {
@@ -408,8 +446,12 @@ class MeditationViewModel: ObservableObject {
         mainTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
             Task { @MainActor [weak self] in
                 guard let self = self, !self.isPaused else { return }
-                self.timeRemaining -= 1
-                self.totalElapsed += 1
+                // Use timestamp-based calculation for accuracy
+                if let start = self.sessionStartDate {
+                    let elapsed = Date().timeIntervalSince(start) - self.pauseAccumulated
+                    self.totalElapsed = min(Int(elapsed), self.selectedDuration)
+                    self.timeRemaining = max(0, self.selectedDuration - self.totalElapsed)
+                }
                 self.updateLiveActivity()
                 if self.timeRemaining <= 0 {
                     self.finish()

@@ -69,20 +69,20 @@ struct TodaysFocusSmallView: View {
                     .fill(theme.accent.opacity(0.15))
                     .frame(width: 46, height: 46)
                 Image(systemName: hasFocused ? "checkmark.seal.fill" : "timer")
-                    .font(.system(size: 22, weight: .medium))
+                    .font(.custom("DinoInitiativeFont-Regular", size: 22))
                     .foregroundColor(theme.accent)
             }
 
             if hasFocused {
                 Text(focusText)
-                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                    .font(.custom("DinoInitiativeFont-Regular", size: 11))
                     .foregroundColor(theme.textPrimary)
                     .multilineTextAlignment(.center)
                     .lineLimit(2)
                     .minimumScaleFactor(0.8)
             } else {
                 Text("start today's focus")
-                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                    .font(.custom("DinoInitiativeFont-Regular", size: 11))
                     .foregroundColor(theme.textPrimary)
                     .multilineTextAlignment(.center)
                     .lineLimit(2)
@@ -110,22 +110,22 @@ struct TodaysFocusMediumView: View {
                             .fill(theme.accent.opacity(0.15))
                             .frame(width: 40, height: 40)
                         Image(systemName: hasFocused ? "checkmark.seal.fill" : "timer")
-                            .font(.system(size: 20, weight: .medium))
+                            .font(.custom("DinoInitiativeFont-Regular", size: 20))
                             .foregroundColor(theme.accent)
                     }
 
                     Text("focus")
-                        .font(.system(size: 18, weight: .bold, design: .rounded))
+                        .font(.custom("DinoInitiativeFont-Regular", size: 18))
                         .foregroundColor(theme.textPrimary)
                 }
 
                 if hasFocused {
                     Text(focusText)
-                        .font(.system(size: 12, weight: .medium, design: .rounded))
+                        .font(.custom("DinoInitiativeFont-Regular", size: 12))
                         .foregroundColor(theme.textSecondary)
                 } else {
                     Text("no focus session yet")
-                        .font(.system(size: 12, design: .rounded))
+                        .font(.custom("DinoInitiativeFont-Regular", size: 12))
                         .foregroundColor(theme.textSecondary)
                 }
 
@@ -133,10 +133,10 @@ struct TodaysFocusMediumView: View {
 
                 HStack(spacing: 4) {
                     Image(systemName: "play.circle.fill")
-                        .font(.system(size: 11))
+                        .font(.custom("DinoInitiativeFont-Regular", size: 11))
                         .foregroundColor(theme.accent)
                     Text(hasFocused ? "continue" : "start focusing")
-                        .font(.system(size: 11, weight: .medium, design: .rounded))
+                        .font(.custom("DinoInitiativeFont-Regular", size: 11))
                         .foregroundColor(theme.accent)
                 }
             }
@@ -148,7 +148,7 @@ struct TodaysFocusMediumView: View {
             // Right: weekly dots
             VStack(alignment: .leading, spacing: 6) {
                 Text("this week")
-                    .font(.system(size: 10, weight: .semibold, design: .rounded))
+                    .font(.custom("DinoInitiativeFont-Regular", size: 10))
                     .foregroundColor(theme.textSecondary)
 
                 HStack(spacing: 4) {
@@ -160,7 +160,7 @@ struct TodaysFocusMediumView: View {
                                       : theme.divider)
                                 .frame(width: 18, height: 18)
                             Text(dayLettersF[i])
-                                .font(.system(size: 8, weight: .medium, design: .rounded))
+                                .font(.custom("DinoInitiativeFont-Regular", size: 8))
                                 .foregroundColor(theme.textSecondary.opacity(0.6))
                         }
                     }

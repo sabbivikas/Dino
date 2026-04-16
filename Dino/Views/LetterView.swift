@@ -8,7 +8,6 @@ import SwiftUI
 struct LetterView: View {
     var onContinue: () -> Void
 
-    private static let customFont = "DinoInitiativeFont-Regular"
     private let audioManager = AudioManager.shared
 
     @State private var displayedText = ""
@@ -29,10 +28,10 @@ struct LetterView: View {
                 HStack(alignment: .top) {
                     VStack(alignment: .leading, spacing: 0) {
                         (Text(displayedText)
-                            .font(.custom(Self.customFont, size: 18))
+                            .font(DinoTheme.dinoFont(size: 18))
                             .foregroundColor(Color(hex: "2D3142"))
                         + Text(showCursor ? "|" : " ")
-                            .font(.custom(Self.customFont, size: 18))
+                            .font(DinoTheme.dinoFont(size: 18))
                             .foregroundColor(Color(hex: "A8C5A0")))
                         .lineSpacing(8)
                         .multilineTextAlignment(.leading)
@@ -47,7 +46,7 @@ struct LetterView: View {
                 if showButton {
                     Button(action: onContinue) {
                         Text("continue")
-                            .font(.custom(Self.customFont, size: 17))
+                            .font(DinoTheme.dinoFont(size: 17))
                             .foregroundColor(.white)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 18)
@@ -67,7 +66,7 @@ struct LetterView: View {
                         withAnimation { showButton = true }
                     } label: {
                         Text("skip")
-                            .font(.custom(Self.customFont, size: 15))
+                            .font(DinoTheme.dinoFont(size: 15))
                             .foregroundColor(Color(hex: "6B7280"))
                     }
                     .padding(.bottom, 48)

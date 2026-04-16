@@ -63,12 +63,12 @@ struct FocusLockScreenView: View {
                         Text("🎯")
                             .font(.system(size: 20))
                         Text(context.state.isPaused ? "paused" : "deep focus")
-                            .font(.system(size: 16, weight: .semibold, design: .rounded))
+                            .font(.custom("DinoInitiativeFont-Regular", size: 16))
                             .foregroundColor(.white)
                     }
 
                     Text(context.state.motivationMessage)
-                        .font(.system(size: 13, design: .rounded))
+                        .font(.custom("DinoInitiativeFont-Regular", size: 13))
                         .foregroundColor(.white.opacity(0.75))
                 }
 
@@ -123,10 +123,10 @@ struct FocusExpandedLeading: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(context.state.isPaused ? "paused" : "deep focus")
-                    .font(.system(size: 13, weight: .semibold, design: .rounded))
+                    .font(.custom("DinoInitiativeFont-Regular", size: 13))
                     .foregroundColor(.white)
                 Text(context.state.motivationMessage)
-                    .font(.system(size: 10, design: .rounded))
+                    .font(.custom("DinoInitiativeFont-Regular", size: 10))
                     .foregroundColor(.white.opacity(0.65))
                     .lineLimit(1)
             }
@@ -177,7 +177,7 @@ struct FocusExpandedBottom: View {
             .padding(.horizontal, 4)
 
             Text("focus session · dino")
-                .font(.system(size: 10, design: .rounded))
+                .font(.custom("DinoInitiativeFont-Regular", size: 10))
                 .foregroundColor(.white.opacity(0.5))
         }
         .padding(.bottom, 4)

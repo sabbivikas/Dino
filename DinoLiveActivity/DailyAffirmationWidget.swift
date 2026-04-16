@@ -101,14 +101,14 @@ struct DailyAffirmationSmallView: View {
                 .font(.system(size: 22))
 
             Text(affirmation)
-                .font(.system(size: 10, weight: .medium, design: .rounded))
+                .font(.custom("DinoInitiativeFont-Regular", size: 10))
                 .foregroundColor(theme.textPrimary)
                 .multilineTextAlignment(.center)
                 .lineLimit(4)
                 .minimumScaleFactor(0.8)
 
             Text("daily affirmation")
-                .font(.system(size: 8, weight: .regular, design: .rounded))
+                .font(.custom("DinoInitiativeFont-Regular", size: 8))
                 .foregroundColor(theme.textSecondary)
         }
         .padding(10)
@@ -127,7 +127,7 @@ struct DailyAffirmationMediumView: View {
                 Text("✨")
                     .font(.system(size: 28))
                 Text("daily\naffirmation")
-                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                    .font(.custom("DinoInitiativeFont-Regular", size: 11))
                     .foregroundColor(theme.accent)
                     .lineLimit(2)
             }
@@ -138,12 +138,12 @@ struct DailyAffirmationMediumView: View {
 
             VStack(alignment: .leading, spacing: 6) {
                 Text("\u{201C}")
-                    .font(.system(size: 28, weight: .bold, design: .rounded))
+                    .font(.custom("DinoInitiativeFont-Regular", size: 28))
                     .foregroundColor(theme.accent.opacity(0.5))
                     .offset(y: 4)
 
                 Text(affirmation)
-                    .font(.system(size: 13, weight: .medium, design: .rounded))
+                    .font(.custom("DinoInitiativeFont-Regular", size: 13))
                     .foregroundColor(theme.textPrimary)
                     .multilineTextAlignment(.leading)
                     .lineLimit(3)
@@ -169,10 +169,10 @@ struct DailyAffirmationLargeView: View {
                     .font(.system(size: 32))
                 VStack(alignment: .leading, spacing: 2) {
                     Text("daily affirmation")
-                        .font(.system(size: 18, weight: .bold, design: .rounded))
+                        .font(.custom("DinoInitiativeFont-Regular", size: 18))
                         .foregroundColor(theme.textPrimary)
                     Text(Date(), style: .date)
-                        .font(.system(size: 12, design: .rounded))
+                        .font(.custom("DinoInitiativeFont-Regular", size: 12))
                         .foregroundColor(theme.textSecondary)
                 }
                 Spacer()
@@ -184,12 +184,12 @@ struct DailyAffirmationLargeView: View {
             // Quote
             VStack(alignment: .leading, spacing: 8) {
                 Text("\u{201C}")
-                    .font(.system(size: 48, weight: .bold, design: .rounded))
+                    .font(.custom("DinoInitiativeFont-Regular", size: 48))
                     .foregroundColor(theme.accent.opacity(0.4))
                     .offset(y: 8)
 
                 Text(affirmation)
-                    .font(.system(size: 18, weight: .medium, design: .rounded))
+                    .font(.custom("DinoInitiativeFont-Regular", size: 18))
                     .foregroundColor(theme.textPrimary)
                     .multilineTextAlignment(.leading)
                     .lineLimit(4)
@@ -197,7 +197,7 @@ struct DailyAffirmationLargeView: View {
                     .fixedSize(horizontal: false, vertical: true)
 
                 Text("\u{201D}")
-                    .font(.system(size: 48, weight: .bold, design: .rounded))
+                    .font(.custom("DinoInitiativeFont-Regular", size: 48))
                     .foregroundColor(theme.accent.opacity(0.4))
                     .frame(maxWidth: .infinity, alignment: .trailing)
                     .offset(y: -8)
@@ -211,11 +211,11 @@ struct DailyAffirmationLargeView: View {
             // Footer
             HStack {
                 Text("reflect on this today")
-                    .font(.system(size: 12, weight: .regular, design: .rounded))
+                    .font(.custom("DinoInitiativeFont-Regular", size: 12))
                     .foregroundColor(theme.textSecondary)
                 Spacer()
                 Text("tap to read more")
-                    .font(.system(size: 11, design: .rounded))
+                    .font(.custom("DinoInitiativeFont-Regular", size: 11))
                     .foregroundColor(theme.accent)
             }
         }

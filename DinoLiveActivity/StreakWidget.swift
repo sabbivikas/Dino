@@ -75,11 +75,11 @@ struct StreakSmallView: View {
                 )
 
             Text("\(streak)")
-                .font(.system(size: 32, weight: .bold, design: .rounded))
+                .font(.custom("DinoInitiativeFont-Regular", size: 32))
                 .foregroundColor(theme.accent)
 
             Text("day streak")
-                .font(.system(size: 11, weight: .medium, design: .rounded))
+                .font(.custom("DinoInitiativeFont-Regular", size: 11))
                 .foregroundColor(theme.textSecondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -101,18 +101,18 @@ struct StreakMediumView: View {
                     Text("🔥")
                         .font(.system(size: 28))
                     Text("\(streak)")
-                        .font(.system(size: 36, weight: .bold, design: .rounded))
+                        .font(.custom("DinoInitiativeFont-Regular", size: 36))
                         .foregroundColor(theme.accent)
                 }
 
                 Text("day streak")
-                    .font(.system(size: 12, weight: .medium, design: .rounded))
+                    .font(.custom("DinoInitiativeFont-Regular", size: 12))
                     .foregroundColor(theme.textSecondary)
 
                 Spacer()
 
                 Text("best: \(longestStreak)d")
-                    .font(.system(size: 11, weight: .regular, design: .rounded))
+                    .font(.custom("DinoInitiativeFont-Regular", size: 11))
                     .foregroundColor(theme.textSecondary.opacity(0.7))
             }
 
@@ -123,7 +123,7 @@ struct StreakMediumView: View {
             // Right: weekly dots
             VStack(alignment: .leading, spacing: 6) {
                 Text("this week")
-                    .font(.system(size: 10, weight: .semibold, design: .rounded))
+                    .font(.custom("DinoInitiativeFont-Regular", size: 10))
                     .foregroundColor(theme.textSecondary)
 
                 HStack(spacing: 4) {
@@ -135,7 +135,7 @@ struct StreakMediumView: View {
                                       : theme.divider)
                                 .frame(width: 18, height: 18)
                             Text(dayLetters[i])
-                                .font(.system(size: 8, weight: .medium, design: .rounded))
+                                .font(.custom("DinoInitiativeFont-Regular", size: 8))
                                 .foregroundColor(theme.textSecondary.opacity(0.6))
                         }
                     }
@@ -174,10 +174,10 @@ struct StreakLargeView: View {
                     .font(.system(size: 32))
                 VStack(alignment: .leading, spacing: 2) {
                     Text("\(streak) day streak")
-                        .font(.system(size: 22, weight: .bold, design: .rounded))
+                        .font(.custom("DinoInitiativeFont-Regular", size: 22))
                         .foregroundColor(theme.textPrimary)
                     Text("longest: \(longestStreak) days")
-                        .font(.system(size: 12, weight: .regular, design: .rounded))
+                        .font(.custom("DinoInitiativeFont-Regular", size: 12))
                         .foregroundColor(theme.textSecondary)
                 }
                 Spacer()
@@ -189,7 +189,7 @@ struct StreakLargeView: View {
             // Weekly progress
             VStack(alignment: .leading, spacing: 8) {
                 Text("this week")
-                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+                    .font(.custom("DinoInitiativeFont-Regular", size: 12))
                     .foregroundColor(theme.textSecondary)
 
                 HStack(spacing: 8) {
@@ -203,12 +203,12 @@ struct StreakLargeView: View {
                                 .overlay(
                                     weeklyDays.indices.contains(i) && weeklyDays[i]
                                     ? Text("✓")
-                                        .font(.system(size: 12, weight: .bold))
+                                        .font(.custom("DinoInitiativeFont-Regular", size: 12))
                                         .foregroundColor(.white)
                                     : nil
                                 )
                             Text(dayLetters[i])
-                                .font(.system(size: 10, weight: .medium, design: .rounded))
+                                .font(.custom("DinoInitiativeFont-Regular", size: 10))
                                 .foregroundColor(theme.textSecondary.opacity(0.7))
                         }
                         .frame(maxWidth: .infinity)
@@ -221,7 +221,7 @@ struct StreakLargeView: View {
 
             // Motivational text
             Text(motivationalText)
-                .font(.system(size: 14, weight: .medium, design: .rounded))
+                .font(.custom("DinoInitiativeFont-Regular", size: 14))
                 .foregroundColor(theme.textSecondary)
                 .multilineTextAlignment(.leading)
                 .lineLimit(2)

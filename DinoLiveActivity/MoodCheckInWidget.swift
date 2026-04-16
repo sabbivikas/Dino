@@ -51,7 +51,7 @@ struct MoodCheckInWidgetSmallView: View {
                 .frame(width: 44, height: 44)
 
             Text("how are\nyou feeling?")
-                .font(.system(size: 11, weight: .medium, design: .rounded))
+                .font(.custom("DinoInitiativeFont-Regular", size: 11))
                 .foregroundColor(theme.textPrimary)
                 .multilineTextAlignment(.center)
                 .lineLimit(2)
@@ -85,11 +85,11 @@ struct MoodCheckInWidgetMediumView: View {
                     .scaledToFit()
                     .frame(width: 48, height: 48)
                 Text("how are\nyou feeling?")
-                    .font(.system(size: 14, weight: .semibold, design: .rounded))
+                    .font(.custom("DinoInitiativeFont-Regular", size: 14))
                     .foregroundColor(theme.textPrimary)
                     .lineLimit(2)
                 Text("tap to check in")
-                    .font(.system(size: 10, weight: .regular, design: .rounded))
+                    .font(.custom("DinoInitiativeFont-Regular", size: 10))
                     .foregroundColor(theme.textSecondary)
             }
 
@@ -101,7 +101,7 @@ struct MoodCheckInWidgetMediumView: View {
                         Text(option.emoji)
                             .font(.system(size: 18))
                         Text(option.label)
-                            .font(.system(size: 12, weight: .medium, design: .rounded))
+                            .font(.custom("DinoInitiativeFont-Regular", size: 12))
                             .foregroundColor(theme.textPrimary.opacity(0.8))
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -133,10 +133,10 @@ struct MoodCheckInWidgetLargeView: View {
                     .frame(width: 52, height: 52)
                 VStack(alignment: .leading, spacing: 2) {
                     Text("mood check-in")
-                        .font(.system(size: 18, weight: .bold, design: .rounded))
+                        .font(.custom("DinoInitiativeFont-Regular", size: 18))
                         .foregroundColor(theme.textPrimary)
                     Text("how are you feeling right now?")
-                        .font(.system(size: 12, design: .rounded))
+                        .font(.custom("DinoInitiativeFont-Regular", size: 12))
                         .foregroundColor(theme.textSecondary)
                 }
             }
@@ -152,10 +152,10 @@ struct MoodCheckInWidgetLargeView: View {
                             .font(.system(size: 28))
                         VStack(alignment: .leading, spacing: 2) {
                             Text(option.label)
-                                .font(.system(size: 14, weight: .semibold, design: .rounded))
+                                .font(.custom("DinoInitiativeFont-Regular", size: 14))
                                 .foregroundColor(theme.textPrimary)
                             Text(option.description)
-                                .font(.system(size: 11, design: .rounded))
+                                .font(.custom("DinoInitiativeFont-Regular", size: 11))
                                 .foregroundColor(theme.textSecondary)
                         }
                         Spacer()
@@ -169,10 +169,10 @@ struct MoodCheckInWidgetLargeView: View {
             // CTA
             HStack(spacing: 6) {
                 Image(systemName: "hand.tap.fill")
-                    .font(.system(size: 12))
+                    .font(.custom("DinoInitiativeFont-Regular", size: 12))
                     .foregroundColor(theme.accent)
                 Text("tap to open and check in")
-                    .font(.system(size: 12, weight: .medium, design: .rounded))
+                    .font(.custom("DinoInitiativeFont-Regular", size: 12))
                     .foregroundColor(theme.accent)
             }
         }

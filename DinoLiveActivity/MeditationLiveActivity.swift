@@ -63,12 +63,12 @@ struct MeditationLockScreenView: View {
                         Text("🧘")
                             .font(.system(size: 20))
                         Text(context.state.isPaused ? "paused" : "meditating")
-                            .font(.system(size: 16, weight: .semibold, design: .rounded))
+                            .font(.custom("DinoInitiativeFont-Regular", size: 16))
                             .foregroundColor(.white)
                     }
 
                     Text(context.state.calmMessage)
-                        .font(.system(size: 13, design: .rounded))
+                        .font(.custom("DinoInitiativeFont-Regular", size: 13))
                         .foregroundColor(.white.opacity(0.75))
                         .italic()
                 }
@@ -124,10 +124,10 @@ struct MeditationExpandedLeading: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(context.state.isPaused ? "paused" : "meditating")
-                    .font(.system(size: 13, weight: .semibold, design: .rounded))
+                    .font(.custom("DinoInitiativeFont-Regular", size: 13))
                     .foregroundColor(.white)
                 Text(context.state.calmMessage)
-                    .font(.system(size: 10, design: .rounded))
+                    .font(.custom("DinoInitiativeFont-Regular", size: 10))
                     .foregroundColor(.white.opacity(0.65))
                     .italic()
                     .lineLimit(1)
@@ -179,7 +179,7 @@ struct MeditationExpandedBottom: View {
             .padding(.horizontal, 4)
 
             Text("stillness · dino")
-                .font(.system(size: 10, design: .rounded))
+                .font(.custom("DinoInitiativeFont-Regular", size: 10))
                 .foregroundColor(.white.opacity(0.5))
         }
         .padding(.bottom, 4)

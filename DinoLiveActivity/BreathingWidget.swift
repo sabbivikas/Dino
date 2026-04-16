@@ -64,12 +64,12 @@ struct BreathingWidgetSmallView: View {
             }
 
             Text("take 1 minute")
-                .font(.system(size: 11, weight: .semibold, design: .rounded))
+                .font(.custom("DinoInitiativeFont-Regular", size: 11))
                 .foregroundColor(theme.textPrimary)
                 .multilineTextAlignment(.center)
 
             Text("breathe")
-                .font(.system(size: 10, weight: .regular, design: .rounded))
+                .font(.custom("DinoInitiativeFont-Regular", size: 10))
                 .foregroundColor(theme.textSecondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -103,11 +103,11 @@ struct BreathingWidgetMediumView: View {
             // Right: copy
             VStack(alignment: .leading, spacing: 6) {
                 Text("breathe")
-                    .font(.system(size: 18, weight: .bold, design: .rounded))
+                    .font(.custom("DinoInitiativeFont-Regular", size: 18))
                     .foregroundColor(theme.textPrimary)
 
                 Text("take a mindful moment and reset with a guided breathing session.")
-                    .font(.system(size: 11, weight: .regular, design: .rounded))
+                    .font(.custom("DinoInitiativeFont-Regular", size: 11))
                     .foregroundColor(theme.textSecondary)
                     .lineLimit(3)
                     .minimumScaleFactor(0.85)
@@ -116,10 +116,10 @@ struct BreathingWidgetMediumView: View {
 
                 HStack(spacing: 4) {
                     Image(systemName: "play.circle.fill")
-                        .font(.system(size: 12))
+                        .font(.custom("DinoInitiativeFont-Regular", size: 12))
                         .foregroundColor(theme.accent)
                     Text("start breathing")
-                        .font(.system(size: 11, weight: .medium, design: .rounded))
+                        .font(.custom("DinoInitiativeFont-Regular", size: 11))
                         .foregroundColor(theme.accent)
                 }
             }

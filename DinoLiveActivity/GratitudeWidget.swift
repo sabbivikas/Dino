@@ -60,11 +60,11 @@ struct GratitudeSmallView: View {
                 .font(.system(size: 32))
 
             Text("\(todayCount)")
-                .font(.system(size: 32, weight: .bold, design: .rounded))
+                .font(.custom("DinoInitiativeFont-Regular", size: 32))
                 .foregroundColor(theme.accent)
 
             Text(todayCount == 1 ? "gratitude today" : "gratitudes today")
-                .font(.system(size: 10, weight: .medium, design: .rounded))
+                .font(.custom("DinoInitiativeFont-Regular", size: 10))
                 .foregroundColor(theme.textSecondary)
                 .multilineTextAlignment(.center)
         }
@@ -92,18 +92,18 @@ struct GratitudeMediumView: View {
                     Text("🫙")
                         .font(.system(size: 28))
                     Text("\(todayCount)")
-                        .font(.system(size: 34, weight: .bold, design: .rounded))
+                        .font(.custom("DinoInitiativeFont-Regular", size: 34))
                         .foregroundColor(theme.accent)
                 }
 
                 Text(todayCount == 1 ? "gratitude today" : "gratitudes today")
-                    .font(.system(size: 11, weight: .medium, design: .rounded))
+                    .font(.custom("DinoInitiativeFont-Regular", size: 11))
                     .foregroundColor(theme.textSecondary)
 
                 Spacer()
 
                 Text("\(totalCount) total")
-                    .font(.system(size: 10, design: .rounded))
+                    .font(.custom("DinoInitiativeFont-Regular", size: 10))
                     .foregroundColor(theme.textSecondary.opacity(0.6))
             }
 
@@ -114,7 +114,7 @@ struct GratitudeMediumView: View {
             // Right: progress + CTA
             VStack(alignment: .leading, spacing: 8) {
                 Text("today's jar")
-                    .font(.system(size: 10, weight: .semibold, design: .rounded))
+                    .font(.custom("DinoInitiativeFont-Regular", size: 10))
                     .foregroundColor(theme.textSecondary)
 
                 // Progress bar representing today's jar fill
@@ -132,17 +132,17 @@ struct GratitudeMediumView: View {
                 .frame(height: 10)
 
                 Text("\(todayCount)/\(dailyGoal) slips added")
-                    .font(.system(size: 10, design: .rounded))
+                    .font(.custom("DinoInitiativeFont-Regular", size: 10))
                     .foregroundColor(theme.textSecondary.opacity(0.7))
 
                 Spacer()
 
                 HStack(spacing: 4) {
                     Image(systemName: "plus.circle.fill")
-                        .font(.system(size: 12))
+                        .font(.custom("DinoInitiativeFont-Regular", size: 12))
                         .foregroundColor(theme.accent)
                     Text("add today's gratitude")
-                        .font(.system(size: 11, weight: .medium, design: .rounded))
+                        .font(.custom("DinoInitiativeFont-Regular", size: 11))
                         .foregroundColor(theme.accent)
                 }
             }
@@ -180,19 +180,19 @@ struct GratitudeLargeView: View {
                     .font(.system(size: 36))
                 VStack(alignment: .leading, spacing: 2) {
                     Text("gratitude jar")
-                        .font(.system(size: 18, weight: .bold, design: .rounded))
+                        .font(.custom("DinoInitiativeFont-Regular", size: 18))
                         .foregroundColor(theme.textPrimary)
                     Text("\(totalCount) slips total")
-                        .font(.system(size: 12, design: .rounded))
+                        .font(.custom("DinoInitiativeFont-Regular", size: 12))
                         .foregroundColor(theme.textSecondary)
                 }
                 Spacer()
                 VStack(alignment: .trailing, spacing: 2) {
                     Text("\(todayCount)")
-                        .font(.system(size: 28, weight: .bold, design: .rounded))
+                        .font(.custom("DinoInitiativeFont-Regular", size: 28))
                         .foregroundColor(theme.accent)
                     Text("today")
-                        .font(.system(size: 10, design: .rounded))
+                        .font(.custom("DinoInitiativeFont-Regular", size: 10))
                         .foregroundColor(theme.textSecondary)
                 }
             }
@@ -203,7 +203,7 @@ struct GratitudeLargeView: View {
             // Today's progress
             VStack(alignment: .leading, spacing: 8) {
                 Text("today's progress")
-                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+                    .font(.custom("DinoInitiativeFont-Regular", size: 12))
                     .foregroundColor(theme.textSecondary)
 
                 GeometryReader { geo in
@@ -220,7 +220,7 @@ struct GratitudeLargeView: View {
                 .frame(height: 14)
 
                 Text("\(todayCount) of \(dailyGoal) daily gratitudes added")
-                    .font(.system(size: 11, design: .rounded))
+                    .font(.custom("DinoInitiativeFont-Regular", size: 11))
                     .foregroundColor(theme.textSecondary.opacity(0.7))
             }
 
@@ -229,7 +229,7 @@ struct GratitudeLargeView: View {
 
             // Encouragement
             Text(encouragement)
-                .font(.system(size: 14, weight: .medium, design: .rounded))
+                .font(.custom("DinoInitiativeFont-Regular", size: 14))
                 .foregroundColor(theme.textSecondary)
                 .multilineTextAlignment(.leading)
 
@@ -238,10 +238,10 @@ struct GratitudeLargeView: View {
             // CTA
             HStack(spacing: 6) {
                 Image(systemName: "plus.circle.fill")
-                    .font(.system(size: 16))
+                    .font(.custom("DinoInitiativeFont-Regular", size: 16))
                     .foregroundColor(theme.accent)
                 Text("tap to add a gratitude")
-                    .font(.system(size: 13, weight: .medium, design: .rounded))
+                    .font(.custom("DinoInitiativeFont-Regular", size: 13))
                     .foregroundColor(theme.accent)
             }
         }

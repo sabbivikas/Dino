@@ -115,7 +115,7 @@ struct ThemeSettingsView: View {
             } label: {
                 HStack(spacing: 8) {
                     Image(systemName: "checkmark")
-                        .font(.system(size: 15, weight: .semibold))
+                        .font(DinoTheme.subheadlineFont())
                     Text("apply theme")
                         .font(DinoTheme.bodyFont())
                 }
@@ -156,7 +156,7 @@ struct ThemeSettingsView: View {
             // Info note: in weather mode the theme isn't manually choosable
             HStack(spacing: 8) {
                 Image(systemName: "info.circle")
-                    .font(.system(size: 14))
+                    .font(DinoTheme.subheadlineFont())
                     .foregroundColor(DinoTheme.accent)
                 Text("theme is controlled by weather. switch to manual to choose your own.")
                     .font(DinoTheme.captionFont())
@@ -320,7 +320,7 @@ private struct ModeButton: View {
         Button(action: action) {
             VStack(spacing: 6) {
                 Image(systemName: icon)
-                    .font(.system(size: 18))
+                    .font(DinoTheme.dinoFont(size: 18))
                 Text(title)
                     .font(DinoTheme.captionFont())
                     .lineLimit(1)
@@ -377,7 +377,7 @@ struct ThemePreviewCard: View {
                     // Checkmark badge — applied theme
                     if isApplied {
                         Image(systemName: "checkmark.circle.fill")
-                            .font(.system(size: 14, weight: .semibold))
+                            .font(DinoTheme.subheadlineFont())
                             .foregroundColor(colors.accent)
                             .background(Circle().fill(Color.white).padding(1))
                             .padding(5)

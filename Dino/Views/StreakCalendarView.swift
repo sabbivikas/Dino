@@ -87,7 +87,7 @@ struct StreakCalendarView: View {
                     withAnimation { shiftMonth(-1) }
                 } label: {
                     Image(systemName: "chevron.left")
-                        .font(.system(size: 14, weight: .semibold))
+                        .font(DinoTheme.subheadlineFont())
                         .foregroundColor(DinoTheme.sageGreen)
                 }
 
@@ -103,7 +103,7 @@ struct StreakCalendarView: View {
                     withAnimation { shiftMonth(1) }
                 } label: {
                     Image(systemName: "chevron.right")
-                        .font(.system(size: 14, weight: .semibold))
+                        .font(DinoTheme.subheadlineFont())
                         .foregroundColor(canGoForward ? DinoTheme.sageGreen : DinoTheme.textSecondary.opacity(0.3))
                 }
                 .disabled(!canGoForward)
