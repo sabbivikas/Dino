@@ -319,6 +319,9 @@ class MeditationViewModel: ObservableObject {
     private var mainTimer: Timer?
     private var messageTimer: Timer?
     private var messageIndex: Int = 0
+    private var trackIndex: Int = 0
+
+    private let meditationTracks = ["meditation_ambient", "meditation_ambient_2"]
 
     let durationOptions: [(label: String, seconds: Int)] = [
         ("2 min", 120),
@@ -364,7 +367,9 @@ class MeditationViewModel: ObservableObject {
         startLiveActivity()
         startMainTimer()
         startMessageTimer()
-        AudioManager.shared.play(track: "meditation_ambient")
+        let track = meditationTracks[trackIndex % meditationTracks.count]
+        trackIndex += 1
+        AudioManager.shared.play(track: track)
         AudioManager.shared.fadeIn(duration: 2.0)
     }
 
