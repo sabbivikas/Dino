@@ -317,57 +317,89 @@ struct MorningMoodSmallView: View {
 
 struct MorningMoodMediumView: View {
     private var weeklyDays: [Bool] { WidgetDataProvider().weeklyStreakDays }
+    private let dayLabels = ["s", "m", "t", "w", "t", "f", "s"]
+    private var todayIndex: Int { Calendar.current.component(.weekday, from: Date()) - 1 }
 
     var body: some View {
-        ZStack {
-            // Warm background
-            morningBg
+        GeometryReader { geo in
+            ZStack {
+                morningBg
 
-            // DinoMorning image on the left ~45% with right-edge fade mask
-            GeometryReader { geo in
-                Image("DinoMorning")
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: geo.size.width * 0.48, height: geo.size.height)
-                    .clipped()
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    // Fade right edge into the background
-                    .mask(
-                        LinearGradient(
-                            colors: [Color.black.opacity(0.9), Color.clear],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
-                    )
-            }
+                HStack(alignment: .center, spacing: 0) {
+                    // MARK: LEFT — greeting + day tracker
+                    VStack(alignment: .leading, spacing: 0) {
+                        // Greeting row: dino + text stack + sun aligned with greeting
+                        HStack(alignment: .center, spacing: 10) {
+                            Image("DinoMorning")
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 52, height: 52)
 
-            // Right side content
-            HStack(alignment: .bottom) {
-                Spacer()
+                            VStack(alignment: .leading, spacing: 2) {
+                                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                                    Text("good morning")
+                                        .font(.custom("DinoInitiativeFont-Regular", size: 15))
+                                        .foregroundColor(morningTextPrimary)
+                                    Image(systemName: "sun.max.fill")
+                                        .font(.system(size: 11))
+                                        .foregroundColor(morningTextPrimary.opacity(0.8))
+                                }
+                                Text("take it easy today")
+                                    .font(.custom("DinoInitiativeFont-Regular", size: 11))
+                                    .foregroundColor(morningTextSecondary)
+                            }
+                        }
 
-                VStack(alignment: .leading, spacing: 6) {
-                    Spacer()
+                        Spacer(minLength: 10)
 
-                    Text("good morning")
-                        .font(.custom("DinoInitiativeFont-Regular", size: 14))
-                        .foregroundColor(morningTextPrimary)
-                        .lineLimit(1)
+                        // Day tracker — evenly spaced, today's dot prominent
+                        HStack(spacing: 8) {
+                            ForEach(0..<7, id: \.self) { index in
+                                let isToday = todayIndex == index
+                                let isActive = weeklyDays[index]
+                                VStack(spacing: 3) {
+                                    Text(dayLabels[index])
+                                        .font(.custom("DinoInitiativeFont-Regular", size: 8))
+                                        .foregroundColor(isToday ? morningAccent : morningTextPrimary.opacity(0.5))
 
-                    Text("take it easy today")
-                        .font(.custom("DinoInitiativeFont-Regular", size: 10))
-                        .foregroundColor(morningTextSecondary)
+                                    ZStack {
+                                        if isToday {
+                                            Circle()
+                                                .stroke(morningAccent, lineWidth: 1.5)
+                                                .frame(width: 14, height: 14)
+                                        }
+                                        Circle()
+                                            .fill(isActive ? morningAccent : morningTextPrimary.opacity(0.2))
+                                            .frame(
+                                                width: isToday ? 9 : 7,
+                                                height: isToday ? 9 : 7
+                                            )
+                                    }
+                                    .frame(width: 14, height: 14)
+                                }
+                            }
+                        }
+                    }
+                    .padding(16)
+                    .frame(width: geo.size.width * 0.55, alignment: .leading)
 
-                    Spacer()
+                    // MARK: DIVIDER — soft white, 60% height
+                    Rectangle()
+                        .fill(Color.white.opacity(0.3))
+                        .frame(width: 1, height: geo.size.height * 0.6)
 
-                    // Weekly tracker
-                    WeeklyTrackerRow(
-                        days: weeklyDays,
-                        textColor: morningTextPrimary,
-                        accentColor: morningAccent
-                    )
+                    // MARK: RIGHT — minimal motivational line, vertically centered
+                    VStack {
+                        Text("a small step\nis still a step")
+                            .font(.custom("DinoInitiativeFont-Regular", size: 13))
+                            .foregroundColor(morningTextPrimary.opacity(0.9))
+                            .multilineTextAlignment(.center)
+                            .lineLimit(2)
+                            .lineSpacing(2)
+                    }
+                    .padding(16)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
-                .padding(14)
-                .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
