@@ -333,26 +333,33 @@ struct MorningMoodMediumView: View {
     var body: some View {
         GeometryReader { geo in
             HStack(spacing: 0) {
-                // LEFT SIDE — dino above text, tracker at bottom
+                // LEFT SIDE — greeting, dino, tracker
                 VStack(alignment: .leading, spacing: 0) {
-                    // Dino image — fixed size, above greeting
-                    Image("DinoMorning")
-                        .resizable()
-                        .scaledToFill()
-                        .frame(width: 52, height: 52)
-                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                    // "good morning" with sun icon inline
+                    HStack(spacing: 6) {
+                        Text("good morning")
+                            .font(.custom("DinoInitiativeFont-Regular", size: 15))
+                            .foregroundColor(morningTextPrimary)
+                            .lineLimit(1)
 
-                    Spacer().frame(height: 8)
+                        Text("☀️")
+                            .font(.system(size: 12))
+                    }
 
-                    // Greeting text
-                    Text("good morning")
-                        .font(.custom("DinoInitiativeFont-Regular", size: 15))
-                        .foregroundColor(morningTextPrimary)
-                        .lineLimit(1)
+                    Spacer().frame(height: 2)
 
                     Text("take it easy today")
                         .font(.custom("DinoInitiativeFont-Regular", size: 10))
                         .foregroundColor(morningTextSecondary)
+
+                    Spacer().frame(height: 8)
+
+                    // Dino image — no card, no box
+                    Image("DinoMorning")
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: 52, height: 52)
+                        .clipped()
 
                     Spacer()
 
