@@ -35,6 +35,7 @@ struct BreathingLiveActivity: Widget {
                     Text(compactPhaseText(context.state.phase))
                         .font(.custom("DinoInitiativeFont-Regular", size: 12))
                         .foregroundColor(.white)
+                        .contentTransition(.opacity)
                 }
             } compactTrailing: {
                 Text(formatTime(context.state.secondsRemaining))
@@ -46,7 +47,7 @@ struct BreathingLiveActivity: Widget {
                     Circle()
                         .stroke(BreathingColors.accent.opacity(0.3), lineWidth: 2)
                     Circle()
-                        .trim(from: 0, to: context.state.progress)
+                        .trim(from: 0, to: 1.0 - context.state.progress)
                         .stroke(BreathingColors.accent, style: StrokeStyle(lineWidth: 2, lineCap: .round))
                         .rotationEffect(.degrees(-90))
                 }
@@ -100,23 +101,14 @@ private func phaseDisplayText(_ phase: String) -> String {
 
 private func phaseSubtext(_ phase: String, isPaused: Bool) -> String {
     if isPaused {
-        return ["pause and feel your breath", "take your time", "no rush, just be"].randomElement() ?? "take your time"
+        return "take your time"
     }
     switch phase {
     case "Inhale": return "let it in slowly"
-    case "Hold":   return "stay here"
-    case "Exhale": return "let it all go"
+    case "Hold":   return "hold the calm"
+    case "Exhale": return "release and let go"
     default:       return "just breathe"
     }
-}
-
-private func completionText() -> (title: String, subtitle: String) {
-    let options: [(String, String)] = [
-        ("you did it", "feel the calm"),
-        ("well done", "carry this peace with you"),
-        ("beautiful", "you showed up for yourself")
-    ]
-    return options.randomElement() ?? ("you did it", "feel the calm")
 }
 
 private func formatTime(_ seconds: Int) -> String {
@@ -140,22 +132,29 @@ struct BreathingLockScreenView: View {
             // Center: phase text + calming subtext
             VStack(alignment: .leading, spacing: 4) {
                 if isComplete {
-                    let text = completionText()
-                    Text(text.title)
+                    Text("✓")
+                        .font(.system(size: 24, weight: .semibold, design: .rounded))
+                        .foregroundColor(BreathingColors.accent)
+                    Text("you did it 🦕")
                         .font(.custom("DinoInitiativeFont-Regular", size: 20))
                         .foregroundColor(BreathingColors.textPrimary)
-                    Text(text.subtitle)
+                    Text("feel the calm")
                         .font(.custom("DinoInitiativeFont-Regular", size: 13))
                         .foregroundColor(BreathingColors.textSecondary)
                 } else {
-                    Text(phaseDisplayText(context.state.phase))
-                        .font(.custom("DinoInitiativeFont-Regular", size: 22))
-                        .foregroundColor(BreathingColors.textPrimary)
+                    Group {
+                        Text(phaseDisplayText(context.state.phase))
+                            .font(.custom("DinoInitiativeFont-Regular", size: 22))
+                            .foregroundColor(BreathingColors.textPrimary)
 
-                    Text(phaseSubtext(context.state.phase, isPaused: context.state.isPaused))
-                        .font(.custom("DinoInitiativeFont-Regular", size: 13))
-                        .foregroundColor(BreathingColors.textSecondary)
-                        .lineLimit(1)
+                        Text(phaseSubtext(context.state.phase, isPaused: context.state.isPaused))
+                            .font(.custom("DinoInitiativeFont-Regular", size: 13))
+                            .foregroundColor(BreathingColors.textSecondary)
+                            .lineLimit(1)
+                    }
+                    .id(context.state.phase)
+                    .transition(.opacity.combined(with: .scale(0.95)))
+                    .animation(.easeInOut(duration: 0.4), value: context.state.phase)
                 }
             }
 
@@ -194,19 +193,20 @@ struct BreathingLockScreenView: View {
 
     private var breathingRing: some View {
         ZStack {
-            // Outer glow ring
+            // Outer glow ring — pulses with phase
             Circle()
-                .fill(BreathingColors.accent.opacity(0.08))
+                .fill(BreathingColors.accent.opacity(outerGlowOpacity))
                 .frame(width: 62, height: 62)
+                .animation(.easeInOut(duration: 0.6), value: context.state.phase)
 
             // Track ring
             Circle()
                 .stroke(BreathingColors.accent.opacity(0.2), lineWidth: 3)
                 .frame(width: 52, height: 52)
 
-            // Progress ring
+            // Progress ring — fills 0.0 → 1.0
             Circle()
-                .trim(from: 0, to: context.state.progress)
+                .trim(from: 0, to: 1.0 - context.state.progress)
                 .stroke(
                     BreathingColors.accent,
                     style: StrokeStyle(lineWidth: 3, lineCap: .round)
@@ -214,10 +214,11 @@ struct BreathingLockScreenView: View {
                 .frame(width: 52, height: 52)
                 .rotationEffect(.degrees(-90))
 
-            // Inner breathing circle — scales with phase
+            // Inner breathing circle — smooth phase transitions
             Circle()
                 .fill(BreathingColors.accent.opacity(0.25))
                 .frame(width: breathCircleSize, height: breathCircleSize)
+                .animation(.easeInOut(duration: 0.6), value: context.state.phase)
 
             // Dino dot
             Circle()
@@ -226,9 +227,18 @@ struct BreathingLockScreenView: View {
         }
     }
 
+    private var outerGlowOpacity: Double {
+        switch context.state.phase {
+        case "Inhale": return 0.14
+        case "Hold":   return 0.10
+        case "Exhale": return 0.06
+        default:       return 0.08
+        }
+    }
+
     private var breathCircleSize: CGFloat {
         switch context.state.phase {
-        case "Inhale": return 30
+        case "Inhale": return 28
         case "Hold":   return 30
         case "Exhale": return 16
         default:       return 20
@@ -249,7 +259,7 @@ struct BreathingIslandLeading: View {
                     .stroke(BreathingColors.accent.opacity(0.3), lineWidth: 2)
                     .frame(width: 28, height: 28)
                 Circle()
-                    .trim(from: 0, to: context.state.progress)
+                    .trim(from: 0, to: 1.0 - context.state.progress)
                     .stroke(BreathingColors.accent, style: StrokeStyle(lineWidth: 2, lineCap: .round))
                     .frame(width: 28, height: 28)
                     .rotationEffect(.degrees(-90))
@@ -262,6 +272,7 @@ struct BreathingIslandLeading: View {
                 Text(phaseDisplayText(context.state.phase))
                     .font(.custom("DinoInitiativeFont-Regular", size: 14))
                     .foregroundColor(.white)
+                    .contentTransition(.opacity)
 
                 if context.state.isPaused {
                     Text("paused")
@@ -311,7 +322,7 @@ struct BreathingIslandBottom: View {
 
                     Capsule()
                         .fill(BreathingColors.accent)
-                        .frame(width: max(4, geo.size.width * context.state.progress), height: 4)
+                        .frame(width: max(4, geo.size.width * (1.0 - context.state.progress)), height: 4)
                 }
             }
             .frame(height: 4)
