@@ -5,6 +5,7 @@
 //  Home screen widget that invites users to check in with their mood.
 //  Tapping opens the app's mood screen via dino://mood deep link.
 //  At night (9PM–6AM), shows a calm sleeping dino scene and links to journal.
+//  In the morning (6AM–noon), shows a bright sunrise dino scene.
 //
 
 import WidgetKit
@@ -12,58 +13,74 @@ import SwiftUI
 
 // Color(hex:) is defined in BreathingLiveActivity.swift
 
+// MARK: - Time State
+
+enum DinoTimeState {
+    case morning   // sunrise (~6AM) to noon
+    case day       // noon to 9PM
+    case night     // 9PM to 6AM
+
+    static func current(for date: Date = Date()) -> DinoTimeState {
+        let hour = Calendar.current.component(.hour, from: date)
+        if hour >= 21 || hour < 6 { return .night }
+        if hour < 12 { return .morning }
+        return .day
+    }
+
+    var deepLink: String {
+        switch self {
+        case .morning: return "dino://mood"
+        case .day: return "dino://mood"
+        case .night: return "dino://journal"
+        }
+    }
+}
+
 // MARK: - Timeline Entry
 
 struct MoodCheckInEntry: TimelineEntry {
     let date: Date
-    let isNightMode: Bool
+    let timeState: DinoTimeState
 }
 
 // MARK: - Timeline Provider
 
 struct MoodCheckInProvider: TimelineProvider {
     func placeholder(in context: Context) -> MoodCheckInEntry {
-        MoodCheckInEntry(date: Date(), isNightMode: false)
+        MoodCheckInEntry(date: Date(), timeState: .day)
     }
 
     func getSnapshot(in context: Context, completion: @escaping (MoodCheckInEntry) -> Void) {
-        completion(MoodCheckInEntry(date: Date(), isNightMode: isNightTime()))
+        completion(MoodCheckInEntry(date: Date(), timeState: DinoTimeState.current()))
     }
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<MoodCheckInEntry>) -> Void) {
         let now = Date()
         let calendar = Calendar.current
-        let hour = calendar.component(.hour, from: now)
-        let isNight = hour >= 21 || hour < 6  // 9PM – 6AM
+        let currentState = DinoTimeState.current(for: now)
 
         var entries: [MoodCheckInEntry] = []
-        entries.append(MoodCheckInEntry(date: now, isNightMode: isNight))
+        entries.append(MoodCheckInEntry(date: now, timeState: currentState))
 
-        // Schedule transition entries at 9PM and 6AM
-        var nextTransition: Date
-        if hour >= 21 {
-            // Currently night, next transition is 6AM tomorrow
-            nextTransition = calendar.date(bySettingHour: 6, minute: 0, second: 0, of: now)!
-            if nextTransition <= now {
-                nextTransition = calendar.date(byAdding: .day, value: 1, to: nextTransition)!
+        // Schedule entries at each transition point
+        let transitionHours = [6, 12, 21]  // morning, day, night
+        let transitionStates: [DinoTimeState] = [.morning, .day, .night]
+
+        for i in 0..<transitionHours.count {
+            var target = calendar.date(bySettingHour: transitionHours[i], minute: 0, second: 0, of: now)!
+            if target <= now {
+                target = calendar.date(byAdding: .day, value: 1, to: target)!
             }
-        } else if hour < 6 {
-            // Currently night (early morning), next transition is 6AM today
-            nextTransition = calendar.date(bySettingHour: 6, minute: 0, second: 0, of: now)!
-        } else {
-            // Currently day, next transition is 9PM today
-            nextTransition = calendar.date(bySettingHour: 21, minute: 0, second: 0, of: now)!
+            entries.append(MoodCheckInEntry(date: target, timeState: transitionStates[i]))
         }
 
-        entries.append(MoodCheckInEntry(date: nextTransition, isNightMode: !isNight))
+        // Sort entries by date
+        entries.sort { $0.date < $1.date }
 
-        let timeline = Timeline(entries: entries, policy: .after(nextTransition.addingTimeInterval(3600)))
+        // Next transition is the second entry (first future one)
+        let nextTransition = entries.count > 1 ? entries[1].date : now.addingTimeInterval(3600)
+        let timeline = Timeline(entries: entries, policy: .after(nextTransition.addingTimeInterval(60)))
         completion(timeline)
-    }
-
-    private func isNightTime() -> Bool {
-        let hour = Calendar.current.component(.hour, from: Date())
-        return hour >= 21 || hour < 6
     }
 }
 
@@ -74,6 +91,14 @@ private let nightCard = Color(hex: "252650")
 private let nightTextPrimary = Color(hex: "E8E8F5")
 private let nightTextSecondary = Color(hex: "9898B8")
 private let nightAccent = Color(hex: "7B8CDE")
+
+// MARK: - Morning Mode Color Palette
+
+private let morningBg = Color(hex: "F5B731")
+private let morningCard = Color(hex: "F0A819")
+private let morningTextPrimary = Color(hex: "2D4A2D")
+private let morningTextSecondary = Color(hex: "5A6B3A")
+private let morningAccent = Color(hex: "2D6B2D")
 
 // MARK: - Weekly Tracker Row
 
@@ -258,6 +283,153 @@ struct NightMoodLargeView: View {
     }
 }
 
+// MARK: - Morning Mode Views
+
+struct MorningMoodSmallView: View {
+    var body: some View {
+        ZStack(alignment: .bottomLeading) {
+            // Full-bleed morning dino image as background
+            Image("DinoMorning")
+                .resizable()
+                .scaledToFill()
+                .clipped()
+
+            // Subtle gradient overlay from top-right for text readability
+            LinearGradient(
+                colors: [
+                    Color.clear,
+                    morningBg.opacity(0.55)
+                ],
+                startPoint: .topTrailing,
+                endPoint: .bottomLeading
+            )
+
+            // Bottom-left "good morning" text
+            Text("good morning")
+                .font(.custom("DinoInitiativeFont-Regular", size: 11))
+                .foregroundColor(morningTextPrimary)
+                .padding(10)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(morningBg)
+    }
+}
+
+struct MorningMoodMediumView: View {
+    private var weeklyDays: [Bool] { WidgetDataProvider().weeklyStreakDays }
+
+    var body: some View {
+        ZStack {
+            // Warm background
+            morningBg
+
+            // DinoMorning image on the left ~45% with right-edge fade mask
+            GeometryReader { geo in
+                Image("DinoMorning")
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: geo.size.width * 0.48, height: geo.size.height)
+                    .clipped()
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    // Fade right edge into the background
+                    .mask(
+                        LinearGradient(
+                            colors: [Color.black.opacity(0.9), Color.clear],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+            }
+
+            // Right side content
+            HStack(alignment: .bottom) {
+                Spacer()
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Spacer()
+
+                    Text("good morning")
+                        .font(.custom("DinoInitiativeFont-Regular", size: 14))
+                        .foregroundColor(morningTextPrimary)
+                        .lineLimit(1)
+
+                    Text("take it easy today")
+                        .font(.custom("DinoInitiativeFont-Regular", size: 10))
+                        .foregroundColor(morningTextSecondary)
+
+                    Spacer()
+
+                    // Weekly tracker
+                    WeeklyTrackerRow(
+                        days: weeklyDays,
+                        textColor: morningTextPrimary,
+                        accentColor: morningAccent
+                    )
+                }
+                .padding(14)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+struct MorningMoodLargeView: View {
+    private var weeklyDays: [Bool] { WidgetDataProvider().weeklyStreakDays }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            // Top: title + subtitle
+            Text("good morning")
+                .font(.custom("DinoInitiativeFont-Regular", size: 18))
+                .foregroundColor(morningTextPrimary)
+                .padding(.top, 18)
+                .padding(.horizontal, 16)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            Text("a new day begins")
+                .font(.custom("DinoInitiativeFont-Regular", size: 12))
+                .foregroundColor(morningTextSecondary)
+                .padding(.top, 4)
+                .padding(.horizontal, 16)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            Spacer()
+
+            // Center: DinoMorning image, prominent
+            Image("DinoMorning")
+                .resizable()
+                .scaledToFit()
+                .frame(maxWidth: .infinity)
+                .padding(.horizontal, 16)
+                .cornerRadius(14)
+
+            Spacer()
+
+            // Bottom: WeeklyTrackerRow + CTA
+            VStack(spacing: 10) {
+                WeeklyTrackerRow(
+                    days: weeklyDays,
+                    textColor: morningTextPrimary,
+                    accentColor: morningAccent
+                )
+
+                Text("tap to check in")
+                    .font(.custom("DinoInitiativeFont-Regular", size: 12))
+                    .foregroundColor(morningAccent)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 7)
+                    .background(morningCard)
+                    .cornerRadius(10)
+            }
+            .padding(.horizontal, 16)
+            .padding(.bottom, 18)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(morningBg)
+    }
+}
+
 // MARK: - Day Mode Widget Views (unchanged)
 
 struct MoodCheckInWidgetSmallView: View {
@@ -412,33 +584,31 @@ struct MoodCheckInWidgetEntryView: View {
 
     var body: some View {
         Group {
-            if entry.isNightMode {
-                // Night mode views
+            switch entry.timeState {
+            case .morning:
                 switch family {
-                case .systemSmall:
-                    NightMoodSmallView()
-                case .systemMedium:
-                    NightMoodMediumView()
-                case .systemLarge:
-                    NightMoodLargeView()
-                default:
-                    NightMoodSmallView()
+                case .systemSmall: MorningMoodSmallView()
+                case .systemMedium: MorningMoodMediumView()
+                case .systemLarge: MorningMoodLargeView()
+                default: MorningMoodSmallView()
                 }
-            } else {
-                // Existing day views — keep unchanged
+            case .day:
                 switch family {
-                case .systemSmall:
-                    MoodCheckInWidgetSmallView(theme: theme)
-                case .systemMedium:
-                    MoodCheckInWidgetMediumView(theme: theme)
-                case .systemLarge:
-                    MoodCheckInWidgetLargeView(theme: theme)
-                default:
-                    MoodCheckInWidgetSmallView(theme: theme)
+                case .systemSmall: MoodCheckInWidgetSmallView(theme: theme)
+                case .systemMedium: MoodCheckInWidgetMediumView(theme: theme)
+                case .systemLarge: MoodCheckInWidgetLargeView(theme: theme)
+                default: MoodCheckInWidgetSmallView(theme: theme)
+                }
+            case .night:
+                switch family {
+                case .systemSmall: NightMoodSmallView()
+                case .systemMedium: NightMoodMediumView()
+                case .systemLarge: NightMoodLargeView()
+                default: NightMoodSmallView()
                 }
             }
         }
-        .widgetURL(URL(string: entry.isNightMode ? "dino://journal" : "dino://mood"))
+        .widgetURL(URL(string: entry.timeState.deepLink))
         .containerBackground(.clear, for: .widget)
     }
 }
@@ -463,6 +633,7 @@ struct MoodCheckInWidget: Widget {
 #Preview(as: .systemSmall) {
     MoodCheckInWidget()
 } timeline: {
-    MoodCheckInEntry(date: .now, isNightMode: false)
-    MoodCheckInEntry(date: .now, isNightMode: true)
+    MoodCheckInEntry(date: .now, timeState: .morning)
+    MoodCheckInEntry(date: .now, timeState: .day)
+    MoodCheckInEntry(date: .now, timeState: .night)
 }
