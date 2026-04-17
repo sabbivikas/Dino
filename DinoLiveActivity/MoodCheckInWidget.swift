@@ -332,69 +332,56 @@ struct MorningMoodMediumView: View {
 
     var body: some View {
         GeometryReader { geo in
-            ZStack {
-                morningBg
+            HStack(spacing: 0) {
+                // LEFT SIDE — dino above text, tracker at bottom
+                VStack(alignment: .leading, spacing: 0) {
+                    // Dino image — fixed size, above greeting
+                    Image("DinoMorning")
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: 52, height: 52)
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
 
-                HStack(spacing: 0) {
-                    // LEFT SIDE — dino image + greeting + tracker
-                    ZStack(alignment: .topLeading) {
-                        // Dino image as background for left half
-                        Image("DinoMorning")
-                            .resizable()
-                            .scaledToFill()
-                            .frame(width: geo.size.width * 0.52, height: geo.size.height)
-                            .clipped()
-                            .mask(
-                                LinearGradient(
-                                    colors: [Color.black, Color.black.opacity(0.8), Color.clear],
-                                    startPoint: .leading,
-                                    endPoint: .trailing
-                                )
-                            )
+                    Spacer().frame(height: 8)
 
-                        // Text overlay on left side
-                        VStack(alignment: .leading, spacing: 2) {
-                            Spacer()
+                    // Greeting text
+                    Text("good morning")
+                        .font(.custom("DinoInitiativeFont-Regular", size: 15))
+                        .foregroundColor(morningTextPrimary)
+                        .lineLimit(1)
 
-                            Text("good morning")
-                                .font(.custom("DinoInitiativeFont-Regular", size: 15))
-                                .foregroundColor(morningTextPrimary)
-                                .lineLimit(1)
+                    Text("take it easy today")
+                        .font(.custom("DinoInitiativeFont-Regular", size: 10))
+                        .foregroundColor(morningTextSecondary)
 
-                            Text("take it easy today")
-                                .font(.custom("DinoInitiativeFont-Regular", size: 10))
-                                .foregroundColor(morningTextSecondary)
+                    Spacer()
 
-                            Spacer().frame(height: 10)
-
-                            // Weekly tracker
-                            WeeklyTrackerRow(
-                                days: weeklyDays,
-                                textColor: morningTextPrimary,
-                                accentColor: morningAccent
-                            )
-                        }
-                        .padding(16)
-                        .frame(width: geo.size.width * 0.52, height: geo.size.height, alignment: .leading)
-                    }
-                    .frame(width: geo.size.width * 0.52)
-
-                    // DIVIDER — soft vertical line
-                    Rectangle()
-                        .fill(Color.white.opacity(0.3))
-                        .frame(width: 1, height: geo.size.height * 0.6)
-
-                    // RIGHT SIDE — motivational text
-                    VStack(spacing: 4) {
-                        Text(todayLine)
-                            .font(.custom("DinoInitiativeFont-Regular", size: 13))
-                            .foregroundColor(morningTextPrimary)
-                            .multilineTextAlignment(.center)
-                            .lineLimit(2)
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    // Weekly tracker at bottom
+                    WeeklyTrackerRow(
+                        days: weeklyDays,
+                        textColor: morningTextPrimary,
+                        accentColor: morningAccent
+                    )
                 }
+                .padding(16)
+                .frame(width: geo.size.width * 0.52, alignment: .leading)
+
+                // DIVIDER — soft vertical line
+                Rectangle()
+                    .fill(Color.white.opacity(0.3))
+                    .frame(width: 1, height: geo.size.height * 0.6)
+
+                // RIGHT SIDE — motivational text
+                VStack(spacing: 4) {
+                    Text(todayLine)
+                        .font(.custom("DinoInitiativeFont-Regular", size: 13))
+                        .foregroundColor(morningTextPrimary)
+                        .multilineTextAlignment(.center)
+                        .lineLimit(2)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
+            .background(morningBg)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
