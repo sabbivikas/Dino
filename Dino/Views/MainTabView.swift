@@ -54,6 +54,7 @@ private struct DinoCustomTabBar: View {
     @Binding var selectedTab: Int
     @ObservedObject private var themeManager = ThemeManager.shared
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var animatingTab: Int? = nil
 
     private let tabs: [(label: String, tag: Int)] = [
         ("Home", 0), ("Journal", 1), ("Mood", 2), ("Jar", 3), ("Profile", 4)
@@ -68,14 +69,23 @@ private struct DinoCustomTabBar: View {
 
             HStack(spacing: 0) {
                 ForEach(tabs, id: \.tag) { tab in
-                    TabButton(
-                        tag: tab.tag,
+                    Spacer()
+                    TabIconButton(
+                        index: tab.tag,
                         label: tab.label,
                         isSelected: selectedTab == tab.tag,
-                        reduceMotion: reduceMotion
-                    ) {
+                        isAnimating: animatingTab == tab.tag
+                    )
+                    .onTapGesture {
+                        guard selectedTab != tab.tag else { return }
                         selectedTab = tab.tag
+                        guard !reduceMotion else { return }
+                        animatingTab = tab.tag
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                            animatingTab = nil
+                        }
                     }
+                    Spacer()
                 }
             }
             .padding(.top, 12)
@@ -85,137 +95,72 @@ private struct DinoCustomTabBar: View {
     }
 }
 
-// MARK: - Tab Button (per-icon animation state)
+// MARK: - Tab Icon Button
 
-private struct TabButton: View {
-    let tag: Int
+private struct TabIconButton: View {
+    let index: Int
     let label: String
     let isSelected: Bool
-    let reduceMotion: Bool
-    let onTap: () -> Void
-
-    @State private var animating = false
+    let isAnimating: Bool
 
     var body: some View {
-        Button(action: {
-            onTap()
-            guard !reduceMotion else { return }
-            animating = true
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-                animating = false
-            }
-        }) {
-            VStack(spacing: 3) {
-                animatedIcon
-                    .frame(width: 24, height: 24)
+        VStack(spacing: 3) {
+            iconView
+                .frame(width: 24, height: 24)
 
-                Text(label)
-                    .font(.system(size: 10, weight: .medium, design: .rounded))
-            }
-            .foregroundColor(isSelected ? DinoTheme.accent : Color.primary.opacity(0.45))
-            .frame(maxWidth: .infinity)
+            Text(label)
+                .font(.system(size: 10, weight: .medium, design: .rounded))
         }
-        .buttonStyle(.plain)
-        .onChange(of: isSelected) { _, newValue in
-            guard newValue, !reduceMotion else { return }
-            animating = true
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-                animating = false
-            }
-        }
+        .foregroundColor(isSelected ? DinoTheme.accent : Color.primary.opacity(0.45))
     }
 
     @ViewBuilder
-    private var animatedIcon: some View {
-        switch tag {
-        case 0: AnimatedHomeIcon(animating: animating)
-        case 1: AnimatedBookIcon(animating: animating)
-        case 2: AnimatedCloudSunIcon(animating: animating)
-        case 3: AnimatedJarIcon(animating: animating)
-        case 4: AnimatedProfileIcon(animating: animating)
-        default: EmptyView()
-        }
-    }
-}
-
-// MARK: - Animated Icons
-
-/// Home: bounce scale + wiggle rotation
-private struct AnimatedHomeIcon: View {
-    let animating: Bool
-
-    var body: some View {
-        DinoHomeIcon()
-            .scaleEffect(animating ? 1.2 : 1.0)
-            .rotationEffect(.degrees(animating ? 5 : 0))
-            .animation(.spring(response: 0.35, dampingFraction: 0.5), value: animating)
-    }
-}
-
-/// Journal: page flutter (scaleY bounce) + spring scale
-private struct AnimatedBookIcon: View {
-    let animating: Bool
-
-    var body: some View {
-        DinoBookIcon()
-            .scaleEffect(x: animating ? 1.05 : 1.0, y: animating ? 1.15 : 1.0)
-            .animation(.spring(response: 0.3, dampingFraction: 0.45), value: animating)
-    }
-}
-
-/// Mood: cloud drifts up + sun rays pulse + spring bounce
-private struct AnimatedCloudSunIcon: View {
-    let animating: Bool
-
-    var body: some View {
-        DinoCloudSunIcon()
-            .scaleEffect(animating ? 1.15 : 1.0)
-            .offset(y: animating ? -3 : 0)
-            .opacity(animating ? 1.0 : 0.85)
-            .animation(.spring(response: 0.35, dampingFraction: 0.5), value: animating)
-    }
-}
-
-/// Jar: bounce + heart pulse (overall scale since heart is inside Canvas)
-private struct AnimatedJarIcon: View {
-    let animating: Bool
-
-    var body: some View {
-        ZStack {
-            DinoJarIcon()
-            // Heart pulse overlay — slightly larger to emphasize the heart
-            if animating {
-                DinoJarHeartOverlay()
-                    .frame(width: 24, height: 24)
-                    .scaleEffect(1.25)
-                    .opacity(0.6)
-                    .transition(.scale.combined(with: .opacity))
+    private var iconView: some View {
+        switch index {
+        case 0:
+            DinoHomeIcon()
+                .scaleEffect(isAnimating ? 1.2 : 1.0)
+                .rotationEffect(.degrees(isAnimating ? 10 : 0))
+                .animation(.spring(response: 0.35, dampingFraction: 0.5), value: isAnimating)
+        case 1:
+            DinoBookIcon()
+                .scaleEffect(x: isAnimating ? 1.05 : 1.0, y: isAnimating ? 1.15 : 1.0)
+                .animation(.spring(response: 0.3, dampingFraction: 0.45), value: isAnimating)
+        case 2:
+            DinoCloudSunIcon()
+                .scaleEffect(isAnimating ? 1.15 : 1.0)
+                .offset(y: isAnimating ? -3 : 0)
+                .animation(.spring(response: 0.35, dampingFraction: 0.5), value: isAnimating)
+        case 3:
+            ZStack {
+                DinoJarIcon()
+                if isAnimating {
+                    DinoJarHeartOverlay()
+                        .frame(width: 24, height: 24)
+                        .scaleEffect(1.25)
+                        .opacity(0.6)
+                        .transition(.scale.combined(with: .opacity))
+                }
             }
-        }
-        .scaleEffect(animating ? 1.15 : 1.0)
-        .animation(.spring(response: 0.3, dampingFraction: 0.45), value: animating)
-    }
-}
-
-/// Profile: scale bounce + circle ring glow
-private struct AnimatedProfileIcon: View {
-    let animating: Bool
-
-    var body: some View {
-        ZStack {
-            // Glow ring behind
-            if animating {
-                Circle()
-                    .strokeBorder(lineWidth: 1.5)
-                    .frame(width: 26, height: 26)
-                    .opacity(0.4)
-                    .scaleEffect(1.3)
-                    .transition(.scale.combined(with: .opacity))
+            .scaleEffect(isAnimating ? 1.15 : 1.0)
+            .animation(.spring(response: 0.3, dampingFraction: 0.45), value: isAnimating)
+        case 4:
+            ZStack {
+                if isAnimating {
+                    Circle()
+                        .strokeBorder(lineWidth: 1.5)
+                        .frame(width: 26, height: 26)
+                        .opacity(0.4)
+                        .scaleEffect(1.3)
+                        .transition(.scale.combined(with: .opacity))
+                }
+                DinoProfileIcon()
             }
-            DinoProfileIcon()
+            .scaleEffect(isAnimating ? 1.15 : 1.0)
+            .animation(.spring(response: 0.35, dampingFraction: 0.5), value: isAnimating)
+        default:
+            EmptyView()
         }
-        .scaleEffect(animating ? 1.15 : 1.0)
-        .animation(.spring(response: 0.35, dampingFraction: 0.5), value: animating)
     }
 }
 
