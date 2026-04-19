@@ -218,7 +218,7 @@ struct MeditationPulseView: View {
                     )
             }
 
-            // Core circle
+            // Core circle with video
             Circle()
                 .fill(DinoTheme.lavender.opacity(0.2))
                 .frame(width: 140, height: 140)
@@ -229,11 +229,17 @@ struct MeditationPulseView: View {
                         : .default,
                     value: pulse
                 )
+                .overlay(
+                    DinoMeditationVideoView(isPlaying: isRunning, isPaused: isPaused)
+                        .frame(width: 140, height: 140)
+                        .clipShape(Circle())
+                )
 
-            // Emoji
-            Text(isPaused ? "⏸" : "🧘")
-                .font(.system(size: isRunning ? 42 : 52))
-                .animation(.easeInOut(duration: 0.3), value: isRunning)
+            // Pause indicator overlay
+            if isPaused {
+                Text("⏸")
+                    .font(.system(size: 42))
+            }
         }
         .frame(height: 220)
         .onAppear {
