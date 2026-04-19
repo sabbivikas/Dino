@@ -17,17 +17,22 @@ struct HomeView: View {
                 DinoTheme.background.ignoresSafeArea()
 
                 ScrollView(showsIndicators: false) {
-                    VStack(spacing: 24) {
+                    VStack(spacing: 18) {
+                        // Greeting header with mascot
+                        greetingHeader
+
+                        // Action Grid
+                        actionGrid
+
                         // Today's Focus Card
                         focusCard
 
-                        // 3x3 Action Grid
-                        actionGrid
+                        // Gentle note
+                        gentleNoteCard
 
-                        Spacer(minLength: 32)
+                        Spacer(minLength: 20)
                     }
                     .padding(.horizontal, DinoTheme.padding)
-                    .padding(.top, 12)
                 }
             }
             .toolbar {
@@ -62,20 +67,17 @@ struct HomeView: View {
         }
     }
 
-    // MARK: - Header Leading (Avatar + Name)
+    // MARK: - Header Leading (Avatar)
 
     private var headerLeading: some View {
-        HStack(spacing: 10) {
-            // Profile avatar
+        NavigationLink {
+            SettingsView().environmentObject(dataManager)
+        } label: {
             Image("DinoMascot")
                 .resizable()
                 .scaledToFill()
-                .frame(width: 38, height: 38)
+                .frame(width: 36, height: 36)
                 .clipShape(Circle())
-
-            Text(displayName)
-                .font(DinoTheme.dinoDisplayFont(size: 20))
-                .foregroundColor(DinoTheme.textPrimary)
         }
     }
 
@@ -108,6 +110,32 @@ struct HomeView: View {
         }
     }
 
+    // MARK: - Greeting Header
+
+    private var greetingHeader: some View {
+        HStack(alignment: .bottom) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("\(displayName) 🌿")
+                    .font(DinoTheme.dinoLabelFont(size: 14))
+                    .foregroundColor(DinoTheme.textSecondary)
+
+                Text("how are you\nfeeling today?")
+                    .font(DinoTheme.dinoDisplayFont(size: 30))
+                    .foregroundColor(DinoTheme.textPrimary)
+                    .lineSpacing(2)
+            }
+
+            Spacer()
+
+            Image("DinoMascot")
+                .resizable()
+                .scaledToFit()
+                .frame(height: 64)
+        }
+        .padding(.top, DinoDesignSystem.space7)
+        .padding(.bottom, DinoDesignSystem.space2)
+    }
+
     // MARK: - Today's Focus Card
 
     private var focusCard: some View {
@@ -115,15 +143,15 @@ struct HomeView: View {
             // Title row
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Today's Focus")
-                        .font(DinoTheme.dinoLabelFont(size: 14))
+                    Text("today's focus")
+                        .font(DinoTheme.dinoLabelFont(size: 13))
                         .foregroundColor(DinoTheme.textSecondary)
 
                     HStack(spacing: 8) {
                         Text(viewModel.todaysFocusEmoji)
                             .font(DinoTheme.dinoFont(size: 22))
                         Text(viewModel.todaysFocus)
-                            .font(DinoTheme.dinoDisplayFont(size: 24))
+                            .font(DinoTheme.dinoDisplayFont(size: 22))
                             .foregroundColor(DinoTheme.textPrimary)
                     }
                 }
@@ -150,13 +178,13 @@ struct HomeView: View {
 
                     ZStack {
                         Circle()
-                            .fill(day.isCompleted ? DinoTheme.peach : DinoTheme.surfaceSecondary)
-                            .frame(width: day.isToday ? 32 : 28, height: day.isToday ? 32 : 28)
+                            .fill(day.isCompleted || day.isToday ? DinoTheme.peach : DinoTheme.surfaceSecondary)
+                            .frame(width: day.isToday ? 30 : 26, height: day.isToday ? 30 : 26)
 
                         if day.isToday {
                             Circle()
                                 .strokeBorder(DinoTheme.peach, lineWidth: 2)
-                                .frame(width: 32, height: 32)
+                                .frame(width: 30, height: 30)
                         }
 
                         if day.isCompleted {
@@ -193,9 +221,9 @@ struct HomeView: View {
             ]
         ]
 
-        return VStack(spacing: DinoDesignSystem.space4) {
+        return VStack(spacing: 10) {
             ForEach(Array(rows.enumerated()), id: \.offset) { rowIndex, row in
-                HStack(spacing: DinoDesignSystem.space4) {
+                HStack(spacing: 10) {
                     ForEach(row) { item in
                         actionCard(item: item)
                     }
@@ -217,7 +245,7 @@ struct HomeView: View {
                 ZStack {
                     Circle()
                         .fill(item.color.opacity(0.20))
-                        .frame(width: 44, height: 44)
+                        .frame(width: DinoDesignSystem.iconCircleSize, height: DinoDesignSystem.iconCircleSize)
 
                     Image(systemName: item.icon)
                         .font(DinoTheme.dinoFont(size: 20))
@@ -230,9 +258,39 @@ struct HomeView: View {
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 18)
-            .dsCardAction(borderColor: item.color, isPressed: isPressed)
+            .padding(.horizontal, DinoDesignSystem.space3)
+            .background(DinoTheme.surfacePrimary)
+            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .strokeBorder(item.color.opacity(0.25), lineWidth: 1.5)
+            )
+            .shadow(
+                color: isPressed ? item.color.opacity(0.15) : Color.black.opacity(0.04),
+                radius: isPressed ? DinoDesignSystem.pressShadowRadius : 10,
+                y: DinoDesignSystem.cardShadowY
+            )
+            .scaleEffect(isPressed ? DinoDesignSystem.pressScaleDeep : 1.0)
+            .animation(.spring(response: DinoDesignSystem.interactiveSpringResponse, dampingFraction: DinoDesignSystem.interactiveSpringDamping), value: isPressed)
         }
         .buttonStyle(.plain)
+    }
+
+    // MARK: - Gentle Note Card
+
+    private var gentleNoteCard: some View {
+        VStack(alignment: .leading, spacing: DinoDesignSystem.space2) {
+            Text("a gentle note")
+                .font(DinoTheme.dinoLabelFont(size: 13))
+                .foregroundColor(DinoTheme.textSecondary)
+
+            Text("you showed up today — and that's already something. 🌱")
+                .font(DinoTheme.dinoFont(size: 18))
+                .foregroundColor(DinoTheme.textPrimary)
+                .lineSpacing(4)
+        }
+        .padding(DinoTheme.padding)
+        .dsCardLarge()
     }
 
     // MARK: - Card Tap Handler

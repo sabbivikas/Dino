@@ -95,18 +95,17 @@ enum DinoDesignSystem {
 
 extension View {
 
-    /// Design-system card: surfacePrimary bg, 1px border, soft shadow, continuous corners.
-    /// Uses `largeCornerRadius` (20pt) — the hero/focus card style.
+    /// Design-system card: surfacePrimary bg, sage-tinted 1px border, soft shadow, 20pt corners.
     func dsCardLarge() -> some View {
         self
             .background(DinoTheme.surfacePrimary)
             .clipShape(RoundedRectangle(cornerRadius: DinoDesignSystem.radiusLG, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: DinoDesignSystem.radiusLG, style: .continuous)
-                    .strokeBorder(DinoTheme.cardBorder, lineWidth: 1)
+                    .strokeBorder(DinoTheme.accent.opacity(0.18), lineWidth: 1)
             )
             .shadow(
-                color: Color.black.opacity(DinoDesignSystem.cardShadowOpacity),
+                color: Color.black.opacity(0.05),
                 radius: DinoDesignSystem.cardShadowRadius,
                 y: DinoDesignSystem.cardShadowY
             )
