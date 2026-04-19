@@ -62,6 +62,12 @@ struct AmbientBackgroundView: View {
                     }
                 }
                 .transition(.opacity)
+                .onAppear {
+                    print("[Dino Ambient] Active style: \(themeManager.currentTheme.ambientStyle) for theme: \(themeManager.currentTheme.rawValue)")
+                }
+                .onChange(of: themeManager.currentTheme) { newTheme in
+                    print("[Dino Ambient] Style changed to: \(newTheme.ambientStyle) for theme: \(newTheme.rawValue)")
+                }
             }
         }
         .ignoresSafeArea()
@@ -454,7 +460,7 @@ private struct SunnyRaysView: View {
                             ))
                             path.closeSubpath()
 
-                            context.fill(path, with: .color(.white.opacity(0.05)))
+                            context.fill(path, with: .color(.white.opacity(0.10)))
                         }
                     }
                 }
@@ -463,7 +469,7 @@ private struct SunnyRaysView: View {
                 Circle()
                     .fill(
                         RadialGradient(
-                            colors: [glowTint.opacity(0.08), glowTint.opacity(0.0)],
+                            colors: [glowTint.opacity(0.16), glowTint.opacity(0.0)],
                             center: .center,
                             startRadius: 10,
                             endRadius: 120
@@ -530,7 +536,7 @@ private struct RainStreaksView: View {
                         xNormalized: CGFloat.random(in: 0...1),
                         startOffset: CGFloat.random(in: 0...1),
                         speed: baseSpeed * CGFloat.random(in: 0.8...1.2),
-                        opacity: Double.random(in: 0.04...0.08)
+                        opacity: Double.random(in: 0.12...0.18)
                     )
                 }
             }
@@ -585,7 +591,7 @@ private struct SnowfallView: View {
                         swayAmplitude: CGFloat.random(in: 8...20),
                         swayFrequency: CGFloat.random(in: 0.3...0.8),
                         swayPhase: CGFloat.random(in: 0...(2 * .pi)),
-                        opacity: Double.random(in: 0.05...0.08)
+                        opacity: Double.random(in: 0.15...0.22)
                     )
                 }
             }
@@ -615,7 +621,7 @@ private struct StormView: View {
     private func scheduleFlash() {
         let delay = Double.random(in: 8...20)
         DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
-            withAnimation(.easeIn(duration: 0.1)) { flashOpacity = 0.08 }
+            withAnimation(.easeIn(duration: 0.1)) { flashOpacity = 0.18 }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
                 withAnimation(.easeOut(duration: 0.15)) { flashOpacity = 0 }
             }
@@ -679,7 +685,7 @@ private struct CloudyMistView: View {
                             width: CGFloat.random(in: 180...220),
                             height: CGFloat.random(in: 40...70),
                             speed: CGFloat.random(in: 5...10),
-                            opacity: Double.random(in: 0.03...0.05)
+                            opacity: Double.random(in: 0.10...0.15)
                         )
                     }
                 }
