@@ -17,8 +17,7 @@ struct WeatherCard: View {
     var body: some View {
         Button(action: onTap) {
             VStack(spacing: 10) {
-                Text(weather.emoji)
-                    .font(.system(size: 40))
+                AnimatedWeatherIllustration(weather: weather, size: 48)
 
                 Text(weather.label)
                     .font(DinoTheme.dinoLabelFont(size: 13))
