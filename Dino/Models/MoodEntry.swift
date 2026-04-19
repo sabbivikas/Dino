@@ -44,10 +44,10 @@ enum EmotionalWeather: String, Codable, CaseIterable {
 
     var color: String {
         switch self {
-        case .clear: return "#A8D4E6"
-        case .partlyCloudy: return "#F5C6AA"
-        case .overwhelmed: return "#C4B8D4"
-        case .drained: return "#A8C5A0"
+        case .clear: return "#F5D98C"          // warm yellow
+        case .partlyCloudy: return "#A8D4E6"   // soft blue
+        case .overwhelmed: return "#C4B8D4"    // soft purple
+        case .drained: return "#C8CDD4"        // soft grey
         }
     }
 }

@@ -12,32 +12,40 @@ struct WeatherCard: View {
     let isSelected: Bool
     let onTap: () -> Void
 
+    private var weatherColor: Color { Color(hex: weather.color) }
+
     var body: some View {
         Button(action: onTap) {
-            VStack(spacing: 8) {
+            VStack(spacing: 10) {
                 Text(weather.emoji)
-                    .font(DinoTheme.dinoFont(size: 32))
+                    .font(.system(size: 40))
 
                 Text(weather.label)
-                    .font(DinoTheme.captionFont())
+                    .font(DinoTheme.dinoLabelFont(size: 13))
                     .fontWeight(isSelected ? .bold : .regular)
                     .foregroundColor(isSelected ? DinoTheme.textPrimary : DinoTheme.textSecondary)
                     .multilineTextAlignment(.center)
             }
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 16)
+            .frame(minHeight: 90)
+            .padding(.vertical, DinoDesignSystem.space5)
             .background(
                 isSelected
-                    ? Color(hex: weather.color).opacity(0.25)
-                    : DinoTheme.surfacePrimary
+                    ? weatherColor.opacity(0.25)
+                    : weatherColor.opacity(0.08)
             )
-            .cornerRadius(DinoTheme.cornerRadius)
+            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: DinoTheme.cornerRadius)
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
                     .strokeBorder(
-                        isSelected ? Color(hex: weather.color) : DinoTheme.cardBorder,
+                        isSelected ? weatherColor : weatherColor.opacity(0.25),
                         lineWidth: isSelected ? 2 : 1
                     )
+            )
+            .shadow(
+                color: isSelected ? weatherColor.opacity(0.15) : Color.black.opacity(0.04),
+                radius: isSelected ? 12 : 8,
+                y: DinoDesignSystem.cardShadowY
             )
         }
         .buttonStyle(ScaleButtonStyle())
