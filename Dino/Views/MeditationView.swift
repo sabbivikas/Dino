@@ -19,7 +19,7 @@ struct MeditationView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                DinoTheme.background.ignoresSafeArea()
+                NatureSceneBackground()
 
                 if viewModel.isDone {
                     MeditationDoneScreen(viewModel: viewModel, onDismiss: { dismiss() })
@@ -511,5 +511,154 @@ class MeditationViewModel: ObservableObject {
         if #available(iOS 16.2, *) {
             DinoLiveActivityManager.shared.endMeditationActivity()
         }
+    }
+}
+
+// MARK: - Nature Scene Background
+
+/// Illustrated forest/garden scene used as the meditation screen backdrop.
+/// Built from SwiftUI shapes — no asset required. Sits behind the
+/// meditation UI and is decorative only (no interaction).
+struct NatureSceneBackground: View {
+    // Color palette tuned for a soft, hand-drawn feel
+    private let skyWhite       = Color(red: 1.00, green: 1.00, blue: 1.00)
+    private let cloudGrey      = Color(red: 0.87, green: 0.88, blue: 0.90)
+    private let trunkBrown     = Color(red: 0.56, green: 0.43, blue: 0.38)
+    private let foliageGreen   = Color(red: 0.50, green: 0.74, blue: 0.50)
+    private let bushGreen      = Color(red: 0.62, green: 0.84, blue: 0.50)
+    private let windBlue       = Color(red: 0.62, green: 0.80, blue: 0.93)
+    private let flowerColors: [Color] = [
+        Color(red: 0.95, green: 0.40, blue: 0.45), // red
+        Color(red: 1.00, green: 0.85, blue: 0.30), // yellow
+        Color(red: 0.55, green: 0.75, blue: 0.95), // sky blue
+        Color(red: 0.78, green: 0.55, blue: 0.88), // purple
+        Color(red: 0.96, green: 0.62, blue: 0.72)  // pink
+    ]
+
+    var body: some View {
+        GeometryReader { geo in
+            let w = geo.size.width
+            let h = geo.size.height
+
+            ZStack {
+                skyWhite
+
+                // Clouds
+                cloud(w: w * 0.55, h: h * 0.09)
+                    .position(x: w * 0.25, y: h * 0.10)
+                cloud(w: w * 0.42, h: h * 0.08)
+                    .position(x: w * 0.82, y: h * 0.13)
+
+                // Wind swirls — distributed in mid sky
+                windSwirl()
+                    .frame(width: 56, height: 12)
+                    .position(x: w * 0.30, y: h * 0.22)
+                windSwirl()
+                    .frame(width: 62, height: 12)
+                    .position(x: w * 0.58, y: h * 0.27)
+                windSwirl()
+                    .frame(width: 50, height: 12)
+                    .position(x: w * 0.74, y: h * 0.20)
+                windSwirl()
+                    .frame(width: 60, height: 12)
+                    .position(x: w * 0.42, y: h * 0.45)
+                windSwirl()
+                    .frame(width: 54, height: 12)
+                    .position(x: w * 0.66, y: h * 0.50)
+
+                // Trees
+                tree(width: w * 0.34, height: h * 0.46)
+                    .position(x: w * 0.10, y: h * 0.42)
+                tree(width: w * 0.36, height: h * 0.50)
+                    .position(x: w * 0.90, y: h * 0.38)
+
+                // Bushes at bottom corners
+                Ellipse()
+                    .fill(bushGreen)
+                    .frame(width: w * 0.55, height: h * 0.10)
+                    .position(x: w * 0.16, y: h * 0.94)
+                Ellipse()
+                    .fill(bushGreen)
+                    .frame(width: w * 0.55, height: h * 0.10)
+                    .position(x: w * 0.84, y: h * 0.95)
+
+                // Flowers scattered in the bushes
+                flowerCluster(w: w, h: h)
+
+                // Dino sitting peacefully — lower third, centered
+                Image("DinoMascot")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: w * 0.26)
+                    .position(x: w * 0.50, y: h * 0.78)
+            }
+        }
+        .ignoresSafeArea()
+    }
+
+    // MARK: - Helpers
+
+    private func cloud(w: CGFloat, h: CGFloat) -> some View {
+        Ellipse()
+            .fill(cloudGrey)
+            .frame(width: w, height: h)
+    }
+
+    private func windSwirl() -> some View {
+        WindSwirlShape()
+            .stroke(windBlue, style: StrokeStyle(lineWidth: 1.5, lineCap: .round))
+    }
+
+    private func tree(width: CGFloat, height: CGFloat) -> some View {
+        ZStack(alignment: .bottom) {
+            // Trunk
+            RoundedRectangle(cornerRadius: 8)
+                .fill(trunkBrown)
+                .frame(width: width * 0.18, height: height * 0.65)
+
+            // Foliage crown
+            Circle()
+                .fill(foliageGreen)
+                .frame(width: width, height: width)
+                .offset(y: -height * 0.42)
+        }
+        .frame(width: width, height: height)
+    }
+
+    private func flowerCluster(w: CGFloat, h: CGFloat) -> some View {
+        // Hand-placed positions matching the reference (left + right corners)
+        let dots: [(x: CGFloat, y: CGFloat, color: Int, size: CGFloat)] = [
+            (0.05, 0.91, 0, 9), (0.10, 0.93, 1, 8), (0.18, 0.92, 3, 9),
+            (0.22, 0.95, 0, 8), (0.78, 0.93, 0, 9), (0.84, 0.91, 4, 8),
+            (0.90, 0.94, 1, 9), (0.95, 0.92, 2, 8)
+        ]
+        return ZStack {
+            ForEach(0..<dots.count, id: \.self) { i in
+                let d = dots[i]
+                Circle()
+                    .fill(flowerColors[d.color % flowerColors.count])
+                    .frame(width: d.size, height: d.size)
+                    .position(x: w * d.x, y: h * d.y)
+            }
+        }
+    }
+}
+
+/// A gentle tilde-like wave used to suggest wind/breath in the air.
+struct WindSwirlShape: Shape {
+    func path(in rect: CGRect) -> Path {
+        var p = Path()
+        p.move(to: CGPoint(x: 0, y: rect.midY))
+        p.addCurve(
+            to: CGPoint(x: rect.width * 0.5, y: rect.midY),
+            control1: CGPoint(x: rect.width * 0.15, y: rect.midY - rect.height * 0.5),
+            control2: CGPoint(x: rect.width * 0.35, y: rect.midY + rect.height * 0.5)
+        )
+        p.addCurve(
+            to: CGPoint(x: rect.width, y: rect.midY),
+            control1: CGPoint(x: rect.width * 0.65, y: rect.midY - rect.height * 0.5),
+            control2: CGPoint(x: rect.width * 0.85, y: rect.midY + rect.height * 0.5)
+        )
+        return p
     }
 }
