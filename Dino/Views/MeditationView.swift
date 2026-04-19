@@ -21,7 +21,7 @@ struct MeditationView: View {
             ZStack {
                 // Full-screen meditation video background
                 DinoMeditationVideoView(isPlaying: viewModel.isRunning, isPaused: viewModel.isPaused)
-                    .ignoresSafeArea()
+                    .ignoresSafeArea(.all)
 
                 // Subtle dark overlay for text readability
                 Color.black.opacity(0.15)

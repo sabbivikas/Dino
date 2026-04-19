@@ -45,7 +45,7 @@ class MeditationPlayerView: UIView {
         self.player = player
 
         let layer = AVPlayerLayer(player: player)
-        layer.videoGravity = .resizeAspectFill
+        layer.videoGravity = .resizeAspect
         layer.frame = bounds
         self.layer.addSublayer(layer)
         self.playerLayer = layer
