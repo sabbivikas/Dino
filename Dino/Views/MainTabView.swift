@@ -53,6 +53,7 @@ struct MainTabView: View {
 private struct DinoCustomTabBar: View {
     @Binding var selectedTab: Int
     @ObservedObject private var themeManager = ThemeManager.shared
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private let tabs: [(label: String, tag: Int)] = [
         ("Home", 0), ("Journal", 1), ("Mood", 2), ("Jar", 3), ("Profile", 4)
@@ -67,22 +68,14 @@ private struct DinoCustomTabBar: View {
 
             HStack(spacing: 0) {
                 ForEach(tabs, id: \.tag) { tab in
-                    Button {
-                        withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) {
-                            selectedTab = tab.tag
-                        }
-                    } label: {
-                        VStack(spacing: 3) {
-                            tabIcon(for: tab.tag)
-                                .frame(width: 24, height: 24)
-
-                            Text(tab.label)
-                                .font(.system(size: 10, weight: .medium, design: .rounded))
-                        }
-                        .foregroundColor(selectedTab == tab.tag ? DinoTheme.accent : Color.primary.opacity(0.45))
-                        .frame(maxWidth: .infinity)
+                    TabButton(
+                        tag: tab.tag,
+                        label: tab.label,
+                        isSelected: selectedTab == tab.tag,
+                        reduceMotion: reduceMotion
+                    ) {
+                        selectedTab = tab.tag
                     }
-                    .buttonStyle(.plain)
                 }
             }
             .padding(.top, 12)
@@ -90,21 +83,143 @@ private struct DinoCustomTabBar: View {
         }
         .background(.ultraThinMaterial)
     }
+}
+
+// MARK: - Tab Button (per-icon animation state)
+
+private struct TabButton: View {
+    let tag: Int
+    let label: String
+    let isSelected: Bool
+    let reduceMotion: Bool
+    let onTap: () -> Void
+
+    @State private var animating = false
+
+    var body: some View {
+        Button(action: {
+            onTap()
+            guard !reduceMotion else { return }
+            animating = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                animating = false
+            }
+        }) {
+            VStack(spacing: 3) {
+                animatedIcon
+                    .frame(width: 24, height: 24)
+
+                Text(label)
+                    .font(.system(size: 10, weight: .medium, design: .rounded))
+            }
+            .foregroundColor(isSelected ? DinoTheme.accent : Color.primary.opacity(0.45))
+            .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(.plain)
+        .onChange(of: isSelected) { _, newValue in
+            guard newValue, !reduceMotion else { return }
+            animating = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                animating = false
+            }
+        }
+    }
 
     @ViewBuilder
-    private func tabIcon(for tag: Int) -> some View {
+    private var animatedIcon: some View {
         switch tag {
-        case 0: DinoHomeIcon()
-        case 1: DinoBookIcon()
-        case 2: DinoCloudSunIcon()
-        case 3: DinoJarIcon()
-        case 4: DinoProfileIcon()
+        case 0: AnimatedHomeIcon(animating: animating)
+        case 1: AnimatedBookIcon(animating: animating)
+        case 2: AnimatedCloudSunIcon(animating: animating)
+        case 3: AnimatedJarIcon(animating: animating)
+        case 4: AnimatedProfileIcon(animating: animating)
         default: EmptyView()
         }
     }
 }
 
-// MARK: - Custom Tab Icons (hand-drawn style)
+// MARK: - Animated Icons
+
+/// Home: bounce scale + wiggle rotation
+private struct AnimatedHomeIcon: View {
+    let animating: Bool
+
+    var body: some View {
+        DinoHomeIcon()
+            .scaleEffect(animating ? 1.2 : 1.0)
+            .rotationEffect(.degrees(animating ? 5 : 0))
+            .animation(.spring(response: 0.35, dampingFraction: 0.5), value: animating)
+    }
+}
+
+/// Journal: page flutter (scaleY bounce) + spring scale
+private struct AnimatedBookIcon: View {
+    let animating: Bool
+
+    var body: some View {
+        DinoBookIcon()
+            .scaleEffect(x: animating ? 1.05 : 1.0, y: animating ? 1.15 : 1.0)
+            .animation(.spring(response: 0.3, dampingFraction: 0.45), value: animating)
+    }
+}
+
+/// Mood: cloud drifts up + sun rays pulse + spring bounce
+private struct AnimatedCloudSunIcon: View {
+    let animating: Bool
+
+    var body: some View {
+        DinoCloudSunIcon()
+            .scaleEffect(animating ? 1.15 : 1.0)
+            .offset(y: animating ? -3 : 0)
+            .opacity(animating ? 1.0 : 0.85)
+            .animation(.spring(response: 0.35, dampingFraction: 0.5), value: animating)
+    }
+}
+
+/// Jar: bounce + heart pulse (overall scale since heart is inside Canvas)
+private struct AnimatedJarIcon: View {
+    let animating: Bool
+
+    var body: some View {
+        ZStack {
+            DinoJarIcon()
+            // Heart pulse overlay — slightly larger to emphasize the heart
+            if animating {
+                DinoJarHeartOverlay()
+                    .frame(width: 24, height: 24)
+                    .scaleEffect(1.25)
+                    .opacity(0.6)
+                    .transition(.scale.combined(with: .opacity))
+            }
+        }
+        .scaleEffect(animating ? 1.15 : 1.0)
+        .animation(.spring(response: 0.3, dampingFraction: 0.45), value: animating)
+    }
+}
+
+/// Profile: scale bounce + circle ring glow
+private struct AnimatedProfileIcon: View {
+    let animating: Bool
+
+    var body: some View {
+        ZStack {
+            // Glow ring behind
+            if animating {
+                Circle()
+                    .strokeBorder(lineWidth: 1.5)
+                    .frame(width: 26, height: 26)
+                    .opacity(0.4)
+                    .scaleEffect(1.3)
+                    .transition(.scale.combined(with: .opacity))
+            }
+            DinoProfileIcon()
+        }
+        .scaleEffect(animating ? 1.15 : 1.0)
+        .animation(.spring(response: 0.35, dampingFraction: 0.5), value: animating)
+    }
+}
+
+// MARK: - Static Icon Shapes (hand-drawn style)
 
 /// Soft rounded house outline
 private struct DinoHomeIcon: View {
@@ -201,7 +316,6 @@ private struct DinoCloudSunIcon: View {
                                control: CGPoint(x: w * 0.92, y: h * 0.55))
             cloud.addLine(to: CGPoint(x: w * 0.12, y: h * 0.70))
             cloud.closeSubpath()
-            // Flat bottom
             cloud.move(to: CGPoint(x: w * 0.12, y: h * 0.70))
             cloud.addLine(to: CGPoint(x: w * 0.88, y: h * 0.70))
             context.stroke(cloud, with: .foreground, style: StrokeStyle(lineWidth: 1.7, lineCap: .round, lineJoin: .round))
@@ -209,7 +323,7 @@ private struct DinoCloudSunIcon: View {
     }
 }
 
-/// Simple jar outline
+/// Jar outline (body only, no heart — used as base)
 private struct DinoJarIcon: View {
     var body: some View {
         Canvas { context, size in
@@ -249,6 +363,29 @@ private struct DinoJarIcon: View {
                                control: CGPoint(x: heartCenter.x + hs * 1.2, y: heartCenter.y + hs * 0.3))
             context.stroke(path, with: .foreground, style: StrokeStyle(lineWidth: 1.7, lineCap: .round, lineJoin: .round))
             context.stroke(heart, with: .foreground, style: StrokeStyle(lineWidth: 1.3, lineCap: .round, lineJoin: .round))
+        }
+    }
+}
+
+/// Heart-only overlay for jar pulse animation
+private struct DinoJarHeartOverlay: View {
+    var body: some View {
+        Canvas { context, size in
+            let w = size.width
+            let h = size.height
+            let heartCenter = CGPoint(x: w * 0.50, y: h * 0.55)
+            let hs: CGFloat = w * 0.10
+            var heart = Path()
+            heart.move(to: CGPoint(x: heartCenter.x, y: heartCenter.y + hs))
+            heart.addQuadCurve(to: CGPoint(x: heartCenter.x - hs, y: heartCenter.y - hs * 0.2),
+                               control: CGPoint(x: heartCenter.x - hs * 1.2, y: heartCenter.y + hs * 0.3))
+            heart.addQuadCurve(to: CGPoint(x: heartCenter.x, y: heartCenter.y - hs * 0.4),
+                               control: CGPoint(x: heartCenter.x - hs * 0.6, y: heartCenter.y - hs * 1.0))
+            heart.addQuadCurve(to: CGPoint(x: heartCenter.x + hs, y: heartCenter.y - hs * 0.2),
+                               control: CGPoint(x: heartCenter.x + hs * 0.6, y: heartCenter.y - hs * 1.0))
+            heart.addQuadCurve(to: CGPoint(x: heartCenter.x, y: heartCenter.y + hs),
+                               control: CGPoint(x: heartCenter.x + hs * 1.2, y: heartCenter.y + hs * 0.3))
+            context.stroke(heart, with: .foreground, style: StrokeStyle(lineWidth: 1.5, lineCap: .round, lineJoin: .round))
         }
     }
 }
