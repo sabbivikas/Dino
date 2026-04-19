@@ -134,13 +134,7 @@ struct HomeView: View {
             weeklyTracker
         }
         .padding(DinoTheme.padding)
-        .background(DinoTheme.surfacePrimary)
-        .clipShape(RoundedRectangle(cornerRadius: DinoTheme.largeCornerRadius, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: DinoTheme.largeCornerRadius, style: .continuous)
-                .strokeBorder(DinoTheme.cardBorder, lineWidth: 1)
-        )
-        .shadow(color: DinoTheme.shadowColor, radius: DinoTheme.shadowRadius, y: DinoTheme.shadowY)
+        .dsCardLarge()
     }
 
     // MARK: - Weekly Tracker
@@ -171,7 +165,7 @@ struct HomeView: View {
                                 .foregroundColor(.white)
                         }
                     }
-                    .animation(.spring(response: 0.4, dampingFraction: 0.6), value: day.isCompleted)
+                    .animation(.spring(response: DinoDesignSystem.interactiveSpringResponse, dampingFraction: DinoDesignSystem.interactiveSpringDamping), value: day.isCompleted)
                 }
                 .frame(maxWidth: .infinity)
             }
@@ -199,9 +193,9 @@ struct HomeView: View {
             ]
         ]
 
-        return VStack(spacing: 14) {
+        return VStack(spacing: DinoDesignSystem.space4) {
             ForEach(Array(rows.enumerated()), id: \.offset) { rowIndex, row in
-                HStack(spacing: 14) {
+                HStack(spacing: DinoDesignSystem.space4) {
                     ForEach(row) { item in
                         actionCard(item: item)
                     }
@@ -236,16 +230,7 @@ struct HomeView: View {
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 18)
-            .background(DinoTheme.surfacePrimary)
-            .clipShape(RoundedRectangle(cornerRadius: DinoTheme.cornerRadius, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: DinoTheme.cornerRadius, style: .continuous)
-                    .strokeBorder(item.color.opacity(0.30), lineWidth: 1.5)
-            )
-            .shadow(color: isPressed ? item.color.opacity(0.15) : DinoTheme.shadowColor,
-                    radius: isPressed ? 16 : DinoTheme.shadowRadius,
-                    y: DinoTheme.shadowY)
-            .scaleEffect(isPressed ? 0.94 : 1.0)
+            .dsCardAction(borderColor: item.color, isPressed: isPressed)
         }
         .buttonStyle(.plain)
     }
