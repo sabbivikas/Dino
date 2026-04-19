@@ -19,7 +19,13 @@ struct MeditationView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                DinoTheme.background.ignoresSafeArea()
+                // Full-screen meditation video background
+                DinoMeditationVideoView(isPlaying: viewModel.isRunning, isPaused: viewModel.isPaused)
+                    .ignoresSafeArea()
+
+                // Subtle dark overlay for text readability
+                Color.black.opacity(0.15)
+                    .ignoresSafeArea()
 
                 if viewModel.isDone {
                     MeditationDoneScreen(viewModel: viewModel, onDismiss: { dismiss() })
@@ -30,23 +36,22 @@ struct MeditationView: View {
                         VStack(spacing: 6) {
                             Text("meditate")
                                 .font(DinoTheme.dinoDisplayFont(size: 28))
-                                .foregroundColor(DinoTheme.textPrimary)
+                                .foregroundColor(.white)
                             Text(viewModel.isRunning ? viewModel.currentMessage : "be still. be here.")
                                 .font(DinoTheme.subheadlineFont())
-                                .foregroundColor(DinoTheme.textSecondary)
+                                .foregroundColor(.white.opacity(0.8))
                                 .italic()
                                 .animation(.easeInOut, value: viewModel.currentMessage)
                         }
                         .padding(.top, 16)
 
-                        // Pulsing visual
-                        MeditationPulseView(isRunning: viewModel.isRunning, isPaused: viewModel.isPaused)
+                        Spacer()
 
                         // Timer (when running)
                         if viewModel.isRunning {
                             Text(viewModel.formattedTimeRemaining)
                                 .font(.system(size: 36, weight: .bold, design: .rounded))
-                                .foregroundColor(DinoTheme.textPrimary)
+                                .foregroundColor(.white)
                                 .monospacedDigit()
                                 .transition(.opacity)
                         }
@@ -56,10 +61,10 @@ struct MeditationView: View {
                             HStack(spacing: 6) {
                                 Image(systemName: "waveform")
                                     .font(DinoTheme.captionFont())
-                                    .foregroundColor(DinoTheme.lavender)
+                                    .foregroundColor(.white.opacity(0.7))
                                 Text("ambient sounds")
                                     .font(DinoTheme.captionFont())
-                                    .foregroundColor(DinoTheme.textSecondary)
+                                    .foregroundColor(.white.opacity(0.6))
                             }
                         }
 
@@ -68,7 +73,7 @@ struct MeditationView: View {
                             VStack(spacing: 12) {
                                 Text("session length")
                                     .font(DinoTheme.captionFont())
-                                    .foregroundColor(DinoTheme.textSecondary)
+                                    .foregroundColor(.white.opacity(0.7))
 
                                 HStack(spacing: 8) {
                                     ForEach(viewModel.durationOptions, id: \.seconds) { option in
@@ -161,7 +166,7 @@ struct MeditationView: View {
                     Button(action: { dismiss() }) {
                         Image(systemName: "xmark")
                             .font(DinoTheme.dinoFont(size: 16))
-                            .foregroundColor(DinoTheme.textSecondary)
+                            .foregroundColor(.white.opacity(0.8))
                     }
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -175,7 +180,7 @@ struct MeditationView: View {
                         }) {
                             Image(systemName: audio.isPlaying ? "speaker.wave.2" : "speaker.slash")
                                 .font(DinoTheme.subheadlineFont())
-                                .foregroundColor(DinoTheme.textSecondary.opacity(0.7))
+                                .foregroundColor(.white.opacity(0.7))
                         }
                         .buttonStyle(ScaleButtonStyle())
                     }
@@ -194,62 +199,7 @@ struct MeditationView: View {
     }
 }
 
-// MARK: - Pulsing Visual
 
-struct MeditationPulseView: View {
-    let isRunning: Bool
-    let isPaused: Bool
-
-    @State private var pulse: Bool = false
-
-    var body: some View {
-        ZStack {
-            // Outer pulse rings
-            ForEach(0..<3, id: \.self) { i in
-                Circle()
-                    .stroke(DinoTheme.lavender.opacity(0.15 - Double(i) * 0.04), lineWidth: 1.5)
-                    .frame(width: 160 + CGFloat(i * 30), height: 160 + CGFloat(i * 30))
-                    .scaleEffect(pulse && isRunning && !isPaused ? 1.15 : 1.0)
-                    .animation(
-                        isRunning && !isPaused
-                            ? .easeInOut(duration: 3.5).repeatForever(autoreverses: true).delay(Double(i) * 0.4)
-                            : .default,
-                        value: pulse
-                    )
-            }
-
-            // Core circle with video
-            Circle()
-                .fill(DinoTheme.lavender.opacity(0.2))
-                .frame(width: 140, height: 140)
-                .scaleEffect(pulse && isRunning && !isPaused ? 1.08 : 1.0)
-                .animation(
-                    isRunning && !isPaused
-                        ? .easeInOut(duration: 3.5).repeatForever(autoreverses: true)
-                        : .default,
-                    value: pulse
-                )
-                .overlay(
-                    DinoMeditationVideoView(isPlaying: isRunning, isPaused: isPaused)
-                        .frame(width: 140, height: 140)
-                        .clipShape(Circle())
-                )
-
-            // Pause indicator overlay
-            if isPaused {
-                Text("⏸")
-                    .font(.system(size: 42))
-            }
-        }
-        .frame(height: 220)
-        .onAppear {
-            pulse = true
-        }
-        .onChange(of: isRunning) { running in
-            pulse = running
-        }
-    }
-}
 
 // MARK: - Done Screen
 
