@@ -49,44 +49,23 @@ struct MeditationView: View {
 
                         Spacer()
 
-                        // Dino character with timer flanking it
+                        // Floating dino meditation character
+                        Image("DinoMeditation")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: geo.size.width * 0.55)
+                            .offset(y: dinoFloat ? -12 : 0)
+                            .animation(
+                                .easeInOut(duration: 4).repeatForever(autoreverses: true),
+                                value: dinoFloat
+                            )
+
+                        // Timer display
                         if viewModel.isRunning {
-                            HStack(alignment: .center, spacing: 0) {
-                                // Minutes
-                                Text(viewModel.minutesPart)
-                                    .font(.custom(DinoTheme.customFontName, size: 36))
-                                    .foregroundColor(.white)
-                                    .frame(minWidth: 50, alignment: .trailing)
-
-                                // Floating dino character
-                                Image("DinoSleeping")
-                                    .resizable()
-                                    .scaledToFit()
-                                    .frame(width: geo.size.width * 0.4)
-                                    .offset(y: dinoFloat ? -10 : 0)
-                                    .animation(
-                                        .easeInOut(duration: 3).repeatForever(autoreverses: true),
-                                        value: dinoFloat
-                                    )
-
-                                // Seconds
-                                Text(viewModel.secondsPart)
-                                    .font(.custom(DinoTheme.customFontName, size: 36))
-                                    .foregroundColor(.white)
-                                    .frame(minWidth: 50, alignment: .leading)
-                            }
-                            .transition(.opacity)
-                        } else {
-                            // Floating dino before session starts
-                            Image("DinoSleeping")
-                                .resizable()
-                                .scaledToFit()
-                                .frame(width: geo.size.width * 0.4)
-                                .offset(y: dinoFloat ? -10 : 0)
-                                .animation(
-                                    .easeInOut(duration: 3).repeatForever(autoreverses: true),
-                                    value: dinoFloat
-                                )
+                            Text(viewModel.formattedTimeRemaining)
+                                .font(.custom(DinoTheme.customFontName, size: 36))
+                                .foregroundColor(.white)
+                                .transition(.opacity)
                         }
 
                         // Sound indicator
@@ -235,17 +214,6 @@ struct MeditationView: View {
 }
 
 
-
-// MARK: - Timer Split Helper
-
-extension MeditationViewModel {
-    var minutesPart: String {
-        String(format: "%02d", timeRemaining / 60)
-    }
-    var secondsPart: String {
-        String(format: "%02d", timeRemaining % 60)
-    }
-}
 
 // MARK: - Done Screen
 
