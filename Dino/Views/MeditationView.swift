@@ -15,6 +15,7 @@ struct MeditationView: View {
     @StateObject private var viewModel: MeditationViewModel = MeditationViewModel(dataManager: SharedDataManager.shared)
     @StateObject private var audio = AudioManager.shared
     @Environment(\.dismiss) private var dismiss
+    @State private var dinoFloat = false
 
     var body: some View {
         NavigationStack {
@@ -31,6 +32,7 @@ struct MeditationView: View {
                     MeditationDoneScreen(viewModel: viewModel, onDismiss: { dismiss() })
                         .transition(.opacity.combined(with: .scale(scale: 0.95)))
                 } else {
+                    GeometryReader { geo in
                     VStack(spacing: 28) {
                         // Header
                         VStack(spacing: 6) {
@@ -47,13 +49,44 @@ struct MeditationView: View {
 
                         Spacer()
 
-                        // Timer (when running)
+                        // Dino character with timer flanking it
                         if viewModel.isRunning {
-                            Text(viewModel.formattedTimeRemaining)
-                                .font(.system(size: 36, weight: .bold, design: .rounded))
-                                .foregroundColor(.white)
-                                .monospacedDigit()
-                                .transition(.opacity)
+                            HStack(alignment: .center, spacing: 0) {
+                                // Minutes
+                                Text(viewModel.minutesPart)
+                                    .font(.custom(DinoTheme.customFontName, size: 36))
+                                    .foregroundColor(.white)
+                                    .frame(minWidth: 50, alignment: .trailing)
+
+                                // Floating dino character
+                                Image("DinoSleeping")
+                                    .resizable()
+                                    .scaledToFit()
+                                    .frame(width: geo.size.width * 0.4)
+                                    .offset(y: dinoFloat ? -10 : 0)
+                                    .animation(
+                                        .easeInOut(duration: 3).repeatForever(autoreverses: true),
+                                        value: dinoFloat
+                                    )
+
+                                // Seconds
+                                Text(viewModel.secondsPart)
+                                    .font(.custom(DinoTheme.customFontName, size: 36))
+                                    .foregroundColor(.white)
+                                    .frame(minWidth: 50, alignment: .leading)
+                            }
+                            .transition(.opacity)
+                        } else {
+                            // Floating dino before session starts
+                            Image("DinoSleeping")
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: geo.size.width * 0.4)
+                                .offset(y: dinoFloat ? -10 : 0)
+                                .animation(
+                                    .easeInOut(duration: 3).repeatForever(autoreverses: true),
+                                    value: dinoFloat
+                                )
                         }
 
                         // Sound indicator
@@ -159,6 +192,8 @@ struct MeditationView: View {
                         .padding(.horizontal, DinoTheme.padding)
                         .padding(.bottom, 32)
                     }
+                    .onAppear { dinoFloat = true }
+                    }
                 }
             }
             .toolbar {
@@ -200,6 +235,17 @@ struct MeditationView: View {
 }
 
 
+
+// MARK: - Timer Split Helper
+
+extension MeditationViewModel {
+    var minutesPart: String {
+        String(format: "%02d", timeRemaining / 60)
+    }
+    var secondsPart: String {
+        String(format: "%02d", timeRemaining % 60)
+    }
+}
 
 // MARK: - Done Screen
 

@@ -325,27 +325,27 @@ private struct SunnyCloud: View {
 
 private struct SunnyBird: View {
     let size: CGFloat
-    @State private var flap = false
 
     var body: some View {
-        Canvas { context, canvasSize in
-            let s = canvasSize.width
-            let flapAmt: CGFloat = flap ? 0.5 : 1.0
-            var path = Path()
-            path.move(to: CGPoint(x: 0, y: s * 0.5))
-            path.addQuadCurve(
-                to: CGPoint(x: s * 0.35, y: s * 0.5),
-                control: CGPoint(x: s * 0.18, y: s * (0.5 - 0.3 * flapAmt))
-            )
-            path.addQuadCurve(
-                to: CGPoint(x: s * 0.7, y: s * 0.5),
-                control: CGPoint(x: s * 0.52, y: s * (0.5 - 0.3 * flapAmt))
-            )
-            context.stroke(path, with: .color(Color(hex: "#3D2A1F")), style: StrokeStyle(lineWidth: 1.5, lineCap: .round))
+        TimelineView(.animation) { timeline in
+            let time = timeline.date.timeIntervalSinceReferenceDate
+            let flapAmt = 0.5 + 0.5 * cos(time * 10)
+            Canvas { context, canvasSize in
+                let s = canvasSize.width
+                var path = Path()
+                path.move(to: CGPoint(x: 0, y: s * 0.5))
+                path.addQuadCurve(
+                    to: CGPoint(x: s * 0.35, y: s * 0.5),
+                    control: CGPoint(x: s * 0.18, y: s * (0.5 - 0.3 * flapAmt))
+                )
+                path.addQuadCurve(
+                    to: CGPoint(x: s * 0.7, y: s * 0.5),
+                    control: CGPoint(x: s * 0.52, y: s * (0.5 - 0.3 * flapAmt))
+                )
+                context.stroke(path, with: .color(Color(hex: "#3D2A1F")), style: StrokeStyle(lineWidth: 1.5, lineCap: .round))
+            }
         }
         .frame(width: size, height: size)
-        .animation(.easeInOut(duration: 0.6).repeatForever(autoreverses: true), value: flap)
-        .onAppear { flap = true }
     }
 }
 
@@ -830,44 +830,84 @@ private struct NightMoon: View {
     }
 }
 
-private struct NightStarField: View {
-    var body: some View {
-        Canvas { context, size in
-            // Small stars
-            for _ in 0..<100 {
-                let x = CGFloat.random(in: 0...size.width)
-                let y = CGFloat.random(in: 0...size.height)
-                let r = CGFloat.random(in: 0.4...1.2)
-                let opacity = Double.random(in: 0.3...0.8)
-                let rect = CGRect(x: x - r, y: y - r, width: r * 2, height: r * 2)
-                context.fill(Circle().path(in: rect), with: .color(ScenePalette.moonColor.opacity(opacity)))
-            }
+private struct StarSeed {
+    let xNorm: CGFloat
+    let yNorm: CGFloat
+    let radius: CGFloat
+    let baseOpacity: Double
+    let twinkleSpeed: Double   // radians per second
+    let twinklePhase: Double
+}
 
-            // Big hero stars with cross flares
+private struct NightStarField: View {
+    @State private var smallStars: [StarSeed] = []
+    @State private var bigStars: [StarSeed] = []
+
+    var body: some View {
+        TimelineView(.animation) { timeline in
+            let time = timeline.date.timeIntervalSinceReferenceDate
+            Canvas { context, size in
+                // Small twinkling stars
+                for star in smallStars {
+                    let x = star.xNorm * size.width
+                    let y = star.yNorm * size.height
+                    let twinkle = 0.5 + 0.5 * sin(time * star.twinkleSpeed + star.twinklePhase)
+                    let opacity = star.baseOpacity * (0.3 + 0.7 * twinkle)
+                    let rect = CGRect(x: x - star.radius, y: y - star.radius, width: star.radius * 2, height: star.radius * 2)
+                    context.fill(Circle().path(in: rect), with: .color(ScenePalette.moonColor.opacity(opacity)))
+                }
+
+                // Big hero stars with cross flares
+                for star in bigStars {
+                    let x = star.xNorm * size.width
+                    let y = star.yNorm * size.height
+                    let twinkle = 0.5 + 0.5 * sin(time * star.twinkleSpeed + star.twinklePhase)
+                    let opacity = 0.5 + 0.5 * twinkle
+
+                    // 4-point flare
+                    var flare = Path()
+                    flare.move(to: CGPoint(x: x, y: y - 5))
+                    flare.addLine(to: CGPoint(x: x + 0.6, y: y - 0.6))
+                    flare.addLine(to: CGPoint(x: x + 5, y: y))
+                    flare.addLine(to: CGPoint(x: x + 0.6, y: y + 0.6))
+                    flare.addLine(to: CGPoint(x: x, y: y + 5))
+                    flare.addLine(to: CGPoint(x: x - 0.6, y: y + 0.6))
+                    flare.addLine(to: CGPoint(x: x - 5, y: y))
+                    flare.addLine(to: CGPoint(x: x - 0.6, y: y - 0.6))
+                    flare.closeSubpath()
+                    context.fill(flare, with: .color(ScenePalette.moonColor.opacity(opacity * 0.9)))
+
+                    // Center glow
+                    let haloRect = CGRect(x: x - 2.2, y: y - 2.2, width: 4.4, height: 4.4)
+                    context.fill(Circle().path(in: haloRect), with: .color(ScenePalette.moonColor.opacity(opacity * 0.4)))
+                }
+            }
+        }
+        .onAppear {
+            smallStars = (0..<100).map { _ in
+                StarSeed(
+                    xNorm: CGFloat.random(in: 0...1),
+                    yNorm: CGFloat.random(in: 0...1),
+                    radius: CGFloat.random(in: 0.4...1.2),
+                    baseOpacity: Double.random(in: 0.4...0.9),
+                    twinkleSpeed: Double.random(in: 0.8...2.5),
+                    twinklePhase: Double.random(in: 0...(2 * .pi))
+                )
+            }
             let bigPositions: [(CGFloat, CGFloat)] = [
                 (0.12, 0.2), (0.24, 0.1), (0.38, 0.3), (0.52, 0.12),
                 (0.44, 0.5), (0.24, 0.6), (0.62, 0.35), (0.56, 0.6),
                 (0.15, 0.45), (0.92, 0.2), (0.96, 0.5), (0.33, 0.15)
             ]
-            for (px, py) in bigPositions {
-                let x = size.width * px
-                let y = size.height * py
-                // 4-point flare
-                var flare = Path()
-                flare.move(to: CGPoint(x: x, y: y - 5))
-                flare.addLine(to: CGPoint(x: x + 0.6, y: y - 0.6))
-                flare.addLine(to: CGPoint(x: x + 5, y: y))
-                flare.addLine(to: CGPoint(x: x + 0.6, y: y + 0.6))
-                flare.addLine(to: CGPoint(x: x, y: y + 5))
-                flare.addLine(to: CGPoint(x: x - 0.6, y: y + 0.6))
-                flare.addLine(to: CGPoint(x: x - 5, y: y))
-                flare.addLine(to: CGPoint(x: x - 0.6, y: y - 0.6))
-                flare.closeSubpath()
-                context.fill(flare, with: .color(ScenePalette.moonColor.opacity(0.9)))
-
-                // Center glow
-                let haloRect = CGRect(x: x - 2.2, y: y - 2.2, width: 4.4, height: 4.4)
-                context.fill(Circle().path(in: haloRect), with: .color(ScenePalette.moonColor.opacity(0.35)))
+            bigStars = bigPositions.map { (px, py) in
+                StarSeed(
+                    xNorm: px,
+                    yNorm: py,
+                    radius: 2.2,
+                    baseOpacity: 1.0,
+                    twinkleSpeed: Double.random(in: 0.5...1.5),
+                    twinklePhase: Double.random(in: 0...(2 * .pi))
+                )
             }
         }
     }
