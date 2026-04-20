@@ -23,11 +23,6 @@ struct MeditationView: View {
                 MeditationSceneBackground(scene: .current())
                     .ignoresSafeArea(.all)
 
-                // Dino meditation video at 60% opacity blended on top
-                DinoMeditationVideoView(isPlaying: viewModel.isRunning, isPaused: viewModel.isPaused)
-                    .ignoresSafeArea(.all)
-                    .opacity(0.6)
-
                 // Subtle dark overlay for text readability
                 Color.black.opacity(0.15)
                     .ignoresSafeArea()
