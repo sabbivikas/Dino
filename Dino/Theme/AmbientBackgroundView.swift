@@ -45,9 +45,10 @@ struct AmbientBackgroundView: View {
 
     var body: some View {
         ZStack {
-            DinoTheme.background
-                .ignoresSafeArea()
+            // Time-aware illustrated sky background
+            DinoSkyBackground(currentTheme: themeManager.currentTheme)
 
+            // Weather-specific particle overlays on top
             if !reduceMotion {
                 Group {
                     switch themeManager.currentTheme.ambientStyle {
@@ -62,15 +63,9 @@ struct AmbientBackgroundView: View {
                     }
                 }
                 .transition(.opacity)
-                .onAppear {
-                    print("[Dino Ambient] Active style: \(themeManager.currentTheme.ambientStyle) for theme: \(themeManager.currentTheme.rawValue)")
-                }
-                .onChange(of: themeManager.currentTheme) { newTheme in
-                    print("[Dino Ambient] Style changed to: \(newTheme.ambientStyle) for theme: \(newTheme.rawValue)")
-                }
             }
         }
-        .ignoresSafeArea()
+        .ignoresSafeArea(.all)
         .allowsHitTesting(false)
         .animation(.easeInOut(duration: 1.5), value: themeManager.currentTheme)
     }
