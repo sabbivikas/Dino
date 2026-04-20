@@ -98,7 +98,7 @@ extension View {
     /// Design-system card: frosted glass bg, sage-tinted 1px border, soft shadow, 20pt corners.
     func dsCardLarge() -> some View {
         self
-            .background(.ultraThinMaterial)
+            .background(DinoTheme.surfacePrimary)
             .clipShape(RoundedRectangle(cornerRadius: DinoDesignSystem.radiusLG, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: DinoDesignSystem.radiusLG, style: .continuous)
@@ -115,7 +115,7 @@ extension View {
     /// Uses `cornerRadius` (16pt) — the action card style.
     func dsCardAction(borderColor: Color, isPressed: Bool = false) -> some View {
         self
-            .background(.ultraThinMaterial)
+            .background(DinoTheme.surfacePrimary)
             .clipShape(RoundedRectangle(cornerRadius: DinoDesignSystem.radiusMD, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: DinoDesignSystem.radiusMD, style: .continuous)

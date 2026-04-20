@@ -122,7 +122,7 @@ struct DinoTheme {
 extension View {
     func dinoCard() -> some View {
         self
-            .background(.ultraThinMaterial)
+            .background(DinoTheme.surfacePrimary)
             .cornerRadius(DinoTheme.cornerRadius)
             .overlay(
                 RoundedRectangle(cornerRadius: DinoTheme.cornerRadius)
@@ -133,7 +133,7 @@ extension View {
 
     func dinoCardWhite() -> some View {
         self
-            .background(.ultraThinMaterial)
+            .background(DinoTheme.surfacePrimary)
             .cornerRadius(DinoTheme.cornerRadius)
             .overlay(
                 RoundedRectangle(cornerRadius: DinoTheme.cornerRadius)

@@ -31,7 +31,7 @@ struct GratitudeJarView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Color.clear.ignoresSafeArea()
+                DinoTheme.background.ignoresSafeArea()
 
                 VStack(spacing: 0) {
                     // Header
@@ -497,7 +497,7 @@ struct AddGratitudeSheet: View {
                         }
                 }
                 .padding(12)
-                .background(.ultraThinMaterial)
+                .background(DinoTheme.cardBackground)
                 .cornerRadius(DinoTheme.cornerRadius)
                 .overlay(
                     RoundedRectangle(cornerRadius: DinoTheme.cornerRadius)

@@ -14,7 +14,7 @@ struct HomeView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Color.clear.ignoresSafeArea()
+                DinoTheme.background.ignoresSafeArea()
 
                 ScrollView(showsIndicators: false) {
                     VStack(spacing: 18) {
@@ -165,7 +165,7 @@ struct HomeView: View {
                 weeklyTracker
             }
             .padding(DinoTheme.padding)
-            .background(.ultraThinMaterial)
+            .background(DinoTheme.surfacePrimary)
         }
         .clipShape(RoundedRectangle(cornerRadius: DinoDesignSystem.radiusLG, style: .continuous))
         .shadow(
@@ -269,7 +269,7 @@ struct HomeView: View {
             .frame(maxWidth: .infinity)
             .padding(.vertical, 18)
             .padding(.horizontal, DinoDesignSystem.space3)
-            .background(.ultraThinMaterial)
+            .background(DinoTheme.surfacePrimary)
             .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: 18, style: .continuous)

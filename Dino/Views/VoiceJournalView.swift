@@ -142,7 +142,7 @@ struct VoiceJournalView: View {
                     .listStyle(.plain)
                 }
             }
-            .background(Color.clear)
+            .background(DinoTheme.background.ignoresSafeArea())
             .alert("Microphone Access Needed", isPresented: $showPermissionAlert) {
                 Button("Open Settings") {
                     if let url = URL(string: UIApplication.openSettingsURLString) {
@@ -230,7 +230,7 @@ struct JournalEntryRow: View {
             }
         }
         .padding(14)
-        .background(.ultraThinMaterial)
+        .background(DinoTheme.cardBackground)
         .cornerRadius(DinoTheme.cornerRadius)
     }
 }
