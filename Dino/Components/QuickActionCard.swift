@@ -33,7 +33,7 @@ struct QuickActionCard: View {
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 18)
-            .background(DinoTheme.surfacePrimary)
+            .background(.ultraThinMaterial)
             .cornerRadius(DinoTheme.cornerRadius)
             .overlay(
                 RoundedRectangle(cornerRadius: DinoTheme.cornerRadius)

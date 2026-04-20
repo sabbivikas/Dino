@@ -120,7 +120,7 @@ struct EmotionalWeatherView: View {
                         .padding(.bottom, 20)
                 }
             }
-            .background(DinoTheme.background.ignoresSafeArea())
+            .background(Color.clear)
             .navigationTitle("")
             .navigationBarHidden(true)
         }

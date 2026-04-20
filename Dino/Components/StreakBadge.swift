@@ -27,7 +27,7 @@ struct StreakBadge: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
-        .background(DinoTheme.surfacePrimary)
+        .background(.ultraThinMaterial)
         .cornerRadius(DinoTheme.cornerRadius)
         .overlay(
             RoundedRectangle(cornerRadius: DinoTheme.cornerRadius)

@@ -104,7 +104,7 @@ struct ProfileView: View {
                         .padding(.bottom, 32)
                 }
             }
-            .background(DinoTheme.background.ignoresSafeArea())
+            .background(Color.clear)
             .navigationTitle("")
             .navigationBarHidden(true)
         }
@@ -331,7 +331,7 @@ struct ProfileNavRow: View {
             }
             .frame(minHeight: 56)
             .padding(.horizontal, 16)
-            .background(DinoTheme.surfacePrimary)
+            .background(.ultraThinMaterial)
             .clipShape(RoundedRectangle(cornerRadius: DinoDesignSystem.radiusMD, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: DinoDesignSystem.radiusMD, style: .continuous)

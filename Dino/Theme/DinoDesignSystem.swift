@@ -95,10 +95,10 @@ enum DinoDesignSystem {
 
 extension View {
 
-    /// Design-system card: surfacePrimary bg, sage-tinted 1px border, soft shadow, 20pt corners.
+    /// Design-system card: frosted glass bg, sage-tinted 1px border, soft shadow, 20pt corners.
     func dsCardLarge() -> some View {
         self
-            .background(DinoTheme.surfacePrimary)
+            .background(.ultraThinMaterial)
             .clipShape(RoundedRectangle(cornerRadius: DinoDesignSystem.radiusLG, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: DinoDesignSystem.radiusLG, style: .continuous)
@@ -111,11 +111,11 @@ extension View {
             )
     }
 
-    /// Design-system card: surfacePrimary bg, 1px colored border, soft shadow, continuous corners.
+    /// Design-system card: frosted glass bg, 1px colored border, soft shadow, continuous corners.
     /// Uses `cornerRadius` (16pt) — the action card style.
     func dsCardAction(borderColor: Color, isPressed: Bool = false) -> some View {
         self
-            .background(DinoTheme.surfacePrimary)
+            .background(.ultraThinMaterial)
             .clipShape(RoundedRectangle(cornerRadius: DinoDesignSystem.radiusMD, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: DinoDesignSystem.radiusMD, style: .continuous)
