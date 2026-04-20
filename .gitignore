@@ -22,3 +22,4 @@ DerivedData/
 
 # Firebase
 # GoogleService-Info.plist  # keeping tracked since it's needed for builds
+.claude/
