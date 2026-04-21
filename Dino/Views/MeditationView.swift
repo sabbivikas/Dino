@@ -15,7 +15,6 @@ struct MeditationView: View {
     @StateObject private var viewModel: MeditationViewModel = MeditationViewModel(dataManager: SharedDataManager.shared)
     @StateObject private var audio = AudioManager.shared
     @Environment(\.dismiss) private var dismiss
-    @State private var dinoFloat = false
 
     var body: some View {
         NavigationStack {
@@ -48,17 +47,6 @@ struct MeditationView: View {
                         .padding(.top, 16)
 
                         Spacer()
-
-                        // Floating dino meditation character
-                        Image("DinoMeditation")
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: geo.size.width * 0.55)
-                            .offset(y: dinoFloat ? -12 : 0)
-                            .animation(
-                                .easeInOut(duration: 4).repeatForever(autoreverses: true),
-                                value: dinoFloat
-                            )
 
                         // Timer display
                         if viewModel.isRunning {
@@ -171,7 +159,6 @@ struct MeditationView: View {
                         .padding(.horizontal, DinoTheme.padding)
                         .padding(.bottom, 32)
                     }
-                    .onAppear { dinoFloat = true }
                     }
                 }
             }
