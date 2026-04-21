@@ -64,7 +64,7 @@ private struct DinoCustomTabBar: View {
         VStack(spacing: 0) {
             // Subtle top border
             Rectangle()
-                .fill(Color.primary.opacity(0.08))
+                .fill(Color.primary.opacity(0.06))
                 .frame(height: 1)
 
             HStack(spacing: 0) {
@@ -91,7 +91,7 @@ private struct DinoCustomTabBar: View {
             .padding(.top, 12)
             .padding(.bottom, 28)
         }
-        .background(.ultraThinMaterial)
+        .background(DinoTheme.navBackground)
     }
 }
 
@@ -111,7 +111,7 @@ private struct TabIconButton: View {
             Text(label)
                 .font(.system(size: 10, weight: .medium, design: .rounded))
         }
-        .foregroundColor(isSelected ? DinoTheme.accent : Color.primary.opacity(0.45))
+        .foregroundColor(isSelected ? DinoTheme.accent : DinoTheme.textSecondary.opacity(0.5))
     }
 
     @ViewBuilder
