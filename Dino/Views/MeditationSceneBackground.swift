@@ -82,8 +82,8 @@ private struct DinoMeditationCharacter: View {
         Image("DinoMeditation")
             .resizable()
             .scaledToFit()
-            .frame(width: size.width * 0.45)
-            .position(x: size.width / 2, y: size.height * 0.58)
+            .frame(width: size.width * 0.28)
+            .position(x: size.width / 2, y: size.height * 0.65)
             .offset(y: floating ? -12 : 0)
             .animation(
                 reduceMotion ? nil : .easeInOut(duration: 4).repeatForever(autoreverses: true),
