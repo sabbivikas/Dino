@@ -16,7 +16,7 @@ enum MeditationScene: Equatable {
     case night
     case snow
 
-    /// Pick scene based on time of day first, then weather theme
+    /// Pick scene: night time → night; weather condition → rain/snow; fallback → sunny
     @MainActor static func current() -> MeditationScene {
         let hour = Calendar.current.component(.hour, from: Date())
 
@@ -25,7 +25,17 @@ enum MeditationScene: Equatable {
             return .night
         }
 
-        // Daytime: use weather theme to pick scene
+        // Check actual weather condition from OpenWeatherMap (via ThemeManager)
+        if let condition = ThemeManager.shared.weatherCondition?.lowercased() {
+            if condition.contains("rain") || condition.contains("drizzle") || condition.contains("thunderstorm") {
+                return .rainy
+            }
+            if condition.contains("snow") {
+                return .snow
+            }
+        }
+
+        // Fallback to weather theme
         switch ThemeManager.shared.currentTheme {
         case .rainy, .cloudy, .storm:
             return .rainy
@@ -1710,9 +1720,9 @@ private struct RainyWisps: View {
 
 // MARK: - Rain Overlay (Canvas)
 
-private struct RainDrop {
-    var x: CGFloat
-    var y: CGFloat
+private struct RainDropSeed {
+    let baseX: CGFloat
+    let baseY: CGFloat
     let len: CGFloat
     let speed: CGFloat
     let alpha: Double
@@ -1720,43 +1730,42 @@ private struct RainDrop {
 
 private struct RainOverlay: View {
     let size: CGSize
-    @State private var drops: [RainDrop] = []
+    @State private var seeds: [RainDropSeed] = []
 
     var body: some View {
         TimelineView(.animation(minimumInterval: 1.0 / 60, paused: false)) { timeline in
-            Canvas { context, canvasSize in
+            Canvas { context, _ in
                 let w = size.width
                 let h = size.height
+                let time = timeline.date.timeIntervalSinceReferenceDate
 
-                for i in drops.indices {
-                    var d = drops[i]
+                for seed in seeds {
+                    // Compute position from time — wraps seamlessly
+                    let totalFall = seed.speed * CGFloat(time)
+                    let y = (seed.baseY + totalFall).truncatingRemainder(dividingBy: h + seed.len) - seed.len
+                    let drift = totalFall * 0.2
+                    let x = (seed.baseX - drift).truncatingRemainder(dividingBy: w + 40)
+
                     var line = Path()
-                    line.move(to: CGPoint(x: d.x, y: d.y))
-                    line.addLine(to: CGPoint(x: d.x - d.len * 0.2, y: d.y + d.len))
-                    context.stroke(line, with: .color(Color(red: 180/255, green: 200/255, blue: 220/255).opacity(d.alpha)),
+                    line.move(to: CGPoint(x: x, y: y))
+                    line.addLine(to: CGPoint(x: x - seed.len * 0.2, y: y + seed.len))
+                    context.stroke(line, with: .color(Color(red: 180/255, green: 200/255, blue: 220/255).opacity(seed.alpha)),
                                   style: StrokeStyle(lineWidth: 1.1))
-                    d.y += d.speed
-                    d.x -= d.speed * 0.2
-                    if d.y > h {
-                        d.y = -d.len
-                        d.x = CGFloat.random(in: 0...(w + 40))
-                    }
-                    drops[i] = d
                 }
             }
         }
         .onAppear {
-            var generated: [RainDrop] = []
+            var generated: [RainDropSeed] = []
             for _ in 0..<120 {
-                generated.append(RainDrop(
-                    x: CGFloat.random(in: 0...size.width),
-                    y: CGFloat.random(in: 0...size.height),
+                generated.append(RainDropSeed(
+                    baseX: CGFloat.random(in: 0...size.width),
+                    baseY: CGFloat.random(in: 0...size.height),
                     len: 12 + CGFloat.random(in: 0...8),
                     speed: 11 + CGFloat.random(in: 0...6),
                     alpha: 0.35 + Double.random(in: 0...0.35)
                 ))
             }
-            drops = generated
+            seeds = generated
         }
     }
 }
