@@ -5,370 +5,828 @@
 
 import SwiftUI
 
+// MARK: - Local Tokens (scrapbook palette)
+
+private enum SB {
+    static let paperCream   = Color(hex: "#FBF5E4")
+    static let paperWhite   = Color(hex: "#FFFDF5")
+    static let sage         = Color(hex: "#6D8B74")
+    static let nearBlack    = Color(hex: "#2D3A2B")
+    static let peach        = Color(hex: "#F6C99F")
+    static let sky          = Color(hex: "#BBD8E0")
+    static let lavender     = Color(hex: "#C3B3E0")
+    static let rose         = Color(hex: "#E8A09A")
+    static let rust         = Color(hex: "#B88A60")
+    static let xpTrack      = Color(hex: "#E8DFCF")
+}
+
+// MARK: - Sheet enum + ComingSoon model
+
+private struct ComingSoonContent: Identifiable, Hashable {
+    let id: String
+    let title: String
+    let subtitle: String
+
+    init(_ title: String, _ subtitle: String) {
+        self.id = title
+        self.title = title
+        self.subtitle = subtitle
+    }
+}
+
+private enum ProfileSheet: Identifiable {
+    case themeSettings
+    case privacyPolicy
+    case assessment
+    case resources
+    case gratitudeJar
+    case growth
+    case stub(ComingSoonContent)
+
+    var id: String {
+        switch self {
+        case .themeSettings: return "themeSettings"
+        case .privacyPolicy: return "privacyPolicy"
+        case .assessment:    return "assessment"
+        case .resources:     return "resources"
+        case .gratitudeJar:  return "gratitudeJar"
+        case .growth:        return "growth"
+        case .stub(let c):   return "stub-\(c.id)"
+        }
+    }
+}
+
+// MARK: - ProfileView
+
 struct ProfileView: View {
     @ObservedObject private var themeManager = ThemeManager.shared
-
     @EnvironmentObject var dataManager: SharedDataManager
-    @State private var showAssessment = false
-    @State private var showResources = false
-    @State private var showSettings = false
+    @Environment(\.dismiss) private var dismiss
 
-    var memberSince: String {
-        dataManager.memberSinceDate.formatted(.dateTime.month(.wide).year())
+    @State private var activeSheet: ProfileSheet?
+    @State private var showSignOutConfirm = false
+
+    // MARK: Derived values
+
+    private var firstName: String {
+        let name = UserDefaults.standard.string(forKey: "userName") ?? ""
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty { return "friend" }
+        return trimmed.split(separator: " ").first.map(String.init) ?? "friend"
     }
+
+    private var joinDateLabel: String {
+        let date = (UserDefaults.standard.object(forKey: "userJoinDate") as? Date) ?? Date()
+        let f = DateFormatter()
+        f.dateFormat = "MMMM yyyy"
+        return f.string(from: date)
+    }
+
+    /// Union-of-practices streak.
+    private var unionStreak: Int {
+        let cal = Calendar.current
+        var set = Set<Date>()
+        dataManager.journalEntries.forEach { set.insert(cal.startOfDay(for: $0.date)) }
+        dataManager.moodEntries.forEach { set.insert(cal.startOfDay(for: $0.date)) }
+        dataManager.gratitudeNotes.forEach { set.insert(cal.startOfDay(for: $0.createdAt)) }
+        dataManager.breathingSessions.forEach { set.insert(cal.startOfDay(for: $0.date)) }
+
+        guard !set.isEmpty else { return 0 }
+
+        let today = cal.startOfDay(for: Date())
+        var cursor = today
+        if !set.contains(cursor) {
+            guard let yesterday = cal.date(byAdding: .day, value: -1, to: today),
+                  set.contains(yesterday) else { return 0 }
+            cursor = yesterday
+        }
+        var streak = 0
+        while set.contains(cursor) {
+            streak += 1
+            guard let prev = cal.date(byAdding: .day, value: -1, to: cursor) else { break }
+            cursor = prev
+        }
+        return streak
+    }
+
+    private var xpLevel: Int { dataManager.growthStats.level }
+    private var xpInLevel: Int { dataManager.growthStats.xpInCurrentLevel }
+    private var xpToNext: Int { dataManager.growthStats.xpToNextLevel }
+    private var xpProgress: Double { dataManager.growthStats.xpProgress }
+
+    private var moodQuote: String {
+        switch themeManager.currentTheme {
+        case .sunny:        return "little suns bloom\neven on quiet days"
+        case .rainy:        return "the garden drinks\nwhat the sky forgets"
+        case .cloudy:       return "soft skies hold you\nwithout asking why"
+        case .night:        return "rest is a kind\nof tending too"
+        case .forest:       return "grow slow.\nthe woods aren't in a rush"
+        case .lavenderCalm: return "you smell like\nsomething gentle"
+        case .snow:         return "even stillness\nkeeps you alive"
+        case .storm:        return "the tree still stands\nafter the wind"
+        case .defaultDino:  return "little you\nis doing enough"
+        }
+    }
+
+    // MARK: Body
 
     var body: some View {
         NavigationStack {
             ScrollView(showsIndicators: false) {
-                VStack(spacing: 22) {
-                    // MARK: - Header: avatar + name + XP
-                    VStack(spacing: 16) {
-                        // Avatar with pulsing glow ring
-                        ProfileAvatarGlow()
-                            .padding(.top, 20)
+                VStack(spacing: 20) {
+                    headerRow
+                        .padding(.top, 14)
 
-                        VStack(spacing: 5) {
-                            Text(dataManager.userName.isEmpty ? "friend" : dataManager.userName)
-                                .font(DinoTheme.dinoDisplayFont(size: 24))
-                                .foregroundColor(DinoTheme.textPrimary)
+                    polaroidRow
 
-                            Text("member since \(memberSince)")
-                                .font(DinoTheme.dinoLabelFont(size: 13))
-                                .foregroundColor(DinoTheme.textSecondary)
-                        }
+                    statsStickersRow
+                        .padding(.top, 4)
 
-                        // XP progress bar
-                        ProfileXPBar(
-                            level: dataManager.growthStats.level,
-                            xpProgress: dataManager.growthStats.xpProgress,
-                            xpInLevel: dataManager.growthStats.xpInCurrentLevel,
-                            xpToNext: dataManager.growthStats.xpToNextLevel
-                        )
-                        .padding(.horizontal, DinoTheme.padding)
-                    }
+                    xpPill
+                        .padding(.top, 2)
 
-                    // MARK: - Stats row
-                    HStack(spacing: 0) {
-                        ProfileStat(emoji: "🎙️", value: "\(dataManager.journalEntries.count)", label: "journals")
-                        ProfileStatDivider()
-                        ProfileStat(emoji: "🌤️", value: "\(dataManager.moodEntries.count)", label: "moods")
-                        ProfileStatDivider()
-                        ProfileStat(emoji: "🌱", value: "\(dataManager.gratitudeNotes.count)", label: "gratitude")
-                    }
-                    .padding(.vertical, 20)
-                    .dsCardLarge()
-                    .padding(.horizontal, DinoTheme.padding)
+                    tornQuoteSlip
+                        .padding(.top, 6)
 
-                    // MARK: - Streak card
-                    NavigationLink {
-                        StreakCalendarView().environmentObject(dataManager)
-                    } label: {
-                        HStack(spacing: 14) {
-                            ProfileStreakFlame(streak: dataManager.streakData.currentStreak)
-                            Spacer()
-                            VStack(alignment: .trailing, spacing: 3) {
-                                Text("longest")
-                                    .font(DinoTheme.dinoLabelFont(size: 12))
-                                    .foregroundColor(DinoTheme.textSecondary)
-                                Text("\(dataManager.streakData.longestStreak) days")
-                                    .font(DinoTheme.headlineFont())
-                                    .foregroundColor(DinoTheme.textPrimary)
-                            }
-                            Image(systemName: "chevron.right")
-                                .font(.system(size: 13, weight: .medium))
-                                .foregroundColor(DinoTheme.textSecondary.opacity(0.4))
-                        }
-                        .padding(DinoTheme.padding)
-                        .dsCardLarge()
-                    }
-                    .buttonStyle(ScaleButtonStyle())
-                    .padding(.horizontal, DinoTheme.padding)
+                    sectionPractice
+                    sectionAppearance
+                    sectionAccount
+                    sectionWellness
+                    sectionAbout
 
-                    // MARK: - Menu items
-                    VStack(spacing: 4) {
-                        ProfileNavRow(icon: "brain.head.profile", label: "weekly assessment", color: DinoTheme.lavender) {
-                            showAssessment = true
-                        }
-                        ProfileNavRow(icon: "heart.text.square.fill", label: "resources", color: DinoTheme.warmRose) {
-                            showResources = true
-                        }
-                        ProfileNavRow(icon: "gearshape.fill", label: "settings", color: DinoTheme.skyBlue) {
-                            showSettings = true
-                        }
-                    }
-                    .padding(.horizontal, DinoTheme.padding)
-
-                    // MARK: - Crisis button
-                    ProfileCrisisButton { showResources = true }
-                        .padding(.horizontal, DinoTheme.padding)
-                        .padding(.bottom, 32)
+                    footer
+                        .padding(.top, 6)
                 }
+                .padding(.horizontal, 20)
+                .padding(.bottom, 80)
             }
-            .background(DinoTheme.background.ignoresSafeArea())
-            .navigationTitle("")
+            .background(ScrapbookBackground().ignoresSafeArea())
             .navigationBarHidden(true)
         }
-        .sheet(isPresented: $showAssessment) {
-            AssessmentView().environmentObject(dataManager)
+        .sheet(item: $activeSheet) { sheet in
+            switch sheet {
+            case .themeSettings: ThemeSettingsView()
+            case .privacyPolicy: PrivacyPolicyView()
+            case .assessment:    AssessmentView().environmentObject(dataManager)
+            case .resources:     ResourcesView()
+            case .gratitudeJar:  GratitudeJarView().environmentObject(dataManager)
+            case .growth:        NavigationStack { GrowthView().environmentObject(dataManager) }
+            case .stub(let content): ComingSoonView(content: content)
+            }
         }
-        .sheet(isPresented: $showResources) {
-            ResourcesView()
+        .confirmationDialog(
+            "sign out?",
+            isPresented: $showSignOutConfirm,
+            titleVisibility: .visible
+        ) {
+            Button("sign out", role: .destructive) {
+                AuthManager.shared.signOut()
+                dataManager.clearForSignOut()
+                UserDefaults.standard.set(false, forKey: "hasPassedAuth")
+                dismiss()
+            }
+            Button("cancel", role: .cancel) {}
         }
-        .sheet(isPresented: $showSettings) {
-            SettingsView().environmentObject(dataManager)
+    }
+
+    // MARK: - Header Row
+
+    private var headerRow: some View {
+        HStack(alignment: .top) {
+            VStack(alignment: .leading, spacing: -2) {
+                Text("my little")
+                    .font(DinoTheme.dinoFont(size: 22))
+                    .foregroundColor(SB.sage)
+                Text("scrapbook")
+                    .font(DinoTheme.dinoFont(size: 34))
+                    .foregroundColor(SB.nearBlack)
+            }
+            .rotationEffect(.degrees(-1))
+
+            Spacer()
+
+            ZStack {
+                Circle()
+                    .strokeBorder(
+                        SB.rust,
+                        style: StrokeStyle(lineWidth: 1.5, dash: [3, 3])
+                    )
+                    .frame(width: 58, height: 58)
+                Text("page 1")
+                    .font(DinoTheme.dinoFont(size: 13))
+                    .foregroundColor(SB.rust)
+            }
+            .rotationEffect(.degrees(6))
+            .padding(.top, 6)
+        }
+    }
+
+    // MARK: - Polaroid Row
+
+    private var polaroidRow: some View {
+        HStack(alignment: .center, spacing: 16) {
+            DinoPolaroid()
+            VStack(alignment: .leading, spacing: 4) {
+                Text("hello,")
+                    .font(DinoTheme.dinoFont(size: 16))
+                    .foregroundColor(SB.sage)
+                Text(firstName)
+                    .font(DinoTheme.dinoFont(size: 28))
+                    .foregroundColor(SB.nearBlack)
+                    .rotationEffect(.degrees(-0.8))
+                Text("it's good to see you")
+                    .font(DinoTheme.dinoFont(size: 14))
+                    .foregroundColor(SB.sage.opacity(0.8))
+            }
+            Spacer(minLength: 0)
+        }
+    }
+
+    // MARK: - Stats stickers row
+
+    private var statsStickersRow: some View {
+        HStack(spacing: 14) {
+            NavigationLink {
+                StreakCalendarView().environmentObject(dataManager)
+            } label: {
+                StickerCircle(
+                    number: "\(unionStreak)",
+                    label: "day streak",
+                    innerRing: SB.peach,
+                    tilt: 3
+                )
+            }
+            .buttonStyle(.plain)
+
+            Button {
+                activeSheet = .gratitudeJar
+            } label: {
+                StickerCircle(
+                    number: "\(dataManager.gratitudeNotes.count)",
+                    label: "slips saved",
+                    innerRing: SB.sky,
+                    tilt: -4
+                )
+            }
+            .buttonStyle(.plain)
+
+            Spacer(minLength: 0)
+        }
+    }
+
+    // MARK: - XP pill
+
+    private var xpPill: some View {
+        Button {
+            activeSheet = .growth
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: "leaf.fill")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(SB.sage)
+
+                Text("level \(xpLevel)")
+                    .font(DinoTheme.dinoFont(size: 14))
+                    .foregroundColor(SB.nearBlack)
+
+                ZStack(alignment: .leading) {
+                    Capsule()
+                        .fill(SB.xpTrack)
+                        .frame(width: 100, height: 6)
+                    Capsule()
+                        .fill(SB.lavender)
+                        .frame(width: max(6, 100 * CGFloat(xpProgress)), height: 6)
+                }
+
+                Text("\(xpInLevel) / \(xpToNext) xp")
+                    .font(DinoTheme.numericFont(size: 12))
+                    .foregroundColor(SB.sage)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .background(
+                Capsule().fill(SB.paperWhite)
+            )
+            .overlay(
+                Capsule()
+                    .strokeBorder(
+                        SB.sage,
+                        style: StrokeStyle(lineWidth: 1, dash: [3, 3])
+                    )
+            )
+            .rotationEffect(.degrees(1.2))
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: - Torn Quote Slip
+
+    private var tornQuoteSlip: some View {
+        ZStack(alignment: .top) {
+            TornPaper()
+                .fill(SB.paperWhite)
+                .shadow(color: .black.opacity(0.08), radius: 6, x: 1, y: 3)
+
+            // Washi tape at top
+            RoundedRectangle(cornerRadius: 2)
+                .fill(SB.rose.opacity(0.7))
+                .frame(width: 80, height: 14)
+                .rotationEffect(.degrees(-3))
+                .offset(y: -6)
+
+            VStack(spacing: 10) {
+                Text(moodQuote)
+                    .italic()
+                    .multilineTextAlignment(.center)
+                    .font(DinoTheme.dinoFont(size: 15))
+                    .foregroundColor(SB.nearBlack)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Text("— dino")
+                    .font(DinoTheme.dinoFont(size: 12))
+                    .foregroundColor(SB.sage.opacity(0.7))
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+            }
+            .padding(.horizontal, 22)
+            .padding(.top, 28)
+            .padding(.bottom, 20)
+        }
+        .rotationEffect(.degrees(-1.5))
+    }
+
+    // MARK: - Sections
+
+    private var sectionPractice: some View {
+        PaperSection(
+            label: "practice",
+            tapeColor: SB.peach,
+            tilt: -0.8
+        ) {
+            SBRow(
+                icon: "bell.fill",
+                iconColor: SB.sage,
+                title: "gentle reminders",
+                subtitle: "nudges from your dino"
+            ) {
+                activeSheet = .stub(ComingSoonContent(
+                    "gentle reminders", "soft nudges, never loud"
+                ))
+            }
+            SBRow(
+                icon: "music.note",
+                iconColor: SB.peach,
+                title: "ambient sounds",
+                subtitle: "rain, forest, soft piano"
+            ) {
+                activeSheet = .stub(ComingSoonContent(
+                    "ambient sounds", "a quiet soundtrack for your garden"
+                ))
+            }
+            SBRow(
+                icon: "moon.stars.fill",
+                iconColor: SB.lavender,
+                title: "wind down",
+                subtitle: "a quiet end to the day"
+            ) {
+                activeSheet = .stub(ComingSoonContent(
+                    "wind down", "a slow path into sleep"
+                ))
+            }
+        }
+    }
+
+    private var sectionAppearance: some View {
+        PaperSection(
+            label: "appearance",
+            tapeColor: SB.sage.opacity(0.35),
+            tilt: 1.0
+        ) {
+            SBRow(
+                icon: "paintpalette.fill",
+                iconColor: SB.rose,
+                title: "theme & weather",
+                subtitle: "current: \(themeManager.currentTheme.displayName)"
+            ) {
+                activeSheet = .themeSettings
+            }
+            SBRow(
+                icon: "textformat.size",
+                iconColor: SB.sky,
+                title: "text size",
+                subtitle: "make reading gentle"
+            ) {
+                activeSheet = .stub(ComingSoonContent(
+                    "text size", "reading, tuned to you"
+                ))
+            }
+
+            // Quick palette swatches
+            VStack(alignment: .leading, spacing: 8) {
+                Text("quick palette")
+                    .font(DinoTheme.dinoFont(size: 12))
+                    .foregroundColor(SB.sage)
+
+                HStack(spacing: 12) {
+                    ForEach(Array([SB.peach, SB.sky, SB.lavender, SB.rose].enumerated()),
+                            id: \.offset) { _, swatch in
+                        Button {
+                            activeSheet = .themeSettings
+                        } label: {
+                            Circle()
+                                .fill(swatch)
+                                .frame(width: 28, height: 28)
+                                .overlay(
+                                    Circle().strokeBorder(
+                                        SB.sage.opacity(0.6),
+                                        style: StrokeStyle(lineWidth: 1, dash: [2, 2])
+                                    )
+                                )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    Spacer(minLength: 0)
+                }
+            }
+            .padding(.top, 4)
+        }
+    }
+
+    private var sectionAccount: some View {
+        PaperSection(
+            label: "account",
+            tapeColor: SB.sky,
+            tilt: -1.0
+        ) {
+            SBRow(
+                icon: "person.fill",
+                iconColor: SB.sage,
+                title: "profile details",
+                subtitle: "name, avatar"
+            ) {
+                activeSheet = .stub(ComingSoonContent(
+                    "profile details", "name, avatar, all the little things"
+                ))
+            }
+            SBRow(
+                icon: "lock.shield.fill",
+                iconColor: SB.lavender,
+                title: "privacy",
+                subtitle: "your data, your garden"
+            ) {
+                activeSheet = .privacyPolicy
+            }
+            SBRow(
+                icon: "arrow.down.doc.fill",
+                iconColor: SB.peach,
+                title: "export your garden",
+                subtitle: "take your notes with you"
+            ) {
+                activeSheet = .stub(ComingSoonContent(
+                    "export your garden", "your notes, portable"
+                ))
+            }
+        }
+    }
+
+    private var sectionWellness: some View {
+        PaperSection(
+            label: "wellness",
+            tapeColor: SB.lavender,
+            tilt: 0.8
+        ) {
+            SBRow(
+                icon: "brain.head.profile",
+                iconColor: SB.lavender,
+                title: "weekly check-in",
+                subtitle: "5 gentle questions"
+            ) {
+                activeSheet = .assessment
+            }
+            SBRow(
+                icon: "heart.text.square.fill",
+                iconColor: SB.sage,
+                title: "resources",
+                subtitle: "grounding, crisis, kindness"
+            ) {
+                activeSheet = .resources
+            }
+            SBRow(
+                icon: "exclamationmark.bubble.fill",
+                iconColor: SB.rose,
+                title: "need help now?",
+                subtitle: "someone will answer, always"
+            ) {
+                activeSheet = .resources
+            }
+        }
+    }
+
+    private var sectionAbout: some View {
+        PaperSection(
+            label: "about",
+            tapeColor: SB.rose,
+            tilt: -0.6
+        ) {
+            SBRow(
+                icon: "questionmark.circle.fill",
+                iconColor: SB.sky,
+                title: "help & feedback",
+                subtitle: "tell us what's growing"
+            ) {
+                activeSheet = .stub(ComingSoonContent(
+                    "help & feedback", "tell dino how it's growing"
+                ))
+            }
+            SBRow(
+                icon: "heart.fill",
+                iconColor: SB.rose,
+                title: "rate dino",
+                subtitle: "if it's helping your days"
+            ) {
+                activeSheet = .stub(ComingSoonContent(
+                    "rate dino", "if dino has helped you bloom"
+                ))
+            }
+        }
+    }
+
+    // MARK: - Footer
+
+    private var footer: some View {
+        VStack(spacing: 10) {
+            Button {
+                showSignOutConfirm = true
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "rectangle.portrait.and.arrow.right")
+                        .font(.system(size: 14, weight: .medium))
+                    Text("sign out")
+                        .font(DinoTheme.dinoFont(size: 15))
+                }
+                .foregroundColor(SB.rose)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 10)
+            }
+            .buttonStyle(.plain)
+
+            Text("xo, dino")
+                .italic()
+                .font(DinoTheme.dinoFont(size: 16))
+                .foregroundColor(SB.sage.opacity(0.8))
+                .frame(maxWidth: .infinity, alignment: .center)
+
+            Text("dino · v1.2.0")
+                .font(DinoTheme.dinoFont(size: 11))
+                .foregroundColor(SB.sage.opacity(0.5))
+                .frame(maxWidth: .infinity, alignment: .center)
+
+            Text("member since \(joinDateLabel)")
+                .font(DinoTheme.dinoFont(size: 11))
+                .foregroundColor(SB.sage.opacity(0.5))
+                .frame(maxWidth: .infinity, alignment: .center)
         }
     }
 }
 
-// MARK: - Avatar with Pulsing Glow Ring
+// MARK: - Scrapbook Background
 
-private struct ProfileAvatarGlow: View {
-    @State private var glowPulsing = false
-
+private struct ScrapbookBackground: View {
     var body: some View {
         ZStack {
-            // Pulsing glow ring
-            Circle()
-                .strokeBorder(DinoTheme.accent.opacity(glowPulsing ? 0.6 : 0.3), lineWidth: 3)
-                .frame(width: 104, height: 104)
-                .scaleEffect(glowPulsing ? 1.06 : 1.0)
-                .animation(
-                    .easeInOut(duration: 1.5).repeatForever(autoreverses: true),
-                    value: glowPulsing
-                )
+            SB.paperCream
+            Canvas { ctx, size in
+                let lineColor = SB.sage.opacity(0.08)
+                var y: CGFloat = 0
+                while y < size.height {
+                    var path = Path()
+                    path.move(to: CGPoint(x: 0, y: y))
+                    path.addLine(to: CGPoint(x: size.width, y: y))
+                    ctx.stroke(path, with: .color(lineColor), lineWidth: 0.8)
+                    y += 28
+                }
+            }
+        }
+    }
+}
 
-            // Soft outer glow
-            Circle()
-                .fill(DinoTheme.accent.opacity(glowPulsing ? 0.12 : 0.05))
-                .frame(width: 112, height: 112)
-                .animation(
-                    .easeInOut(duration: 1.5).repeatForever(autoreverses: true),
-                    value: glowPulsing
-                )
+// MARK: - DinoPolaroid
+
+private struct DinoPolaroid: View {
+    var body: some View {
+        ZStack {
+            // White card
+            RoundedRectangle(cornerRadius: 4, style: .continuous)
+                .fill(Color.white)
+                .frame(width: 130, height: 130)
 
             Image("DinoMascot")
                 .resizable()
-                .scaledToFill()
-                .frame(width: 90, height: 90)
-                .clipShape(Circle())
-                .shadow(color: DinoTheme.accent.opacity(0.25), radius: 12, y: 4)
+                .aspectRatio(contentMode: .fit)
+                .frame(width: 114, height: 114)
+                .padding(8)
+
+            // Tape top-left
+            RoundedRectangle(cornerRadius: 1)
+                .fill(SB.peach.opacity(0.7))
+                .frame(width: 48, height: 14)
+                .rotationEffect(.degrees(-8))
+                .offset(x: -40, y: -60)
+
+            // Tape top-right
+            RoundedRectangle(cornerRadius: 1)
+                .fill(SB.peach.opacity(0.7))
+                .frame(width: 48, height: 14)
+                .rotationEffect(.degrees(8))
+                .offset(x: 40, y: -60)
         }
-        .onAppear { glowPulsing = true }
+        .rotationEffect(.degrees(-3))
+        .shadow(color: .black.opacity(0.12), radius: 8, x: 2, y: 4)
+        .frame(width: 150, height: 150)
     }
 }
 
-// MARK: - XP Progress Bar
+// MARK: - Sticker Circle
 
-private struct ProfileXPBar: View {
-    let level: Int
-    let xpProgress: Double
-    let xpInLevel: Int
-    let xpToNext: Int
-
-    @State private var animatedProgress: Double = 0
-
-    var body: some View {
-        VStack(spacing: 8) {
-            // Level labels
-            HStack {
-                Text("lv. \(level)")
-                    .font(DinoTheme.dinoLabelFont(size: 12))
-                    .foregroundColor(DinoTheme.accent)
-                Spacer()
-                Text("\(xpInLevel)/\(xpToNext) xp")
-                    .font(DinoTheme.numericFont(size: 12))
-                    .foregroundColor(DinoTheme.textSecondary)
-                Spacer()
-                Text("lv. \(level + 1)")
-                    .font(DinoTheme.dinoLabelFont(size: 12))
-                    .foregroundColor(DinoTheme.textSecondary)
-            }
-
-            // Progress track
-            GeometryReader { geo in
-                ZStack(alignment: .leading) {
-                    RoundedRectangle(cornerRadius: 4)
-                        .fill(DinoTheme.accent.opacity(0.12))
-                        .frame(height: 8)
-
-                    RoundedRectangle(cornerRadius: 4)
-                        .fill(DinoTheme.accent)
-                        .frame(width: max(8, geo.size.width * animatedProgress), height: 8)
-                        .shadow(color: DinoTheme.accent.opacity(0.3), radius: 4, y: 1)
-                }
-            }
-            .frame(height: 8)
-        }
-        .onAppear {
-            withAnimation(.spring(response: 0.8, dampingFraction: 0.7)) {
-                animatedProgress = xpProgress
-            }
-        }
-        .onChange(of: xpProgress) { _, newValue in
-            withAnimation(.spring(response: 0.8, dampingFraction: 0.7)) {
-                animatedProgress = newValue
-            }
-        }
-    }
-}
-
-// MARK: - Profile Stat
-
-struct ProfileStat: View {
-    let emoji: String
-    let value: String
+private struct StickerCircle: View {
+    let number: String
     let label: String
+    let innerRing: Color
+    let tilt: Double
 
     var body: some View {
-        VStack(spacing: 6) {
-            Text(emoji)
-                .font(.system(size: 20))
+        ZStack {
+            Circle()
+                .fill(SB.paperWhite)
+            Circle()
+                .strokeBorder(
+                    SB.sage,
+                    style: StrokeStyle(lineWidth: 2, dash: [4, 3])
+                )
+            Circle()
+                .strokeBorder(innerRing, lineWidth: 3)
+                .padding(6)
 
-            Text(value)
-                .font(DinoTheme.numericFont(size: 28))
-                .foregroundColor(DinoTheme.textPrimary)
-
-            Text(label)
-                .font(DinoTheme.dinoLabelFont(size: 12))
-                .foregroundColor(DinoTheme.textSecondary)
-        }
-        .frame(maxWidth: .infinity)
-    }
-}
-
-// MARK: - Stat Divider
-
-private struct ProfileStatDivider: View {
-    var body: some View {
-        RoundedRectangle(cornerRadius: 1)
-            .fill(DinoTheme.accent.opacity(0.15))
-            .frame(width: 1, height: 44)
-    }
-}
-
-// MARK: - Streak Flame (animated)
-
-private struct ProfileStreakFlame: View {
-    let streak: Int
-    @State private var flameScale: Bool = false
-
-    var body: some View {
-        HStack(spacing: 10) {
-            // Flame with orange glow
-            ZStack {
-                // Warm glow behind flame
-                Circle()
-                    .fill(Color.orange.opacity(0.15))
-                    .frame(width: 48, height: 48)
-                    .blur(radius: 6)
-
-                Text("🔥")
-                    .font(.system(size: 32))
-                    .scaleEffect(flameScale ? 1.08 : 1.0)
-                    .animation(
-                        .easeInOut(duration: 1.0).repeatForever(autoreverses: true),
-                        value: flameScale
-                    )
-            }
-
-            VStack(alignment: .leading, spacing: 3) {
-                Text("\(streak) day\(streak == 1 ? "" : "s")")
-                    .font(DinoTheme.headlineFont())
-                    .foregroundColor(DinoTheme.textPrimary)
-
-                Text("current streak")
-                    .font(DinoTheme.dinoLabelFont(size: 11))
-                    .foregroundColor(DinoTheme.textSecondary)
-            }
-        }
-        .onAppear { flameScale = true }
-    }
-}
-
-// MARK: - Profile Nav Row
-
-struct ProfileNavRow: View {
-    let icon: String
-    let label: String
-    let color: Color
-    let action: () -> Void
-
-    @State private var chevronOffset: CGFloat = 0
-
-    var body: some View {
-        Button(action: {
-            // Chevron slide animation on tap
-            withAnimation(.spring(response: 0.25, dampingFraction: 0.5)) {
-                chevronOffset = 4
-            }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                withAnimation(.spring(response: 0.25, dampingFraction: 0.6)) {
-                    chevronOffset = 0
-                }
-            }
-            action()
-        }) {
-            HStack(spacing: 14) {
-                Image(systemName: icon)
-                    .font(.system(size: 18, weight: .medium))
-                    .foregroundColor(color)
-                    .frame(width: 40, height: 40)
-                    .background(
-                        RoundedRectangle(cornerRadius: 11, style: .continuous)
-                            .fill(DinoTheme.accent.opacity(0.12))
-                    )
-
+            VStack(spacing: 0) {
+                Text(number)
+                    .font(DinoTheme.numericFont(size: 22))
+                    .foregroundColor(SB.nearBlack)
                 Text(label)
-                    .font(DinoTheme.bodyFont())
-                    .foregroundColor(DinoTheme.textPrimary)
-
-                Spacer()
-
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(DinoTheme.textSecondary.opacity(0.4))
-                    .offset(x: chevronOffset)
+                    .font(DinoTheme.dinoFont(size: 11))
+                    .foregroundColor(SB.sage)
+                    .multilineTextAlignment(.center)
             }
-            .frame(minHeight: 56)
-            .padding(.horizontal, 16)
-            .background(DinoTheme.surfacePrimary)
-            .clipShape(RoundedRectangle(cornerRadius: DinoDesignSystem.radiusMD, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: DinoDesignSystem.radiusMD, style: .continuous)
-                    .strokeBorder(DinoTheme.accent.opacity(0.10), lineWidth: 1)
-            )
+            .padding(.horizontal, 6)
         }
-        .buttonStyle(ScaleButtonStyle())
+        .frame(width: 84, height: 84)
+        .rotationEffect(.degrees(tilt))
     }
 }
 
-// MARK: - Crisis Button (soft pulse)
+// MARK: - Torn Paper Shape
 
-private struct ProfileCrisisButton: View {
+private struct TornPaper: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        let tearAmplitude: CGFloat = 4
+        let tearStep: CGFloat = 10
+
+        path.move(to: CGPoint(x: 0, y: tearAmplitude))
+
+        var x: CGFloat = 0
+        var goingDown = true
+        while x <= rect.width {
+            let nextX = min(x + tearStep, rect.width)
+            let y: CGFloat = goingDown ? tearAmplitude * 2 : 0
+            path.addLine(to: CGPoint(x: nextX, y: y))
+            x = nextX
+            goingDown.toggle()
+        }
+
+        path.addLine(to: CGPoint(x: rect.width, y: rect.height))
+        path.addLine(to: CGPoint(x: 0, y: rect.height))
+        path.closeSubpath()
+        return path
+    }
+}
+
+// MARK: - Paper Section (card with washi tape, label, contents)
+
+private struct PaperSection<Content: View>: View {
+    let label: String
+    let tapeColor: Color
+    let tilt: Double
+    @ViewBuilder let content: () -> Content
+
+    var body: some View {
+        ZStack(alignment: .top) {
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(SB.paperWhite)
+                .shadow(color: .black.opacity(0.08), radius: 6, x: 1, y: 3)
+
+            // Washi tape at top-center
+            RoundedRectangle(cornerRadius: 2)
+                .fill(tapeColor)
+                .frame(width: 62, height: 16)
+                .rotationEffect(.degrees(tilt >= 0 ? 6 : -6))
+                .offset(y: -8)
+
+            VStack(alignment: .leading, spacing: 10) {
+                Text(label.uppercased())
+                    .font(DinoTheme.dinoFont(size: 13))
+                    .tracking(2)
+                    .foregroundColor(SB.sage)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.top, 4)
+
+                VStack(spacing: 10) {
+                    content()
+                }
+            }
+            .padding(16)
+        }
+        .rotationEffect(.degrees(tilt))
+        .padding(.top, 6)
+    }
+}
+
+// MARK: - Scrapbook Row
+
+private struct SBRow: View {
+    let icon: String
+    let iconColor: Color
+    let title: String
+    let subtitle: String
     let action: () -> Void
-    @State private var pulsing = false
 
     var body: some View {
         Button(action: action) {
             HStack(spacing: 12) {
-                Image(systemName: "heart.fill")
-                    .font(.system(size: 18, weight: .medium))
-                Text("need help now?")
-                    .font(DinoTheme.headlineFont())
+                ZStack {
+                    Circle()
+                        .fill(iconColor)
+                        .frame(width: 36, height: 36)
+                    Image(systemName: icon)
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundColor(.white)
+                }
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(DinoTheme.dinoFont(size: 16))
+                        .foregroundColor(SB.nearBlack)
+                    Text(subtitle)
+                        .font(DinoTheme.dinoFont(size: 12))
+                        .foregroundColor(SB.sage)
+                }
+
+                Spacer(minLength: 0)
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(SB.sage.opacity(0.5))
             }
-            .foregroundColor(.white)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 18)
-            .background(DinoTheme.warmRose)
-            .clipShape(RoundedRectangle(cornerRadius: DinoDesignSystem.radiusMD, style: .continuous))
-            .shadow(color: DinoTheme.warmRose.opacity(0.25), radius: 8, y: 3)
-            .scaleEffect(pulsing ? 1.02 : 1.0)
-            .animation(
-                .easeInOut(duration: 1.0).repeatForever(autoreverses: true),
-                value: pulsing
-            )
+            .padding(.vertical, 6)
+            .contentShape(Rectangle())
         }
-        .buttonStyle(ScaleButtonStyle())
-        .onAppear { pulsing = true }
+        .buttonStyle(.plain)
+    }
+}
+
+// MARK: - Coming Soon View
+
+private struct ComingSoonView: View {
+    let content: ComingSoonContent
+
+    var body: some View {
+        ZStack {
+            SB.paperCream.ignoresSafeArea()
+            VStack(spacing: 18) {
+                Image("DinoSleeping")
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: 180, height: 180)
+
+                Text(content.title)
+                    .font(DinoTheme.dinoFont(size: 24))
+                    .foregroundColor(SB.nearBlack)
+                    .multilineTextAlignment(.center)
+
+                Text(content.subtitle)
+                    .font(DinoTheme.dinoFont(size: 15))
+                    .foregroundColor(SB.sage)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 28)
+
+                Text("coming soon")
+                    .font(DinoTheme.dinoFont(size: 12))
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 6)
+                    .background(Capsule().fill(SB.rose))
+            }
+            .padding(24)
+        }
+        .presentationDetents([.medium])
     }
 }
