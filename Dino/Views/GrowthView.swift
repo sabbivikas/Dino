@@ -16,7 +16,7 @@ struct GrowthView: View {
     @State private var selectedPlant: PlantState? = nil
     @State private var appeared = false
 
-    private let gardenBG = Color(hex: "#FDF8F0")
+    private let gardenBG = Color("#FDF8F0")
 
     var body: some View {
         NavigationStack {
@@ -76,8 +76,8 @@ struct GrowthView: View {
         let plants = viewModel.plantStates
         return VStack(spacing: 0) {
             LazyVGrid(
-                columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)],
-                spacing: 12
+                columns: [GridItem(.flexible(), spacing: 6), GridItem(.flexible(), spacing: 6)],
+                spacing: 8
             ) {
                 ForEach(Array(plants.enumerated()), id: \.element.id) { index, plant in
                     GardenPlotTile(
@@ -91,13 +91,14 @@ struct GrowthView: View {
                     }
                 }
             }
-            .padding(20)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 12)
         }
         .background(gardenBG)
         .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .stroke(Color(hex: "#A8C5A0").opacity(0.25), lineWidth: 1)
+                .stroke(Color("#A8C5A0").opacity(0.25), lineWidth: 1)
         )
         .shadow(color: Color.black.opacity(0.06), radius: 12, x: 0, y: 4)
     }
@@ -135,10 +136,10 @@ struct GrowthView: View {
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
                     RoundedRectangle(cornerRadius: 999)
-                        .fill(Color(hex: "#E8E4D5"))
+                        .fill(Color("#E8E4D5"))
                     RoundedRectangle(cornerRadius: 999)
                         .fill(LinearGradient(
-                            colors: [Color(hex: "#A8C5A0"), Color(hex: "#A8D4E6")],
+                            colors: [Color("#A8C5A0"), Color("#A8D4E6")],
                             startPoint: .leading,
                             endPoint: .trailing
                         ))
@@ -175,7 +176,7 @@ private struct GardenPlotTile: View {
                 growth: plant.growth,
                 care: plant.care
             )
-            .frame(height: 150)
+            .frame(width: 130, height: 160)
             .rotationEffect(
                 plant.care >= 0.5
                     ? .degrees(sin(swayPhase) * 1.5)
@@ -189,7 +190,7 @@ private struct GardenPlotTile: View {
                 .font(DinoTheme.dinoFont(size: 13))
                 .foregroundColor(plant.practice.bloomColor)
         }
-        .padding(.vertical, 8)
+        .padding(.vertical, 2)
         .frame(maxWidth: .infinity)
         .contentShape(Rectangle())
         .onAppear {
@@ -226,7 +227,7 @@ private struct WeekDayColumn: View {
             VStack(spacing: 3) {
                 ForEach(Practice.allCases) { p in
                     Circle()
-                        .fill(practices.contains(p) ? p.bloomColor : Color(hex: "#E8E4D5"))
+                        .fill(practices.contains(p) ? p.bloomColor : Color("#E8E4D5"))
                         .frame(width: 6, height: 6)
                 }
             }
@@ -301,27 +302,27 @@ struct PlantCanvas: View {
 
         // --- Soil mound ---
         var soil = Path()
-        soil.addEllipse(in: CGRect(x: 35 - 9, y: soilY + 2 - 2.2, width: 18, height: 4.4))
-        context.fill(soil, with: .color(Color(hex: "#6B4A30").opacity(0.5)))
+        soil.addEllipse(in: CGRect(x: 35 - 13, y: soilY + 2 - 3.2, width: 26, height: 6.4))
+        context.fill(soil, with: .color(Color("#6B4A30").opacity(0.65)))
 
         // --- Seed phase (g < 0.25) ---
         if g < 0.25 {
             let seedOpacity = 1 - max(0, (g - 0.18) / 0.07)
-            let seedRX = 4.5 - sprout * 1.5
-            let seedRY = 3 - sprout * 0.5
+            let seedRX = 6.5 - sprout * 2.0
+            let seedRY = 4.5 - sprout * 1.0
             let seedCY = soilY - 1 + (1 - sprout) * 2
             var seed = Path()
             seed.addEllipse(in: CGRect(x: 35 - seedRX, y: seedCY - seedRY, width: seedRX * 2, height: seedRY * 2))
-            context.fill(seed, with: .color(Color(hex: "#8B6B4A").opacity(seedOpacity)))
-            context.stroke(seed, with: .color(Color(hex: "#5A4530").opacity(seedOpacity)), lineWidth: 1)
+            context.fill(seed, with: .color(Color("#8B6B4A").opacity(seedOpacity)))
+            context.stroke(seed, with: .color(Color("#5A4530").opacity(seedOpacity)), lineWidth: 1.3)
 
             // Seed crack
             if g > 0.04 && g < 0.2 {
                 let crackOp = smoothstep(g, 0.04, 0.12)
                 var crack = Path()
-                crack.move(to: CGPoint(x: 33, y: soilY - 1))
-                crack.addQuadCurve(to: CGPoint(x: 37, y: soilY - 1), control: CGPoint(x: 35, y: soilY - 3))
-                context.stroke(crack, with: .color(Color(hex: "#3F2A1C").opacity(crackOp)), lineWidth: 0.6)
+                crack.move(to: CGPoint(x: 32, y: soilY - 1))
+                crack.addQuadCurve(to: CGPoint(x: 38, y: soilY - 1), control: CGPoint(x: 35, y: soilY - 4))
+                context.stroke(crack, with: .color(Color("#3F2A1C").opacity(crackOp)), lineWidth: 0.8)
             }
         }
 
@@ -331,8 +332,8 @@ struct PlantCanvas: View {
             stem.move(to: CGPoint(x: 35, y: soilY))
             stem.addQuadCurve(to: CGPoint(x: stemTipX, y: stemTopY), control: CGPoint(x: ctrlX, y: ctrlY))
             let stemGradient = Gradient(colors: [
-                wiltColor(Color(hex: "#5A8A5C"), care: c),
-                wiltColor(Color(hex: "#3F6B50"), care: c)
+                wiltColor(Color("#5A8A5C"), care: c),
+                wiltColor(Color("#3F6B50"), care: c)
             ])
             context.stroke(
                 stem,
@@ -415,8 +416,8 @@ struct PlantCanvas: View {
         // --- Wilt: fallen leaves ---
         if c < 0.45 && trueLeafP > 0.5 {
             let fallenOp = (1 - c) * 0.9
-            let fallenColor = wiltColor(Color(hex: "#6B4A30"), care: c).opacity(fallenOp)
-            let strokeColor = Color(hex: "#3F2A1C").opacity(fallenOp)
+            let fallenColor = wiltColor(Color("#6B4A30"), care: c).opacity(fallenOp)
+            let strokeColor = Color("#3F2A1C").opacity(fallenOp)
             let positions: [(Double, Double, Double)] = [(14, 118, 40), (52, 122, -30), (22, 128, 10)]
             for (x, y, r) in positions {
                 var leaf = Path()
@@ -440,7 +441,7 @@ struct PlantCanvas: View {
             stump.addLine(to: CGPoint(x: 38, y: soilY - 10))
             context.stroke(
                 stump,
-                with: .color(Color(hex: "#6B4A30").opacity(0.8)),
+                with: .color(Color("#6B4A30").opacity(0.8)),
                 style: StrokeStyle(lineWidth: 1.5, lineCap: .round)
             )
         }
@@ -559,7 +560,7 @@ struct PlantCanvas: View {
                 context.stroke(bud, with: .color(centerColor.opacity(0.8 * bloomP)), lineWidth: 0.8)
             }
         case .mood: // daisy: 8 petals + center + fallen petals
-            let petalStrokeColor = pal.petalStroke ?? Color(hex: "#B06B8A")
+            let petalStrokeColor = pal.petalStroke ?? Color("#B06B8A")
             let angles: [Double] = [0, 45, 90, 135, 180, 225, 270, 315]
             let cx = stemTipX
             let cy = stemTopY - 4
@@ -584,7 +585,7 @@ struct PlantCanvas: View {
             let cr = 4 * bloomP
             center.addEllipse(in: CGRect(x: cx - cr, y: cy - cr, width: cr * 2, height: cr * 2))
             context.fill(center, with: .color(centerColor.opacity(bloomP)))
-            context.stroke(center, with: .color(Color(hex: "#D4A55A").opacity(bloomP)), lineWidth: 0.8)
+            context.stroke(center, with: .color(Color("#D4A55A").opacity(bloomP)), lineWidth: 0.8)
             // Fallen petals
             if c < 0.5 && bloomP > 0.5 {
                 let fallenOp = (1 - c) * 0.7
@@ -601,7 +602,7 @@ struct PlantCanvas: View {
                 }
             }
         case .gratitude: // sunflower: 12 petals with head droop + seed dots
-            let petalStrokeColor = pal.petalStroke ?? Color(hex: "#C99520")
+            let petalStrokeColor = pal.petalStroke ?? Color("#C99520")
             let cx = stemTipX
             let cy = stemTopY - 2
             let headDroop = (1 - c) * 55 * .pi / 180
@@ -629,7 +630,7 @@ struct PlantCanvas: View {
             let cr = 6.5 * bloomP
             center.addEllipse(in: CGRect(x: cx - cr, y: cy - cr, width: cr * 2, height: cr * 2))
             context.fill(center, with: .color(centerColor.opacity(bloomP)))
-            context.stroke(center, with: .color(Color(hex: "#3F2A1C").opacity(bloomP)), lineWidth: 1)
+            context.stroke(center, with: .color(Color("#3F2A1C").opacity(bloomP)), lineWidth: 1)
             if bloomP > 0.6 {
                 let dotAngles: [Double] = [0, 60, 120, 180, 240, 300]
                 for a in dotAngles {
@@ -638,7 +639,7 @@ struct PlantCanvas: View {
                     let dy = sin(ar) * 3
                     var dot = Path()
                     dot.addEllipse(in: CGRect(x: cx + dx - 0.6, y: cy + dy - 0.6, width: 1.2, height: 1.2))
-                    context.fill(dot, with: .color(Color(hex: "#3F2A1C").opacity(0.5 * bloomP)))
+                    context.fill(dot, with: .color(Color("#3F2A1C").opacity(0.5 * bloomP)))
                 }
             }
         case .breathing: // lavender: 5 ascending floret pairs + fallen florets
@@ -745,26 +746,26 @@ struct PlantCanvas: View {
         switch species {
         case .journal:
             return SpeciesPalette(
-                leaf: Color(hex: "#6BAA7C"), leafDark: Color(hex: "#3F6B50"),
-                flower: Color(hex: "#F5D28A"), center: Color(hex: "#D4A55A"),
+                leaf: Color("#6BAA7C"), leafDark: Color("#3F6B50"),
+                flower: Color("#F5D28A"), center: Color("#D4A55A"),
                 petalStroke: nil
             )
         case .mood:
             return SpeciesPalette(
-                leaf: Color(hex: "#7BBC8C"), leafDark: Color(hex: "#3F6B50"),
-                flower: Color(hex: "#E8B4B8"), center: Color(hex: "#F5D28A"),
-                petalStroke: Color(hex: "#B06B8A")
+                leaf: Color("#7BBC8C"), leafDark: Color("#3F6B50"),
+                flower: Color("#E8B4B8"), center: Color("#F5D28A"),
+                petalStroke: Color("#B06B8A")
             )
         case .gratitude:
             return SpeciesPalette(
-                leaf: Color(hex: "#8BC8A0"), leafDark: Color(hex: "#3F6B50"),
-                flower: Color(hex: "#F5C84F"), center: Color(hex: "#8B5A2B"),
-                petalStroke: Color(hex: "#C99520")
+                leaf: Color("#8BC8A0"), leafDark: Color("#3F6B50"),
+                flower: Color("#F5C84F"), center: Color("#8B5A2B"),
+                petalStroke: Color("#C99520")
             )
         case .breathing:
             return SpeciesPalette(
-                leaf: Color(hex: "#7BBC8C"), leafDark: Color(hex: "#3F6B50"),
-                flower: Color(hex: "#B4A4C8"), center: Color(hex: "#7B6BA0"),
+                leaf: Color("#7BBC8C"), leafDark: Color("#3F6B50"),
+                flower: Color("#B4A4C8"), center: Color("#7B6BA0"),
                 petalStroke: nil
             )
         }
@@ -850,7 +851,7 @@ private struct PlantDetailSheet: View {
                 .padding(.horizontal, 20)
                 .padding(.bottom, 40)
             }
-            .background(Color(hex: "#FDF8F0").ignoresSafeArea())
+            .background(Color("#FDF8F0").ignoresSafeArea())
             .navigationBarTitleDisplayMode(.inline)
         }
     }
@@ -891,8 +892,8 @@ private struct PlantDetailSheet: View {
             .foregroundColor(.white)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 14)
-            .background(Color(hex: "#A8C5A0"))
+            .background(Color("#A8C5A0"))
             .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-            .shadow(color: Color(hex: "#A8C5A0").opacity(0.4), radius: 12, x: 0, y: 4)
+            .shadow(color: Color("#A8C5A0").opacity(0.4), radius: 12, x: 0, y: 4)
     }
 }
