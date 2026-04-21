@@ -17,7 +17,7 @@ enum MeditationScene: Equatable {
     case snow
 
     /// Pick scene based on current weather theme from ThemeManager
-    static func current() -> MeditationScene {
+    @MainActor static func current() -> MeditationScene {
         switch ThemeManager.shared.currentTheme {
         case .sunny, .defaultDino, .forest, .lavenderCalm:
             return .sunny
@@ -743,7 +743,10 @@ private struct NightMilkyWay: View {
     var body: some View {
         Canvas { context, canvasSize in
             context.drawLayer { ctx in
-                ctx.rotate(by: .degrees(-12), anchor: CGPoint(x: size.width * 0.5, y: size.height * 0.15))
+                let anchorPt = CGPoint(x: size.width * 0.5, y: size.height * 0.15)
+                ctx.translateBy(x: anchorPt.x, y: anchorPt.y)
+                ctx.rotate(by: .degrees(-12))
+                ctx.translateBy(x: -anchorPt.x, y: -anchorPt.y)
                 let rect = CGRect(x: -50, y: size.height * 0.05, width: size.width + 100, height: size.height * 0.2)
                 ctx.fill(Path(rect), with: .linearGradient(
                     Gradient(colors: [
