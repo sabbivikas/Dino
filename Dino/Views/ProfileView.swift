@@ -165,7 +165,14 @@ struct ProfileView: View {
         }
         .sheet(item: $activeSheet) { sheet in
             switch sheet {
-            case .themeSettings: ThemeSettingsView()
+            case .themeSettings:
+                // ThemeSettingsView declares `@EnvironmentObject var themeManager: ThemeManager`.
+                // Sheet content does NOT inherit the presenting view's environment, so we must
+                // inject ThemeManager.shared here or SwiftUI will fatalError at runtime with
+                // "No ObservableObject of type ThemeManager found".
+                ThemeSettingsView()
+                    .environmentObject(ThemeManager.shared)
+                    .environmentObject(dataManager)
             case .privacyPolicy: PrivacyPolicyView()
             case .assessment:    AssessmentView().environmentObject(dataManager)
             case .resources:     ResourcesView()
@@ -691,14 +698,24 @@ private struct TornPaper: Shape {
         let tearAmplitude: CGFloat = 4
         let tearStep: CGFloat = 10
 
+        // Guard against pre-layout zero / non-finite sizes — the original
+        // `while x <= rect.width` loop advances via `min(x + step, width)`,
+        // which pins x to 0 when width is 0 and spins forever.
+        guard rect.width.isFinite, rect.height.isFinite,
+              rect.width > 0, rect.height > 0 else {
+            path.addRect(rect)
+            return path
+        }
+
         path.move(to: CGPoint(x: 0, y: tearAmplitude))
 
         var x: CGFloat = 0
         var goingDown = true
-        while x <= rect.width {
+        while x < rect.width {
             let nextX = min(x + tearStep, rect.width)
             let y: CGFloat = goingDown ? tearAmplitude * 2 : 0
             path.addLine(to: CGPoint(x: nextX, y: y))
+            if nextX == x { break } // belt-and-braces: never loop on no progress
             x = nextX
             goingDown.toggle()
         }
