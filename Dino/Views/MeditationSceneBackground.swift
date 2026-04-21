@@ -16,17 +16,23 @@ enum MeditationScene: Equatable {
     case night
     case snow
 
-    /// Pick scene based on current weather theme from ThemeManager
+    /// Pick scene based on time of day first, then weather theme
     @MainActor static func current() -> MeditationScene {
-        switch ThemeManager.shared.currentTheme {
-        case .sunny, .defaultDino, .forest, .lavenderCalm:
-            return .sunny
-        case .night:
+        let hour = Calendar.current.component(.hour, from: Date())
+
+        // Night time always shows night scene (9pm - 5am)
+        if hour >= 21 || hour < 5 {
             return .night
+        }
+
+        // Daytime: use weather theme to pick scene
+        switch ThemeManager.shared.currentTheme {
         case .rainy, .cloudy, .storm:
             return .rainy
         case .snow:
             return .snow
+        default:
+            return .sunny
         }
     }
 }
@@ -39,9 +45,10 @@ private enum TimeOfDay {
     static func current() -> TimeOfDay {
         let hour = Calendar.current.component(.hour, from: Date())
         switch hour {
-        case 5..<10:  return .dawn
-        case 10..<17: return .noon
-        default:      return .dusk
+        case 5..<8:   return .dawn
+        case 8..<17:  return .noon
+        case 17..<21: return .dusk
+        default:      return .noon // Night scene handles 21-5 at scene level
         }
     }
 }
@@ -61,35 +68,10 @@ struct MeditationSceneBackground: View {
                 case .night: NightScene(size: geo.size, reduceMotion: reduceMotion)
                 case .snow:  SnowScene(size: geo.size, reduceMotion: reduceMotion)
                 }
-
-                // Dino meditation character on top of all scenes
-                DinoMeditationCharacter(size: geo.size, reduceMotion: reduceMotion)
             }
         }
         .ignoresSafeArea(.all)
         .animation(.easeInOut(duration: 2), value: scene)
-    }
-}
-
-// MARK: - Dino Meditation Character
-
-private struct DinoMeditationCharacter: View {
-    let size: CGSize
-    let reduceMotion: Bool
-    @State private var floating = false
-
-    var body: some View {
-        Image("DinoMeditation")
-            .resizable()
-            .scaledToFit()
-            .frame(width: size.width * 0.28)
-            .position(x: size.width / 2, y: size.height * 0.65)
-            .offset(y: floating ? -12 : 0)
-            .animation(
-                reduceMotion ? nil : .easeInOut(duration: 4).repeatForever(autoreverses: true),
-                value: floating
-            )
-            .onAppear { floating = true }
     }
 }
 
