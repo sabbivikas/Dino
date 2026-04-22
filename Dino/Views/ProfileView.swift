@@ -41,6 +41,7 @@ private enum ProfileSheet: Identifiable {
     case resources
     case gratitudeJar
     case growth
+    case profileDetails
     case stub(ComingSoonContent)
 
     var id: String {
@@ -51,6 +52,7 @@ private enum ProfileSheet: Identifiable {
         case .resources:     return "resources"
         case .gratitudeJar:  return "gratitudeJar"
         case .growth:        return "growth"
+        case .profileDetails: return "profileDetails"
         case .stub(let c):   return "stub-\(c.id)"
         }
     }
@@ -65,6 +67,7 @@ struct ProfileView: View {
 
     @State private var activeSheet: ProfileSheet?
     @State private var showSignOutConfirm = false
+    @State private var savedProfilePhoto: UIImage? = nil
 
     // MARK: Derived values
 
@@ -163,7 +166,12 @@ struct ProfileView: View {
             .background(ScrapbookBackground().ignoresSafeArea())
             .navigationBarHidden(true)
         }
-        .sheet(item: $activeSheet) { sheet in
+        .onAppear {
+            savedProfilePhoto = PhotoStore.load()
+        }
+        .sheet(item: $activeSheet, onDismiss: {
+            savedProfilePhoto = PhotoStore.load()
+        }) { sheet in
             switch sheet {
             case .themeSettings:
                 // ThemeSettingsView declares `@EnvironmentObject var themeManager: ThemeManager`.
@@ -178,6 +186,7 @@ struct ProfileView: View {
             case .resources:     ResourcesView()
             case .gratitudeJar:  GratitudeJarView().environmentObject(dataManager)
             case .growth:        NavigationStack { GrowthView().environmentObject(dataManager) }
+            case .profileDetails: ProfileDetailsView()
             case .stub(let content): ComingSoonView(content: content)
             }
         }
@@ -232,7 +241,7 @@ struct ProfileView: View {
 
     private var polaroidRow: some View {
         HStack(alignment: .center, spacing: 16) {
-            DinoPolaroid()
+            DinoPolaroid(profilePhoto: savedProfilePhoto)
             VStack(alignment: .leading, spacing: 4) {
                 Text("hello,")
                     .font(DinoTheme.dinoFont(size: 16))
@@ -471,9 +480,7 @@ struct ProfileView: View {
                 title: "profile details",
                 subtitle: "name, avatar"
             ) {
-                activeSheet = .stub(ComingSoonContent(
-                    "profile details", "name, avatar, all the little things"
-                ))
+                activeSheet = .profileDetails
             }
             SBRow(
                 icon: "lock.shield.fill",
@@ -620,6 +627,8 @@ private struct ScrapbookBackground: View {
 // MARK: - DinoPolaroid
 
 private struct DinoPolaroid: View {
+    let profilePhoto: UIImage?
+
     var body: some View {
         ZStack {
             // White card
@@ -627,11 +636,21 @@ private struct DinoPolaroid: View {
                 .fill(Color.white)
                 .frame(width: 130, height: 130)
 
-            Image("DinoMascot")
-                .resizable()
-                .aspectRatio(contentMode: .fit)
-                .frame(width: 114, height: 114)
-                .padding(8)
+            Group {
+                if let img = profilePhoto {
+                    Image(uiImage: img)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(width: 114, height: 114)
+                        .clipShape(RoundedRectangle(cornerRadius: 2, style: .continuous))
+                } else {
+                    Image("DinoMascot")
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(width: 114, height: 114)
+                }
+            }
+            .padding(8)
 
             // Tape top-left
             RoundedRectangle(cornerRadius: 1)
