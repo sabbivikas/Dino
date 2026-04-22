@@ -82,6 +82,101 @@ class NotificationManager: ObservableObject {
         if dailyCheckInEnabled { scheduleDailyCheckIn() }
         if streakReminderEnabled { scheduleStreakReminder() }
         if windDownEnabled { scheduleWindDown() }
+
+        // Wind-down with user-configurable time + routines (separate identifier)
+        rescheduleWindDown()
+    }
+
+    // MARK: - Wind-down (configurable — routines + custom time)
+
+    private let windDownConfigurableMessages: [String] = [
+        "time to wind down gently",
+        "the day is softening — so can you",
+        "a quiet moment is waiting for you",
+        "let today settle with care",
+        "close the day kindly",
+        "rest is a practice too",
+        "breathe, write, be — then sleep"
+    ]
+
+    /// Schedule the configurable wind-down reminder driven by @AppStorage keys:
+    /// `wind_down_enabled`, `wind_down_time`, and routine toggles.
+    /// Separate from the legacy `wind_down` identifier above — uses `winddown.daily`.
+    func rescheduleWindDown() {
+        let center = UNUserNotificationCenter.current()
+        center.removePendingNotificationRequests(withIdentifiers: ["winddown.daily"])
+
+        let ud = UserDefaults.standard
+        let enabled = ud.bool(forKey: "wind_down_enabled")
+        guard enabled else {
+            print("[Notifications] wind-down (configurable) disabled — cleared")
+            return
+        }
+
+        // Permission — request if not determined, mirror existing pattern.
+        center.getNotificationSettings { settings in
+            Task { @MainActor in
+                switch settings.authorizationStatus {
+                case .authorized, .provisional, .ephemeral:
+                    self.scheduleConfigurableWindDown()
+                case .notDetermined:
+                    let granted = await self.requestPermission()
+                    if granted { self.scheduleConfigurableWindDown() }
+                default:
+                    print("[Notifications] wind-down (configurable) skipped — no permission")
+                }
+            }
+        }
+    }
+
+    private func scheduleConfigurableWindDown() {
+        let ud = UserDefaults.standard
+        let interval = ud.double(forKey: "wind_down_time")
+
+        // Determine reminder time — default 9:30pm if never set.
+        var hour = 21
+        var minute = 30
+        if interval != 0 {
+            let date = Date(timeIntervalSinceReferenceDate: interval)
+            let comps = Calendar.current.dateComponents([.hour, .minute], from: date)
+            hour = comps.hour ?? 21
+            minute = comps.minute ?? 30
+        }
+
+        var routines: [String] = []
+        // Default to true when keys don't exist yet
+        let breathing = ud.object(forKey: "wind_down_breathing") as? Bool ?? true
+        let journal   = ud.object(forKey: "wind_down_journal") as? Bool ?? true
+        let gratitude = ud.object(forKey: "wind_down_gratitude") as? Bool ?? true
+        if breathing { routines.append("breathing") }
+        if journal { routines.append("journal") }
+        if gratitude { routines.append("gratitude") }
+
+        let content = UNMutableNotificationContent()
+        content.title = windDownConfigurableMessages.randomElement() ?? "wind down"
+        if !routines.isEmpty {
+            content.body = "tonight: " + routines.joined(separator: " · ")
+        }
+        content.sound = .default
+        content.categoryIdentifier = "WIND_DOWN"
+        content.userInfo = ["action": "journal"]
+
+        var dc = DateComponents()
+        dc.hour = hour
+        dc.minute = minute
+
+        let trigger = UNCalendarNotificationTrigger(dateMatching: dc, repeats: true)
+        let request = UNNotificationRequest(identifier: "winddown.daily",
+                                            content: content,
+                                            trigger: trigger)
+
+        UNUserNotificationCenter.current().add(request) { error in
+            if let error = error {
+                print("[Notifications] wind-down (configurable) schedule ERROR: \(error)")
+            } else {
+                print("[Notifications] wind-down (configurable) scheduled at \(hour):\(String(format: "%02d", minute))")
+            }
+        }
     }
 
     // MARK: - Daily Check-in

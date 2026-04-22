@@ -42,6 +42,9 @@ private enum ProfileSheet: Identifiable {
     case gratitudeJar
     case growth
     case profileDetails
+    case gentleReminders
+    case windDown
+    case textSize
     case stub(ComingSoonContent)
 
     var id: String {
@@ -53,6 +56,9 @@ private enum ProfileSheet: Identifiable {
         case .gratitudeJar:  return "gratitudeJar"
         case .growth:        return "growth"
         case .profileDetails: return "profileDetails"
+        case .gentleReminders: return "gentleReminders"
+        case .windDown:      return "windDown"
+        case .textSize:      return "textSize"
         case .stub(let c):   return "stub-\(c.id)"
         }
     }
@@ -187,6 +193,10 @@ struct ProfileView: View {
             case .gratitudeJar:  GratitudeJarView().environmentObject(dataManager)
             case .growth:        NavigationStack { GrowthView().environmentObject(dataManager) }
             case .profileDetails: ProfileDetailsView()
+            case .gentleReminders:
+                SettingsView().environmentObject(dataManager)
+            case .windDown:      WindDownView()
+            case .textSize:      TextSizeView()
             case .stub(let content): ComingSoonView(content: content)
             }
         }
@@ -385,9 +395,7 @@ struct ProfileView: View {
                 title: "gentle reminders",
                 subtitle: "nudges from your dino"
             ) {
-                activeSheet = .stub(ComingSoonContent(
-                    "gentle reminders", "soft nudges, never loud"
-                ))
+                activeSheet = .gentleReminders
             }
             SBRow(
                 icon: "music.note",
@@ -405,9 +413,7 @@ struct ProfileView: View {
                 title: "wind down",
                 subtitle: "a quiet end to the day"
             ) {
-                activeSheet = .stub(ComingSoonContent(
-                    "wind down", "a slow path into sleep"
-                ))
+                activeSheet = .windDown
             }
         }
     }
@@ -432,9 +438,7 @@ struct ProfileView: View {
                 title: "text size",
                 subtitle: "make reading gentle"
             ) {
-                activeSheet = .stub(ComingSoonContent(
-                    "text size", "reading, tuned to you"
-                ))
+                activeSheet = .textSize
             }
 
             // Quick palette swatches

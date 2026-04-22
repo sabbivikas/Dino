@@ -57,6 +57,11 @@ struct DinoApp: App {
     @StateObject private var syncService = FirestoreSyncService.shared
     @StateObject private var notificationManager = NotificationManager.shared
 
+    // Observing this @AppStorage value causes the entire view tree to re-render
+    // when the user adjusts text size — propagating the new scale into every
+    // DinoTheme.dinoFont / numericFont call downstream.
+    @AppStorage("text_size_scale") private var textSizeScale: Double = 1.0
+
     var body: some Scene {
         WindowGroup {
             ContentView()

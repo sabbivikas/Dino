@@ -92,9 +92,17 @@ struct DinoTheme {
         .custom(customFontName, size: 11)
     }
 
-    /// Convenience for arbitrary sizes
+    /// User text-size scale multiplier, driven by the `text_size_scale` @AppStorage key.
+    /// Clamped to 0.8...1.4; a missing (0) value falls back to 1.0.
+    private static var textSizeScale: CGFloat {
+        let raw = UserDefaults.standard.double(forKey: "text_size_scale")
+        let resolved = raw == 0 ? 1.0 : raw
+        return CGFloat(min(max(resolved, 0.8), 1.4))
+    }
+
+    /// Convenience for arbitrary sizes — multiplies by user text-size scale.
     static func dinoFont(size: CGFloat) -> Font {
-        .custom(customFontName, size: size)
+        .custom(customFontName, size: size * textSizeScale)
     }
 
     /// Display titles (large)
@@ -112,9 +120,10 @@ struct DinoTheme {
         .custom(customFontName, size: size)
     }
 
-    /// For numeric-only content (digits, sliders, counts) — system rounded since custom font lacks digits
+    /// For numeric-only content (digits, sliders, counts) — system rounded since custom font lacks digits.
+    /// Multiplies by user text-size scale.
     static func numericFont(size: CGFloat = 17) -> Font {
-        .system(size: size, weight: .semibold, design: .rounded)
+        .system(size: size * textSizeScale, weight: .semibold, design: .rounded)
     }
 }
 
