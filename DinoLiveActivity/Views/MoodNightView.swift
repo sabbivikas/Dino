@@ -3,7 +3,7 @@
 //  DinoLiveActivity
 //
 //  Night (8pm–6am) mood scene for small + medium families.
-//  Night sky + stars + moon + mountain silhouette + DinoSleeping mascot.
+//  Night sky + stars + moon + mountain silhouette + WidgetMascotNight mascot.
 //
 
 import SwiftUI
@@ -39,7 +39,7 @@ struct MoodNightSmallView: View {
                 Spacer()
                 HStack {
                     Spacer()
-                    Image("DinoSleeping")
+                    Image("WidgetMascotNight")
                         .resizable()
                         .scaledToFit()
                         .frame(width: 80, height: 80)
@@ -115,7 +115,7 @@ struct MoodNightMediumView: View {
 
                 Spacer(minLength: 0)
 
-                Image("DinoSleeping")
+                Image("WidgetMascotNight")
                     .resizable()
                     .scaledToFit()
                     .frame(width: 130, height: 130)

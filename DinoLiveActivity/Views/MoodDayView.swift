@@ -106,7 +106,7 @@ struct MoodDayMediumView: View {
 
                 Spacer(minLength: 0)
 
-                Image("DinoWidget")
+                Image("WidgetMascotDay")
                     .resizable()
                     .scaledToFit()
                     .frame(width: 120, height: 120)

@@ -3,7 +3,7 @@
 //  DinoLiveActivity
 //
 //  Morning (6am–12pm) mood scene for small + medium families.
-//  Sky gradient + sun (rotating per timeline phase) + hills + DinoMorning mascot.
+//  Sky gradient + sun (rotating per timeline phase) + hills + WidgetMascotMorning mascot.
 //
 
 import SwiftUI
@@ -35,7 +35,7 @@ struct MoodMorningSmallView: View {
                 Spacer()
                 HStack {
                     Spacer()
-                    Image("DinoMorning")
+                    Image("WidgetMascotMorning")
                         .resizable()
                         .scaledToFit()
                         .frame(width: 90, height: 90)
@@ -103,7 +103,7 @@ struct MoodMorningMediumView: View {
 
                 Spacer(minLength: 0)
 
-                Image("DinoMorning")
+                Image("WidgetMascotMorning")
                     .resizable()
                     .scaledToFit()
                     .frame(width: 130, height: 130)
