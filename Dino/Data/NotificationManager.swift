@@ -62,8 +62,13 @@ class NotificationManager: ObservableObject {
     func checkPermissionStatus() {
         UNUserNotificationCenter.current().getNotificationSettings { settings in
             Task { @MainActor in
+                let wasGranted = self.hasPermission
                 self.hasPermission = settings.authorizationStatus == .authorized
                 print("[Notifications] current permission: \(self.hasPermission)")
+                // If permission just became available, schedule notifications
+                if self.hasPermission && !wasGranted {
+                    self.rescheduleAll()
+                }
             }
         }
     }
@@ -294,10 +299,18 @@ class NotificationManager: ObservableObject {
         print("[Notifications] streak reminder removed — user already logged mood today")
     }
 
-    /// Call this when user opens the app. Checks if we should suppress notifications.
+    /// Call this when user opens the app. Re-checks permission and reschedules if needed.
     func userDidOpenApp() {
-        checkPermissionStatus()
-        print("[Notifications] app opened — checking status")
+        UNUserNotificationCenter.current().getNotificationSettings { settings in
+            Task { @MainActor in
+                self.hasPermission = settings.authorizationStatus == .authorized
+                print("[Notifications] app opened — permission: \(self.hasPermission)")
+                if self.hasPermission && self.notificationsEnabled {
+                    self.rescheduleAll()
+                    self.scheduleReEngagementIfNeeded()
+                }
+            }
+        }
     }
 
     // MARK: - Re-engagement

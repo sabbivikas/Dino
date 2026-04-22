@@ -73,6 +73,9 @@ struct DinoApp: App {
                 .onOpenURL { url in
                     GIDSignIn.sharedInstance.handle(url)
                 }
+                .task {
+                    notificationManager.userDidOpenApp()
+                }
         }
     }
 }

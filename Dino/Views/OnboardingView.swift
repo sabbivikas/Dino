@@ -730,11 +730,14 @@ private struct StepNotificationsPage: View {
     }
 
     private func requestNotifications() {
-        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound]) { granted, _ in
-            DispatchQueue.main.async {
+        Task {
+            let granted = await NotificationManager.shared.requestPermission()
+            await MainActor.run {
                 permissionRequested = true
-                NotificationManager.shared.rescheduleAll()
-                NotificationManager.shared.scheduleReEngagementIfNeeded()
+                if granted {
+                    NotificationManager.shared.rescheduleAll()
+                    NotificationManager.shared.scheduleReEngagementIfNeeded()
+                }
             }
         }
     }
