@@ -13,10 +13,20 @@ struct GrowthView: View {
     @StateObject private var viewModel: GrowthViewModel = GrowthViewModel(dataManager: SharedDataManager.shared)
     @Environment(\.dismiss) private var dismiss
 
-    @State private var selectedPlant: PlantState? = nil
     @State private var appeared = false
 
-    private let gardenBG = Color("#FDF8F0")
+    // Combined scalars across all four practices, used to drive the single
+    // symbolic sunflower in the garden panel.
+    private var combinedGrowth: Double {
+        let total = viewModel.plantStates.reduce(0) { $0 + $1.totalSessions }
+        return min(Double(total) / 62.0, 1.0)
+    }
+
+    private var combinedCare: Double {
+        let days = viewModel.plantStates.compactMap { $0.daysSinceLastUsed }
+        guard let minDays = days.min() else { return 1.0 }
+        return max(0, 1.0 - Double(minDays) / 14.0)
+    }
 
     var body: some View {
         NavigationStack {
@@ -47,12 +57,6 @@ struct GrowthView: View {
                     appeared = true
                 }
             }
-            .sheet(item: $selectedPlant) { plant in
-                PlantDetailSheet(plant: plant)
-                    .environmentObject(dataManager)
-                    .presentationDetents([.medium, .large])
-                    .presentationDragIndicator(.visible)
-            }
         }
     }
 
@@ -70,35 +74,41 @@ struct GrowthView: View {
         .frame(maxWidth: .infinity)
     }
 
-    // MARK: Garden panel (2x2 grid of plants)
+    // MARK: Garden panel (single centered sunflower on layered background)
 
     private var gardenPanel: some View {
-        let plants = viewModel.plantStates
-        return VStack(spacing: 0) {
-            LazyVGrid(
-                columns: [GridItem(.flexible(), spacing: 6), GridItem(.flexible(), spacing: 6)],
-                spacing: 8
-            ) {
-                ForEach(Array(plants.enumerated()), id: \.element.id) { index, plant in
-                    GardenPlotTile(
-                        plant: plant,
-                        appearDelay: Double(index) * 0.2
-                    )
-                    .onTapGesture {
-                        withAnimation(.spring(response: 0.35, dampingFraction: 0.6)) {
-                            selectedPlant = plant
-                        }
-                    }
-                }
+        GeometryReader { geo in
+            let panelW = geo.size.width
+            let panelH = geo.size.height
+            let grassH = panelH * 0.08
+            let soilH  = panelH * 0.15
+
+            // Sunflower sized ~163x200, base aligned just above the grass strip.
+            let plantW: CGFloat = 163
+            let plantH: CGFloat = 200
+            let plantBottomY = panelH - soilH - grassH - 2 // a couple pts above grass
+
+            ZStack(alignment: .topLeading) {
+                GardenBackground()
+
+                SingleSunflower(
+                    growth: combinedGrowth,
+                    care: combinedCare,
+                    width: plantW,
+                    height: plantH
+                )
+                .position(
+                    x: panelW / 2,
+                    y: plantBottomY - plantH / 2
+                )
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 12)
+            .frame(width: panelW, height: panelH)
         }
-        .background(gardenBG)
+        .frame(height: 300)
         .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .stroke(Color("#A8C5A0").opacity(0.25), lineWidth: 1)
+                .stroke(Color(hex: "#A8C5A0").opacity(0.25), lineWidth: 1)
         )
         .shadow(color: Color.black.opacity(0.06), radius: 12, x: 0, y: 4)
     }
@@ -159,50 +169,90 @@ struct GrowthView: View {
     }
 }
 
-// MARK: - GardenPlotTile (single plant in 2x2 grid)
+// MARK: - GardenBackground (layered sky → cream gradient + grass + curved soil)
 
-private struct GardenPlotTile: View {
-    let plant: PlantState
-    let appearDelay: Double
+private struct GardenBackground: View {
+    var body: some View {
+        GeometryReader { geo in
+            let w = geo.size.width
+            let h = geo.size.height
+            let grassH = h * 0.08
+            let soilH  = h * 0.15
+            let curveDepth: CGFloat = 8
+
+            ZStack {
+                // Base sky-to-cream gradient
+                LinearGradient(
+                    colors: [Color(hex: "#E8F4E8"), Color(hex: "#FDF8F0")],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+
+                // Grass strip, sitting directly above the soil
+                Rectangle()
+                    .fill(Color(hex: "#A8C5A0"))
+                    .frame(width: w, height: grassH)
+                    .position(x: w / 2, y: h - soilH - grassH / 2)
+
+                // Soil strip with a gently curved top edge
+                soilShape(width: w, height: soilH, curveDepth: curveDepth)
+                    .fill(Color(hex: "#8B6343"))
+                    .frame(width: w, height: soilH)
+                    .position(x: w / 2, y: h - soilH / 2)
+            }
+            .frame(width: w, height: h)
+        }
+    }
+
+    private func soilShape(width: CGFloat, height: CGFloat, curveDepth: CGFloat) -> Path {
+        Path { p in
+            p.move(to: CGPoint(x: 0, y: curveDepth))
+            p.addQuadCurve(
+                to: CGPoint(x: width, y: curveDepth),
+                control: CGPoint(x: width / 2, y: 0)
+            )
+            p.addLine(to: CGPoint(x: width, y: height))
+            p.addLine(to: CGPoint(x: 0, y: height))
+            p.closeSubpath()
+        }
+    }
+}
+
+// MARK: - SingleSunflower (one large symbolic plant centered on the garden)
+
+private struct SingleSunflower: View {
+    let growth: Double
+    let care: Double
+    let width: CGFloat
+    let height: CGFloat
 
     @State private var swayPhase: Double = 0
     @State private var scale: CGFloat = 0.3
     @State private var opacity: Double = 0
 
     var body: some View {
-        VStack(spacing: 8) {
-            PlantCanvas(
-                species: plant.practice,
-                growth: plant.growth,
-                care: plant.care
-            )
-            .frame(width: 130, height: 160)
-            .rotationEffect(
-                plant.care >= 0.5
-                    ? .degrees(sin(swayPhase) * 1.5)
-                    : .degrees(max(0, (0.5 - plant.care)) * 12),
-                anchor: .bottom
-            )
-            .scaleEffect(scale, anchor: .bottom)
-            .opacity(opacity)
-
-            Text(plant.practice.displayName)
-                .font(DinoTheme.dinoFont(size: 13))
-                .foregroundColor(plant.practice.bloomColor)
-        }
-        .padding(.vertical, 2)
-        .frame(maxWidth: .infinity)
-        .contentShape(Rectangle())
+        PlantCanvas(
+            species: .gratitude,
+            growth: growth,
+            care: care
+        )
+        .frame(width: width, height: height)
+        .rotationEffect(
+            care >= 0.5
+                ? .degrees(sin(swayPhase) * 1.5)
+                : .degrees(max(0, (0.5 - care)) * 12),
+            anchor: .bottom
+        )
+        .scaleEffect(scale, anchor: .bottom)
+        .opacity(opacity)
         .onAppear {
-            DispatchQueue.main.asyncAfter(deadline: .now() + appearDelay) {
-                withAnimation(.spring(response: 0.7, dampingFraction: 0.65)) {
-                    scale = 1.0
-                    opacity = 1.0
-                }
-                if plant.care >= 0.5 {
-                    withAnimation(.easeInOut(duration: 4.0).repeatForever(autoreverses: true)) {
-                        swayPhase = .pi
-                    }
+            withAnimation(.spring(response: 0.7, dampingFraction: 0.65)) {
+                scale = 1.0
+                opacity = 1.0
+            }
+            if care >= 0.5 {
+                withAnimation(.easeInOut(duration: 4.0).repeatForever(autoreverses: true)) {
+                    swayPhase = .pi
                 }
             }
         }
@@ -788,112 +838,3 @@ private extension Color {
     }
 }
 
-// MARK: - PlantDetailSheet
-
-private struct PlantDetailSheet: View {
-    let plant: PlantState
-    @EnvironmentObject var dataManager: SharedDataManager
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(spacing: 24) {
-                    PlantCanvas(species: plant.practice, growth: plant.growth, care: plant.care)
-                        .frame(width: 220, height: 280)
-                        .padding(.top, 12)
-
-                    Text(plant.practice.displayName)
-                        .font(DinoTheme.dinoFont(size: 20))
-                        .foregroundColor(plant.practice.bloomColor)
-
-                    HStack(spacing: 6) {
-                        Text("\(plant.totalSessions)")
-                            .font(DinoTheme.numericFont(size: 16))
-                            .foregroundColor(DinoTheme.textPrimary)
-                        Text("sessions")
-                            .font(DinoTheme.dinoFont(size: 14))
-                            .foregroundColor(DinoTheme.textSecondary)
-                        Text("·")
-                            .foregroundColor(DinoTheme.textSecondary)
-                        Text("\(plant.currentStreak)")
-                            .font(DinoTheme.numericFont(size: 16))
-                            .foregroundColor(DinoTheme.textPrimary)
-                        Text("day streak")
-                            .font(DinoTheme.dinoFont(size: 14))
-                            .foregroundColor(DinoTheme.textSecondary)
-                    }
-
-                    // Status pill
-                    if plant.totalSessions > 0 {
-                        Text(plant.careStatus.label)
-                            .font(DinoTheme.dinoFont(size: 13))
-                            .foregroundColor(plant.careStatus.color)
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 6)
-                            .background(plant.careStatus.color.opacity(0.15))
-                            .clipShape(Capsule())
-                    }
-
-                    // Italic note
-                    Text("\"\(noteText)\"")
-                        .font(.system(size: 14, weight: .regular, design: .default).italic())
-                        .foregroundColor(DinoTheme.textSecondary)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, 20)
-
-                    // Go practice button
-                    goPracticeButton
-                        .padding(.horizontal, 20)
-                        .padding(.top, 4)
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.horizontal, 20)
-                .padding(.bottom, 40)
-            }
-            .background(Color("#FDF8F0").ignoresSafeArea())
-            .navigationBarTitleDisplayMode(.inline)
-        }
-    }
-
-    private var noteText: String {
-        if plant.totalSessions == 0 {
-            return "a seed waiting to be watered"
-        }
-        return plant.careStatus.note
-    }
-
-    @ViewBuilder
-    private var goPracticeButton: some View {
-        if let tab = plant.practice.deepLinkTab {
-            Button {
-                dataManager.deepLinkTab = tab
-                dismiss()
-                // Re-assert tab after sheet dismissal finishes animating.
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                    dataManager.deepLinkTab = tab
-                }
-            } label: {
-                goButtonLabel
-            }
-        } else {
-            // Breathing: push via NavigationLink
-            NavigationLink {
-                BreathingView().environmentObject(dataManager)
-            } label: {
-                goButtonLabel
-            }
-        }
-    }
-
-    private var goButtonLabel: some View {
-        Text("go practice")
-            .font(DinoTheme.dinoFont(size: 16))
-            .foregroundColor(.white)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 14)
-            .background(Color("#A8C5A0"))
-            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-            .shadow(color: Color("#A8C5A0").opacity(0.4), radius: 12, x: 0, y: 4)
-    }
-}
