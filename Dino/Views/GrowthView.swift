@@ -39,11 +39,6 @@ private func mixHex(_ a: String, _ b: String, _ t: Double) -> Color {
     )
 }
 
-private func wiltColor(base: String, care: Double, clampMin: Double) -> Color {
-    let amount = 1 - max(clampMin, care)
-    return mixHex(base, "#9C7C50", amount)
-}
-
 private func phyllotaxis(count: Int, scale: Double) -> [CGPoint] {
     let golden = 137.5 * .pi / 180.0
     return (0..<count).map { i in
@@ -104,6 +99,13 @@ struct GrowthView: View {
         .background(DinoTheme.background.ignoresSafeArea())
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            // Explicitly blank principal slot — prevents any ancestor title
+            // (e.g. streak count "13") from leaking into the back-button area.
+            ToolbarItem(placement: .principal) {
+                Text("")
+            }
+        }
     }
 }
 
@@ -141,19 +143,26 @@ private struct ProgressCard: View {
                 Spacer()
             }
 
-            PhaseBar(progress: vm.growth)
+            PhaseBar(
+                totalSessions: vm.totalSessions,
+                growthStage: vm.growthStage
+            )
 
+            // Stage-milestone labels matching the 5 tick positions on the bar.
             HStack {
                 phaseLabel("seed")
                 Spacer()
                 phaseLabel("sprout")
                 Spacer()
-                phaseLabel("stem")
+                phaseLabel("growing")
                 Spacer()
-                phaseLabel("bud")
+                phaseLabel("budding")
                 Spacer()
                 phaseLabel("bloom")
             }
+
+            // Narrative next-stage line beneath the bar.
+            nextStageLine
 
             Spacer().frame(height: 2)
 
@@ -192,6 +201,21 @@ private struct ProgressCard: View {
     }
 
     @ViewBuilder
+    private var nextStageLine: some View {
+        HStack(spacing: 4) {
+            Text("your sunflower is \(vm.growthStage.displayName)")
+                .font(DinoTheme.dinoFont(size: 13))
+                .foregroundColor(Color(hex: "#2D3142"))
+            if let remain = vm.sessionsToNextStage, let next = vm.nextStageName {
+                Text(" · \(remain) more \(remain == 1 ? "session" : "sessions") to \(next)")
+                    .font(DinoTheme.dinoFont(size: 12))
+                    .foregroundColor(Color(hex: "#6B7280"))
+            }
+            Spacer()
+        }
+    }
+
+    @ViewBuilder
     private var wateringLine: some View {
         HStack(spacing: 6) {
             if vm.wateredToday {
@@ -212,39 +236,53 @@ private struct ProgressCard: View {
     }
 }
 
-// MARK: - PhaseBar
+// MARK: - PhaseBar (5 stage milestones + current progress)
 
 private struct PhaseBar: View {
-    let progress: Double
+    let totalSessions: Int
+    let growthStage: GrowthStage
+
+    /// Normalized milestone tick positions.
+    /// 0/62, 3/62, 11/62, 21/62, 51/62  — last 1.0 handled by bar terminus.
+    private let tickFractions: [Double] = [
+        0.0,
+        3.0 / 62.0,
+        11.0 / 62.0,
+        21.0 / 62.0,
+        51.0 / 62.0
+    ]
 
     var body: some View {
         GeometryReader { geo in
             let w = geo.size.width
-            let clamped = max(0, min(1, progress))
+            let progress = min(1.0, Double(totalSessions) / 62.0)
+
             ZStack(alignment: .leading) {
+                // Background track
                 Capsule()
                     .fill(Color(hex: "#E8DFCF"))
                     .frame(height: 6)
                     .frame(maxWidth: .infinity)
 
+                // Filled segment up to current progress
                 Capsule()
                     .fill(Color(hex: "#6B9E44"))
-                    .frame(width: max(0, w * clamped), height: 6)
+                    .frame(width: max(0, w * progress), height: 6)
 
-                HStack(spacing: 0) {
-                    ForEach(0..<5) { i in
-                        Circle()
-                            .fill(Color(hex: "#D6C7A8"))
-                            .frame(width: 6, height: 6)
-                        if i < 4 { Spacer(minLength: 0) }
-                    }
+                // 5 milestone dots at stage boundaries
+                ForEach(Array(tickFractions.enumerated()), id: \.offset) { _, frac in
+                    Circle()
+                        .fill(Color(hex: "#D6C7A8"))
+                        .frame(width: 6, height: 6)
+                        .offset(x: max(0, w * frac - 3))
                 }
 
+                // Accent dot at current progress
                 Circle()
                     .fill(Color(hex: "#F5C842"))
                     .overlay(Circle().stroke(Color(hex: "#D49020"), lineWidth: 1))
                     .frame(width: 12, height: 12)
-                    .offset(x: max(0, w * clamped - 6))
+                    .offset(x: max(0, w * progress - 6))
             }
             .frame(height: 12)
         }
@@ -301,6 +339,8 @@ private struct CareBar: View {
 // MARK: - Plant snapshot (value captured on MainActor, safe to read in Canvas)
 
 private struct SunflowerSnapshot {
+    let stage: GrowthStage
+    let careState: CareState
     let sproutP: Double
     let stemP: Double
     let leafP: Double
@@ -320,6 +360,8 @@ private struct GardenPanel: View {
 
     var body: some View {
         let snap = SunflowerSnapshot(
+            stage: vm.growthStage,
+            careState: vm.careState,
             sproutP: vm.sproutP,
             stemP: vm.stemP,
             leafP: vm.leafP,
@@ -356,6 +398,90 @@ private struct GardenPanel: View {
     }
 }
 
+// MARK: - Care mapping (discrete -> drawing params)
+
+private struct CareParams {
+    let bendDeg: Double
+    let leafYellow: Double    // 0..1 toward amber
+    let leafBrown: Double     // 0..1 toward brown (beyond yellow)
+    let droopDeg: Double      // extra per-leaf droop
+    let fallenPetals: Int
+    let collapsed: Bool       // true when .dead (stem lies down)
+    let headDroop: Double     // degrees head falls forward
+    let saturation: Double    // multiplicative color vividness
+    let careColorMin: Double  // wiltColor clamp tweak
+}
+
+private func careParams(for state: CareState) -> CareParams {
+    switch state {
+    case .healthy:
+        return CareParams(
+            bendDeg: 0, leafYellow: 0, leafBrown: 0,
+            droopDeg: 0, fallenPetals: 0, collapsed: false,
+            headDroop: 0, saturation: 1.0, careColorMin: 0.25
+        )
+    case .tired:
+        return CareParams(
+            bendDeg: 4, leafYellow: 0.05, leafBrown: 0,
+            droopDeg: 12, fallenPetals: 0, collapsed: false,
+            headDroop: 2, saturation: 0.9, careColorMin: 0.22
+        )
+    case .struggling:
+        return CareParams(
+            bendDeg: 15, leafYellow: 0.3, leafBrown: 0,
+            droopDeg: 22, fallenPetals: 2, collapsed: false,
+            headDroop: 8, saturation: 0.8, careColorMin: 0.18
+        )
+    case .wilting:
+        return CareParams(
+            bendDeg: 30, leafYellow: 0.7, leafBrown: 0.1,
+            droopDeg: 34, fallenPetals: 4, collapsed: false,
+            headDroop: 18, saturation: 0.7, careColorMin: 0.15
+        )
+    case .dying:
+        return CareParams(
+            bendDeg: 50, leafYellow: 0.8, leafBrown: 0.5,
+            droopDeg: 48, fallenPetals: 7, collapsed: false,
+            headDroop: 90, saturation: 0.55, careColorMin: 0.12
+        )
+    case .dead:
+        return CareParams(
+            bendDeg: 85, leafYellow: 1.0, leafBrown: 1.0,
+            droopDeg: 60, fallenPetals: 10, collapsed: true,
+            headDroop: 90, saturation: 0.4, careColorMin: 0.08
+        )
+    }
+}
+
+/// Leaf / stem / bud color shaded toward amber then brown based on care.
+private func foliageColor(base: String, cp: CareParams) -> Color {
+    // First blend base -> amber by leafYellow
+    let yellowed = mixHex(base, "#C4A35A", cp.leafYellow)
+    // Then blend toward brown by leafBrown
+    let (yr, yg, yb) = rgbFromColor(yellowed)
+    let (br, bg, bb) = hexRGB("#9C7C50")
+    let t = max(0, min(1, cp.leafBrown))
+    return Color(
+        .sRGB,
+        red: lerp(yr, br, t),
+        green: lerp(yg, bg, t),
+        blue: lerp(yb, bb, t),
+        opacity: 1.0
+    )
+}
+
+/// Pulls back RGB from a Color via UIColor introspection (iOS only).
+private func rgbFromColor(_ color: Color) -> (Double, Double, Double) {
+    #if canImport(UIKit)
+    let ui = UIColor(color)
+    var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+    if ui.getRed(&r, green: &g, blue: &b, alpha: &a) {
+        return (Double(r), Double(g), Double(b))
+    }
+    #endif
+    return (0.5, 0.5, 0.5)
+}
+
 // MARK: - Plant rendering
 
 private func drawSunflower(
@@ -370,61 +496,109 @@ private func drawSunflower(
     let sx = size.width / 400.0
     let sy = size.height / 320.0
 
-    // Helper to transform design-space coords into view-space
     func px(_ x: Double) -> CGFloat { CGFloat(x * Double(sx)) }
     func py(_ y: Double) -> CGFloat { CGFloat(y * Double(sy)) }
 
     let cx = 200.0
+    // groundY is the soil *surface*. grass strip is drawn above this line in
+    // drawBackground; groundY matches the top of the grass strip (h*0.55 - 18
+    // in canvas pixels). In 320-design coords this is 320*0.55 - 18 = 158.
+    // Keep using 260 for historical stem geometry but anchor drawing above it.
     let groundY = 260.0
 
-    let sproutP = snap.sproutP
+    let stage = snap.stage
     let stemP = snap.stemP
     let leafP = snap.leafP
     let budP = snap.budP
     let bloomP = snap.bloomP
     let care = max(0, min(1, snap.care))
+    let cp = careParams(for: snap.careState)
 
-    // ----- 1. Seed mound & seed -----
-    do {
-        let moundRect = CGRect(
-            x: px(cx - 13), y: py(groundY + 3 - 3.2),
-            width: px(26) - px(0), height: py(6.4) - py(0)
-        )
-        ctx.fill(Path(ellipseIn: moundRect), with: .color(Color(hex: "#3A2818").opacity(0.3)))
-
-        if sproutP < 1 {
-            let seedOp = 1 - sproutP
-            let seedRect = CGRect(
-                x: px(cx - 6), y: py(groundY + 1 - 4),
-                width: px(12) - px(0), height: py(8) - py(0)
-            )
-            ctx.fill(Path(ellipseIn: seedRect),
-                     with: .color(Color(hex: "#8B6B4A").opacity(seedOp)))
-            ctx.stroke(Path(ellipseIn: seedRect),
-                       with: .color(Color(hex: "#5A4028").opacity(seedOp)),
-                       lineWidth: 1)
+    // ----- STAGE 0: SEED (buried / crack lines on soil) -----
+    if stage == .seed || stage == .cracking {
+        // Soil crack lines around seed
+        for dx in [-10.0, 0.0, 8.0] {
+            var crack = Path()
+            crack.move(to: CGPoint(x: px(cx + dx - 4), y: py(groundY)))
+            crack.addLine(to: CGPoint(x: px(cx + dx + 4), y: py(groundY + 1)))
+            ctx.stroke(crack, with: .color(Color(hex: "#3F2A1C").opacity(0.3)), lineWidth: 0.8)
         }
+        // Buried seed
+        let seedRect = CGRect(
+            x: px(cx - 6), y: py(groundY - 2),
+            width: px(12), height: py(8)
+        )
+        ctx.fill(Path(ellipseIn: seedRect), with: .color(Color(hex: "#6B4226")))
+        ctx.stroke(Path(ellipseIn: seedRect), with: .color(Color(hex: "#3F2610")), lineWidth: 0.8)
     }
 
-    // ----- Stem geometry shared by stem, leaves, bud, bloom -----
-    let stemH = 6 + stemP * 120
-    let stemW = 2 + stemP * 4
-    let bendDeg = (1 - care) * 55
-    let swayDeg: Double = {
+    // ----- STAGE 1: CRACKING (seed splits, root emerges) -----
+    if stage == .cracking {
+        // Crack across the oval
+        var split = Path()
+        split.move(to: CGPoint(x: px(cx - 5), y: py(groundY)))
+        split.addQuadCurve(
+            to: CGPoint(x: px(cx + 5), y: py(groundY)),
+            control: CGPoint(x: px(cx), y: py(groundY - 2))
+        )
+        ctx.stroke(split, with: .color(Color(hex: "#3F2610")), lineWidth: 1)
+
+        // Root tip going down
+        var root = Path()
+        root.move(to: CGPoint(x: px(cx), y: py(groundY + 3)))
+        root.addQuadCurve(
+            to: CGPoint(x: px(cx - 1), y: py(groundY + 10)),
+            control: CGPoint(x: px(cx - 2), y: py(groundY + 7))
+        )
+        ctx.stroke(root, with: .color(Color(hex: "#F5F0E8")), lineWidth: 1.2)
+
+        // Small soil bump above seed
+        let bumpRect = CGRect(
+            x: px(cx - 8), y: py(groundY - 4),
+            width: px(16), height: py(4)
+        )
+        ctx.fill(Path(ellipseIn: bumpRect), with: .color(Color(hex: "#5E4220").opacity(0.4)))
+    }
+
+    // ----- Above-ground stages begin at .sprout -----
+    let aboveGround = stage.rawValue >= GrowthStage.sprout.rawValue
+
+    // Stem geometry per-stage.
+    struct StemSpec { let height: Double; let width: Double; let leanBase: Double }
+    let spec: StemSpec = {
+        switch stage {
+        case .sprout:   return StemSpec(height: 22, width: 2.0, leanBase: 4)
+        case .seedling: return StemSpec(height: 52, width: 3.0, leanBase: 7)
+        case .growing:  return StemSpec(height: 92, width: 5.0, leanBase: 2)
+        case .budding:  return StemSpec(height: 120, width: 5.0, leanBase: 2)
+        case .opening:  return StemSpec(height: 140, width: 5.0, leanBase: 1)
+        case .bloomed:  return StemSpec(height: 160, width: 5.5, leanBase: 1)
+        case .thriving: return StemSpec(height: 162, width: 6.0, leanBase: 1)
+        default:        return StemSpec(height: 0, width: 0, leanBase: 0)
+        }
+    }()
+
+    let stemH = spec.height * max(0.6, stemP) // continuous interp for smoothness
+    let stemW = spec.width
+    // If dead/collapsed, stem lies down. Otherwise bend per care state plus tiny sway/lean.
+    let bendDeg = cp.collapsed ? 85.0 : cp.bendDeg
+    let leanSway: Double = {
         guard !reduceMotion else { return 0 }
-        if bloomP > 0.3 && care > 0.7 {
-            return sin(t * 2.0 * .pi / 5.5) * 1.8
+        if stage == .sprout || stage == .seedling {
+            return sin(t * 2.0 * .pi / 6.0) * spec.leanBase
+        }
+        if stage.rawValue >= GrowthStage.bloomed.rawValue && snap.careState == .healthy {
+            return sin(t * 2.0 * .pi / 5.5) * 1.5
         }
         return 0
     }()
-    let totalRot = bendDeg * 0.3 + swayDeg
+    let totalRot = bendDeg + leanSway
 
-    // Pivot for stem rotation — base at (cx, groundY)
     let pivotX = px(cx)
     let pivotY = py(groundY)
 
-    // ----- 2. Stem (drawn in a rotated layer) -----
-    if stemP > 0.01 {
+    // ----- STAGE 2+: STEM -----
+    if aboveGround && stemH > 0.1 {
         ctx.drawLayer { layer in
             layer.translateBy(x: pivotX, y: pivotY)
             layer.rotate(by: .degrees(totalRot))
@@ -436,53 +610,97 @@ private func drawSunflower(
             let topY = groundY - stemH
             stem.move(to: CGPoint(x: px(bx - stemW / 2), y: py(by)))
             stem.addQuadCurve(
-                to: CGPoint(x: px(bx - stemW / 3), y: py(topY + 4)),
-                control: CGPoint(x: px(bx), y: py(by - stemH * 0.6))
+                to: CGPoint(x: px(bx - stemW / 3), y: py(topY + 2)),
+                control: CGPoint(x: px(bx + (stage == .sprout ? 2 : 0)),
+                                 y: py(by - stemH * 0.6))
             )
-            stem.addLine(to: CGPoint(x: px(bx + stemW / 3), y: py(topY + 4)))
+            stem.addLine(to: CGPoint(x: px(bx + stemW / 3), y: py(topY + 2)))
             stem.addQuadCurve(
                 to: CGPoint(x: px(bx + stemW / 2), y: py(by)),
-                control: CGPoint(x: px(bx), y: py(by - stemH * 0.6))
+                control: CGPoint(x: px(bx + (stage == .sprout ? 2 : 0)),
+                                 y: py(by - stemH * 0.6))
             )
             stem.closeSubpath()
 
-            layer.fill(stem, with: .color(wiltColor(base: "#5D8A3C", care: care, clampMin: 0.2)))
+            let stemBase = stage == .sprout ? "#7AB648" : "#5D8A3C"
+            layer.fill(stem, with: .color(foliageColor(base: stemBase, cp: cp)))
         }
     }
 
-    // ----- 3. Leaves -----
-    if leafP > 0.01 {
-        let leafFractions: [Double] = [0.35, 0.42, 0.62, 0.70]
-        let leafSides: [Double] = [-1, 1, -1, 1]
-        let leafAngles: [Double] = [30, 25, 35, 28]
-        let droop = (1 - care) * 40
-        let leafLen = 22.0 * leafP
+    // ----- STAGE 2: SPROUT — cotyledon leaves -----
+    if stage == .sprout {
+        ctx.drawLayer { layer in
+            layer.translateBy(x: pivotX, y: pivotY)
+            layer.rotate(by: .degrees(totalRot))
+            layer.translateBy(x: -pivotX, y: -pivotY)
 
-        let leafBase = wiltColor(base: "#6B9E44", care: care, clampMin: 0.15)
-        let yellowShift = max(0.0, (0.6 - care) / 0.6)
-        let leafFill = mixBaseAndHex(base: leafBase, hex: "#C4A35A", t: yellowShift)
+            let topY = groundY - stemH
+            let cotFill = foliageColor(base: "#A8D575", cp: cp)
+            for side in [-1.0, 1.0] {
+                layer.drawLayer { sub in
+                    sub.translateBy(x: px(cx + side * 3), y: py(topY - 0.5))
+                    sub.rotate(by: .degrees(side * 25))
+                    let r = CGRect(x: px(-4), y: py(-2.5), width: px(8), height: py(5))
+                    sub.fill(Path(ellipseIn: r), with: .color(cotFill))
+                }
+            }
+        }
+    }
 
-        for i in 0..<4 {
-            let frac = leafFractions[i]
+    // ----- STAGE 3+: LEAVES -----
+    if stage.rawValue >= GrowthStage.seedling.rawValue {
+        // Lush scaling at thriving
+        let leafScale: Double = stage == .thriving ? 1.1 : 1.0
+        let leafLen: Double
+        let leafCount: Int
+        let leafFracs: [Double]
+        let leafSides: [Double]
+
+        switch stage {
+        case .seedling:
+            leafLen = 14 * leafScale
+            leafCount = 2
+            leafFracs = [0.55, 0.62]
+            leafSides = [-1, 1]
+        case .growing:
+            leafLen = 20 * leafScale
+            leafCount = 4
+            leafFracs = [0.30, 0.45, 0.60, 0.75]
+            leafSides = [-1, 1, -1, 1]
+        case .budding:
+            leafLen = 22 * leafScale
+            leafCount = 5
+            leafFracs = [0.28, 0.42, 0.54, 0.66, 0.78]
+            leafSides = [-1, 1, -1, 1, -1]
+        default: // .opening, .bloomed, .thriving
+            leafLen = 24 * leafScale
+            leafCount = 6
+            leafFracs = [0.25, 0.38, 0.50, 0.62, 0.74, 0.82]
+            leafSides = [-1, 1, -1, 1, -1, 1]
+        }
+
+        let leafFill = foliageColor(base: "#6B9E44", cp: cp)
+        let leafEdge = foliageColor(base: "#3F6B50", cp: cp)
+
+        for i in 0..<leafCount where leafP > 0.01 {
+            let frac = leafFracs[i]
             let side = leafSides[i]
-            let baseAngle = leafAngles[i]
-            let angle = side * baseAngle + (side * droop)
+            let baseAngle = 28.0 + Double(i % 2) * 6
+            let angle = side * baseAngle + (side * cp.droopDeg)
+
             let lx = cx
             let ly = groundY - stemH * frac
 
             ctx.drawLayer { layer in
-                // Stem rotation first
                 layer.translateBy(x: pivotX, y: pivotY)
                 layer.rotate(by: .degrees(totalRot))
                 layer.translateBy(x: -pivotX, y: -pivotY)
 
-                // Leaf own rotation around its attachment
                 let attachX = px(lx)
                 let attachY = py(ly)
                 layer.translateBy(x: attachX, y: attachY)
                 layer.rotate(by: .degrees(angle))
 
-                // Draw a teardrop leaf along +x axis, length leafLen
                 let len = leafLen
                 var leaf = Path()
                 leaf.move(to: CGPoint(x: 0, y: 0))
@@ -497,130 +715,154 @@ private func drawSunflower(
                 leaf.closeSubpath()
 
                 layer.fill(leaf, with: .color(leafFill))
-                layer.stroke(leaf,
-                             with: .color(wiltColor(base: "#3F6B50", care: care, clampMin: 0.15)),
-                             lineWidth: 0.7)
+                layer.stroke(leaf, with: .color(leafEdge), lineWidth: 0.7)
             }
         }
     }
 
-    // ----- 4. Bud -----
+    // Head base position (used by bud & bloom)
     let hxBase = cx
     let hyBase = groundY - stemH
 
-    if budP > 0.01 && bloomP < 0.5 {
+    // ----- STAGE 5: BUDDING -----
+    if stage == .budding && budP > 0.01 {
         ctx.drawLayer { layer in
             layer.translateBy(x: pivotX, y: pivotY)
             layer.rotate(by: .degrees(totalRot))
             layer.translateBy(x: -pivotX, y: -pivotY)
 
-            let budOp = 1 - bloomP * 2
             let bx = hxBase
             let by = hyBase
-            let rxD = 6 + budP * 4
-            let ryD = 8 + budP * 4
+            let rxD = 8.0
+            let ryD = 11.0
             let rect = CGRect(
                 x: px(bx - rxD), y: py(by - ryD),
-                width: px(rxD * 2) - px(0), height: py(ryD * 2) - py(0)
+                width: px(rxD * 2), height: py(ryD * 2)
             )
-            let budFill = wiltColor(base: "#6B9E44", care: care, clampMin: 0.15)
-            layer.fill(Path(ellipseIn: rect), with: .color(budFill.opacity(budOp)))
+            let budFill = foliageColor(base: "#4A7A2E", cp: cp)
+            layer.fill(Path(ellipseIn: rect), with: .color(budFill))
             layer.stroke(Path(ellipseIn: rect),
-                         with: .color(wiltColor(base: "#3F6B50", care: care, clampMin: 0.15).opacity(budOp)),
-                         lineWidth: 0.7)
+                         with: .color(foliageColor(base: "#3F6B50", cp: cp)),
+                         lineWidth: 0.8)
 
-            // 4 sepal strokes
-            let sepalAngles: [Double] = [-35, -10, 15, 40]
-            for a in sepalAngles {
-                let rad = a * .pi / 180
-                let tipX = bx + cos(rad) * (rxD + 3)
-                let tipY = by + sin(rad) * (ryD + 3)
-                var sep = Path()
-                sep.move(to: CGPoint(x: px(bx), y: py(by + ryD * 0.2)))
-                sep.addQuadCurve(
-                    to: CGPoint(x: px(tipX), y: py(tipY)),
-                    control: CGPoint(x: px((bx + tipX) / 2), y: py(by + ryD * 0.5))
-                )
-                layer.stroke(sep,
-                             with: .color(budFill.opacity(budOp)),
-                             lineWidth: 1.2)
-            }
+            // Yellow tip hint at peak
+            let tipRect = CGRect(
+                x: px(bx - 3), y: py(by - ryD + 1),
+                width: px(6), height: py(4)
+            )
+            layer.fill(Path(ellipseIn: tipRect),
+                       with: .color(foliageColor(base: "#F5C842", cp: cp).opacity(0.85)))
         }
     }
 
-    // ----- 5. Bloom -----
-    if bloomP > 0.01 {
-        let headR = 30.0 * bloomP
-        let headDroopDeg = (1 - care) * 30
+    // ----- STAGE 6: OPENING -----
+    if stage == .opening {
+        ctx.drawLayer { layer in
+            layer.translateBy(x: pivotX, y: pivotY)
+            layer.rotate(by: .degrees(totalRot))
+            layer.translateBy(x: -pivotX, y: -pivotY)
+            layer.translateBy(x: px(hxBase), y: py(hyBase))
+            layer.rotate(by: .degrees(cp.headDroop))
+
+            // 5 half-length yellow petals peeking out
+            let petalFill = foliageColor(base: "#F5C842", cp: cp)
+            let petalCount = 5
+            let petalLen = 14.0
+            for i in 0..<petalCount {
+                let a = (Double(i) / Double(petalCount)) * 360.0
+                layer.drawLayer { sub in
+                    sub.rotate(by: .degrees(a))
+                    let rect = CGRect(
+                        x: px(-3), y: py(-petalLen),
+                        width: px(6), height: py(petalLen * 0.6)
+                    )
+                    sub.fill(Path(ellipseIn: rect), with: .color(petalFill))
+                }
+            }
+
+            // Brown center visible through opening
+            let centerR = 6.0
+            let centerRect = CGRect(
+                x: px(-centerR), y: py(-centerR),
+                width: px(centerR * 2), height: py(centerR * 2)
+            )
+            layer.fill(Path(ellipseIn: centerRect),
+                       with: .color(Color(hex: "#8B4513")))
+        }
+    }
+
+    // ----- STAGE 7+: BLOOMED (full flower head) -----
+    if stage.rawValue >= GrowthStage.bloomed.rawValue {
+        let headR = stage == .thriving ? 32.0 : 30.0
+        let headTilt = stage == .thriving ? -6.0 : -5.0
 
         ctx.drawLayer { layer in
-            // Stem rotation
             layer.translateBy(x: pivotX, y: pivotY)
             layer.rotate(by: .degrees(totalRot))
             layer.translateBy(x: -pivotX, y: -pivotY)
 
             // Head droop pivot at head base
-            let hx = hxBase
-            let hy = hyBase
-            let droopPivotX = px(hx)
-            let droopPivotY = py(hy + 2)
+            let droopPivotX = px(hxBase)
+            let droopPivotY = py(hyBase + 2)
             layer.translateBy(x: droopPivotX, y: droopPivotY)
-            layer.rotate(by: .degrees(headDroopDeg))
+            layer.rotate(by: .degrees(cp.headDroop + headTilt))
             layer.translateBy(x: -droopPivotX, y: -droopPivotY)
 
-            // Outer ring — 14 petals
-            let petalFill = wiltColor(base: "#F5C842", care: care, clampMin: 0.3)
-            let petalEdge = wiltColor(base: "#D49020", care: care, clampMin: 0.3)
-            for i in 0..<14 {
-                let a = (Double(i) / 14.0) * 360.0
+            // Thriving: golden glow behind head
+            if stage == .thriving && snap.careState == .healthy {
+                let glowR = headR * 1.5
+                let glowRect = CGRect(
+                    x: px(hxBase - glowR), y: py(hyBase - glowR),
+                    width: px(glowR * 2), height: py(glowR * 2)
+                )
+                let glowShading = GraphicsContext.Shading.radialGradient(
+                    Gradient(colors: [
+                        Color(hex: "#F5C842").opacity(0.30),
+                        Color(hex: "#F5C842").opacity(0.0)
+                    ]),
+                    center: CGPoint(x: px(hxBase), y: py(hyBase)),
+                    startRadius: 0,
+                    endRadius: px(glowR)
+                )
+                layer.fill(Path(ellipseIn: glowRect), with: glowShading)
+            }
+
+            // 12 gold petals
+            let petalFill = foliageColor(base: "#F5C842", cp: cp)
+            let petalEdge = foliageColor(base: "#D49020", cp: cp)
+            for i in 0..<12 {
+                let a = (Double(i) / 12.0) * 360.0
                 let rad = (a - 90) * .pi / 180
-                let pxd = hx + cos(rad) * headR * 0.55
-                let pyd = hy + sin(rad) * headR * 0.55
+                let pxd = hxBase + cos(rad) * headR * 0.55
+                let pyd = hyBase + sin(rad) * headR * 0.55
                 let petalRX = headR * 0.95 * 0.75
                 let petalRY = headR * 0.95 * 0.32
 
+                // Care-driven per-petal offset at struggling+
+                let offsetRot = snap.careState == .struggling && (i == 2 || i == 7)
+                    ? 8.0 : 0.0
+
                 layer.drawLayer { sub in
                     sub.translateBy(x: px(pxd), y: py(pyd))
-                    sub.rotate(by: .degrees(a))
+                    sub.rotate(by: .degrees(a + offsetRot))
                     let rect = CGRect(
                         x: px(-petalRX / 2), y: py(-petalRY / 2),
-                        width: px(petalRX) - px(0), height: py(petalRY) - py(0)
+                        width: px(petalRX), height: py(petalRY)
                     )
                     sub.fill(Path(ellipseIn: rect), with: .color(petalFill))
                     sub.stroke(Path(ellipseIn: rect), with: .color(petalEdge), lineWidth: 0.7)
                 }
             }
 
-            // Inner ring — 10 petals offset by 18°
-            let innerTint = mixHex("#F5C842", "#FFE5A0", 0.4)
-            for i in 0..<10 {
-                let a = (Double(i) / 10.0) * 360.0 + 18.0
-                let rad = (a - 90) * .pi / 180
-                let pxd = hx + cos(rad) * headR * 0.45
-                let pyd = hy + sin(rad) * headR * 0.45
-                let petalRX = headR * 0.72 * 0.7
-                let petalRY = headR * 0.72 * 0.3
-
-                layer.drawLayer { sub in
-                    sub.translateBy(x: px(pxd), y: py(pyd))
-                    sub.rotate(by: .degrees(a))
-                    let rect = CGRect(
-                        x: px(-petalRX / 2), y: py(-petalRY / 2),
-                        width: px(petalRX) - px(0), height: py(petalRY) - py(0)
-                    )
-                    sub.fill(Path(ellipseIn: rect), with: .color(innerTint))
-                }
-            }
-
             // Center disk
             let centerR = headR * 0.42
             let centerRect = CGRect(
-                x: px(hx - centerR), y: py(hy - centerR),
-                width: px(centerR * 2) - px(0), height: py(centerR * 2) - py(0)
+                x: px(hxBase - centerR), y: py(hyBase - centerR),
+                width: px(centerR * 2), height: py(centerR * 2)
             )
             let centerGradient = GraphicsContext.Shading.radialGradient(
                 Gradient(colors: [Color(hex: "#9C5A2A"), Color(hex: "#8B4513")]),
-                center: CGPoint(x: px(hx), y: py(hy)),
+                center: CGPoint(x: px(hxBase), y: py(hyBase)),
                 startRadius: 0,
                 endRadius: px(centerR)
             )
@@ -628,72 +870,117 @@ private func drawSunflower(
             layer.stroke(Path(ellipseIn: centerRect),
                          with: .color(Color(hex: "#4A2810")), lineWidth: 1)
 
-            // Seed dots (phyllotaxis)
-            if bloomP > 0.6 {
-                let pts = phyllotaxis(count: 16, scale: headR * 0.38)
-                for p in pts {
-                    let dotRect = CGRect(
-                        x: px(hx + p.x - 0.6), y: py(hy + p.y - 0.6),
-                        width: px(1.2) - px(0), height: py(1.2) - py(0)
-                    )
-                    layer.fill(Path(ellipseIn: dotRect),
-                               with: .color(Color(hex: "#3F2610")))
-                }
-            }
-        }
-
-        // Falling petal (outside head droop layer so it can fall straight)
-        if care < 0.45 && bloomP > 0.3 && !reduceMotion {
-            let phase = (t.truncatingRemainder(dividingBy: 3.5)) / 3.5
-            let fallX = hxBase - 30 - phase * 25
-            let fallY = hyBase + 20 + phase * 140
-            let rotation = phase * 180
-            let opacity = max(0, 1 - phase * 1.2)
-
-            ctx.drawLayer { layer in
-                layer.translateBy(x: px(fallX), y: py(fallY))
-                layer.rotate(by: .degrees(rotation))
-                let rect = CGRect(
-                    x: px(-5), y: py(-2.2),
-                    width: px(10) - px(0), height: py(4.4) - py(0)
+            // Phyllotaxis seed dots
+            let pts = phyllotaxis(count: 20, scale: headR * 0.38)
+            for p in pts {
+                let dotRect = CGRect(
+                    x: px(hxBase + p.x - 0.6), y: py(hyBase + p.y - 0.6),
+                    width: px(1.2), height: py(1.2)
                 )
-                layer.opacity = opacity
-                layer.fill(Path(ellipseIn: rect),
-                          with: .color(wiltColor(base: "#F5C842", care: care, clampMin: 0.3)))
+                layer.fill(Path(ellipseIn: dotRect),
+                           with: .color(Color(hex: "#3F2610")))
             }
         }
     }
 
-    // Apply appearScale as a minor scale-in (scale the whole thing is tricky —
-    // we instead fade via opacity proxy by drawing nothing when appearScale=0).
-    _ = appearScale // referenced; Canvas opacity handled at GardenPanel level if needed
-}
+    // ----- STAGE 8: THRIVING — side bud on a branch -----
+    if stage == .thriving {
+        ctx.drawLayer { layer in
+            layer.translateBy(x: pivotX, y: pivotY)
+            layer.rotate(by: .degrees(totalRot))
+            layer.translateBy(x: -pivotX, y: -pivotY)
 
-// Helper to mix a resolved base Color with a hex target by amount t (0..1).
-private func mixBaseAndHex(base: Color, hex: String, t: Double) -> Color {
-    // We can't introspect arbitrary Color RGB cheaply, so approximate by
-    // layering: return a LinearInterp via hex assumption — callers pass base
-    // as a hex-origin color. In practice we mix from the original hex name,
-    // but since wiltColor already returned a mixed Color, we fall back to
-    // returning `base` with a tint overlay approximation.
-    guard t > 0 else { return base }
-    // Simple approach: blend base toward hex using UIColor introspection.
-    #if canImport(UIKit)
-    let ui = UIColor(base)
-    var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
-    guard ui.getRed(&r, green: &g, blue: &b, alpha: &a) else { return base }
-    let (tr, tg, tb) = hexRGB(hex)
-    let clamped = max(0, min(1, t))
-    return Color(
-        .sRGB,
-        red: lerp(Double(r), tr, clamped),
-        green: lerp(Double(g), tg, clamped),
-        blue: lerp(Double(b), tb, clamped),
-        opacity: Double(a)
-    )
-    #else
-    return base
-    #endif
+            // Branch
+            let branchStartY = groundY - stemH * 0.6
+            var branch = Path()
+            branch.move(to: CGPoint(x: px(cx + 2), y: py(branchStartY)))
+            branch.addQuadCurve(
+                to: CGPoint(x: px(cx + 28), y: py(branchStartY - 18)),
+                control: CGPoint(x: px(cx + 18), y: py(branchStartY - 4))
+            )
+            layer.stroke(branch,
+                         with: .color(foliageColor(base: "#5D8A3C", cp: cp)),
+                         lineWidth: 3)
+
+            // Secondary bud
+            let bbx = cx + 28.0
+            let bby = branchStartY - 18.0
+            let budRect = CGRect(
+                x: px(bbx - 5), y: py(bby - 7),
+                width: px(10), height: py(14)
+            )
+            layer.fill(Path(ellipseIn: budRect),
+                       with: .color(foliageColor(base: "#4A7A2E", cp: cp)))
+            // Yellow peeking
+            let tipRect = CGRect(
+                x: px(bbx - 2.5), y: py(bby - 6),
+                width: px(5), height: py(3)
+            )
+            layer.fill(Path(ellipseIn: tipRect),
+                       with: .color(foliageColor(base: "#F5C842", cp: cp)))
+        }
+    }
+
+    // ----- Fallen petals (care-driven) -----
+    if cp.fallenPetals > 0 {
+        let fallColor = mixHex("#F5C842", "#C4A35A", cp.leafYellow * 0.5)
+        // Deterministic pseudo-random placement
+        let baseSeeds: [(Double, Double, Double)] = [
+            (-32, 6, 15), (26, 4, -22), (-14, 9, 40), (8, 12, -10),
+            (-42, 3, 55), (38, 7, 70), (-6, 14, -45), (18, 11, 25),
+            (-22, 15, 85), (30, 13, -55)
+        ]
+        for i in 0..<min(cp.fallenPetals, baseSeeds.count) {
+            let (dx, dy, rot) = baseSeeds[i]
+            let fx = cx + dx
+            let fy = groundY + dy - 4
+            ctx.drawLayer { layer in
+                layer.translateBy(x: px(fx), y: py(fy))
+                layer.rotate(by: .degrees(rot))
+                let r = CGRect(
+                    x: px(-5), y: py(-2.2),
+                    width: px(10), height: py(4.4)
+                )
+                layer.fill(Path(ellipseIn: r), with: .color(fallColor))
+            }
+        }
+    }
+
+    // ----- DEAD extras: dry cracks, label, fresh seed for restart -----
+    if snap.careState == .dead {
+        // Dry cracked soil lines
+        for i in 0..<4 {
+            let offset = Double(i) * 18 - 30
+            var crack = Path()
+            crack.move(to: CGPoint(x: px(cx + offset), y: py(groundY + 4)))
+            crack.addLine(to: CGPoint(x: px(cx + offset + 6), y: py(groundY + 8)))
+            crack.addLine(to: CGPoint(x: px(cx + offset + 2), y: py(groundY + 12)))
+            ctx.stroke(crack, with: .color(Color(hex: "#3F2A1C").opacity(0.5)), lineWidth: 0.8)
+        }
+        // Label "dead" — use a system font here because DinoTheme.dinoFont is
+        // main-actor isolated and Canvas drawing closures are nonisolated.
+        let deadText = Text("dead")
+            .font(.system(size: 10, weight: .regular, design: .rounded))
+            .foregroundColor(Color(hex: "#9C7C50"))
+        ctx.draw(deadText, at: CGPoint(x: px(cx - 20), y: py(groundY + 20)))
+
+        // Fresh seed next to fallen plant (cycle restart)
+        let freshRect = CGRect(
+            x: px(cx + 24), y: py(groundY - 1),
+            width: px(8), height: py(5)
+        )
+        ctx.fill(Path(ellipseIn: freshRect),
+                 with: .color(Color(hex: "#6B4226")))
+        ctx.stroke(Path(ellipseIn: freshRect),
+                   with: .color(Color(hex: "#3F2610")), lineWidth: 0.7)
+    }
+
+    _ = appearScale
+    _ = care
+    _ = stemP
+    _ = leafP
+    _ = budP
+    _ = bloomP
 }
 
 // MARK: - Background rendering
@@ -708,7 +995,7 @@ private func drawBackground(
     let w = size.width
     let h = size.height
 
-    // 1. Sky gradient (top 45%)
+    // 1. Sky gradient (top 55%)
     let skyRect = CGRect(x: 0, y: 0, width: w, height: h * 0.55)
     let skyColors: [Color]
     switch scene {
@@ -731,7 +1018,6 @@ private func drawBackground(
     case .morning, .afternoon:
         let sunCenter = CGPoint(x: w * 0.78, y: h * 0.18)
         let r: CGFloat = 22
-        // Rays
         ctx.drawLayer { layer in
             layer.translateBy(x: sunCenter.x, y: sunCenter.y)
             layer.rotate(by: .radians(t * 0.05))
@@ -760,7 +1046,6 @@ private func drawBackground(
         let moonRect = CGRect(x: moonCenter.x - r, y: moonCenter.y - r, width: r * 2, height: r * 2)
         ctx.fill(Path(ellipseIn: moonRect), with: .color(Color(hex: "#F5F0D8")))
         ctx.stroke(Path(ellipseIn: moonRect), with: .color(Color(hex: "#BFB88E")), lineWidth: 1)
-        // Craters
         let craters: [(Double, Double, Double)] = [(-4, -3, 2), (3, 1, 1.5), (-2, 4, 1.2)]
         for (dx, dy, cr) in craters {
             let cRect = CGRect(
@@ -811,22 +1096,43 @@ private func drawBackground(
 
     // 4. Clouds (morning / afternoon / cloudy)
     if scene == .morning || scene == .afternoon || scene == .cloudy {
-        let clouds: [(Double, Double, Double, Double)] = [
-            (0.14, 60.0, 1.0, 0.20),
-            (0.10, 75.0, 0.8, 0.55),
-            (0.22, 90.0, 1.2, 0.10)
+        // y fractions of sky height (h * 0.55)
+        let cloudSpecs: [(Double, Double, Double, Double, Double)] = [
+            // (yFracOfSky, driftDur, bobPeriod, scale, phase)
+            (0.15, 60.0,  8.0, 1.0, 0.0),
+            (0.32, 90.0, 10.0, 0.85, 2.1),
+            (0.22, 75.0, 12.0, 1.15, 4.7)
         ]
-        for (fy, dur, scale, initialFX) in clouds {
-            let span = w + 200
-            let progress: Double
+        let skyHeight = h * 0.55
+        let travelSpan = w + 200
+        for (fy, driftDur, bobPeriod, scale, phase) in cloudSpecs {
+            let baseY = skyHeight * fy
+            let x: Double
+            let bobY: Double
             if reduceMotion {
-                progress = initialFX
+                // Static positions (use phase to spread them)
+                x = Double(travelSpan) * ((phase / 6.28).truncatingRemainder(dividingBy: 1.0)) - 100
+                bobY = 0
             } else {
-                progress = (t / dur).truncatingRemainder(dividingBy: 1.0)
+                let drift = ((t + phase * 5) / driftDur).truncatingRemainder(dividingBy: 1.0)
+                x = drift * Double(travelSpan) - 100
+                bobY = sin((t + phase) * 2 * .pi / bobPeriod) * 4
             }
-            let x = (progress + initialFX).truncatingRemainder(dividingBy: 1.0) * Double(span) - 100
-            let y = h * fy
-            drawCloud(ctx: &ctx, center: CGPoint(x: CGFloat(x), y: y), scale: CGFloat(scale))
+            let opacity: Double
+            let breathScale: Double
+            if reduceMotion {
+                opacity = 0.92
+                breathScale = scale
+            } else {
+                opacity = 0.85 + 0.15 * (0.5 + 0.5 * sin((t + phase) * 2 * .pi / 6))
+                breathScale = scale * (1.0 + 0.03 * sin((t + phase) * 2 * .pi / 10))
+            }
+            drawCloud(
+                ctx: &ctx,
+                center: CGPoint(x: CGFloat(x), y: CGFloat(baseY + bobY)),
+                scale: breathScale,
+                opacity: opacity
+            )
         }
     }
 
@@ -881,6 +1187,8 @@ private func drawBackground(
     }
 
     // 9. Grass strip (18pt tall, just above soil)
+    // NOTE: Draw grass BEFORE sprout so sprout (drawn later in drawSunflower)
+    // appears in front. Canvas draws later operations on top.
     let grassTop = h * 0.55 - 18
     let grassRect = CGRect(x: 0, y: grassTop, width: w, height: 18)
     let grassShading = GraphicsContext.Shading.linearGradient(
@@ -890,7 +1198,6 @@ private func drawBackground(
     )
     ctx.fill(Path(grassRect), with: grassShading)
 
-    // Tufts
     let tuftCount = 11
     for i in 0..<tuftCount {
         let fx = (Double(i) + 0.5) / Double(tuftCount)
@@ -935,21 +1242,52 @@ private func drawBackground(
     }
 }
 
-private func drawCloud(ctx: inout GraphicsContext, center: CGPoint, scale: CGFloat) {
-    let base: [(CGFloat, CGFloat, CGFloat)] = [
-        (-18, 0, 14),
-        (-4, -4, 16),
-        (10, 0, 14),
-        (22, 2, 12)
-    ]
-    for (dx, dy, r) in base {
-        let rr = r * scale
-        let rect = CGRect(
-            x: center.x + dx * scale - rr, y: center.y + dy * scale - rr,
-            width: rr * 2, height: rr * 2
-        )
-        ctx.fill(Path(ellipseIn: rect), with: .color(Color.white.opacity(0.8)))
-    }
+// MARK: - Cloud helper (layered quad-curve puff with soft shadow)
+
+private func drawCloud(
+    ctx: inout GraphicsContext,
+    center: CGPoint,
+    scale: Double,
+    opacity: Double
+) {
+    let s = CGFloat(scale)
+    let cx = center.x
+    let cy = center.y
+
+    // Soft shadow below
+    var shadow = Path()
+    shadow.addEllipse(in: CGRect(
+        x: cx - 40 * s,
+        y: cy + 12 * s,
+        width: 80 * s,
+        height: 8 * s
+    ))
+    ctx.fill(shadow, with: .color(Color(hex: "#E8E0D0").opacity(0.35 * opacity)))
+
+    // Cloud body — 4 overlapping bumps with flat bottom
+    var cloud = Path()
+    let baseY = cy + 10 * s
+    cloud.move(to: CGPoint(x: cx - 35 * s, y: baseY))
+    cloud.addQuadCurve(
+        to: CGPoint(x: cx - 20 * s, y: cy - 14 * s),
+        control: CGPoint(x: cx - 40 * s, y: cy - 8 * s)
+    )
+    cloud.addQuadCurve(
+        to: CGPoint(x: cx - 5 * s, y: cy - 18 * s),
+        control: CGPoint(x: cx - 18 * s, y: cy - 22 * s)
+    )
+    cloud.addQuadCurve(
+        to: CGPoint(x: cx + 18 * s, y: cy - 16 * s),
+        control: CGPoint(x: cx + 8 * s, y: cy - 26 * s)
+    )
+    cloud.addQuadCurve(
+        to: CGPoint(x: cx + 35 * s, y: baseY),
+        control: CGPoint(x: cx + 38 * s, y: cy - 4 * s)
+    )
+    cloud.addLine(to: CGPoint(x: cx - 35 * s, y: baseY))
+    cloud.closeSubpath()
+
+    ctx.fill(cloud, with: .color(Color.white.opacity(opacity)))
 }
 
 // MARK: - StatusLine
@@ -958,10 +1296,16 @@ private struct StatusLine: View {
     @ObservedObject var vm: GrowthViewModel
 
     var body: some View {
-        VStack(spacing: 6) {
-            Text("your sunflower is \(vm.stageLabel)")
+        let isHealthy = vm.careState == .healthy
+        let messageColor: Color = isHealthy
+            ? Color(hex: "#2D3142")
+            : Color(hex: "#A05030")
+
+        return VStack(spacing: 6) {
+            Text(vm.statusMessage)
                 .font(DinoTheme.dinoFont(size: 16))
-                .foregroundColor(Color(hex: "#2D3142"))
+                .foregroundColor(messageColor)
+                .multilineTextAlignment(.center)
             Text("\(vm.growthPercent)% GROWN")
                 .font(DinoTheme.dinoFont(size: 10))
                 .tracking(1)

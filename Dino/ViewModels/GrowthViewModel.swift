@@ -33,6 +33,89 @@ struct DayBloom: Identifiable {
     let practices: Set<PracticeType>
 }
 
+// MARK: - GrowthStage (discrete, session-driven)
+
+enum GrowthStage: Int, CaseIterable {
+    case seed      // 0 sessions
+    case cracking  // 1-2
+    case sprout    // 3-5
+    case seedling  // 6-10
+    case growing   // 11-20
+    case budding   // 21-35
+    case opening   // 36-50
+    case bloomed   // 51-62
+    case thriving  // 63+
+
+    static func from(sessions: Int) -> GrowthStage {
+        switch sessions {
+        case ..<1:    return .seed
+        case 1...2:   return .cracking
+        case 3...5:   return .sprout
+        case 6...10:  return .seedling
+        case 11...20: return .growing
+        case 21...35: return .budding
+        case 36...50: return .opening
+        case 51...62: return .bloomed
+        default:      return .thriving
+        }
+    }
+
+    /// Inclusive lower bound of sessions required to reach this stage.
+    var minSessions: Int {
+        switch self {
+        case .seed:     return 0
+        case .cracking: return 1
+        case .sprout:   return 3
+        case .seedling: return 6
+        case .growing:  return 11
+        case .budding:  return 21
+        case .opening:  return 36
+        case .bloomed:  return 51
+        case .thriving: return 63
+        }
+    }
+
+    var displayName: String {
+        switch self {
+        case .seed:     return "seed"
+        case .cracking: return "cracking"
+        case .sprout:   return "sprouting"
+        case .seedling: return "seedling"
+        case .growing:  return "growing"
+        case .budding:  return "budding"
+        case .opening:  return "opening"
+        case .bloomed:  return "bloomed"
+        case .thriving: return "thriving"
+        }
+    }
+
+    var nextStage: GrowthStage? {
+        GrowthStage(rawValue: rawValue + 1)
+    }
+}
+
+// MARK: - CareState (discrete, days-since-practice driven)
+
+enum CareState {
+    case healthy    // 0-2 days
+    case tired      // 3-4
+    case struggling // 5-7
+    case wilting    // 8-10
+    case dying      // 11-13
+    case dead       // 14+
+
+    static func from(daysSince: Int) -> CareState {
+        switch daysSince {
+        case ..<3:    return .healthy
+        case 3...4:   return .tired
+        case 5...7:   return .struggling
+        case 8...10:  return .wilting
+        case 11...13: return .dying
+        default:      return .dead
+        }
+    }
+}
+
 // MARK: - ViewModel
 
 @MainActor
@@ -152,6 +235,28 @@ final class GrowthViewModel: ObservableObject {
         return max(0, 1.0 - Double(d) / 14.0)
     }
 
+    // MARK: - Discrete stage + care API
+
+    var growthStage: GrowthStage {
+        GrowthStage.from(sessions: totalSessions)
+    }
+
+    var nextStageName: String? {
+        growthStage.nextStage?.displayName
+    }
+
+    /// Sessions remaining until the next discrete stage; nil at `.thriving`.
+    var sessionsToNextStage: Int? {
+        guard let next = growthStage.nextStage else { return nil }
+        let need = next.minSessions - totalSessions
+        return need > 0 ? need : 1
+    }
+
+    var careState: CareState {
+        if totalSessions == 0 { return .healthy }
+        return CareState.from(daysSince: daysSinceAny)
+    }
+
     // MARK: - Recency
 
     var daysSinceJournal: Int {
@@ -210,7 +315,7 @@ final class GrowthViewModel: ObservableObject {
         return d
     }
 
-    // MARK: - Phase progressions (smoothstep)
+    // MARK: - Phase progressions (smoothstep — used as continuous drawing scalars)
 
     var sproutP: Double { vmSmoothstep(growth, 0.04, 0.18) }
     var stemP:   Double { vmSmoothstep(growth, 0.22, 0.70) }
@@ -218,17 +323,36 @@ final class GrowthViewModel: ObservableObject {
     var budP:    Double { vmSmoothstep(growth, 0.55, 0.82) }
     var bloomP:  Double { vmSmoothstep(growth, 0.78, 1.00) }
 
-    var stageLabel: String {
-        if bloomP > 0.5 { return "in full bloom" }
-        if budP   > 0.5 { return "forming a bud" }
-        if leafP  > 0.5 { return "growing tall" }
-        if sproutP > 0.5 { return "a fresh sprout" }
-        return "a tiny seed"
-    }
+    /// Legacy stage label retained for back-compat; new code uses `statusMessage`.
+    var stageLabel: String { growthStage.displayName }
 
     var growthPercent: Int { Int((growth * 100).rounded()) }
 
     var dayNumber: Int { max(totalSessions, 1) }
+
+    /// Status-line message driven by both care and growth. Wilting takes
+    /// priority when the plant has been neglected.
+    var statusMessage: String {
+        switch careState {
+        case .tired:      return "looking a little thirsty"
+        case .struggling: return "your sunflower needs attention"
+        case .wilting:    return "wilting — come back soon"
+        case .dying:      return "nearly gone — one practice saves it"
+        case .dead:       return "your sunflower has rested. a new seed waits"
+        case .healthy:
+            switch growthStage {
+            case .seed:     return "a seed full of potential"
+            case .cracking: return "something is stirring underground"
+            case .sprout:   return "your sunflower just broke through"
+            case .seedling: return "growing stronger every day"
+            case .growing:  return "reaching for the light"
+            case .budding:  return "a bud is forming — keep going"
+            case .opening:  return "almost there, keep showing up"
+            case .bloomed:  return "your sunflower is in full bloom"
+            case .thriving: return "thriving beyond measure"
+            }
+        }
+    }
 
     // MARK: - Helpers
 
