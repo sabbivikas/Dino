@@ -2,153 +2,88 @@
 //  BreathingWidget.swift
 //  DinoLiveActivity
 //
-//  Home screen widget prompting users to take a breathing break.
-//  This is a static widget — NOT the Live Activity.
-//  Tapping opens the breathing screen via dino://breathe deep link.
+//  Home-screen breathing widget. Small + medium. Hand-drawn 5-petal bloom
+//  scaled by a timeline-driven `breathPhase` for a subtle pseudo-breath cycle.
+//  Deep links to `dino://breathe`.
+//
+//  kind = "BreathingWidget" preserved from the prior implementation.
 //
 
-import WidgetKit
 import SwiftUI
-
-// Color(hex:) is defined in BreathingLiveActivity.swift
-
-// MARK: - Timeline Entry
-
-struct BreathingWidgetEntry: TimelineEntry {
-    let date: Date
-}
+import WidgetKit
 
 // MARK: - Timeline Provider
 
-struct BreathingWidgetProvider: TimelineProvider {
-    func placeholder(in context: Context) -> BreathingWidgetEntry {
-        BreathingWidgetEntry(date: Date())
+struct BreathingTimelineProvider: TimelineProvider {
+    typealias Entry = BreathingSnapshot
+
+    /// 6 breath-phase keyframes → scale = 0.92 + 0.16 * sin(phase * 2π).
+    /// Walks from ~0.92 at phase 0 through 1.08 at phase ~0.25 back down.
+    private let breathPhases: [Double] = [0.0, 0.167, 0.333, 0.5, 0.667, 0.833]
+
+    private func scaleFor(_ phase: Double) -> Double {
+        0.92 + 0.16 * (0.5 + 0.5 * sin(phase * 2 * .pi))
     }
 
-    func getSnapshot(in context: Context, completion: @escaping (BreathingWidgetEntry) -> Void) {
-        completion(BreathingWidgetEntry(date: Date()))
+    func placeholder(in context: Context) -> BreathingSnapshot {
+        BreathingSnapshot(date: Date(), breathPhase: 1.0)
     }
 
-    func getTimeline(in context: Context, completion: @escaping (Timeline<BreathingWidgetEntry>) -> Void) {
-        let entry = BreathingWidgetEntry(date: Date())
-        // Refresh every hour — breathing prompts can update throughout the day
-        let nextHour = Calendar.current.date(byAdding: .hour, value: 1, to: Date()) ?? Date()
-        let timeline = Timeline(entries: [entry], policy: .after(nextHour))
-        completion(timeline)
+    func getSnapshot(in context: Context, completion: @escaping (BreathingSnapshot) -> Void) {
+        completion(BreathingSnapshot(date: Date(), breathPhase: 1.0))
     }
-}
 
-// MARK: - Widget Views
+    func getTimeline(in context: Context, completion: @escaping (Timeline<BreathingSnapshot>) -> Void) {
+        let now = Date()
+        let calendar = Calendar.current
+        var entries: [BreathingSnapshot] = []
 
-struct BreathingWidgetSmallView: View {
-    let theme: WidgetTheme
+        // Starting entry at now
+        entries.append(BreathingSnapshot(date: now, breathPhase: scaleFor(breathPhases[0])))
 
-    var body: some View {
-        VStack(spacing: 8) {
-            // Calm pulsing circle visual
-            ZStack {
-                Circle()
-                    .fill(theme.accent.opacity(0.12))
-                    .frame(width: 52, height: 52)
+        // 6 entries at 10-min cadence starting at the next 10-min boundary
+        let minute = calendar.component(.minute, from: now)
+        let delta = (10 - (minute % 10)) % 10
+        var startBoundary = calendar.date(byAdding: .minute, value: delta == 0 ? 10 : delta, to: now) ?? now
+        startBoundary = calendar.date(
+            bySettingHour: calendar.component(.hour, from: startBoundary),
+            minute: calendar.component(.minute, from: startBoundary),
+            second: 0,
+            of: startBoundary
+        ) ?? startBoundary
 
-                Circle()
-                    .fill(theme.accent.opacity(0.22))
-                    .frame(width: 36, height: 36)
-
-                Circle()
-                    .fill(theme.accent.opacity(0.6))
-                    .frame(width: 22, height: 22)
-
-                Text("🌿")
-                    .font(.system(size: 13))
-            }
-
-            Text("take 1 minute")
-                .font(.custom("DinoInitiativeFont-Regular", size: 11))
-                .foregroundColor(theme.textPrimary)
-                .multilineTextAlignment(.center)
-
-            Text("breathe")
-                .font(.custom("DinoInitiativeFont-Regular", size: 10))
-                .foregroundColor(theme.textSecondary)
+        for step in 0..<6 {
+            let d = calendar.date(byAdding: .minute, value: step * 10, to: startBoundary) ?? startBoundary
+            entries.append(BreathingSnapshot(
+                date: d,
+                breathPhase: scaleFor(breathPhases[(step + 1) % breathPhases.count])
+            ))
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(theme.cardBackground)
+
+        let last = entries.last?.date ?? now.addingTimeInterval(3600)
+        completion(Timeline(entries: entries, policy: .after(last)))
     }
 }
 
-struct BreathingWidgetMediumView: View {
-    let theme: WidgetTheme
-
-    var body: some View {
-        HStack(spacing: 18) {
-            // Left: breathing circle
-            ZStack {
-                Circle()
-                    .fill(theme.accent.opacity(0.10))
-                    .frame(width: 72, height: 72)
-
-                Circle()
-                    .fill(theme.accent.opacity(0.20))
-                    .frame(width: 52, height: 52)
-
-                Circle()
-                    .fill(theme.accent.opacity(0.50))
-                    .frame(width: 34, height: 34)
-
-                Text("🌿")
-                    .font(.system(size: 18))
-            }
-
-            // Right: copy
-            VStack(alignment: .leading, spacing: 6) {
-                Text("breathe")
-                    .font(.custom("DinoInitiativeFont-Regular", size: 18))
-                    .foregroundColor(theme.textPrimary)
-
-                Text("take a mindful moment and reset with a guided breathing session.")
-                    .font(.custom("DinoInitiativeFont-Regular", size: 11))
-                    .foregroundColor(theme.textSecondary)
-                    .lineLimit(3)
-                    .minimumScaleFactor(0.85)
-
-                Spacer()
-
-                HStack(spacing: 4) {
-                    Image(systemName: "play.circle.fill")
-                        .font(.custom("DinoInitiativeFont-Regular", size: 12))
-                        .foregroundColor(theme.accent)
-                    Text("start breathing")
-                        .font(.custom("DinoInitiativeFont-Regular", size: 11))
-                        .foregroundColor(theme.accent)
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .padding(14)
-        .background(theme.cardBackground)
-    }
-}
+// MARK: - Entry View
 
 struct BreathingWidgetEntryView: View {
-    let entry: BreathingWidgetEntry
+    let entry: BreathingSnapshot
     @Environment(\.widgetFamily) var family
-
-    private var theme: WidgetTheme { WidgetTheme.current }
 
     var body: some View {
         Group {
             switch family {
             case .systemSmall:
-                BreathingWidgetSmallView(theme: theme)
+                BreathingSmallView(entry: entry)
             case .systemMedium:
-                BreathingWidgetMediumView(theme: theme)
+                BreathingMediumView(entry: entry)
             default:
-                BreathingWidgetSmallView(theme: theme)
+                BreathingSmallView(entry: entry)
             }
         }
         .widgetURL(URL(string: "dino://breathe"))
-        .containerBackground(.clear, for: .widget)
+        .containerBackground(WidgetGradients.breathing, for: .widget)
     }
 }
 
@@ -158,11 +93,11 @@ struct BreathingWidget: Widget {
     let kind: String = "BreathingWidget"
 
     var body: some WidgetConfiguration {
-        StaticConfiguration(kind: kind, provider: BreathingWidgetProvider()) { entry in
+        StaticConfiguration(kind: kind, provider: BreathingTimelineProvider()) { entry in
             BreathingWidgetEntryView(entry: entry)
         }
-        .configurationDisplayName("Breathing")
-        .description("A gentle reminder to take a mindful breathing break.")
+        .configurationDisplayName("breathe")
+        .description("tap anytime for a one-minute breathing reset")
         .supportedFamilies([.systemSmall, .systemMedium])
     }
 }
@@ -172,5 +107,6 @@ struct BreathingWidget: Widget {
 #Preview(as: .systemMedium) {
     BreathingWidget()
 } timeline: {
-    BreathingWidgetEntry(date: .now)
+    BreathingSnapshot(date: .now, breathPhase: 1.0)
+    BreathingSnapshot(date: .now, breathPhase: 1.08)
 }

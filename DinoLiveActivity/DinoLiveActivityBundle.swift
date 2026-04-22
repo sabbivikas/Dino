@@ -16,14 +16,14 @@ struct DinoLiveActivityBundle: WidgetBundle {
         MeditationLiveActivity()
         FocusLiveActivity()
 
-        // Home Screen Widgets — existing (now theme-synced + large)
-        MoodCheckInWidget()
-        DailyAffirmationWidget()
-
-        // Home Screen Widgets — new
+        // Home Screen Widgets — mood/streak/breathing redesigned
+        MoodWidget()
         StreakWidget()
-        GratitudeWidget()
         BreathingWidget()
+
+        // Home Screen Widgets — unchanged
+        DailyAffirmationWidget()
+        GratitudeWidget()
         TodaysFocusWidget()
     }
 }

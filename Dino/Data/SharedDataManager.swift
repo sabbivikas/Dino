@@ -5,6 +5,7 @@
 
 import Foundation
 import Combine
+import WidgetKit
 
 private let suiteName = "group.com.vikassabbi.dino"
 
@@ -299,6 +300,7 @@ final class SharedDataManager: ObservableObject {
         addXP(10)
         recordActivity()
         NotificationManager.shared.userDidLogMood()
+        WidgetCenter.shared.reloadAllTimelines()
     }
 
     // MARK: - Journal
@@ -306,6 +308,7 @@ final class SharedDataManager: ObservableObject {
         journalEntries.insert(entry, at: 0)
         addXP(15)
         recordActivity()
+        WidgetCenter.shared.reloadAllTimelines()
     }
 
     func deleteJournalEntry(_ entry: JournalEntry) {
@@ -370,6 +373,7 @@ final class SharedDataManager: ObservableObject {
         breathingSessions.insert(session, at: 0)
         addXP(20)
         recordActivity()
+        WidgetCenter.shared.reloadAllTimelines()
     }
 
     // MARK: - Focus
