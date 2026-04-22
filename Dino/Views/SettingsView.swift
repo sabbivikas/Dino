@@ -88,29 +88,47 @@ struct SettingsView: View {
                             isOn: $notifManager.windDownEnabled
                         )
                     }
-                    // Test notification button
-                    Button {
-                        notifManager.sendTestNotification()
-                        notifManager.debugPrintPending()
-                    } label: {
-                        HStack {
-                            Image(systemName: "bell.badge")
-                                .foregroundColor(DinoTheme.accent)
-                            Text("send test notification")
-                                .font(DinoTheme.bodyFont())
-                                .foregroundColor(DinoTheme.textPrimary)
-                            Spacer()
-                            Text("5s")
-                                .font(DinoTheme.captionFont())
-                                .foregroundColor(DinoTheme.textSecondary)
-                        }
-                    }
                 } header: {
                     Text("notifications")
                         .font(DinoTheme.captionFont())
                         .foregroundColor(DinoTheme.textSecondary)
                 }
                 .listRowBackground(DinoTheme.cardBackground)
+
+                // Test-nudge button (standalone — outside notifications card)
+                Section {
+                    VStack(spacing: 0) {
+                        Button {
+                            notifManager.sendTestNotification()
+                            notifManager.debugPrintPending()
+                        } label: {
+                            HStack(spacing: 10) {
+                                Image("DinoMascot")
+                                    .resizable()
+                                    .scaledToFit()
+                                    .frame(width: 20, height: 20)
+                                Text("send a test nudge")
+                                    .font(DinoTheme.dinoFont(size: 16))
+                                    .foregroundColor(.white)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 16)
+                            .background(
+                                RoundedRectangle(cornerRadius: 14)
+                                    .fill(DinoTheme.sageGreen)
+                            )
+                        }
+                        .buttonStyle(SpringPressStyle())
+
+                        Text("make sure dino can reach you")
+                            .font(DinoTheme.dinoFont(size: 12))
+                            .foregroundColor(.secondary)
+                            .frame(maxWidth: .infinity)
+                            .padding(.top, 6)
+                    }
+                }
+                .listRowBackground(Color.clear)
+                .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
 
                 // Appearance
                 Section {
@@ -245,6 +263,15 @@ struct SettingsView: View {
         dataManager.clearForSignOut()
         UserDefaults.standard.set(false, forKey: "hasPassedAuth")
         dismiss()
+    }
+}
+
+// MARK: - Spring Press Style
+fileprivate struct SpringPressStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.97 : 1.0)
+            .animation(.spring(response: 0.3, dampingFraction: 0.6), value: configuration.isPressed)
     }
 }
 
