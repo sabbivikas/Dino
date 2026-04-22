@@ -32,6 +32,8 @@ class NotificationManager: ObservableObject {
     }
     @Published var hasPermission: Bool = false
 
+    private var isInitializing = true
+
     private init() {
         let ud = UserDefaults.standard
         self.notificationsEnabled = ud.object(forKey: "notif_enabled") as? Bool ?? true
@@ -40,6 +42,7 @@ class NotificationManager: ObservableObject {
         self.windDownEnabled = ud.object(forKey: "notif_windDown") as? Bool ?? true
         self.checkInHour = ud.object(forKey: "notif_checkInHour") as? Int ?? 19 // 7pm default
         self.checkInMinute = ud.object(forKey: "notif_checkInMinute") as? Int ?? 0
+        self.isInitializing = false
 
         checkPermissionStatus()
     }
@@ -76,13 +79,16 @@ class NotificationManager: ObservableObject {
     // MARK: - Scheduling
 
     func rescheduleAll() {
-        UNUserNotificationCenter.current().removeAllPendingNotificationRequests()
-        print("[Notifications] cleared all pending")
+        guard !isInitializing else { return }
 
         guard notificationsEnabled && hasPermission else {
-            print("[Notifications] disabled or no permission — skipping schedule")
+            UNUserNotificationCenter.current().removeAllPendingNotificationRequests()
+            print("[Notifications] disabled or no permission — cleared all pending")
             return
         }
+
+        UNUserNotificationCenter.current().removeAllPendingNotificationRequests()
+        print("[Notifications] cleared all pending, rescheduling...")
 
         if dailyCheckInEnabled { scheduleDailyCheckIn() }
         if streakReminderEnabled { scheduleStreakReminder() }
