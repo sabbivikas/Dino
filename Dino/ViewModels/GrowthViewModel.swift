@@ -6,9 +6,9 @@
 import SwiftUI
 import Combine
 
-// MARK: - File-scope types
+// MARK: - PracticeType
 
-enum Practice: String, CaseIterable, Identifiable {
+enum PracticeType: String, CaseIterable, Identifiable {
     case journal, mood, gratitude, breathing
 
     var id: String { rawValue }
@@ -16,171 +16,230 @@ enum Practice: String, CaseIterable, Identifiable {
 
     var bloomColor: Color {
         switch self {
-        case .journal:   return Color(hex: "#F5D98C")  // yellow vine
-        case .mood:      return Color(hex: "#E8B4B8")  // warm rose daisy
-        case .gratitude: return Color(hex: "#F5C842")  // gold sunflower
-        case .breathing: return Color(hex: "#B4A4C8")  // lavender
-        }
-    }
-
-    // nil = breathing (pushed via NavigationLink instead of tab switch)
-    var deepLinkTab: Int? {
-        switch self {
-        case .journal:   return 1
-        case .mood:      return 2
-        case .gratitude: return 3
-        case .breathing: return nil
+        case .journal:   return Color(hex: "#F5C842")  // gold
+        case .mood:      return Color(hex: "#E8A0A8")  // rose
+        case .gratitude: return Color(hex: "#C4A35A")  // warm amber
+        case .breathing: return Color(hex: "#A594C4")  // lavender
         }
     }
 }
 
-enum PlantStage: String {
-    case seed, sprouting, growing, budding, bloomed
+// MARK: - DayBloom
+
+struct DayBloom: Identifiable {
+    let id = UUID()
+    let date: Date
+    let dayLabel: String
+    let practices: Set<PracticeType>
 }
 
-enum CareStatus {
-    case thriving       // care > 0.7  -> sage green
-    case needsAttention // care > 0.4  -> peach/amber
-    case wilting        // care <= 0.4 -> red
+// MARK: - ViewModel
 
-    var label: String {
-        switch self {
-        case .thriving:       return "thriving"
-        case .needsAttention: return "needs attention"
-        case .wilting:        return "wilting"
+@MainActor
+final class GrowthViewModel: ObservableObject {
+
+    // Singleton — the new GrowthView expects `GrowthViewModel.shared`.
+    static let shared = GrowthViewModel()
+
+    // Explicit published streak so callers can observe updates without reaching
+    // through SharedDataManager every time.
+    @Published var currentStreak: Int
+
+    init() {
+        self.currentStreak = SharedDataManager.shared.streakData.currentStreak
+    }
+
+    // MARK: - XP / Level (persisted via SharedDataManager.growthStats)
+
+    private var dataManager: SharedDataManager { SharedDataManager.shared }
+
+    var currentXP: Int { dataManager.growthStats.xp }
+
+    var currentLevel: Int { dataManager.growthStats.level }
+
+    var xpToNextLevel: Int { dataManager.growthStats.xpToNextLevel }
+
+    var xpInCurrentLevel: Int { dataManager.growthStats.xpInCurrentLevel }
+
+    var xpProgress: Double { dataManager.growthStats.xpProgress }
+
+    var levelLabel: String { "level \(currentLevel)" }
+
+    var xpLabel: String { "\(xpInCurrentLevel) / \(xpToNextLevel) xp" }
+
+    /// Award XP and handle level-up bookkeeping. Persistence is automatic via
+    /// the `growthStats` didSet in SharedDataManager.
+    func addXP(_ amount: Int) {
+        dataManager.addXP(amount)
+        objectWillChange.send()
+    }
+
+    /// Force a level bump (used by assessment / milestone flows).
+    func levelUp() {
+        dataManager.growthStats.level += 1
+        objectWillChange.send()
+    }
+
+    /// Record a practice activity and award XP appropriate for the type.
+    func recordGrowthActivity(_ practice: PracticeType) {
+        switch practice {
+        case .journal:   addXP(15)
+        case .mood:      addXP(10)
+        case .gratitude: addXP(5)
+        case .breathing: addXP(20)
+        }
+        updateStreak()
+    }
+
+    /// Refresh the published streak from SharedDataManager.
+    func updateStreak() {
+        currentStreak = dataManager.streakData.currentStreak
+    }
+
+    // MARK: - Weekly Bloom Log
+
+    /// 7 days Mon-Sun for the current week, each with the set of practices
+    /// the user touched that day.
+    var weeklyBlooms: [DayBloom] {
+        let cal = Calendar.current
+        let today = cal.startOfDay(for: Date())
+        let weekday = cal.component(.weekday, from: today)   // 1=Sun ... 7=Sat
+        let daysBackToMonday = (weekday + 5) % 7             // Sun=6, Mon=0
+        guard let monday = cal.date(byAdding: .day, value: -daysBackToMonday, to: today) else {
+            return []
+        }
+        let labels = ["m", "t", "w", "t", "f", "s", "s"]
+        return (0..<7).compactMap { offset in
+            guard let d = cal.date(byAdding: .day, value: offset, to: monday) else { return nil }
+            var done: Set<PracticeType> = []
+            for p in PracticeType.allCases {
+                if datesUsed(for: p).contains(where: { cal.isDate($0, inSameDayAs: d) }) {
+                    done.insert(p)
+                }
+            }
+            return DayBloom(date: d, dayLabel: labels[offset], practices: done)
         }
     }
 
-    var color: Color {
-        switch self {
-        case .thriving:       return Color(hex: "#7BA872")
-        case .needsAttention: return Color(hex: "#D4920A")
-        case .wilting:        return Color(hex: "#C85050")
-        }
+    /// Placeholder trigger for callers that want to recompute weekly blooms.
+    /// The property is already a computed view of SharedDataManager state, so
+    /// all this does is nudge observers.
+    func updateWeeklyBlooms() {
+        objectWillChange.send()
     }
 
-    var note: String {
-        switch self {
-        case .thriving:       return "keep showing up"
-        case .needsAttention: return "dino misses this practice"
-        case .wilting:        return "come back before it is too late"
-        }
+    // MARK: - Combined practice scalars (sunflower driver)
+
+    var totalSessions: Int {
+        journalSessionCount + moodSessionCount + gratitudeSessionCount + breathingSessionCount
     }
-}
 
-struct PlantState: Identifiable {
-    let practice: Practice
-    let totalSessions: Int
-    let daysSinceLastUsed: Int?   // nil = never used
-    let currentStreak: Int
+    var journalSessionCount: Int   { dataManager.journalEntries.count }
+    var moodSessionCount: Int      { dataManager.moodEntries.count }
+    var gratitudeSessionCount: Int { dataManager.gratitudeNotes.count }
+    var breathingSessionCount: Int { dataManager.breathingSessions.count }
 
-    var id: String { practice.rawValue }
+    /// Normalized growth 0...1 — reaches full bloom at ~62 total sessions.
+    var growth: Double {
+        min(Double(totalSessions) / 62.0, 1.0)
+    }
 
-    var growth: Double { min(Double(totalSessions) / 62.0, 1.0) }
-
+    /// Care 0...1 based on recency of any practice. Happy seed for new users.
     var care: Double {
-        guard totalSessions > 0, let d = daysSinceLastUsed else { return 0 }
+        if totalSessions == 0 { return 1.0 }
+        let d = daysSinceAny
+        if d >= Int.max / 2 { return 0.0 }
         return max(0, 1.0 - Double(d) / 14.0)
     }
 
-    var stage: PlantStage {
-        switch growth {
-        case ..<0.06: return .seed
-        case ..<0.30: return .sprouting
-        case ..<0.55: return .growing
-        case ..<0.82: return .budding
-        default:      return .bloomed
-        }
+    // MARK: - Recency
+
+    var daysSinceJournal: Int {
+        guard let d = dataManager.journalEntries.first?.date else { return .max }
+        return daysSince(d)
     }
 
-    var careStatus: CareStatus {
-        if care > 0.7 { return .thriving }
-        if care > 0.4 { return .needsAttention }
-        return .wilting
-    }
-}
-
-@MainActor
-class GrowthViewModel: ObservableObject {
-    private let dataManager: SharedDataManager
-
-    init(dataManager: SharedDataManager) {
-        self.dataManager = dataManager
+    var daysSinceMood: Int {
+        guard let d = dataManager.moodEntries.first?.date else { return .max }
+        return daysSince(d)
     }
 
-    // MARK: - XP / level (preserved)
-
-    var stats: GrowthStats { dataManager.growthStats }
-
-    var levelLabel: String { "level \(stats.level)" }
-
-    var xpLabel: String { "\(stats.xpInCurrentLevel) / 100 xp" }
-
-    var xpProgress: Double { stats.xpProgress }
-
-    // MARK: - Per-practice data derivation
-
-    var plantStates: [PlantState] {
-        Practice.allCases.map { practice in
-            let (count, lastUsed) = rawSessionData(for: practice)
-            let days = lastUsed.map { daysBetween($0, and: Date()) }
-            return PlantState(
-                practice: practice,
-                totalSessions: count,
-                daysSinceLastUsed: days,
-                currentStreak: computeStreak(for: practice)
-            )
-        }
+    var daysSinceGratitude: Int {
+        guard let d = dataManager.gratitudeNotes.first?.createdAt else { return .max }
+        return daysSince(d)
     }
 
-    private func rawSessionData(for practice: Practice) -> (Int, Date?) {
-        switch practice {
-        case .journal:
-            return (dataManager.journalEntries.count,
-                    dataManager.journalEntries.first?.date)
-        case .mood:
-            return (dataManager.moodEntries.count,
-                    dataManager.moodEntries.first?.date)
-        case .gratitude:
-            return (dataManager.gratitudeNotes.count,
-                    dataManager.gratitudeNotes.first?.createdAt)
-        case .breathing:
-            return (dataManager.breathingSessions.count,
-                    dataManager.breathingSessions.first?.date)
-        }
+    var daysSinceBreathing: Int {
+        guard let d = dataManager.breathingSessions.first?.date else { return .max }
+        return daysSince(d)
     }
 
-    private func daysBetween(_ from: Date, and to: Date) -> Int {
+    var daysSinceAny: Int {
+        let all = [daysSinceJournal, daysSinceMood, daysSinceGratitude, daysSinceBreathing]
+        let m = all.min() ?? .max
+        return m == .max ? 14 : m
+    }
+
+    // MARK: - "Today" flags
+
+    var usedJournalToday: Bool {
+        dataManager.journalEntries.contains { Calendar.current.isDateInToday($0.date) }
+    }
+
+    var usedMoodToday: Bool {
+        dataManager.moodEntries.contains { Calendar.current.isDateInToday($0.date) }
+    }
+
+    var usedGratitudeToday: Bool {
+        dataManager.gratitudeNotes.contains { Calendar.current.isDateInToday($0.createdAt) }
+    }
+
+    var usedBreathingToday: Bool {
+        dataManager.breathingSessions.contains { Calendar.current.isDateInToday($0.date) }
+    }
+
+    var wateredToday: Bool {
+        usedJournalToday || usedMoodToday || usedGratitudeToday || usedBreathingToday
+    }
+
+    var lastWateredDaysAgo: Int? {
+        let d = daysSinceAny
+        guard d > 0, d < 14 else { return nil }
+        // daysSinceAny collapses "never used" to 14 — treat it as nil.
+        if totalSessions == 0 { return nil }
+        return d
+    }
+
+    // MARK: - Phase progressions (smoothstep)
+
+    var sproutP: Double { vmSmoothstep(growth, 0.04, 0.18) }
+    var stemP:   Double { vmSmoothstep(growth, 0.22, 0.70) }
+    var leafP:   Double { vmSmoothstep(growth, 0.32, 0.78) }
+    var budP:    Double { vmSmoothstep(growth, 0.55, 0.82) }
+    var bloomP:  Double { vmSmoothstep(growth, 0.78, 1.00) }
+
+    var stageLabel: String {
+        if bloomP > 0.5 { return "in full bloom" }
+        if budP   > 0.5 { return "forming a bud" }
+        if leafP  > 0.5 { return "growing tall" }
+        if sproutP > 0.5 { return "a fresh sprout" }
+        return "a tiny seed"
+    }
+
+    var growthPercent: Int { Int((growth * 100).rounded()) }
+
+    var dayNumber: Int { max(totalSessions, 1) }
+
+    // MARK: - Helpers
+
+    private func daysSince(_ date: Date) -> Int {
         let cal = Calendar.current
-        let a = cal.startOfDay(for: from)
-        let b = cal.startOfDay(for: to)
+        let a = cal.startOfDay(for: date)
+        let b = cal.startOfDay(for: Date())
         return max(0, cal.dateComponents([.day], from: a, to: b).day ?? 0)
     }
 
-    private func computeStreak(for practice: Practice) -> Int {
-        let dates = practiceDates(for: practice)
-        guard !dates.isEmpty else { return 0 }
-        let cal = Calendar.current
-        let today = cal.startOfDay(for: Date())
-        let keys = Set(dates.map { cal.startOfDay(for: $0) })
-
-        // Streak must include today or yesterday to be "current"
-        var cursor = today
-        if !keys.contains(cursor) {
-            guard let yesterday = cal.date(byAdding: .day, value: -1, to: today),
-                  keys.contains(yesterday) else { return 0 }
-            cursor = yesterday
-        }
-        var streak = 0
-        while keys.contains(cursor) {
-            streak += 1
-            guard let prev = cal.date(byAdding: .day, value: -1, to: cursor) else { break }
-            cursor = prev
-        }
-        return streak
-    }
-
-    private func practiceDates(for practice: Practice) -> [Date] {
+    private func datesUsed(for practice: PracticeType) -> [Date] {
         switch practice {
         case .journal:   return dataManager.journalEntries.map { $0.date }
         case .mood:      return dataManager.moodEntries.map { $0.date }
@@ -188,29 +247,11 @@ class GrowthViewModel: ObservableObject {
         case .breathing: return dataManager.breathingSessions.map { $0.date }
         }
     }
+}
 
-    // MARK: - Weekly bloom log
-    // 7 days ending with the current week's Sunday (Mon-Sun), each day -> set
-    // of practices done.
-    var weeklyBlooms: [(date: Date, dayLabel: String, practices: Set<Practice>)] {
-        let cal = Calendar.current
-        let today = cal.startOfDay(for: Date())
-        // weekday where 1=Sunday, so Monday=2. Distance back to Monday:
-        let weekday = cal.component(.weekday, from: today)   // 1...7
-        let daysBackToMonday = (weekday + 5) % 7             // Sun=6..Sat=5 -> Mon=0
-        guard let monday = cal.date(byAdding: .day, value: -daysBackToMonday, to: today) else {
-            return []
-        }
-        let labels = ["m", "t", "w", "t", "f", "s", "s"]
-        return (0..<7).compactMap { offset in
-            guard let d = cal.date(byAdding: .day, value: offset, to: monday) else { return nil }
-            var done: Set<Practice> = []
-            for p in Practice.allCases {
-                if practiceDates(for: p).contains(where: { cal.isDate($0, inSameDayAs: d) }) {
-                    done.insert(p)
-                }
-            }
-            return (d, labels[offset], done)
-        }
-    }
+// File-private smoothstep (used only by GrowthViewModel). Suffixed to avoid
+// collision with the view-side smoothstep.
+private func vmSmoothstep(_ t: Double, _ a: Double, _ b: Double) -> Double {
+    let x = max(0, min(1, (t - a) / (b - a)))
+    return x * x * (3 - 2 * x)
 }

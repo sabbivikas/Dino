@@ -5,265 +5,1067 @@
 
 import SwiftUI
 
+// MARK: - File-private helpers
+
+private func smoothstep(_ t: Double, _ a: Double, _ b: Double) -> Double {
+    let x = max(0, min(1, (t - a) / (b - a)))
+    return x * x * (3 - 2 * x)
+}
+
+private func lerp(_ a: Double, _ b: Double, _ t: Double) -> Double {
+    a + (b - a) * t
+}
+
+private func hexRGB(_ hex: String) -> (Double, Double, Double) {
+    let trimmed = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
+    var value: UInt64 = 0
+    Scanner(string: trimmed).scanHexInt64(&value)
+    let r = Double((value >> 16) & 0xFF) / 255.0
+    let g = Double((value >> 8) & 0xFF) / 255.0
+    let b = Double(value & 0xFF) / 255.0
+    return (r, g, b)
+}
+
+private func mixHex(_ a: String, _ b: String, _ t: Double) -> Color {
+    let clamped = max(0, min(1, t))
+    let (ar, ag, ab) = hexRGB(a)
+    let (br, bg, bb) = hexRGB(b)
+    return Color(
+        .sRGB,
+        red: lerp(ar, br, clamped),
+        green: lerp(ag, bg, clamped),
+        blue: lerp(ab, bb, clamped),
+        opacity: 1.0
+    )
+}
+
+private func wiltColor(base: String, care: Double, clampMin: Double) -> Color {
+    let amount = 1 - max(clampMin, care)
+    return mixHex(base, "#9C7C50", amount)
+}
+
+private func phyllotaxis(count: Int, scale: Double) -> [CGPoint] {
+    let golden = 137.5 * .pi / 180.0
+    return (0..<count).map { i in
+        let r = scale * sqrt(Double(i) / Double(max(count - 1, 1)))
+        let theta = Double(i) * golden
+        return CGPoint(x: cos(theta) * r, y: sin(theta) * r)
+    }
+}
+
+private enum GardenScene {
+    case morning, afternoon, evening, night, rainy, cloudy
+}
+
+private func sceneKey(theme: DinoAppTheme, date: Date) -> GardenScene {
+    switch theme {
+    case .rainy, .storm: return .rainy
+    case .cloudy:        return .cloudy
+    case .night:         return .night
+    default:
+        break
+    }
+    let hour = Calendar.current.component(.hour, from: date)
+    switch hour {
+    case 6...11:  return .morning
+    case 12...16: return .afternoon
+    case 17...19: return .evening
+    default:      return .night
+    }
+}
+
 // MARK: - GrowthView
 
 struct GrowthView: View {
+
+    @StateObject private var vm = GrowthViewModel.shared
+    @ObservedObject private var shared = SharedDataManager.shared
     @ObservedObject private var themeManager = ThemeManager.shared
-    @EnvironmentObject var dataManager: SharedDataManager
-    @StateObject private var viewModel: GrowthViewModel = GrowthViewModel(dataManager: SharedDataManager.shared)
-    @Environment(\.dismiss) private var dismiss
-
-    @State private var appeared = false
-
-    // Combined scalars across all four practices, used to drive the single
-    // symbolic sunflower in the garden panel.
-    private var combinedGrowth: Double {
-        let total = viewModel.plantStates.reduce(0) { $0 + $1.totalSessions }
-        return min(Double(total) / 62.0, 1.0)
-    }
-
-    private var combinedCare: Double {
-        let days = viewModel.plantStates.compactMap { $0.daysSinceLastUsed }
-        guard let minDays = days.min() else { return 1.0 }
-        return max(0, 1.0 - Double(minDays) / 14.0)
-    }
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(spacing: 24) {
-                    header
-                    gardenPanel
-                    weeklyBloomLog
-                    xpCard
-                }
-                .padding(.horizontal, 20)
-                .padding(.top, 16)
-                .padding(.bottom, 40)
+        ScrollView {
+            VStack(spacing: 20) {
+                GrowthHeader()
+                ProgressCard(vm: vm)
+                GardenPanel(
+                    vm: vm,
+                    scene: sceneKey(theme: themeManager.currentTheme, date: Date()),
+                    reduceMotion: reduceMotion
+                )
+                StatusLine(vm: vm)
+                PracticePillsRow(vm: vm)
+                WeeklyBloomLog(blooms: vm.weeklyBlooms)
+                XPCard(vm: vm)
             }
-            .background(DinoTheme.background.ignoresSafeArea())
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button(action: { dismiss() }) {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundColor(DinoTheme.textSecondary)
+            .padding(.horizontal, 20)
+            .padding(.vertical, 16)
+        }
+        .background(DinoTheme.background.ignoresSafeArea())
+        .navigationTitle("")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+// MARK: - GrowthHeader
+
+private struct GrowthHeader: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("THIS SEASON")
+                .font(DinoTheme.dinoFont(size: 12))
+                .tracking(1.2)
+                .foregroundColor(Color(hex: "#6B7280"))
+            Text("your garden 🌻")
+                .font(DinoTheme.dinoFont(size: 32))
+                .foregroundColor(Color(hex: "#2D3142"))
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+// MARK: - ProgressCard
+
+private struct ProgressCard: View {
+    @ObservedObject var vm: GrowthViewModel
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text("day")
+                    .font(DinoTheme.dinoFont(size: 14))
+                    .foregroundColor(Color(hex: "#6B7280"))
+                Text("\(vm.dayNumber)")
+                    .font(DinoTheme.numericFont(size: 28))
+                    .foregroundColor(Color(hex: "#2D3142"))
+                Spacer()
+            }
+
+            PhaseBar(progress: vm.growth)
+
+            HStack {
+                phaseLabel("seed")
+                Spacer()
+                phaseLabel("sprout")
+                Spacer()
+                phaseLabel("stem")
+                Spacer()
+                phaseLabel("bud")
+                Spacer()
+                phaseLabel("bloom")
+            }
+
+            Spacer().frame(height: 2)
+
+            CareBar(care: vm.care, daysSince: vm.daysSinceAny)
+
+            HStack {
+                phaseLabel("today")
+                Spacer()
+                phaseLabel("3d")
+                Spacer()
+                phaseLabel("7d")
+                Spacer()
+                phaseLabel("10d")
+                Spacer()
+                phaseLabel("14d+")
+            }
+
+            wateringLine
+        }
+        .padding(20)
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(Color(hex: "#FFFDF5"))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(Color(hex: "#E8E0CC"), lineWidth: 1)
+        )
+        .shadow(color: Color.black.opacity(0.05), radius: 10, x: 0, y: 3)
+    }
+
+    private func phaseLabel(_ text: String) -> some View {
+        Text(text)
+            .font(DinoTheme.dinoFont(size: 10))
+            .foregroundColor(Color(hex: "#6B7280"))
+    }
+
+    @ViewBuilder
+    private var wateringLine: some View {
+        HStack(spacing: 6) {
+            if vm.wateredToday {
+                Text("watered today 💧")
+                    .font(DinoTheme.dinoFont(size: 14))
+                    .foregroundColor(Color(hex: "#2D3142"))
+            } else if let d = vm.lastWateredDaysAgo {
+                Text("last watered \(d)d ago")
+                    .font(DinoTheme.dinoFont(size: 14))
+                    .foregroundColor(Color(hex: "#6B7280"))
+            } else {
+                Text("waiting to be watered")
+                    .font(DinoTheme.dinoFont(size: 14))
+                    .foregroundColor(Color(hex: "#6B7280"))
+            }
+            Spacer()
+        }
+    }
+}
+
+// MARK: - PhaseBar
+
+private struct PhaseBar: View {
+    let progress: Double
+
+    var body: some View {
+        GeometryReader { geo in
+            let w = geo.size.width
+            let clamped = max(0, min(1, progress))
+            ZStack(alignment: .leading) {
+                Capsule()
+                    .fill(Color(hex: "#E8DFCF"))
+                    .frame(height: 6)
+                    .frame(maxWidth: .infinity)
+
+                Capsule()
+                    .fill(Color(hex: "#6B9E44"))
+                    .frame(width: max(0, w * clamped), height: 6)
+
+                HStack(spacing: 0) {
+                    ForEach(0..<5) { i in
+                        Circle()
+                            .fill(Color(hex: "#D6C7A8"))
+                            .frame(width: 6, height: 6)
+                        if i < 4 { Spacer(minLength: 0) }
                     }
                 }
+
+                Circle()
+                    .fill(Color(hex: "#F5C842"))
+                    .overlay(Circle().stroke(Color(hex: "#D49020"), lineWidth: 1))
+                    .frame(width: 12, height: 12)
+                    .offset(x: max(0, w * clamped - 6))
             }
-            .onAppear {
-                withAnimation(.spring(response: 0.6, dampingFraction: 0.75)) {
-                    appeared = true
-                }
-            }
+            .frame(height: 12)
         }
+        .frame(height: 12)
     }
+}
 
-    // MARK: Header
+// MARK: - CareBar
 
-    private var header: some View {
-        VStack(spacing: 4) {
-            Text("your garden")
-                .font(DinoTheme.dinoFont(size: 26))
-                .foregroundColor(DinoTheme.textPrimary)
-            Text("tends to grow with your practice")
-                .font(DinoTheme.dinoFont(size: 13))
-                .foregroundColor(DinoTheme.textSecondary)
-        }
-        .frame(maxWidth: .infinity)
-    }
+private struct CareBar: View {
+    let care: Double
+    let daysSince: Int
 
-    // MARK: Garden panel (single centered sunflower on layered background)
-
-    private var gardenPanel: some View {
+    var body: some View {
         GeometryReader { geo in
-            let panelW = geo.size.width
-            let panelH = geo.size.height
-            let grassH = panelH * 0.08
-            let soilH  = panelH * 0.15
+            let w = geo.size.width
+            let clamped = max(0, min(1, care))
+            let careColor = mixHex("#7BA872", "#9C7C50", 1 - clamped)
+            let fillW = max(0, w * clamped)
 
-            // Sunflower sized ~163x200, base aligned just above the grass strip.
-            let plantW: CGFloat = 163
-            let plantH: CGFloat = 200
-            let plantBottomY = panelH - soilH - grassH - 2 // a couple pts above grass
+            ZStack(alignment: .leading) {
+                Capsule()
+                    .fill(Color(hex: "#E8DFCF"))
+                    .frame(height: 6)
+                    .frame(maxWidth: .infinity)
 
-            ZStack(alignment: .topLeading) {
-                GardenBackground()
+                Capsule()
+                    .fill(careColor)
+                    .frame(width: fillW, height: 6)
 
-                SingleSunflower(
-                    growth: combinedGrowth,
-                    care: combinedCare,
-                    width: plantW,
-                    height: plantH
-                )
-                .position(
-                    x: panelW / 2,
-                    y: plantBottomY - plantH / 2
+                HStack(spacing: 0) {
+                    ForEach(0..<5) { i in
+                        Circle()
+                            .fill(Color(hex: "#D6C7A8"))
+                            .frame(width: 6, height: 6)
+                        if i < 4 { Spacer(minLength: 0) }
+                    }
+                }
+
+                // Left = healthy (today, care=1), right = wilted (14d+, care=0)
+                let dotOffset = max(0, (1 - clamped) * w - 6)
+                Circle()
+                    .fill(careColor)
+                    .overlay(Circle().stroke(careColor.opacity(0.7), lineWidth: 1))
+                    .frame(width: 12, height: 12)
+                    .offset(x: dotOffset)
+            }
+            .frame(height: 12)
+        }
+        .frame(height: 12)
+    }
+}
+
+// MARK: - Plant snapshot (value captured on MainActor, safe to read in Canvas)
+
+private struct SunflowerSnapshot {
+    let sproutP: Double
+    let stemP: Double
+    let leafP: Double
+    let budP: Double
+    let bloomP: Double
+    let care: Double
+}
+
+// MARK: - GardenPanel
+
+private struct GardenPanel: View {
+    @ObservedObject var vm: GrowthViewModel
+    let scene: GardenScene
+    let reduceMotion: Bool
+
+    @State private var appeared: Bool = false
+
+    var body: some View {
+        let snap = SunflowerSnapshot(
+            sproutP: vm.sproutP,
+            stemP: vm.stemP,
+            leafP: vm.leafP,
+            budP: vm.budP,
+            bloomP: vm.bloomP,
+            care: vm.care
+        )
+
+        return TimelineView(.animation(minimumInterval: reduceMotion ? 1.0 / 15.0 : nil, paused: false)) { timeline in
+            Canvas { ctx, size in
+                let t = timeline.date.timeIntervalSinceReferenceDate
+                drawBackground(ctx: &ctx, size: size, scene: scene, t: t, reduceMotion: reduceMotion)
+                drawSunflower(
+                    ctx: &ctx,
+                    size: size,
+                    snap: snap,
+                    t: t,
+                    reduceMotion: reduceMotion,
+                    appearScale: appeared ? 1.0 : 0.0
                 )
             }
-            .frame(width: panelW, height: panelH)
         }
-        .frame(height: 300)
+        .frame(height: 280)
         .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .stroke(Color(hex: "#A8C5A0").opacity(0.25), lineWidth: 1)
+                .stroke(Color(hex: "#A8C5A0").opacity(0.3), lineWidth: 1)
         )
-        .shadow(color: Color.black.opacity(0.06), radius: 12, x: 0, y: 4)
+        .onAppear {
+            withAnimation(.spring(response: 0.8, dampingFraction: 0.7)) {
+                appeared = true
+            }
+        }
+    }
+}
+
+// MARK: - Plant rendering
+
+private func drawSunflower(
+    ctx: inout GraphicsContext,
+    size: CGSize,
+    snap: SunflowerSnapshot,
+    t: TimeInterval,
+    reduceMotion: Bool,
+    appearScale: Double
+) {
+    // Design uses a 400x320 viewBox
+    let sx = size.width / 400.0
+    let sy = size.height / 320.0
+
+    // Helper to transform design-space coords into view-space
+    func px(_ x: Double) -> CGFloat { CGFloat(x * Double(sx)) }
+    func py(_ y: Double) -> CGFloat { CGFloat(y * Double(sy)) }
+
+    let cx = 200.0
+    let groundY = 260.0
+
+    let sproutP = snap.sproutP
+    let stemP = snap.stemP
+    let leafP = snap.leafP
+    let budP = snap.budP
+    let bloomP = snap.bloomP
+    let care = max(0, min(1, snap.care))
+
+    // ----- 1. Seed mound & seed -----
+    do {
+        let moundRect = CGRect(
+            x: px(cx - 13), y: py(groundY + 3 - 3.2),
+            width: px(26) - px(0), height: py(6.4) - py(0)
+        )
+        ctx.fill(Path(ellipseIn: moundRect), with: .color(Color(hex: "#3A2818").opacity(0.3)))
+
+        if sproutP < 1 {
+            let seedOp = 1 - sproutP
+            let seedRect = CGRect(
+                x: px(cx - 6), y: py(groundY + 1 - 4),
+                width: px(12) - px(0), height: py(8) - py(0)
+            )
+            ctx.fill(Path(ellipseIn: seedRect),
+                     with: .color(Color(hex: "#8B6B4A").opacity(seedOp)))
+            ctx.stroke(Path(ellipseIn: seedRect),
+                       with: .color(Color(hex: "#5A4028").opacity(seedOp)),
+                       lineWidth: 1)
+        }
     }
 
-    // MARK: Weekly bloom log
+    // ----- Stem geometry shared by stem, leaves, bud, bloom -----
+    let stemH = 6 + stemP * 120
+    let stemW = 2 + stemP * 4
+    let bendDeg = (1 - care) * 55
+    let swayDeg: Double = {
+        guard !reduceMotion else { return 0 }
+        if bloomP > 0.3 && care > 0.7 {
+            return sin(t * 2.0 * .pi / 5.5) * 1.8
+        }
+        return 0
+    }()
+    let totalRot = bendDeg * 0.3 + swayDeg
 
-    private var weeklyBloomLog: some View {
+    // Pivot for stem rotation — base at (cx, groundY)
+    let pivotX = px(cx)
+    let pivotY = py(groundY)
+
+    // ----- 2. Stem (drawn in a rotated layer) -----
+    if stemP > 0.01 {
+        ctx.drawLayer { layer in
+            layer.translateBy(x: pivotX, y: pivotY)
+            layer.rotate(by: .degrees(totalRot))
+            layer.translateBy(x: -pivotX, y: -pivotY)
+
+            var stem = Path()
+            let bx = cx
+            let by = groundY
+            let topY = groundY - stemH
+            stem.move(to: CGPoint(x: px(bx - stemW / 2), y: py(by)))
+            stem.addQuadCurve(
+                to: CGPoint(x: px(bx - stemW / 3), y: py(topY + 4)),
+                control: CGPoint(x: px(bx), y: py(by - stemH * 0.6))
+            )
+            stem.addLine(to: CGPoint(x: px(bx + stemW / 3), y: py(topY + 4)))
+            stem.addQuadCurve(
+                to: CGPoint(x: px(bx + stemW / 2), y: py(by)),
+                control: CGPoint(x: px(bx), y: py(by - stemH * 0.6))
+            )
+            stem.closeSubpath()
+
+            layer.fill(stem, with: .color(wiltColor(base: "#5D8A3C", care: care, clampMin: 0.2)))
+        }
+    }
+
+    // ----- 3. Leaves -----
+    if leafP > 0.01 {
+        let leafFractions: [Double] = [0.35, 0.42, 0.62, 0.70]
+        let leafSides: [Double] = [-1, 1, -1, 1]
+        let leafAngles: [Double] = [30, 25, 35, 28]
+        let droop = (1 - care) * 40
+        let leafLen = 22.0 * leafP
+
+        let leafBase = wiltColor(base: "#6B9E44", care: care, clampMin: 0.15)
+        let yellowShift = max(0.0, (0.6 - care) / 0.6)
+        let leafFill = mixBaseAndHex(base: leafBase, hex: "#C4A35A", t: yellowShift)
+
+        for i in 0..<4 {
+            let frac = leafFractions[i]
+            let side = leafSides[i]
+            let baseAngle = leafAngles[i]
+            let angle = side * baseAngle + (side * droop)
+            let lx = cx
+            let ly = groundY - stemH * frac
+
+            ctx.drawLayer { layer in
+                // Stem rotation first
+                layer.translateBy(x: pivotX, y: pivotY)
+                layer.rotate(by: .degrees(totalRot))
+                layer.translateBy(x: -pivotX, y: -pivotY)
+
+                // Leaf own rotation around its attachment
+                let attachX = px(lx)
+                let attachY = py(ly)
+                layer.translateBy(x: attachX, y: attachY)
+                layer.rotate(by: .degrees(angle))
+
+                // Draw a teardrop leaf along +x axis, length leafLen
+                let len = leafLen
+                var leaf = Path()
+                leaf.move(to: CGPoint(x: 0, y: 0))
+                leaf.addQuadCurve(
+                    to: CGPoint(x: px(len), y: 0),
+                    control: CGPoint(x: px(len * 0.5), y: py(-len * 0.4))
+                )
+                leaf.addQuadCurve(
+                    to: CGPoint(x: 0, y: 0),
+                    control: CGPoint(x: px(len * 0.5), y: py(len * 0.4))
+                )
+                leaf.closeSubpath()
+
+                layer.fill(leaf, with: .color(leafFill))
+                layer.stroke(leaf,
+                             with: .color(wiltColor(base: "#3F6B50", care: care, clampMin: 0.15)),
+                             lineWidth: 0.7)
+            }
+        }
+    }
+
+    // ----- 4. Bud -----
+    let hxBase = cx
+    let hyBase = groundY - stemH
+
+    if budP > 0.01 && bloomP < 0.5 {
+        ctx.drawLayer { layer in
+            layer.translateBy(x: pivotX, y: pivotY)
+            layer.rotate(by: .degrees(totalRot))
+            layer.translateBy(x: -pivotX, y: -pivotY)
+
+            let budOp = 1 - bloomP * 2
+            let bx = hxBase
+            let by = hyBase
+            let rxD = 6 + budP * 4
+            let ryD = 8 + budP * 4
+            let rect = CGRect(
+                x: px(bx - rxD), y: py(by - ryD),
+                width: px(rxD * 2) - px(0), height: py(ryD * 2) - py(0)
+            )
+            let budFill = wiltColor(base: "#6B9E44", care: care, clampMin: 0.15)
+            layer.fill(Path(ellipseIn: rect), with: .color(budFill.opacity(budOp)))
+            layer.stroke(Path(ellipseIn: rect),
+                         with: .color(wiltColor(base: "#3F6B50", care: care, clampMin: 0.15).opacity(budOp)),
+                         lineWidth: 0.7)
+
+            // 4 sepal strokes
+            let sepalAngles: [Double] = [-35, -10, 15, 40]
+            for a in sepalAngles {
+                let rad = a * .pi / 180
+                let tipX = bx + cos(rad) * (rxD + 3)
+                let tipY = by + sin(rad) * (ryD + 3)
+                var sep = Path()
+                sep.move(to: CGPoint(x: px(bx), y: py(by + ryD * 0.2)))
+                sep.addQuadCurve(
+                    to: CGPoint(x: px(tipX), y: py(tipY)),
+                    control: CGPoint(x: px((bx + tipX) / 2), y: py(by + ryD * 0.5))
+                )
+                layer.stroke(sep,
+                             with: .color(budFill.opacity(budOp)),
+                             lineWidth: 1.2)
+            }
+        }
+    }
+
+    // ----- 5. Bloom -----
+    if bloomP > 0.01 {
+        let headR = 30.0 * bloomP
+        let headDroopDeg = (1 - care) * 30
+
+        ctx.drawLayer { layer in
+            // Stem rotation
+            layer.translateBy(x: pivotX, y: pivotY)
+            layer.rotate(by: .degrees(totalRot))
+            layer.translateBy(x: -pivotX, y: -pivotY)
+
+            // Head droop pivot at head base
+            let hx = hxBase
+            let hy = hyBase
+            let droopPivotX = px(hx)
+            let droopPivotY = py(hy + 2)
+            layer.translateBy(x: droopPivotX, y: droopPivotY)
+            layer.rotate(by: .degrees(headDroopDeg))
+            layer.translateBy(x: -droopPivotX, y: -droopPivotY)
+
+            // Outer ring — 14 petals
+            let petalFill = wiltColor(base: "#F5C842", care: care, clampMin: 0.3)
+            let petalEdge = wiltColor(base: "#D49020", care: care, clampMin: 0.3)
+            for i in 0..<14 {
+                let a = (Double(i) / 14.0) * 360.0
+                let rad = (a - 90) * .pi / 180
+                let pxd = hx + cos(rad) * headR * 0.55
+                let pyd = hy + sin(rad) * headR * 0.55
+                let petalRX = headR * 0.95 * 0.75
+                let petalRY = headR * 0.95 * 0.32
+
+                layer.drawLayer { sub in
+                    sub.translateBy(x: px(pxd), y: py(pyd))
+                    sub.rotate(by: .degrees(a))
+                    let rect = CGRect(
+                        x: px(-petalRX / 2), y: py(-petalRY / 2),
+                        width: px(petalRX) - px(0), height: py(petalRY) - py(0)
+                    )
+                    sub.fill(Path(ellipseIn: rect), with: .color(petalFill))
+                    sub.stroke(Path(ellipseIn: rect), with: .color(petalEdge), lineWidth: 0.7)
+                }
+            }
+
+            // Inner ring — 10 petals offset by 18°
+            let innerTint = mixHex("#F5C842", "#FFE5A0", 0.4)
+            for i in 0..<10 {
+                let a = (Double(i) / 10.0) * 360.0 + 18.0
+                let rad = (a - 90) * .pi / 180
+                let pxd = hx + cos(rad) * headR * 0.45
+                let pyd = hy + sin(rad) * headR * 0.45
+                let petalRX = headR * 0.72 * 0.7
+                let petalRY = headR * 0.72 * 0.3
+
+                layer.drawLayer { sub in
+                    sub.translateBy(x: px(pxd), y: py(pyd))
+                    sub.rotate(by: .degrees(a))
+                    let rect = CGRect(
+                        x: px(-petalRX / 2), y: py(-petalRY / 2),
+                        width: px(petalRX) - px(0), height: py(petalRY) - py(0)
+                    )
+                    sub.fill(Path(ellipseIn: rect), with: .color(innerTint))
+                }
+            }
+
+            // Center disk
+            let centerR = headR * 0.42
+            let centerRect = CGRect(
+                x: px(hx - centerR), y: py(hy - centerR),
+                width: px(centerR * 2) - px(0), height: py(centerR * 2) - py(0)
+            )
+            let centerGradient = GraphicsContext.Shading.radialGradient(
+                Gradient(colors: [Color(hex: "#9C5A2A"), Color(hex: "#8B4513")]),
+                center: CGPoint(x: px(hx), y: py(hy)),
+                startRadius: 0,
+                endRadius: px(centerR)
+            )
+            layer.fill(Path(ellipseIn: centerRect), with: centerGradient)
+            layer.stroke(Path(ellipseIn: centerRect),
+                         with: .color(Color(hex: "#4A2810")), lineWidth: 1)
+
+            // Seed dots (phyllotaxis)
+            if bloomP > 0.6 {
+                let pts = phyllotaxis(count: 16, scale: headR * 0.38)
+                for p in pts {
+                    let dotRect = CGRect(
+                        x: px(hx + p.x - 0.6), y: py(hy + p.y - 0.6),
+                        width: px(1.2) - px(0), height: py(1.2) - py(0)
+                    )
+                    layer.fill(Path(ellipseIn: dotRect),
+                               with: .color(Color(hex: "#3F2610")))
+                }
+            }
+        }
+
+        // Falling petal (outside head droop layer so it can fall straight)
+        if care < 0.45 && bloomP > 0.3 && !reduceMotion {
+            let phase = (t.truncatingRemainder(dividingBy: 3.5)) / 3.5
+            let fallX = hxBase - 30 - phase * 25
+            let fallY = hyBase + 20 + phase * 140
+            let rotation = phase * 180
+            let opacity = max(0, 1 - phase * 1.2)
+
+            ctx.drawLayer { layer in
+                layer.translateBy(x: px(fallX), y: py(fallY))
+                layer.rotate(by: .degrees(rotation))
+                let rect = CGRect(
+                    x: px(-5), y: py(-2.2),
+                    width: px(10) - px(0), height: py(4.4) - py(0)
+                )
+                layer.opacity = opacity
+                layer.fill(Path(ellipseIn: rect),
+                          with: .color(wiltColor(base: "#F5C842", care: care, clampMin: 0.3)))
+            }
+        }
+    }
+
+    // Apply appearScale as a minor scale-in (scale the whole thing is tricky —
+    // we instead fade via opacity proxy by drawing nothing when appearScale=0).
+    _ = appearScale // referenced; Canvas opacity handled at GardenPanel level if needed
+}
+
+// Helper to mix a resolved base Color with a hex target by amount t (0..1).
+private func mixBaseAndHex(base: Color, hex: String, t: Double) -> Color {
+    // We can't introspect arbitrary Color RGB cheaply, so approximate by
+    // layering: return a LinearInterp via hex assumption — callers pass base
+    // as a hex-origin color. In practice we mix from the original hex name,
+    // but since wiltColor already returned a mixed Color, we fall back to
+    // returning `base` with a tint overlay approximation.
+    guard t > 0 else { return base }
+    // Simple approach: blend base toward hex using UIColor introspection.
+    #if canImport(UIKit)
+    let ui = UIColor(base)
+    var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+    guard ui.getRed(&r, green: &g, blue: &b, alpha: &a) else { return base }
+    let (tr, tg, tb) = hexRGB(hex)
+    let clamped = max(0, min(1, t))
+    return Color(
+        .sRGB,
+        red: lerp(Double(r), tr, clamped),
+        green: lerp(Double(g), tg, clamped),
+        blue: lerp(Double(b), tb, clamped),
+        opacity: Double(a)
+    )
+    #else
+    return base
+    #endif
+}
+
+// MARK: - Background rendering
+
+private func drawBackground(
+    ctx: inout GraphicsContext,
+    size: CGSize,
+    scene: GardenScene,
+    t: TimeInterval,
+    reduceMotion: Bool
+) {
+    let w = size.width
+    let h = size.height
+
+    // 1. Sky gradient (top 45%)
+    let skyRect = CGRect(x: 0, y: 0, width: w, height: h * 0.55)
+    let skyColors: [Color]
+    switch scene {
+    case .morning:   skyColors = [Color(hex: "#FFE4B5"), Color(hex: "#87CEEB")]
+    case .afternoon: skyColors = [Color(hex: "#8DC9EC"), Color(hex: "#B8D9E8"), Color(hex: "#E6F1EC")]
+    case .evening:   skyColors = [Color(hex: "#FF9A5C"), Color(hex: "#FF6B6B"), Color(hex: "#6B4FA0")]
+    case .night:     skyColors = [Color(hex: "#1A1A2E"), Color(hex: "#16213E")]
+    case .rainy:     skyColors = [Color(hex: "#6B7280"), Color(hex: "#4A5568")]
+    case .cloudy:    skyColors = [Color(hex: "#9CA3AF"), Color(hex: "#D1D5DB")]
+    }
+    let skyShading = GraphicsContext.Shading.linearGradient(
+        Gradient(colors: skyColors),
+        startPoint: CGPoint(x: w / 2, y: 0),
+        endPoint: CGPoint(x: w / 2, y: h * 0.55)
+    )
+    ctx.fill(Path(skyRect), with: skyShading)
+
+    // 2. Celestial
+    switch scene {
+    case .morning, .afternoon:
+        let sunCenter = CGPoint(x: w * 0.78, y: h * 0.18)
+        let r: CGFloat = 22
+        // Rays
+        ctx.drawLayer { layer in
+            layer.translateBy(x: sunCenter.x, y: sunCenter.y)
+            layer.rotate(by: .radians(t * 0.05))
+            for i in 0..<8 {
+                let a = Double(i) * (.pi / 4)
+                var ray = Path()
+                ray.move(to: CGPoint(x: cos(a) * (r + 4), y: sin(a) * (r + 4)))
+                ray.addLine(to: CGPoint(x: cos(a) * (r + 14), y: sin(a) * (r + 14)))
+                layer.stroke(ray, with: .color(Color(hex: "#F5D28A").opacity(0.75)), lineWidth: 2.5)
+            }
+        }
+        let sunRect = CGRect(x: sunCenter.x - r, y: sunCenter.y - r, width: r * 2, height: r * 2)
+        ctx.fill(Path(ellipseIn: sunRect), with: .color(Color(hex: "#F5D28A")))
+        ctx.stroke(Path(ellipseIn: sunRect), with: .color(Color(hex: "#D4A55A")), lineWidth: 1)
+
+    case .evening:
+        let sunCenter = CGPoint(x: w * 0.80, y: h * 0.30)
+        let r: CGFloat = 18
+        let sunRect = CGRect(x: sunCenter.x - r, y: sunCenter.y - r, width: r * 2, height: r * 2)
+        ctx.fill(Path(ellipseIn: sunRect), with: .color(Color(hex: "#FFCF7A")))
+        ctx.stroke(Path(ellipseIn: sunRect), with: .color(Color(hex: "#D4884A")), lineWidth: 1)
+
+    case .night:
+        let moonCenter = CGPoint(x: w * 0.78, y: h * 0.18)
+        let r: CGFloat = 18
+        let moonRect = CGRect(x: moonCenter.x - r, y: moonCenter.y - r, width: r * 2, height: r * 2)
+        ctx.fill(Path(ellipseIn: moonRect), with: .color(Color(hex: "#F5F0D8")))
+        ctx.stroke(Path(ellipseIn: moonRect), with: .color(Color(hex: "#BFB88E")), lineWidth: 1)
+        // Craters
+        let craters: [(Double, Double, Double)] = [(-4, -3, 2), (3, 1, 1.5), (-2, 4, 1.2)]
+        for (dx, dy, cr) in craters {
+            let cRect = CGRect(
+                x: moonCenter.x + dx - cr, y: moonCenter.y + dy - cr,
+                width: cr * 2, height: cr * 2
+            )
+            ctx.fill(Path(ellipseIn: cRect), with: .color(Color(hex: "#BFB88E").opacity(0.5)))
+        }
+
+    case .rainy, .cloudy:
+        break
+    }
+
+    // 3. Stars (night)
+    if scene == .night {
+        let stars: [(Double, Double, Double, Double)] = [
+            (0.08, 0.10, 3.1, 0.0),
+            (0.15, 0.18, 2.4, 0.8),
+            (0.22, 0.08, 2.9, 1.6),
+            (0.30, 0.22, 3.3, 2.4),
+            (0.37, 0.14, 2.6, 0.4),
+            (0.44, 0.30, 2.8, 1.2),
+            (0.50, 0.06, 3.0, 0.2),
+            (0.58, 0.24, 2.5, 2.0),
+            (0.62, 0.12, 3.2, 0.9),
+            (0.70, 0.28, 2.7, 1.8),
+            (0.13, 0.32, 3.4, 2.6),
+            (0.27, 0.38, 2.3, 0.1),
+            (0.42, 0.40, 2.9, 1.5),
+            (0.55, 0.36, 3.1, 2.2),
+            (0.68, 0.40, 2.4, 0.7),
+            (0.82, 0.10, 2.8, 1.4),
+            (0.88, 0.24, 3.0, 2.8),
+            (0.92, 0.36, 2.5, 0.5),
+            (0.05, 0.22, 2.6, 1.1),
+            (0.19, 0.26, 3.0, 1.9)
+        ]
+        let count = reduceMotion ? 10 : 20
+        for i in 0..<min(count, stars.count) {
+            let (fx, fy, period, phase) = stars[i]
+            let alpha = 0.3 + 0.7 * (0.5 + 0.5 * sin(t * 2 * .pi / period + phase))
+            let r: CGFloat = 1.2
+            let rect = CGRect(x: w * fx - r, y: h * fy - r, width: r * 2, height: r * 2)
+            ctx.fill(Path(ellipseIn: rect),
+                     with: .color(Color(hex: "#F5F0D8").opacity(alpha)))
+        }
+    }
+
+    // 4. Clouds (morning / afternoon / cloudy)
+    if scene == .morning || scene == .afternoon || scene == .cloudy {
+        let clouds: [(Double, Double, Double, Double)] = [
+            (0.14, 60.0, 1.0, 0.20),
+            (0.10, 75.0, 0.8, 0.55),
+            (0.22, 90.0, 1.2, 0.10)
+        ]
+        for (fy, dur, scale, initialFX) in clouds {
+            let span = w + 200
+            let progress: Double
+            if reduceMotion {
+                progress = initialFX
+            } else {
+                progress = (t / dur).truncatingRemainder(dividingBy: 1.0)
+            }
+            let x = (progress + initialFX).truncatingRemainder(dividingBy: 1.0) * Double(span) - 100
+            let y = h * fy
+            drawCloud(ctx: &ctx, center: CGPoint(x: CGFloat(x), y: y), scale: CGFloat(scale))
+        }
+    }
+
+    // 5. Rain
+    if scene == .rainy {
+        let dropCount = reduceMotion ? 60 : 120
+        for i in 0..<dropCount {
+            let seed = Double(i) * 17.31
+            let fx = (sin(seed) * 0.5 + 0.5)
+            let phase = (cos(seed * 0.7) * 0.5 + 0.5) * h
+            let speed = 180.0 + (sin(seed * 1.3) * 0.5 + 0.5) * 120.0
+            let y = (t * speed + phase).truncatingRemainder(dividingBy: Double(h))
+            let x = Double(w) * fx
+            var drop = Path()
+            let dx = 2.0
+            let dy = 10.0
+            drop.move(to: CGPoint(x: x, y: y))
+            drop.addLine(to: CGPoint(x: x + dx, y: y + dy))
+            ctx.stroke(drop, with: .color(Color(hex: "#B8CFDA").opacity(0.6)), lineWidth: 1)
+        }
+    }
+
+    // 8. Soil (bottom 45% → y = h*0.55 to h)
+    let soilRect = CGRect(x: 0, y: h * 0.55, width: w, height: h * 0.45)
+    let soilTop: Color
+    let soilBottom: Color
+    switch scene {
+    case .night:
+        soilTop = Color(hex: "#6B4A30")
+        soilBottom = Color(hex: "#3A2818")
+    default:
+        soilTop = Color(hex: "#9A7550")
+        soilBottom = Color(hex: "#5E4220")
+    }
+    let soilShading = GraphicsContext.Shading.linearGradient(
+        Gradient(colors: [soilTop, soilBottom]),
+        startPoint: CGPoint(x: w / 2, y: h * 0.55),
+        endPoint: CGPoint(x: w / 2, y: h)
+    )
+    ctx.fill(Path(soilRect), with: soilShading)
+
+    // Speckles
+    let speckles: [(Double, Double)] = [
+        (0.08, 0.70), (0.18, 0.82), (0.26, 0.74), (0.34, 0.88),
+        (0.46, 0.78), (0.55, 0.86), (0.62, 0.72), (0.72, 0.80),
+        (0.83, 0.84), (0.91, 0.76)
+    ]
+    for (fx, fy) in speckles {
+        let r: CGFloat = 1.2
+        let rect = CGRect(x: w * fx - r, y: h * fy - r, width: r * 2, height: r * 2)
+        ctx.fill(Path(ellipseIn: rect), with: .color(Color(hex: "#3F2A1C").opacity(0.35)))
+    }
+
+    // 9. Grass strip (18pt tall, just above soil)
+    let grassTop = h * 0.55 - 18
+    let grassRect = CGRect(x: 0, y: grassTop, width: w, height: 18)
+    let grassShading = GraphicsContext.Shading.linearGradient(
+        Gradient(colors: [Color(hex: "#A8C5A0"), Color(hex: "#7BA872")]),
+        startPoint: CGPoint(x: w / 2, y: grassTop),
+        endPoint: CGPoint(x: w / 2, y: h * 0.55)
+    )
+    ctx.fill(Path(grassRect), with: grassShading)
+
+    // Tufts
+    let tuftCount = 11
+    for i in 0..<tuftCount {
+        let fx = (Double(i) + 0.5) / Double(tuftCount)
+        let x = w * CGFloat(fx)
+        var tuft = Path()
+        tuft.move(to: CGPoint(x: x - 3, y: h * 0.55 - 1))
+        tuft.addLine(to: CGPoint(x: x, y: grassTop + 4))
+        tuft.move(to: CGPoint(x: x, y: h * 0.55 - 1))
+        tuft.addLine(to: CGPoint(x: x + 2, y: grassTop + 6))
+        tuft.move(to: CGPoint(x: x + 3, y: h * 0.55 - 1))
+        tuft.addLine(to: CGPoint(x: x + 5, y: grassTop + 4))
+        ctx.stroke(tuft, with: .color(Color(hex: "#4A8A5C")), lineWidth: 1.5)
+    }
+
+    // 6. Fireflies (night)
+    if scene == .night {
+        let count = reduceMotion ? 4 : 8
+        let firefliesBase: [(Double, Double, Double, Double, Double)] = [
+            (0.40, 0.45, 2.0, 1.8, 0.0),
+            (0.55, 0.50, 2.4, 2.1, 0.7),
+            (0.48, 0.55, 1.8, 2.5, 1.3),
+            (0.60, 0.42, 2.2, 2.0, 0.4),
+            (0.45, 0.62, 2.6, 1.9, 1.1),
+            (0.62, 0.58, 2.0, 2.3, 0.9),
+            (0.50, 0.40, 2.3, 2.6, 1.6),
+            (0.58, 0.52, 2.5, 2.2, 0.2)
+        ]
+        for i in 0..<min(count, firefliesBase.count) {
+            let (fx, fy, p1, p2, phase) = firefliesBase[i]
+            let bx = w * fx
+            let by = h * fy
+            let x = bx + 8 * sin(t * 2 * .pi / p1 + phase)
+            let y = by + 6 * cos(t * 2 * .pi / p2 + phase)
+            let pulse = 0.2 + 0.8 * (0.5 + 0.5 * sin(t * 2 * .pi / 2.3 + phase))
+            let outerRect = CGRect(x: x - 5, y: y - 5, width: 10, height: 10)
+            let innerRect = CGRect(x: x - 2.5, y: y - 2.5, width: 5, height: 5)
+            ctx.fill(Path(ellipseIn: outerRect),
+                     with: .color(Color(hex: "#FFEB8F").opacity(0.3 * pulse)))
+            ctx.fill(Path(ellipseIn: innerRect),
+                     with: .color(Color(hex: "#FFEB8F").opacity(pulse)))
+        }
+    }
+}
+
+private func drawCloud(ctx: inout GraphicsContext, center: CGPoint, scale: CGFloat) {
+    let base: [(CGFloat, CGFloat, CGFloat)] = [
+        (-18, 0, 14),
+        (-4, -4, 16),
+        (10, 0, 14),
+        (22, 2, 12)
+    ]
+    for (dx, dy, r) in base {
+        let rr = r * scale
+        let rect = CGRect(
+            x: center.x + dx * scale - rr, y: center.y + dy * scale - rr,
+            width: rr * 2, height: rr * 2
+        )
+        ctx.fill(Path(ellipseIn: rect), with: .color(Color.white.opacity(0.8)))
+    }
+}
+
+// MARK: - StatusLine
+
+private struct StatusLine: View {
+    @ObservedObject var vm: GrowthViewModel
+
+    var body: some View {
+        VStack(spacing: 6) {
+            Text("your sunflower is \(vm.stageLabel)")
+                .font(DinoTheme.dinoFont(size: 16))
+                .foregroundColor(Color(hex: "#2D3142"))
+            Text("\(vm.growthPercent)% GROWN")
+                .font(DinoTheme.dinoFont(size: 10))
+                .tracking(1)
+                .foregroundColor(Color(hex: "#6B7280"))
+        }
+        .frame(maxWidth: .infinity)
+    }
+}
+
+// MARK: - PracticePillsRow
+
+private struct PracticePillsRow: View {
+    @ObservedObject var vm: GrowthViewModel
+
+    var body: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 10) {
+                PracticePill(
+                    label: "journal",
+                    count: vm.journalSessionCount,
+                    dotColor: Color(hex: "#F5C842"),
+                    usedToday: vm.usedJournalToday
+                )
+                PracticePill(
+                    label: "mood",
+                    count: vm.moodSessionCount,
+                    dotColor: Color(hex: "#E8A0A8"),
+                    usedToday: vm.usedMoodToday
+                )
+                PracticePill(
+                    label: "gratitude",
+                    count: vm.gratitudeSessionCount,
+                    dotColor: Color(hex: "#C4A35A"),
+                    usedToday: vm.usedGratitudeToday
+                )
+                PracticePill(
+                    label: "breathing",
+                    count: vm.breathingSessionCount,
+                    dotColor: Color(hex: "#A594C4"),
+                    usedToday: vm.usedBreathingToday
+                )
+            }
+            .padding(.horizontal, 4)
+        }
+    }
+}
+
+private struct PracticePill: View {
+    let label: String
+    let count: Int
+    let dotColor: Color
+    let usedToday: Bool
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Circle()
+                .fill(dotColor)
+                .frame(width: 8, height: 8)
+            Text(label)
+                .font(DinoTheme.dinoFont(size: 13))
+                .foregroundColor(Color(hex: "#2D3142"))
+            Text("\(count)")
+                .font(DinoTheme.numericFont(size: 13))
+                .foregroundColor(Color(hex: "#2D3142"))
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
+        .background(
+            Capsule().fill(usedToday ? dotColor.opacity(0.18) : Color.clear)
+        )
+        .overlay(
+            Capsule().stroke(usedToday ? dotColor : Color(hex: "#6B7280").opacity(0.3), lineWidth: 1)
+        )
+    }
+}
+
+// MARK: - WeeklyBloomLog
+
+private struct WeeklyBloomLog: View {
+    let blooms: [DayBloom]
+
+    var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("this week")
                 .font(DinoTheme.dinoFont(size: 15))
-                .foregroundColor(DinoTheme.textPrimary)
+                .foregroundColor(Color(hex: "#2D3142"))
             HStack(spacing: 0) {
-                ForEach(Array(viewModel.weeklyBlooms.enumerated()), id: \.offset) { index, day in
-                    WeekDayColumn(label: day.dayLabel, practices: day.practices, appearDelay: Double(index) * 0.08)
-                        .frame(maxWidth: .infinity)
+                ForEach(Array(blooms.enumerated()), id: \.offset) { index, day in
+                    WeekDayColumn(
+                        label: day.dayLabel,
+                        practices: day.practices,
+                        appearDelay: Double(index) * 0.08
+                    )
+                    .frame(maxWidth: .infinity)
                 }
             }
         }
         .padding(.horizontal, 4)
     }
-
-    // MARK: XP card (preserved from original)
-
-    private var xpCard: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .firstTextBaseline) {
-                Text(viewModel.levelLabel)
-                    .font(DinoTheme.titleFont())
-                    .foregroundColor(DinoTheme.textPrimary)
-                Spacer()
-                Text(viewModel.xpLabel)
-                    .font(DinoTheme.numericFont(size: 14))
-                    .foregroundColor(DinoTheme.textSecondary)
-            }
-            GeometryReader { geo in
-                ZStack(alignment: .leading) {
-                    RoundedRectangle(cornerRadius: 999)
-                        .fill(Color("#E8E4D5"))
-                    RoundedRectangle(cornerRadius: 999)
-                        .fill(LinearGradient(
-                            colors: [Color("#A8C5A0"), Color("#A8D4E6")],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        ))
-                        .frame(width: max(12, geo.size.width * viewModel.xpProgress))
-                }
-            }
-            .frame(height: 12)
-        }
-        .padding(20)
-        .background(DinoTheme.surfacePrimary)
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .stroke(DinoTheme.cardBorder, lineWidth: 1)
-        )
-        .shadow(color: DinoTheme.shadowColor, radius: 12, x: 0, y: 4)
-    }
 }
-
-// MARK: - GardenBackground (layered sky → cream gradient + grass + curved soil)
-
-private struct GardenBackground: View {
-    var body: some View {
-        GeometryReader { geo in
-            let w = geo.size.width
-            let h = geo.size.height
-            let grassH = h * 0.08
-            let soilH  = h * 0.15
-            let curveDepth: CGFloat = 8
-
-            ZStack {
-                // Base sky-to-cream gradient
-                LinearGradient(
-                    colors: [Color(hex: "#E8F4E8"), Color(hex: "#FDF8F0")],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-
-                // Grass strip, sitting directly above the soil
-                Rectangle()
-                    .fill(Color(hex: "#A8C5A0"))
-                    .frame(width: w, height: grassH)
-                    .position(x: w / 2, y: h - soilH - grassH / 2)
-
-                // Soil strip with a gently curved top edge
-                soilShape(width: w, height: soilH, curveDepth: curveDepth)
-                    .fill(Color(hex: "#8B6343"))
-                    .frame(width: w, height: soilH)
-                    .position(x: w / 2, y: h - soilH / 2)
-            }
-            .frame(width: w, height: h)
-        }
-    }
-
-    private func soilShape(width: CGFloat, height: CGFloat, curveDepth: CGFloat) -> Path {
-        Path { p in
-            p.move(to: CGPoint(x: 0, y: curveDepth))
-            p.addQuadCurve(
-                to: CGPoint(x: width, y: curveDepth),
-                control: CGPoint(x: width / 2, y: 0)
-            )
-            p.addLine(to: CGPoint(x: width, y: height))
-            p.addLine(to: CGPoint(x: 0, y: height))
-            p.closeSubpath()
-        }
-    }
-}
-
-// MARK: - SingleSunflower (one large symbolic plant centered on the garden)
-
-private struct SingleSunflower: View {
-    let growth: Double
-    let care: Double
-    let width: CGFloat
-    let height: CGFloat
-
-    @State private var swayPhase: Double = 0
-    @State private var scale: CGFloat = 0.3
-    @State private var opacity: Double = 0
-
-    var body: some View {
-        PlantCanvas(
-            species: .gratitude,
-            growth: growth,
-            care: care
-        )
-        .frame(width: width, height: height)
-        .rotationEffect(
-            care >= 0.5
-                ? .degrees(sin(swayPhase) * 1.5)
-                : .degrees(max(0, (0.5 - care)) * 12),
-            anchor: .bottom
-        )
-        .scaleEffect(scale, anchor: .bottom)
-        .opacity(opacity)
-        .onAppear {
-            withAnimation(.spring(response: 0.7, dampingFraction: 0.65)) {
-                scale = 1.0
-                opacity = 1.0
-            }
-            if care >= 0.5 {
-                withAnimation(.easeInOut(duration: 4.0).repeatForever(autoreverses: true)) {
-                    swayPhase = .pi
-                }
-            }
-        }
-    }
-}
-
-// MARK: - WeekDayColumn
 
 private struct WeekDayColumn: View {
     let label: String
-    let practices: Set<Practice>
+    let practices: Set<PracticeType>
     let appearDelay: Double
 
     @State private var appeared = false
@@ -272,12 +1074,12 @@ private struct WeekDayColumn: View {
         VStack(spacing: 6) {
             Text(label.uppercased())
                 .font(DinoTheme.dinoFont(size: 11))
-                .foregroundColor(DinoTheme.textSecondary)
+                .foregroundColor(Color(hex: "#6B7280"))
                 .tracking(0.8)
             VStack(spacing: 3) {
-                ForEach(Practice.allCases) { p in
+                ForEach(PracticeType.allCases) { p in
                     Circle()
-                        .fill(practices.contains(p) ? p.bloomColor : Color("#E8E4D5"))
+                        .fill(practices.contains(p) ? p.bloomColor : Color(hex: "#E8E4D5"))
                         .frame(width: 6, height: 6)
                 }
             }
@@ -294,547 +1096,44 @@ private struct WeekDayColumn: View {
     }
 }
 
-// MARK: - PlantCanvas (procedural plant rendering)
+// MARK: - XPCard
 
-struct PlantCanvas: View {
-    let species: Practice
-    let growth: Double
-    let care: Double
-
-    // Canvas coordinate system: 70 wide x 140 tall. Scaled to fit frame.
+private struct XPCard: View {
+    @ObservedObject var vm: GrowthViewModel
 
     var body: some View {
-        GeometryReader { geo in
-            let scaleX = geo.size.width / 70.0
-            let scaleY = geo.size.height / 140.0
-            let s = min(scaleX, scaleY)
-            let offsetX = (geo.size.width - 70.0 * s) / 2
-            let offsetY = (geo.size.height - 140.0 * s) / 2
-
-            Canvas { context, _ in
-                var ctx = context
-                ctx.translateBy(x: offsetX, y: offsetY)
-                ctx.scaleBy(x: s, y: s)
-                drawPlant(context: &ctx)
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(vm.levelLabel)
+                    .font(DinoTheme.titleFont())
+                    .foregroundColor(DinoTheme.textPrimary)
+                Spacer()
+                Text(vm.xpLabel)
+                    .font(DinoTheme.numericFont(size: 14))
+                    .foregroundColor(DinoTheme.textSecondary)
             }
-        }
-    }
-
-    private func drawPlant(context: inout GraphicsContext) {
-        let g = max(0, min(1, growth))
-        let c = max(0, min(1, care))
-
-        // Phase progressions
-        let sprout = smoothstep(g, 0.04, 0.18)
-        let cotyP = smoothstep(g, 0.12, 0.28)
-        let stemP = smoothstep(g, 0.22, 0.70)
-        let trueLeafP = smoothstep(g, 0.32, 0.78)
-        let budP = smoothstep(g, 0.55, 0.82)
-        let bloomP = smoothstep(g, 0.78, 1.00)
-
-        // Geometry
-        let soilY: Double = 132
-        let maxH: Double = 110
-        let stemH = 4 + sprout * 10 + stemP * (maxH - 14)
-        let stemTopY = soilY - stemH
-        let wiltBend = (1 - c) * 14 * (species == .gratitude ? 0.7 : 1)
-        let bendDir: Double = species == .journal ? -1 : 1
-        let stemTipX = 35 + wiltBend * bendDir
-        let ctrlX = 35 + (stemTipX - 35) * 0.45
-        let ctrlY = soilY - stemH * 0.55
-        let stemW = species == .gratitude ? 2.8 : species == .breathing ? 1.6 : 2.2
-
-        let pal = palette(for: species)
-        let leafColor = wiltColor(pal.leaf, care: c)
-        let leafStroke = wiltColor(pal.leafDark, care: c)
-        let flowerColor = wiltColor(pal.flower, care: max(0.2, c))
-        let centerColor = wiltColor(pal.center, care: max(0.3, c))
-
-        // --- Soil mound ---
-        var soil = Path()
-        soil.addEllipse(in: CGRect(x: 35 - 13, y: soilY + 2 - 3.2, width: 26, height: 6.4))
-        context.fill(soil, with: .color(Color(hex: "#6B4A30").opacity(0.65)))
-
-        // --- Seed phase (g < 0.25) ---
-        if g < 0.25 {
-            let seedOpacity = 1 - max(0, (g - 0.18) / 0.07)
-            let seedRX = 6.5 - sprout * 2.0
-            let seedRY = 4.5 - sprout * 1.0
-            let seedCY = soilY - 1 + (1 - sprout) * 2
-            var seed = Path()
-            seed.addEllipse(in: CGRect(x: 35 - seedRX, y: seedCY - seedRY, width: seedRX * 2, height: seedRY * 2))
-            context.fill(seed, with: .color(Color(hex: "#8B6B4A").opacity(seedOpacity)))
-            context.stroke(seed, with: .color(Color(hex: "#5A4530").opacity(seedOpacity)), lineWidth: 1.3)
-
-            // Seed crack
-            if g > 0.04 && g < 0.2 {
-                let crackOp = smoothstep(g, 0.04, 0.12)
-                var crack = Path()
-                crack.move(to: CGPoint(x: 32, y: soilY - 1))
-                crack.addQuadCurve(to: CGPoint(x: 38, y: soilY - 1), control: CGPoint(x: 35, y: soilY - 4))
-                context.stroke(crack, with: .color(Color(hex: "#3F2A1C").opacity(crackOp)), lineWidth: 0.8)
-            }
-        }
-
-        // --- Stem ---
-        if sprout > 0.05 {
-            var stem = Path()
-            stem.move(to: CGPoint(x: 35, y: soilY))
-            stem.addQuadCurve(to: CGPoint(x: stemTipX, y: stemTopY), control: CGPoint(x: ctrlX, y: ctrlY))
-            let stemGradient = Gradient(colors: [
-                wiltColor(Color(hex: "#5A8A5C"), care: c),
-                wiltColor(Color(hex: "#3F6B50"), care: c)
-            ])
-            context.stroke(
-                stem,
-                with: .linearGradient(
-                    stemGradient,
-                    startPoint: CGPoint(x: 35, y: stemTopY),
-                    endPoint: CGPoint(x: 35, y: soilY)
-                ),
-                style: StrokeStyle(lineWidth: stemW * (0.6 + sprout * 0.4), lineCap: .round)
-            )
-        }
-
-        // --- Cotyledons ---
-        if cotyP > 0.05 {
-            let cotyOp = max(0, 1 - trueLeafP * 0.9)
-            let cy = soilY - 4 - sprout * 4
-            drawEllipseRotated(
-                context: &context,
-                cx: 35 - 5 * cotyP, cy: cy,
-                rx: 4 * cotyP, ry: 2.5 * cotyP,
-                rotationDeg: -25 + (1 - c) * 20,
-                fill: leafColor.opacity(cotyOp),
-                stroke: leafStroke.opacity(cotyOp),
-                strokeWidth: 0.8
-            )
-            drawEllipseRotated(
-                context: &context,
-                cx: 35 + 5 * cotyP, cy: cy,
-                rx: 4 * cotyP, ry: 2.5 * cotyP,
-                rotationDeg: 25 - (1 - c) * 20,
-                fill: leafColor.opacity(cotyOp),
-                stroke: leafStroke.opacity(cotyOp),
-                strokeWidth: 0.8
-            )
-        }
-
-        // --- True leaves (species-specific) ---
-        if trueLeafP > 0.1 {
-            drawTrueLeaves(
-                context: &context,
-                species: species, stemP: stemP, stemH: stemH,
-                stemTipX: stemTipX, soilY: soilY, care: c,
-                leafColor: leafColor, leafStroke: leafStroke
-            )
-        }
-
-        // --- Bud phase ---
-        if budP > 0.1 && bloomP < 0.9 {
-            let budOp = max(0, 1 - bloomP)
-            drawEllipseRotated(
-                context: &context,
-                cx: stemTipX, cy: stemTopY + 2,
-                rx: 3 + budP * 2, ry: 5 + budP * 3,
-                rotationDeg: 0,
-                fill: wiltColor(pal.leaf, care: c).opacity(budOp),
-                stroke: leafStroke.opacity(budOp),
-                strokeWidth: 0.8
-            )
-            drawEllipseRotated(
-                context: &context,
-                cx: stemTipX, cy: stemTopY - 1,
-                rx: 1.5 + budP, ry: 2 + budP,
-                rotationDeg: 0,
-                fill: wiltColor(pal.flower, care: c * 0.7).opacity(budP * budOp),
-                stroke: leafStroke.opacity(budP * budOp),
-                strokeWidth: 0.5
-            )
-        }
-
-        // --- Bloom (species-specific) ---
-        if bloomP > 0.1 {
-            drawBloom(
-                context: &context,
-                species: species, bloomP: bloomP,
-                stemTipX: stemTipX, stemTopY: stemTopY, care: c,
-                flowerColor: flowerColor, centerColor: centerColor, pal: pal
-            )
-        }
-
-        // --- Wilt: fallen leaves ---
-        if c < 0.45 && trueLeafP > 0.5 {
-            let fallenOp = (1 - c) * 0.9
-            let fallenColor = wiltColor(Color(hex: "#6B4A30"), care: c).opacity(fallenOp)
-            let strokeColor = Color(hex: "#3F2A1C").opacity(fallenOp)
-            let positions: [(Double, Double, Double)] = [(14, 118, 40), (52, 122, -30), (22, 128, 10)]
-            for (x, y, r) in positions {
-                var leaf = Path()
-                leaf.move(to: CGPoint(x: x, y: y))
-                leaf.addQuadCurve(to: CGPoint(x: x - 6, y: y - 3), control: CGPoint(x: x - 3, y: y - 4))
-                leaf.addQuadCurve(to: CGPoint(x: x, y: y), control: CGPoint(x: x - 3, y: y + 1))
-                leaf.closeSubpath()
-                let t = CGAffineTransform(translationX: -x, y: -y)
-                    .concatenating(CGAffineTransform(rotationAngle: r * .pi / 180))
-                    .concatenating(CGAffineTransform(translationX: x, y: y))
-                let rotated = leaf.applying(t)
-                context.fill(rotated, with: .color(fallenColor))
-                context.stroke(rotated, with: .color(strokeColor), lineWidth: 0.5)
-            }
-        }
-
-        // --- Withered stump ---
-        if g > 0.3 && c < 0.08 {
-            var stump = Path()
-            stump.move(to: CGPoint(x: 35, y: soilY))
-            stump.addLine(to: CGPoint(x: 38, y: soilY - 10))
-            context.stroke(
-                stump,
-                with: .color(Color(hex: "#6B4A30").opacity(0.8)),
-                style: StrokeStyle(lineWidth: 1.5, lineCap: .round)
-            )
-        }
-    }
-
-    // ----- Leaves per species -----
-
-    private func drawTrueLeaves(
-        context: inout GraphicsContext,
-        species: Practice, stemP: Double, stemH: Double, stemTipX: Double, soilY: Double,
-        care c: Double, leafColor: Color, leafStroke: Color
-    ) {
-        switch species {
-        case .journal: // vine: 5 alternating leaves
-            for i in 0..<5 {
-                let leafT = Double(i + 1) / 5.0
-                let show = smoothstep(stemP, leafT * 0.6, leafT * 0.6 + 0.25)
-                if show < 0.02 { continue }
-                let ty = soilY - stemH * leafT
-                let tx = 35 + (stemTipX - 35) * (leafT * leafT)
-                let side: Double = i % 2 == 0 ? -1 : 1
-                drawLeafShape(
-                    context: &context,
-                    base: CGPoint(x: tx, y: ty),
-                    angle: side * (40 + (1 - c) * 30),
-                    length: 9 + show * 6,
-                    curl: 0.3,
-                    care: c,
-                    fill: leafColor.opacity(show),
-                    stroke: leafStroke.opacity(show)
-                )
-            }
-        case .mood: // daisy: 3 leaves curl=0.25
-            for i in 0..<3 {
-                let leafT = 0.2 + Double(i) * 0.25
-                let show = smoothstep(stemP, leafT + 0.1, leafT + 0.35)
-                if show < 0.02 { continue }
-                let ty = soilY - stemH * leafT
-                let tx = 35 + (stemTipX - 35) * leafT * leafT
-                let side: Double = i % 2 == 0 ? -1 : 1
-                drawLeafShape(
-                    context: &context,
-                    base: CGPoint(x: tx, y: ty),
-                    angle: side * (55 + (1 - c) * 25),
-                    length: 8 + show * 4,
-                    curl: 0.25,
-                    care: c,
-                    fill: leafColor.opacity(show),
-                    stroke: leafStroke.opacity(show)
-                )
-            }
-        case .gratitude: // sunflower: 3 leaves curl=0.45
-            for i in 0..<3 {
-                let leafT = 0.25 + Double(i) * 0.22
-                let show = smoothstep(stemP, leafT + 0.05, leafT + 0.3)
-                if show < 0.02 { continue }
-                let ty = soilY - stemH * leafT
-                let tx = 35 + (stemTipX - 35) * leafT * leafT
-                let side: Double = i % 2 == 0 ? -1 : 1
-                drawLeafShape(
-                    context: &context,
-                    base: CGPoint(x: tx, y: ty),
-                    angle: side * (35 + (1 - c) * 30),
-                    length: 10 + show * 6,
-                    curl: 0.45,
-                    care: c,
-                    fill: leafColor.opacity(show),
-                    stroke: leafStroke.opacity(show)
-                )
-            }
-        case .breathing: // lavender: paired narrow leaves curl=0.15
-            for i in 0..<2 {
-                let leafT = 0.2 + Double(i) * 0.2
-                let show = smoothstep(stemP, leafT + 0.05, leafT + 0.3)
-                if show < 0.02 { continue }
-                let ty = soilY - stemH * leafT
-                let tx = 35 + (stemTipX - 35) * leafT * leafT
-                drawLeafShape(
-                    context: &context,
-                    base: CGPoint(x: tx - 2, y: ty),
-                    angle: -70 + (1 - c) * 30,
-                    length: 7 + show * 3, curl: 0.15, care: c,
-                    fill: leafColor.opacity(show), stroke: leafStroke.opacity(show)
-                )
-                drawLeafShape(
-                    context: &context,
-                    base: CGPoint(x: tx + 2, y: ty),
-                    angle: -110 - (1 - c) * 30,
-                    length: 7 + show * 3, curl: 0.15, care: c,
-                    fill: leafColor.opacity(show), stroke: leafStroke.opacity(show)
-                )
-            }
-        }
-    }
-
-    // ----- Bloom per species -----
-
-    private func drawBloom(
-        context: inout GraphicsContext,
-        species: Practice, bloomP: Double, stemTipX: Double, stemTopY: Double,
-        care c: Double, flowerColor: Color, centerColor: Color,
-        pal: SpeciesPalette
-    ) {
-        switch species {
-        case .journal: // vine: small circle + secondary bud
-            var main = Path()
-            let r1 = 4 * bloomP * (0.7 + c * 0.3)
-            main.addEllipse(in: CGRect(x: stemTipX - r1, y: stemTopY - 2 - r1, width: r1 * 2, height: r1 * 2))
-            context.fill(main, with: .color(flowerColor.opacity(bloomP)))
-            context.stroke(main, with: .color(centerColor.opacity(bloomP)), lineWidth: 1)
-            if bloomP > 0.4 {
-                var bud = Path()
-                let r2 = 2.5 * bloomP
-                bud.addEllipse(in: CGRect(x: stemTipX - 6 - r2, y: stemTopY + 10 - r2, width: r2 * 2, height: r2 * 2))
-                context.fill(bud, with: .color(flowerColor.opacity(0.8 * bloomP)))
-                context.stroke(bud, with: .color(centerColor.opacity(0.8 * bloomP)), lineWidth: 0.8)
-            }
-        case .mood: // daisy: 8 petals + center + fallen petals
-            let petalStrokeColor = pal.petalStroke ?? Color(hex: "#B06B8A")
-            let angles: [Double] = [0, 45, 90, 135, 180, 225, 270, 315]
-            let cx = stemTipX
-            let cy = stemTopY - 4
-            for a in angles {
-                let ar = a * .pi / 180
-                let wilt = (1 - c) * (0.4 + 0.4 * sin(ar))
-                let px = cos(ar) * 8 * bloomP
-                let py = sin(ar) * 8 * bloomP + wilt * 6
-                let rx = 6 * bloomP * (0.7 + c * 0.3)
-                let ry = 3.5 * bloomP
-                drawEllipseRotated(
-                    context: &context,
-                    cx: cx + px, cy: cy + py,
-                    rx: rx, ry: ry,
-                    rotationDeg: a,
-                    fill: flowerColor.opacity(bloomP * (0.4 + c * 0.6)),
-                    stroke: petalStrokeColor.opacity(bloomP * (0.4 + c * 0.6)),
-                    strokeWidth: 0.8
-                )
-            }
-            var center = Path()
-            let cr = 4 * bloomP
-            center.addEllipse(in: CGRect(x: cx - cr, y: cy - cr, width: cr * 2, height: cr * 2))
-            context.fill(center, with: .color(centerColor.opacity(bloomP)))
-            context.stroke(center, with: .color(Color(hex: "#D4A55A").opacity(bloomP)), lineWidth: 0.8)
-            // Fallen petals
-            if c < 0.5 && bloomP > 0.5 {
-                let fallenOp = (1 - c) * 0.7
-                let fallen: [(Double, Double, Double)] = [(-14, 14, 30), (12, 18, -20), (-8, 22, 60)]
-                for (dx, dy, r) in fallen {
-                    drawEllipseRotated(
-                        context: &context,
-                        cx: cx + dx, cy: cy + dy,
-                        rx: 5, ry: 3, rotationDeg: r,
-                        fill: flowerColor.opacity(fallenOp),
-                        stroke: petalStrokeColor.opacity(fallenOp),
-                        strokeWidth: 0.6
-                    )
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    RoundedRectangle(cornerRadius: 999)
+                        .fill(Color(hex: "#E8E4D5"))
+                    RoundedRectangle(cornerRadius: 999)
+                        .fill(LinearGradient(
+                            colors: [Color(hex: "#A8C5A0"), Color(hex: "#A8D4E6")],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        ))
+                        .frame(width: max(12, geo.size.width * vm.xpProgress))
                 }
             }
-        case .gratitude: // sunflower: 12 petals with head droop + seed dots
-            let petalStrokeColor = pal.petalStroke ?? Color(hex: "#C99520")
-            let cx = stemTipX
-            let cy = stemTopY - 2
-            let headDroop = (1 - c) * 55 * .pi / 180
-            let angles: [Double] = [0, 30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330]
-            for a in angles {
-                let ar = a * .pi / 180
-                let baseX = cos(ar) * 11 * bloomP
-                let baseY = sin(ar) * 11 * bloomP
-                // Apply head-droop rotation around (0,0) then translate
-                let rotX = baseX * cos(headDroop) - baseY * sin(headDroop)
-                let rotY = baseX * sin(headDroop) + baseY * cos(headDroop)
-                let rx = 6 * bloomP * (0.6 + c * 0.4)
-                let ry = 3.5 * bloomP
-                drawEllipseRotated(
-                    context: &context,
-                    cx: cx + rotX, cy: cy + rotY,
-                    rx: rx, ry: ry,
-                    rotationDeg: a + (1 - c) * 55,
-                    fill: flowerColor.opacity(bloomP * (0.3 + c * 0.7)),
-                    stroke: petalStrokeColor.opacity(bloomP * (0.3 + c * 0.7)),
-                    strokeWidth: 0.8
-                )
-            }
-            var center = Path()
-            let cr = 6.5 * bloomP
-            center.addEllipse(in: CGRect(x: cx - cr, y: cy - cr, width: cr * 2, height: cr * 2))
-            context.fill(center, with: .color(centerColor.opacity(bloomP)))
-            context.stroke(center, with: .color(Color(hex: "#3F2A1C").opacity(bloomP)), lineWidth: 1)
-            if bloomP > 0.6 {
-                let dotAngles: [Double] = [0, 60, 120, 180, 240, 300]
-                for a in dotAngles {
-                    let ar = a * .pi / 180
-                    let dx = cos(ar) * 3
-                    let dy = sin(ar) * 3
-                    var dot = Path()
-                    dot.addEllipse(in: CGRect(x: cx + dx - 0.6, y: cy + dy - 0.6, width: 1.2, height: 1.2))
-                    context.fill(dot, with: .color(Color(hex: "#3F2A1C").opacity(0.5 * bloomP)))
-                }
-            }
-        case .breathing: // lavender: 5 ascending floret pairs + fallen florets
-            for i in 0..<5 {
-                let t = Double(i) / 5.0
-                let show = smoothstep(bloomP, t * 0.4, t * 0.4 + 0.4)
-                if show < 0.02 { continue }
-                let sy = stemTopY + 6 - Double(i) * 5
-                let sx = stemTipX + (1 - c) * Double(i) * 1.2
-                var left = Path()
-                left.addEllipse(in: CGRect(x: sx - 2.5 - 2.3, y: sy - 3.5, width: 4.6, height: 7))
-                context.fill(left, with: .color(flowerColor.opacity(show)))
-                context.stroke(left, with: .color(centerColor.opacity(show)), lineWidth: 0.7)
-                var right = Path()
-                right.addEllipse(in: CGRect(x: sx + 2.5 - 2.3, y: sy - 3.5, width: 4.6, height: 7))
-                context.fill(right, with: .color(flowerColor.opacity(show)))
-                context.stroke(right, with: .color(centerColor.opacity(show)), lineWidth: 0.7)
-            }
-            if c < 0.4 {
-                let fallenOp = (1 - c) * 0.8
-                let fallen: [(Double, Double)] = [(-12, 30), (10, 40), (-4, 34)]
-                for (dx, dy) in fallen {
-                    var f = Path()
-                    f.addEllipse(in: CGRect(x: stemTipX + dx - 2, y: stemTopY + dy - 3, width: 4, height: 6))
-                    context.fill(f, with: .color(flowerColor.opacity(fallenOp)))
-                    context.stroke(f, with: .color(centerColor.opacity(fallenOp)), lineWidth: 0.5)
-                }
-            }
+            .frame(height: 12)
         }
-    }
-
-    // ----- Shared drawing helpers -----
-
-    private func drawLeafShape(
-        context: inout GraphicsContext,
-        base: CGPoint, angle: Double, length: Double, curl: Double, care c: Double,
-        fill: Color, stroke: Color
-    ) {
-        let droop = (1 - c) * 35 * (angle >= 0 ? 1 : -1)
-        let a = angle + droop
-        let rad = a * .pi / 180
-        let tip = CGPoint(x: base.x + cos(rad) * length, y: base.y + sin(rad) * length)
-        let perpX = -sin(rad); let perpY = cos(rad)
-        let mid = CGPoint(x: base.x + cos(rad) * length * 0.5, y: base.y + sin(rad) * length * 0.5)
-        let c1 = CGPoint(x: mid.x + perpX * length * curl, y: mid.y + perpY * length * curl)
-        let c2 = CGPoint(x: mid.x - perpX * length * curl, y: mid.y - perpY * length * curl)
-        var leaf = Path()
-        leaf.move(to: base)
-        leaf.addQuadCurve(to: tip, control: c1)
-        leaf.addQuadCurve(to: base, control: c2)
-        leaf.closeSubpath()
-        context.fill(leaf, with: .color(fill))
-        context.stroke(leaf, with: .color(stroke), style: StrokeStyle(lineWidth: 1, lineJoin: .round))
-    }
-
-    private func drawEllipseRotated(
-        context: inout GraphicsContext,
-        cx: Double, cy: Double, rx: Double, ry: Double, rotationDeg: Double,
-        fill: Color, stroke: Color, strokeWidth: Double
-    ) {
-        var path = Path()
-        path.addEllipse(in: CGRect(x: -rx, y: -ry, width: rx * 2, height: ry * 2))
-        let t = CGAffineTransform(rotationAngle: rotationDeg * .pi / 180)
-            .concatenating(CGAffineTransform(translationX: cx, y: cy))
-        let transformed = path.applying(t)
-        context.fill(transformed, with: .color(fill))
-        if strokeWidth > 0 {
-            context.stroke(transformed, with: .color(stroke), lineWidth: strokeWidth)
-        }
-    }
-
-    // ----- Math helpers -----
-
-    private func smoothstep(_ t: Double, _ a: Double, _ b: Double) -> Double {
-        let x = max(0, min(1, (t - a) / (b - a)))
-        return x * x * (3 - 2 * x)
-    }
-
-    private func wiltColor(_ healthy: Color, care: Double) -> Color {
-        guard let rgb = healthy.rgbComponents() else { return healthy }
-        let (r1, g1, b1) = rgb
-        let r2: Double = 156.0 / 255.0
-        let g2: Double = 124.0 / 255.0
-        let b2: Double = 80.0 / 255.0
-        let t = 1 - care
-        return Color(
-            red: r1 * (1 - t) + r2 * t,
-            green: g1 * (1 - t) + g2 * t,
-            blue: b1 * (1 - t) + b2 * t
+        .padding(20)
+        .background(DinoTheme.surfacePrimary)
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(DinoTheme.cardBorder, lineWidth: 1)
         )
-    }
-
-    // ----- Palette -----
-
-    private struct SpeciesPalette {
-        let leaf: Color
-        let leafDark: Color
-        let flower: Color
-        let center: Color
-        let petalStroke: Color?
-    }
-
-    private func palette(for species: Practice) -> SpeciesPalette {
-        switch species {
-        case .journal:
-            return SpeciesPalette(
-                leaf: Color(hex: "#6BAA7C"), leafDark: Color(hex: "#3F6B50"),
-                flower: Color(hex: "#F5D28A"), center: Color(hex: "#D4A55A"),
-                petalStroke: nil
-            )
-        case .mood:
-            return SpeciesPalette(
-                leaf: Color(hex: "#7BBC8C"), leafDark: Color(hex: "#3F6B50"),
-                flower: Color(hex: "#E8B4B8"), center: Color(hex: "#F5D28A"),
-                petalStroke: Color(hex: "#B06B8A")
-            )
-        case .gratitude:
-            return SpeciesPalette(
-                leaf: Color(hex: "#8BC8A0"), leafDark: Color(hex: "#3F6B50"),
-                flower: Color(hex: "#F5C84F"), center: Color(hex: "#8B5A2B"),
-                petalStroke: Color(hex: "#C99520")
-            )
-        case .breathing:
-            return SpeciesPalette(
-                leaf: Color(hex: "#7BBC8C"), leafDark: Color(hex: "#3F6B50"),
-                flower: Color(hex: "#B4A4C8"), center: Color(hex: "#7B6BA0"),
-                petalStroke: nil
-            )
-        }
+        .shadow(color: DinoTheme.shadowColor, radius: 12, x: 0, y: 4)
     }
 }
-
-// MARK: - Color RGB helper
-
-private extension Color {
-    /// Returns (r, g, b) in 0..1, or nil if not resolvable.
-    func rgbComponents() -> (Double, Double, Double)? {
-        #if canImport(UIKit)
-        let ui = UIColor(self)
-        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
-        guard ui.getRed(&r, green: &g, blue: &b, alpha: &a) else { return nil }
-        return (Double(r), Double(g), Double(b))
-        #else
-        return nil
-        #endif
-    }
-}
-
