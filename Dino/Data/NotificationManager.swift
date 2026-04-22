@@ -93,29 +93,16 @@ class NotificationManager: ObservableObject {
         if dailyCheckInEnabled { scheduleDailyCheckIn() }
         if streakReminderEnabled { scheduleStreakReminder() }
         if windDownEnabled { scheduleWindDown() }
-
-        // Wind-down with user-configurable time + routines (separate identifier)
-        rescheduleWindDown()
     }
 
     // MARK: - Wind-down (configurable — routines + custom time)
 
-    private let windDownConfigurableMessages: [String] = [
-        "time to wind down gently",
-        "the day is softening — so can you",
-        "a quiet moment is waiting for you",
-        "let today settle with care",
-        "close the day kindly",
-        "rest is a practice too",
-        "breathe, write, be — then sleep"
-    ]
-
-    /// Schedule the configurable wind-down reminder driven by @AppStorage keys:
-    /// `wind_down_enabled`, `wind_down_time`, and routine toggles.
-    /// Separate from the legacy `wind_down` identifier above — uses `winddown.daily`.
+    /// Called from WindDownView when user changes wind-down settings.
     func rescheduleWindDown() {
         let center = UNUserNotificationCenter.current()
         center.removePendingNotificationRequests(withIdentifiers: ["winddown.daily"])
+
+        guard hasPermission && notificationsEnabled else { return }
 
         let ud = UserDefaults.standard
         let enabled = ud.bool(forKey: "wind_down_enabled")
@@ -124,27 +111,7 @@ class NotificationManager: ObservableObject {
             return
         }
 
-        // Permission — request if not determined, mirror existing pattern.
-        center.getNotificationSettings { settings in
-            Task { @MainActor in
-                switch settings.authorizationStatus {
-                case .authorized, .provisional, .ephemeral:
-                    self.scheduleConfigurableWindDown()
-                case .notDetermined:
-                    let granted = await self.requestPermission()
-                    if granted { self.scheduleConfigurableWindDown() }
-                default:
-                    print("[Notifications] wind-down (configurable) skipped — no permission")
-                }
-            }
-        }
-    }
-
-    private func scheduleConfigurableWindDown() {
-        let ud = UserDefaults.standard
         let interval = ud.double(forKey: "wind_down_time")
-
-        // Determine reminder time — default 9:30pm if never set.
         var hour = 21
         var minute = 30
         if interval != 0 {
@@ -155,7 +122,6 @@ class NotificationManager: ObservableObject {
         }
 
         var routines: [String] = []
-        // Default to true when keys don't exist yet
         let breathing = ud.object(forKey: "wind_down_breathing") as? Bool ?? true
         let journal   = ud.object(forKey: "wind_down_journal") as? Bool ?? true
         let gratitude = ud.object(forKey: "wind_down_gratitude") as? Bool ?? true
@@ -163,8 +129,16 @@ class NotificationManager: ObservableObject {
         if journal { routines.append("journal") }
         if gratitude { routines.append("gratitude") }
 
+        let messages = [
+            "time to wind down gently",
+            "the day is softening, so can you",
+            "a quiet moment is waiting for you",
+            "close the day kindly",
+            "rest is a practice too",
+        ]
+
         let content = UNMutableNotificationContent()
-        content.title = windDownConfigurableMessages.randomElement() ?? "wind down"
+        content.title = messages[Calendar.current.component(.dayOfYear, from: Date()) % messages.count]
         if !routines.isEmpty {
             content.body = "tonight: " + routines.joined(separator: " · ")
         }
@@ -201,7 +175,8 @@ class NotificationManager: ObservableObject {
     ]
 
     private func scheduleDailyCheckIn() {
-        let message = checkInMessages.randomElement() ?? checkInMessages[0]
+        let dayOfYear = Calendar.current.ordinality(of: .day, in: .year, for: Date()) ?? 0
+        let message = checkInMessages[dayOfYear % checkInMessages.count]
 
         var dateComponents = DateComponents()
         dateComponents.hour = checkInHour
@@ -236,7 +211,8 @@ class NotificationManager: ObservableObject {
     ]
 
     private func scheduleStreakReminder() {
-        let message = streakMessages.randomElement() ?? streakMessages[0]
+        let dayOfYear = Calendar.current.ordinality(of: .day, in: .year, for: Date()) ?? 0
+        let message = streakMessages[dayOfYear % streakMessages.count]
 
         // Schedule for 2 hours after check-in time as a fallback
         var dateComponents = DateComponents()
@@ -272,7 +248,8 @@ class NotificationManager: ObservableObject {
     ]
 
     private func scheduleWindDown() {
-        let message = windDownMessages.randomElement() ?? windDownMessages[0]
+        let dayOfYear = Calendar.current.ordinality(of: .day, in: .year, for: Date()) ?? 0
+        let message = windDownMessages[dayOfYear % windDownMessages.count]
 
         var dateComponents = DateComponents()
         dateComponents.hour = 21 // 9pm
@@ -315,6 +292,38 @@ class NotificationManager: ObservableObject {
                     self.rescheduleAll()
                     self.scheduleReEngagementIfNeeded()
                 }
+                self.debugPrintPending()
+            }
+        }
+    }
+
+    // MARK: - Test Notification
+
+    /// Send a test notification in 5 seconds to verify the system works.
+    func sendTestNotification() {
+        let content = UNMutableNotificationContent()
+        content.title = "dino is here"
+        content.body = "notifications are working perfectly"
+        content.sound = .default
+
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 5, repeats: false)
+        let request = UNNotificationRequest(identifier: "test_notification", content: content, trigger: trigger)
+
+        UNUserNotificationCenter.current().add(request) { error in
+            if let error = error {
+                print("[Notifications] test ERROR: \(error)")
+            } else {
+                print("[Notifications] test notification scheduled in 5s")
+            }
+        }
+    }
+
+    /// Debug: print all pending notifications
+    func debugPrintPending() {
+        UNUserNotificationCenter.current().getPendingNotificationRequests { requests in
+            print("[Notifications] \(requests.count) pending:")
+            for r in requests {
+                print("  - \(r.identifier): \(r.content.title) | trigger: \(String(describing: r.trigger))")
             }
         }
     }

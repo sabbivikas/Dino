@@ -88,6 +88,23 @@ struct SettingsView: View {
                             isOn: $notifManager.windDownEnabled
                         )
                     }
+                    // Test notification button
+                    Button {
+                        notifManager.sendTestNotification()
+                        notifManager.debugPrintPending()
+                    } label: {
+                        HStack {
+                            Image(systemName: "bell.badge")
+                                .foregroundColor(DinoTheme.accent)
+                            Text("send test notification")
+                                .font(DinoTheme.bodyFont())
+                                .foregroundColor(DinoTheme.textPrimary)
+                            Spacer()
+                            Text("5s")
+                                .font(DinoTheme.captionFont())
+                                .foregroundColor(DinoTheme.textSecondary)
+                        }
+                    }
                 } header: {
                     Text("notifications")
                         .font(DinoTheme.captionFont())
