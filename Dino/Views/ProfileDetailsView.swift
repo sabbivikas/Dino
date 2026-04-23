@@ -2,20 +2,48 @@ import SwiftUI
 import PhotosUI
 
 // MARK: - PhotoStore (internal — ProfileView also reads this)
+//
+// Per-user storage. Each user gets their own file:
+//   Documents/{uid}_profile_photo.jpg
+// and per-user UserDefaults flag:
+//   has_profile_photo_{uid}
+//
+// The current uid comes from SharedDataManager.shared.currentUserId.
+// If no uid is available (guest / pre-auth), we fall back to the legacy
+// shared path so existing single-user data keeps working until sign-in.
 
 struct PhotoStore {
-    private static let fileName = "profile_photo.jpg"
-    private static let hasPhotoKey = "has_profile_photo"
+    private static let legacyFileName = "profile_photo.jpg"
+    private static let legacyHasPhotoKey = "has_profile_photo"
 
-    private static var fileURL: URL? {
-        FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)
-            .first?
-            .appendingPathComponent(fileName)
+    @MainActor
+    private static var currentUID: String? {
+        SharedDataManager.shared.currentUserId
     }
 
+    @MainActor
+    private static func fileURL() -> URL? {
+        guard let docs = FileManager.default
+            .urls(for: .documentDirectory, in: .userDomainMask).first else { return nil }
+        if let uid = currentUID, !uid.isEmpty {
+            return docs.appendingPathComponent("\(uid)_profile_photo.jpg")
+        }
+        // Fallback: legacy shared path (no signed-in user)
+        return docs.appendingPathComponent(legacyFileName)
+    }
+
+    @MainActor
+    private static var hasPhotoKey: String {
+        if let uid = currentUID, !uid.isEmpty {
+            return "has_profile_photo_\(uid)"
+        }
+        return legacyHasPhotoKey
+    }
+
+    @MainActor
     @discardableResult
     static func save(image: UIImage) -> Bool {
-        guard let url = fileURL else { return false }
+        guard let url = fileURL() else { return false }
 
         // Scale to max 1024×1024 preserving aspect ratio
         let maxDim: CGFloat = 1024
@@ -39,16 +67,30 @@ struct PhotoStore {
         }
     }
 
+    @MainActor
     static func load() -> UIImage? {
         guard UserDefaults.standard.bool(forKey: hasPhotoKey),
-              let url = fileURL else { return nil }
+              let url = fileURL() else { return nil }
         return UIImage(contentsOfFile: url.path)
     }
 
+    @MainActor
     static func clear() {
-        guard let url = fileURL else { return }
+        guard let url = fileURL() else { return }
         try? FileManager.default.removeItem(at: url)
         UserDefaults.standard.set(false, forKey: hasPhotoKey)
+    }
+
+    /// Clear legacy shared artifacts left behind from pre-per-user builds.
+    /// Called from SharedDataManager.clearForSignOut so stale data doesn't
+    /// leak when a signed-out app is re-opened.
+    static func clearLegacyShared() {
+        if let docs = FileManager.default
+            .urls(for: .documentDirectory, in: .userDomainMask).first {
+            let legacyURL = docs.appendingPathComponent(legacyFileName)
+            try? FileManager.default.removeItem(at: legacyURL)
+        }
+        UserDefaults.standard.removeObject(forKey: legacyHasPhotoKey)
     }
 }
 
@@ -56,6 +98,7 @@ struct PhotoStore {
 
 struct ProfileDetailsView: View {
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject var dataManager: SharedDataManager
 
     @State private var name: String = ""
     @State private var bio: String = ""
@@ -294,9 +337,21 @@ struct ProfileDetailsView: View {
 
     // MARK: Actions
 
+    /// Per-user UserDefaults key for bio. Falls back to legacy shared key
+    /// if no signed-in user (guest) — keeps old data visible to a single user.
+    private var bioKey: String {
+        if let uid = dataManager.currentUserId, !uid.isEmpty {
+            return "user_bio_\(uid)"
+        }
+        return "user_bio"
+    }
+
     private func loadCurrent() {
-        name = UserDefaults.standard.string(forKey: "userName") ?? ""
-        bio = UserDefaults.standard.string(forKey: "user_bio") ?? ""
+        // Name lives on the namespaced SharedDataManager.userName — single source
+        // of truth. Avoids the old bug where ProfileDetailsView read the bare
+        // "userName" key which leaked across account switches.
+        name = dataManager.userName
+        bio = UserDefaults.standard.string(forKey: bioKey) ?? ""
         let loaded = PhotoStore.load()
         photoUIImage = loaded
         originalName = name
@@ -320,8 +375,10 @@ struct ProfileDetailsView: View {
     private func save() {
         // Persist
         let trimmedName = name.trimmingCharacters(in: .whitespaces)
-        UserDefaults.standard.set(trimmedName, forKey: "userName")
-        UserDefaults.standard.set(bio, forKey: "user_bio")
+        // Route through the data manager so its namespaced @Published key is
+        // updated (and cross-view observers refresh correctly).
+        dataManager.userName = trimmedName
+        UserDefaults.standard.set(bio, forKey: bioKey)
 
         if photoUIImage !== originalPhoto, let img = photoUIImage {
             _ = PhotoStore.save(image: img)
@@ -349,4 +406,5 @@ struct ProfileDetailsView: View {
 
 #Preview {
     ProfileDetailsView()
+        .environmentObject(SharedDataManager.shared)
 }

@@ -72,6 +72,7 @@ struct OnboardingView: View {
     @State private var selectedChallenge: String = ""
     @State private var selectedReferral: String = ""
     @State private var dinoNameInput: String = ""
+    @State private var showSettingsAlert: Bool = false
 
     private var totalSteps: Int { 9 }
 
@@ -126,6 +127,23 @@ struct OnboardingView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: OnboardingMaybeLaterNotifier.name)) { _ in
             advance()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: OnboardingShowSettingsAlertNotifier.name)) { _ in
+            showSettingsAlert = true
+        }
+        .alert("enable notifications", isPresented: $showSettingsAlert) {
+            Button("open settings") {
+                if let url = URL(string: UIApplication.openSettingsURLString) {
+                    UIApplication.shared.open(url)
+                }
+                // Advance past the notifications step regardless
+                advance()
+            }
+            Button("not now", role: .cancel) {
+                advance()
+            }
+        } message: {
+            Text("to enable notifications, go to Settings → Dino → Notifications and turn them on")
         }
     }
 
@@ -750,16 +768,26 @@ private struct StepNotificationsPage: View {
 
     private func requestNotifications() {
         Task {
-            let granted = await NotificationManager.shared.requestPermission()
+            let result = await NotificationManager.shared.requestPermissionDetailed()
             await MainActor.run {
                 permissionRequested = true
-                if granted {
+
+                if result.granted {
                     NotificationManager.shared.rescheduleAll()
                     NotificationManager.shared.scheduleReEngagementIfNeeded()
-                }
-                // Advance shortly after
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.9) {
-                    OnboardingMaybeLaterNotifier.fire()
+                    // Advance shortly after so the "reminders enabled!" state is visible
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.9) {
+                        OnboardingMaybeLaterNotifier.fire()
+                    }
+                } else if result.shouldShowSettingsAlert {
+                    // Previously denied — iOS won't re-prompt. Surface the Settings alert
+                    // on the parent OnboardingView. The alert's buttons advance the flow.
+                    OnboardingShowSettingsAlertNotifier.fire()
+                } else {
+                    // Fresh denial — treat as "maybe later" and advance.
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.9) {
+                        OnboardingMaybeLaterNotifier.fire()
+                    }
                 }
             }
         }
@@ -768,6 +796,13 @@ private struct StepNotificationsPage: View {
 
 private enum OnboardingMaybeLaterNotifier {
     static let name = Notification.Name("DinoOnboardingMaybeLaterTap")
+    static func fire() {
+        NotificationCenter.default.post(name: Self.name, object: nil)
+    }
+}
+
+private enum OnboardingShowSettingsAlertNotifier {
+    static let name = Notification.Name("DinoOnboardingShowSettingsAlert")
     static func fire() {
         NotificationCenter.default.post(name: Self.name, object: nil)
     }

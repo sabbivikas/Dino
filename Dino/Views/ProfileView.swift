@@ -84,8 +84,9 @@ struct ProfileView: View {
     // MARK: Derived values
 
     private var firstName: String {
-        let name = UserDefaults.standard.string(forKey: "userName") ?? ""
-        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        // Read from SharedDataManager (per-user, namespaced) rather than the
+        // bare UserDefaults "userName" key, which used to bleed across accounts.
+        let trimmed = dataManager.userName.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed.isEmpty { return "friend" }
         return trimmed.split(separator: " ").first.map(String.init) ?? "friend"
     }
@@ -201,7 +202,7 @@ struct ProfileView: View {
             case .resources:     ResourcesView()
             case .gratitudeJar:  GratitudeJarView().environmentObject(dataManager)
             case .growth:        NavigationStack { GrowthView().environmentObject(dataManager) }
-            case .profileDetails: ProfileDetailsView()
+            case .profileDetails: ProfileDetailsView().environmentObject(dataManager)
             case .gentleReminders:
                 SettingsView().environmentObject(dataManager)
             case .windDown:      WindDownView()

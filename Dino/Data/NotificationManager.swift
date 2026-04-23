@@ -49,17 +49,48 @@ class NotificationManager: ObservableObject {
 
     // MARK: - Permission
 
-    func requestPermission() async -> Bool {
-        do {
-            let granted = try await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound])
-            hasPermission = granted
-            print("[Notifications] permission: \(granted)")
-            if granted { rescheduleAll() }
-            return granted
-        } catch {
-            print("[Notifications] permission error: \(error)")
-            return false
+    /// Result of a permission request. `shouldShowSettingsAlert` is true when
+    /// the user previously denied — iOS will NOT re-prompt, so the caller
+    /// should surface a "go to Settings" alert instead.
+    struct PermissionResult {
+        let granted: Bool
+        let shouldShowSettingsAlert: Bool
+    }
+
+    /// Preferred permission request — distinguishes "freshly denied" from
+    /// "previously denied" so callers can route the latter to Settings.
+    func requestPermissionDetailed() async -> PermissionResult {
+        let settings = await UNUserNotificationCenter.current().notificationSettings()
+        switch settings.authorizationStatus {
+        case .notDetermined:
+            do {
+                let granted = try await UNUserNotificationCenter.current()
+                    .requestAuthorization(options: [.alert, .badge, .sound])
+                hasPermission = granted
+                print("[Notifications] permission (fresh prompt): \(granted)")
+                if granted { rescheduleAll() }
+                return PermissionResult(granted: granted, shouldShowSettingsAlert: false)
+            } catch {
+                print("[Notifications] permission error: \(error)")
+                return PermissionResult(granted: false, shouldShowSettingsAlert: false)
+            }
+        case .denied:
+            // iOS will NOT re-prompt — caller should show a Settings alert.
+            hasPermission = false
+            print("[Notifications] permission previously denied — need Settings alert")
+            return PermissionResult(granted: false, shouldShowSettingsAlert: true)
+        case .authorized, .provisional, .ephemeral:
+            hasPermission = true
+            rescheduleAll()
+            return PermissionResult(granted: true, shouldShowSettingsAlert: false)
+        @unknown default:
+            return PermissionResult(granted: false, shouldShowSettingsAlert: false)
         }
+    }
+
+    /// Back-compat wrapper for existing call sites that only care about granted/not.
+    func requestPermission() async -> Bool {
+        await requestPermissionDetailed().granted
     }
 
     func checkPermissionStatus() {

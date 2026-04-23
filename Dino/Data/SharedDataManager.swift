@@ -182,6 +182,17 @@ final class SharedDataManager: ObservableObject {
         currentUserId = nil
         isSignedIn = false
         clearInMemoryData()
+
+        // Clean up legacy SHARED keys/files written by older builds so they
+        // don't leak into the next signed-in session. These are the bare,
+        // un-namespaced keys that the old ProfileDetailsView / PhotoStore
+        // wrote before per-user storage was introduced. We leave the
+        // per-user `{uid}_...` copies alone so each user's data is intact.
+        let ud = UserDefaults.standard
+        ud.removeObject(forKey: "userName")
+        ud.removeObject(forKey: "user_bio")
+        // Legacy profile photo file + "has photo" flag
+        PhotoStore.clearLegacyShared()
     }
 
     /// Reload all persistent data from user-namespaced UserDefaults keys.
