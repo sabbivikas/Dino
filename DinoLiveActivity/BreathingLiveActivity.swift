@@ -2,7 +2,9 @@
 //  BreathingLiveActivity.swift
 //  DinoLiveActivity
 //
-//  Calm, emotional Live Activity for breathing sessions — lock screen & Dynamic Island.
+//  v6 redesign: sage meadow, dino holding a flower, breathing hoops, pattern pill.
+//  Lock-screen layout fits a 374x136 budget with ~16pt horizontal safe margins.
+//  Reduce Motion falls back to a static frame.
 //
 
 import ActivityKit
@@ -23,72 +25,37 @@ struct BreathingLiveActivity: Widget {
                 DynamicIslandExpandedRegion(.trailing) {
                     BreathingIslandTrailing(context: context)
                 }
+                DynamicIslandExpandedRegion(.center) {
+                    BreathingIslandCenter(context: context)
+                }
                 DynamicIslandExpandedRegion(.bottom) {
                     BreathingIslandBottom(context: context)
                 }
             } compactLeading: {
-                // Dino accent dot + phase
-                HStack(spacing: 4) {
-                    Circle()
-                        .fill(BreathingColors.accent)
-                        .frame(width: 8, height: 8)
-                    Text(compactPhaseText(context.state.phase))
-                        .font(.custom("DinoInitiativeFont-Regular", size: 12))
-                        .foregroundColor(.white)
-                        .contentTransition(.opacity)
-                }
+                Image("DinoFlower-cut")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 18, height: 18)
             } compactTrailing: {
-                Text(formatTime(context.state.secondsRemaining))
-                    .font(.system(size: 12, weight: .semibold, design: .rounded))
-                    .foregroundColor(BreathingColors.accent)
-                    .monospacedDigit()
+                Text("\(context.state.currentCycle)/\(context.state.totalCycles)")
+                    .font(.custom("DinoInitiativeFont-Regular", size: 18))
+                    .foregroundColor(DinoPalette.laInk)
             } minimal: {
                 ZStack {
                     Circle()
-                        .stroke(BreathingColors.accent.opacity(0.3), lineWidth: 2)
+                        .stroke(DinoPalette.laSageRing.opacity(0.3), lineWidth: 2)
                     Circle()
-                        .trim(from: 0, to: 1.0 - context.state.progress)
-                        .stroke(BreathingColors.accent, style: StrokeStyle(lineWidth: 2, lineCap: .round))
+                        .trim(from: 0, to: max(0.0, min(1.0, context.state.progress)))
+                        .stroke(DinoPalette.laSageRing, style: StrokeStyle(lineWidth: 2, lineCap: .round))
                         .rotationEffect(.degrees(-90))
                 }
-                .padding(2)
+                .frame(width: 14, height: 14)
             }
         }
     }
-
-    private func compactPhaseText(_ phase: String) -> String {
-        switch phase {
-        case "Inhale": return "inhale"
-        case "Hold":   return "hold"
-        case "Exhale": return "exhale"
-        default:       return "breathe"
-        }
-    }
-
-    private func formatTime(_ seconds: Int) -> String {
-        let m = seconds / 60
-        let s = seconds % 60
-        return String(format: "%d:%02d", m, s)
-    }
 }
 
-// MARK: - Theme-aware colors
-
-private struct BreathingColors {
-    private static var theme: WidgetTheme { WidgetTheme.current }
-
-    static var accent: Color { theme.accent }
-    static var textPrimary: Color { .white }
-    static var textSecondary: Color { .white.opacity(0.7) }
-    static var textMuted: Color { .white.opacity(0.5) }
-    static var surfaceTint: Color { theme.accent.opacity(0.15) }
-
-    static var backgroundGradient: [Color] {
-        [theme.background.opacity(0.95), theme.accent.opacity(0.3)]
-    }
-}
-
-// MARK: - Calming text
+// MARK: - Helpers
 
 private func phaseDisplayText(_ phase: String) -> String {
     switch phase {
@@ -99,192 +66,148 @@ private func phaseDisplayText(_ phase: String) -> String {
     }
 }
 
-private func phaseSubtext(_ phase: String, isPaused: Bool) -> String {
-    if isPaused {
-        return "take your time"
-    }
+private func phaseCueText(_ phase: String, isPaused: Bool) -> String {
+    if isPaused { return "take your time" }
     switch phase {
-    case "Inhale": return "let it in slowly"
+    case "Inhale": return "smell the flowers"
     case "Hold":   return "hold the calm"
     case "Exhale": return "release and let go"
-    default:       return "just breathe"
+    default:       return "breathe with dino"
     }
 }
 
-private func formatTime(_ seconds: Int) -> String {
-    let m = seconds / 60
-    let s = seconds % 60
+private func formatBreathingTime(_ seconds: Int) -> String {
+    let clamped = max(0, seconds)
+    let m = clamped / 60
+    let s = clamped % 60
     return String(format: "%d:%02d", m, s)
 }
 
-// MARK: - Lock Screen View
+private func patternText(_ sessionType: String) -> String {
+    // "4-7-8" -> "4 · 7 · 8 rhythm"
+    let parts = sessionType.split(separator: "-")
+    guard !parts.isEmpty else { return "\(sessionType) rhythm" }
+    return parts.joined(separator: " · ") + " rhythm"
+}
+
+// MARK: - Pattern Pill
+
+private struct PatternPill: View {
+    let sessionType: String
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Circle()
+                .fill(DinoPalette.laCuePeach)
+                .frame(width: 6, height: 6)
+            Text(patternText(sessionType))
+                .font(.custom("DinoInitiativeFont-Regular", size: 12))
+                .foregroundColor(DinoPalette.laInk)
+                .lineLimit(1)
+        }
+        .padding(.vertical, 4)
+        .padding(.horizontal, 10)
+        .background(Color.white)
+        .overlay(
+            RoundedRectangle(cornerRadius: 999)
+                .stroke(Color(hex: "#11402D").opacity(0.12), lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 999))
+    }
+}
+
+// MARK: - Dino w/ sway
+
+private struct DinoBreathingMascot: View {
+    var size: CGFloat = 112
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var swaying: Bool = false
+
+    var body: some View {
+        Image("DinoFlower-cut")
+            .resizable()
+            .scaledToFit()
+            .frame(width: size, height: size)
+            .shadow(color: Color(hex: "#11402D").opacity(0.18), radius: 2, x: 0, y: 2)
+            .rotationEffect(.degrees(reduceMotion ? 0 : (swaying ? 1.4 : -1.4)))
+            .offset(y: reduceMotion ? 0 : (swaying ? -3 : 0))
+            .onAppear {
+                guard !reduceMotion else { return }
+                withAnimation(.easeInOut(duration: 5.2).repeatForever(autoreverses: true)) {
+                    swaying = true
+                }
+            }
+    }
+}
+
+// MARK: - Lock Screen
 
 struct BreathingLockScreenView: View {
     let context: ActivityViewContext<BreathingActivityAttributes>
 
     var body: some View {
-        let isComplete = context.state.secondsRemaining <= 0 && !context.state.isPaused
+        ZStack {
+            MeadowBackground()
 
-        HStack(spacing: 16) {
-            // Left: breathing ring with dino dot
-            breathingRing
+            HStack(alignment: .center, spacing: 12) {
+                // Left column: hoops + dino
+                ZStack {
+                    BreathingHoops()
+                    DinoBreathingMascot(size: 112)
+                }
+                .frame(width: 112, height: 112)
 
-            // Center: phase text + calming subtext
-            VStack(alignment: .leading, spacing: 4) {
-                if isComplete {
-                    Text("✓")
-                        .font(.system(size: 24, weight: .semibold, design: .rounded))
-                        .foregroundColor(BreathingColors.accent)
-                    Text("you did it 🦕")
-                        .font(.custom("DinoInitiativeFont-Regular", size: 20))
-                        .foregroundColor(BreathingColors.textPrimary)
-                    Text("feel the calm")
-                        .font(.custom("DinoInitiativeFont-Regular", size: 13))
-                        .foregroundColor(BreathingColors.textSecondary)
-                } else {
-                    Group {
-                        Text(phaseDisplayText(context.state.phase))
-                            .font(.custom("DinoInitiativeFont-Regular", size: 22))
-                            .foregroundColor(BreathingColors.textPrimary)
+                // Center: text
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(phaseDisplayText(context.state.phase))
+                        .font(.custom("DinoInitiativeFont-Regular", size: 34))
+                        .kerning(-0.5)
+                        .foregroundColor(DinoPalette.laInk)
+                        .lineLimit(1)
 
-                        Text(phaseSubtext(context.state.phase, isPaused: context.state.isPaused))
-                            .font(.custom("DinoInitiativeFont-Regular", size: 13))
-                            .foregroundColor(BreathingColors.textSecondary)
-                            .lineLimit(1)
-                    }
-                    .id(context.state.phase)
-                    .transition(.opacity.combined(with: .scale(0.95)))
-                    .animation(.easeInOut(duration: 0.4), value: context.state.phase)
+                    Text(phaseCueText(context.state.phase, isPaused: context.state.isPaused))
+                        .font(.system(.callout))
+                        .foregroundColor(DinoPalette.laCueText.opacity(0.9))
+                        .lineLimit(1)
+
+                    PatternPill(sessionType: context.attributes.sessionType)
+                        .padding(.top, 2)
+                }
+
+                Spacer(minLength: 4)
+
+                // Right: timer + cycle dots
+                VStack(alignment: .trailing, spacing: 6) {
+                    Text(formatBreathingTime(context.state.secondsRemaining))
+                        .font(.system(size: 30, weight: .semibold, design: .rounded))
+                        .foregroundColor(DinoPalette.laInk)
+                        .monospacedDigit()
+
+                    CycleDotsRow(total: context.state.totalCycles, current: context.state.currentCycle)
                 }
             }
-
-            Spacer()
-
-            // Right: timer
-            VStack(alignment: .trailing, spacing: 4) {
-                Text(formatTime(context.state.secondsRemaining))
-                    .font(.system(size: 24, weight: .bold, design: .rounded))
-                    .foregroundColor(BreathingColors.textPrimary)
-                    .monospacedDigit()
-
-                Text("cycle \(context.state.currentCycle)/\(context.state.totalCycles)")
-                    .font(.custom("DinoInitiativeFont-Regular", size: 11))
-                    .foregroundColor(BreathingColors.textMuted)
-            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
         }
-        .padding(18)
-        .background(
-            ZStack {
-                LinearGradient(
-                    colors: BreathingColors.backgroundGradient,
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-
-                // Subtle breathing glow behind the ring
-                Circle()
-                    .fill(BreathingColors.accent.opacity(context.state.isPaused ? 0.05 : 0.1))
-                    .frame(width: 120, height: 120)
-                    .blur(radius: 40)
-                    .offset(x: -80, y: 0)
-            }
-        )
-    }
-
-    private var breathingRing: some View {
-        ZStack {
-            // Outer glow ring — pulses with phase
-            Circle()
-                .fill(BreathingColors.accent.opacity(outerGlowOpacity))
-                .frame(width: 62, height: 62)
-                .animation(.easeInOut(duration: 0.6), value: context.state.phase)
-
-            // Track ring
-            Circle()
-                .stroke(BreathingColors.accent.opacity(0.2), lineWidth: 3)
-                .frame(width: 52, height: 52)
-
-            // Progress ring — fills 0.0 → 1.0
-            Circle()
-                .trim(from: 0, to: 1.0 - context.state.progress)
-                .stroke(
-                    BreathingColors.accent,
-                    style: StrokeStyle(lineWidth: 3, lineCap: .round)
-                )
-                .frame(width: 52, height: 52)
-                .rotationEffect(.degrees(-90))
-
-            // Inner breathing circle — smooth phase transitions
-            Circle()
-                .fill(BreathingColors.accent.opacity(0.25))
-                .frame(width: breathCircleSize, height: breathCircleSize)
-                .animation(.easeInOut(duration: 0.6), value: context.state.phase)
-
-            // Dino dot
-            Circle()
-                .fill(BreathingColors.accent)
-                .frame(width: 10, height: 10)
-        }
-    }
-
-    private var outerGlowOpacity: Double {
-        switch context.state.phase {
-        case "Inhale": return 0.14
-        case "Hold":   return 0.10
-        case "Exhale": return 0.06
-        default:       return 0.08
-        }
-    }
-
-    private var breathCircleSize: CGFloat {
-        switch context.state.phase {
-        case "Inhale": return 28
-        case "Hold":   return 30
-        case "Exhale": return 16
-        default:       return 20
-        }
+        .frame(height: 136)
     }
 }
 
-// MARK: - Dynamic Island Expanded
+// MARK: - Dynamic Island
 
 struct BreathingIslandLeading: View {
     let context: ActivityViewContext<BreathingActivityAttributes>
 
     var body: some View {
-        HStack(spacing: 8) {
-            // Small breathing indicator
-            ZStack {
-                Circle()
-                    .stroke(BreathingColors.accent.opacity(0.3), lineWidth: 2)
-                    .frame(width: 28, height: 28)
-                Circle()
-                    .trim(from: 0, to: 1.0 - context.state.progress)
-                    .stroke(BreathingColors.accent, style: StrokeStyle(lineWidth: 2, lineCap: .round))
-                    .frame(width: 28, height: 28)
-                    .rotationEffect(.degrees(-90))
-                Circle()
-                    .fill(BreathingColors.accent)
-                    .frame(width: 6, height: 6)
-            }
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(phaseDisplayText(context.state.phase))
-                    .font(.custom("DinoInitiativeFont-Regular", size: 14))
-                    .foregroundColor(.white)
-                    .contentTransition(.opacity)
-
-                if context.state.isPaused {
-                    Text("paused")
-                        .font(.custom("DinoInitiativeFont-Regular", size: 10))
-                        .foregroundColor(.white.opacity(0.5))
-                } else {
-                    Text(phaseSubtext(context.state.phase, isPaused: false))
-                        .font(.custom("DinoInitiativeFont-Regular", size: 10))
-                        .foregroundColor(.white.opacity(0.6))
-                        .lineLimit(1)
-                }
-            }
+        ZStack {
+            Circle()
+                .stroke(DinoPalette.laSageRing.opacity(0.45), lineWidth: 1.2)
+                .frame(width: 66, height: 66)
+            Image("DinoFlower-cut")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 64, height: 64)
         }
         .padding(.leading, 4)
     }
@@ -294,17 +217,32 @@ struct BreathingIslandTrailing: View {
     let context: ActivityViewContext<BreathingActivityAttributes>
 
     var body: some View {
-        VStack(alignment: .trailing, spacing: 2) {
-            Text(formatTime(context.state.secondsRemaining))
-                .font(.system(size: 16, weight: .bold, design: .rounded))
+        VStack(alignment: .trailing, spacing: 3) {
+            Text(formatBreathingTime(context.state.secondsRemaining))
+                .font(.system(size: 22, weight: .semibold, design: .rounded))
                 .foregroundColor(.white)
                 .monospacedDigit()
-
-            Text("cycle \(context.state.currentCycle)/\(context.state.totalCycles)")
-                .font(.custom("DinoInitiativeFont-Regular", size: 10))
-                .foregroundColor(.white.opacity(0.5))
+            Text("\(context.state.currentCycle)/\(context.state.totalCycles)")
+                .font(.custom("DinoInitiativeFont-Regular", size: 11))
+                .foregroundColor(DinoPalette.laHillFar)
         }
         .padding(.trailing, 4)
+    }
+}
+
+struct BreathingIslandCenter: View {
+    let context: ActivityViewContext<BreathingActivityAttributes>
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(phaseDisplayText(context.state.phase))
+                .font(.custom("DinoInitiativeFont-Regular", size: 24))
+                .foregroundColor(DinoPalette.laHillFar)
+            Text(phaseCueText(context.state.phase, isPaused: context.state.isPaused))
+                .font(.system(size: 13))
+                .foregroundColor(.white.opacity(0.55))
+                .lineLimit(1)
+        }
     }
 }
 
@@ -312,31 +250,24 @@ struct BreathingIslandBottom: View {
     let context: ActivityViewContext<BreathingActivityAttributes>
 
     var body: some View {
-        VStack(spacing: 6) {
-            // Soft rounded progress
-            GeometryReader { geo in
-                ZStack(alignment: .leading) {
-                    Capsule()
-                        .fill(Color.white.opacity(0.12))
-                        .frame(height: 4)
-
-                    Capsule()
-                        .fill(BreathingColors.accent)
-                        .frame(width: max(4, geo.size.width * (1.0 - context.state.progress)), height: 4)
-                }
+        VStack(spacing: 4) {
+            CycleDotsRow(total: context.state.totalCycles, current: context.state.currentCycle)
+            HStack {
+                Text(patternText(context.attributes.sessionType))
+                Spacer()
+                Text("breathe with dino")
             }
-            .frame(height: 4)
-            .padding(.horizontal, 4)
-
-            Text("breathe with dino")
-                .font(.custom("DinoInitiativeFont-Regular", size: 10))
-                .foregroundColor(.white.opacity(0.4))
+            .font(.custom("DinoInitiativeFont-Regular", size: 11))
+            .foregroundColor(.white.opacity(0.4))
         }
+        .padding(.horizontal, 4)
         .padding(.bottom, 4)
     }
 }
 
-// MARK: - Color Extension (shared across widget extension)
+// MARK: - Color Hex (shared across widget extension)
+// Keep this here — both LA files referenced it in the legacy code and other
+// files in this target rely on it being in this file.
 
 extension Color {
     init(hex: String) {

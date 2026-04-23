@@ -92,6 +92,30 @@ enum DinoPalette {
     // Mood pill
     static let moodPillBg = Color.white.opacity(0.55)
     static let moodPillStroke = Color(hex: "#11402D").opacity(0.12)
+
+    // MARK: - v6 Live Activity tokens (mirrors DinoTheme.la*)
+    // These are duplicated here because DinoTheme is @MainActor and lives in
+    // the main app target; widget-target code cannot reach it.
+    static let laInk                = Color(hex: "#11402D")
+    static let laSageRing           = Color(hex: "#7BA872")
+    static let laCuePeach           = Color(hex: "#E8B4B8")
+    static let laCueText            = Color(hex: "#4A6852")
+    static let laHillFar            = Color(hex: "#B9D3A8")
+    static let laHillNear           = Color(hex: "#9FC291")
+    static let laMeadowTop          = Color(hex: "#F4F8EE")
+    static let laMeadowMid          = Color(hex: "#E9EFDC")
+    static let laMeadowBottom       = Color(hex: "#E3EBD1")
+    static let laSunCore            = Color(hex: "#FFE9B8")
+    static let laSunEdge            = Color(hex: "#FBD98A")
+    static let laNightTop           = Color(hex: "#1D2148")
+    static let laNightMid           = Color(hex: "#2E2D5E")
+    static let laNightBottom        = Color(hex: "#4B3B78")
+    static let laMoonFace           = Color(hex: "#F5E9C4")
+    static let laMoonStroke         = Color(hex: "#3A2E5E")
+    static let laMoonCrater         = Color(hex: "#E4D4A2")
+    static let laNebula             = Color(hex: "#C5ACE2")
+    static let laProgressFillStart  = Color(hex: "#C4B8D4")
+    static let laProgressFillEnd    = Color(hex: "#F5E9C4")
 }
 
 // MARK: - Scene gradients
