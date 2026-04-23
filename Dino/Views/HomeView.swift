@@ -70,8 +70,8 @@ struct HomeView: View {
     // MARK: - Header Leading (Avatar)
 
     private var headerLeading: some View {
-        NavigationLink {
-            SettingsView().environmentObject(dataManager)
+        Button {
+            dataManager.deepLinkTab = 4
         } label: {
             Image("DinoMascot")
                 .resizable()
@@ -100,8 +100,8 @@ struct HomeView: View {
                 }
             }
 
-            NavigationLink {
-                SettingsView().environmentObject(dataManager)
+            Button {
+                dataManager.deepLinkTab = 4
             } label: {
                 Image(systemName: "gearshape")
                     .font(DinoTheme.dinoFont(size: 18))

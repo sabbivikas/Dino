@@ -35,8 +35,8 @@ struct WindDownView: View {
                 if windDownTimeInterval == 0 {
                     // default 9:30pm today
                     var comps = DateComponents()
-                    comps.hour = 21
-                    comps.minute = 30
+                    comps.hour = 22
+                    comps.minute = 0
                     return Calendar.current.date(from: comps) ?? Date()
                 }
                 return Date(timeIntervalSinceReferenceDate: windDownTimeInterval)

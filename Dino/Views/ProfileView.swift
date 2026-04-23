@@ -73,7 +73,13 @@ struct ProfileView: View {
 
     @State private var activeSheet: ProfileSheet?
     @State private var showSignOutConfirm = false
+    @State private var showClearDataConfirm = false
+    @State private var showDeleteAccountConfirm = false
     @State private var savedProfilePhoto: UIImage? = nil
+
+    private var appVersion: String {
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
+    }
 
     // MARK: Derived values
 
@@ -174,6 +180,9 @@ struct ProfileView: View {
         }
         .onAppear {
             savedProfilePhoto = PhotoStore.load()
+            if UserDefaults.standard.object(forKey: "userJoinDate") == nil {
+                UserDefaults.standard.set(Date(), forKey: "userJoinDate")
+            }
         }
         .sheet(item: $activeSheet, onDismiss: {
             savedProfilePhoto = PhotoStore.load()
@@ -213,6 +222,50 @@ struct ProfileView: View {
             }
             Button("cancel", role: .cancel) {}
         }
+        .confirmationDialog(
+            "clear all data?",
+            isPresented: $showClearDataConfirm,
+            titleVisibility: .visible
+        ) {
+            Button("clear everything", role: .destructive) {
+                dataManager.clearAllData()
+                dismiss()
+            }
+            Button("cancel", role: .cancel) {}
+        } message: {
+            Text("this will delete all your moods, journals and gratitude. are you sure?")
+        }
+        .confirmationDialog(
+            "delete your account?",
+            isPresented: $showDeleteAccountConfirm,
+            titleVisibility: .visible
+        ) {
+            Button("delete forever", role: .destructive) {
+                Task {
+                    await deleteAccount()
+                }
+            }
+            Button("cancel", role: .cancel) {}
+        } message: {
+            Text("this will permanently delete your account, all your data from the cloud, and sign you out. this cannot be undone. are you sure?")
+        }
+    }
+
+    private func deleteAccount() async {
+        // Delete Firestore data first
+        await FirestoreSyncService.shared.deleteAllUserData()
+
+        // Delete Firebase Auth account
+        do {
+            try await AuthManager.shared.deleteAccount()
+        } catch {
+            print("[Profile] account deletion error: \(error)")
+        }
+
+        // Clear local data
+        dataManager.clearForSignOut()
+        UserDefaults.standard.set(false, forKey: "hasPassedAuth")
+        dismiss()
     }
 
     // MARK: - Header Row
@@ -489,7 +542,7 @@ struct ProfileView: View {
             SBRow(
                 icon: "lock.shield.fill",
                 iconColor: SB.lavender,
-                title: "privacy",
+                title: "privacy & data",
                 subtitle: "your data, your garden"
             ) {
                 activeSheet = .privacyPolicy
@@ -503,6 +556,22 @@ struct ProfileView: View {
                 activeSheet = .stub(ComingSoonContent(
                     "export your garden", "your notes, portable"
                 ))
+            }
+            SBRow(
+                icon: "trash",
+                iconColor: SB.rose,
+                title: "clear all data",
+                subtitle: "start with a fresh page"
+            ) {
+                showClearDataConfirm = true
+            }
+            SBRow(
+                icon: "person.slash",
+                iconColor: Color.red,
+                title: "delete account",
+                subtitle: "permanently remove everything"
+            ) {
+                showDeleteAccountConfirm = true
             }
         }
     }
@@ -566,6 +635,33 @@ struct ProfileView: View {
                     "rate dino", "if dino has helped you bloom"
                 ))
             }
+
+            HStack(spacing: 12) {
+                ZStack {
+                    Circle()
+                        .fill(SB.sage.opacity(0.5))
+                        .frame(width: 36, height: 36)
+                    Image(systemName: "info.circle")
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundColor(.white)
+                }
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("version")
+                        .font(DinoTheme.dinoFont(size: 16))
+                        .foregroundColor(SB.nearBlack)
+                    Text("current build")
+                        .font(DinoTheme.dinoFont(size: 12))
+                        .foregroundColor(SB.sage)
+                }
+
+                Spacer(minLength: 0)
+
+                Text(appVersion)
+                    .font(DinoTheme.dinoFont(size: 14))
+                    .foregroundColor(SB.sage.opacity(0.8))
+            }
+            .padding(.vertical, 6)
         }
     }
 
