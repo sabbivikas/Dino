@@ -34,6 +34,78 @@ struct DinoTheme {
     static let skyBlue  = Color(hex: "#A8D4E6")
     static let warmRose = Color(hex: "#E8B4B8")
 
+    // MARK: - v6 Design System tokens
+
+    // General / paper
+    static let paper     = Color(hex: "#FEFBF3")
+    static let cream     = Color(hex: "#FAF6EC")
+    static let ink       = Color(hex: "#4A3520")
+    static let muted     = Color(hex: "#8B7A5C")
+    static let sageDeep  = Color(hex: "#7BA872") // alias of DinoDesignSystem.brandSageDeep
+
+    // Calendar / streak
+    // streakPeach skipped — value #F5C6AA already exists as `peach`
+    static let streakSage        = Color(hex: "#A8C5A0")
+    static let threadTan         = Color(hex: "#B9A580")
+    static let sunYellow         = Color(hex: "#FFD56E")
+    static let goldStar          = Color(hex: "#E8B86A")
+    static let sunHighlight      = Color(hex: "#FFF2B3")
+    static let mutedCalendar     = Color(hex: "#A8886B")
+    static let monthRibbonText   = Color(hex: "#6B5A3C")
+    static let hillGrassFar      = Color(hex: "#C9D9B5")
+    static let hillGrassMid      = Color(hex: "#A8C5A0")
+    static let hillGrassNear     = Color(hex: "#7BA872")
+
+    // Onboarding
+    // obPeach skipped — value #F5C6AA already exists as `peach`
+    static let obNavy        = Color(hex: "#1A1A33")
+    static let obNavy2       = Color(hex: "#0F0F22")
+    static let obMoonlight   = Color(hex: "#F5E9C4")
+    static let obSky         = Color(hex: "#A8D4E6")
+    static let obRose        = Color(hex: "#E8B4B8")
+    static let obLavender    = Color(hex: "#C4B8D4")
+    static let obPlaceholder = Color(hex: "#A0958A")
+    static let obMutedText   = Color(hex: "#6B7280")
+
+    // Live Activity
+    static let laInk                = Color(hex: "#11402D")
+    static let laSageRing           = Color(hex: "#7BA872")
+    static let laCuePeach           = Color(hex: "#E8B4B8")
+    static let laCueText            = Color(hex: "#4A6852")
+    static let laHillFar            = Color(hex: "#B9D3A8")
+    static let laHillNear           = Color(hex: "#9FC291")
+    static let laMeadowTop          = Color(hex: "#F4F8EE")
+    static let laMeadowMid          = Color(hex: "#E9EFDC")
+    static let laMeadowBottom       = Color(hex: "#E3EBD1")
+    static let laSunCore            = Color(hex: "#FFE9B8")
+    static let laSunEdge            = Color(hex: "#FBD98A")
+    static let laNightTop           = Color(hex: "#1D2148")
+    static let laNightMid           = Color(hex: "#2E2D5E")
+    static let laNightBottom        = Color(hex: "#4B3B78")
+    static let laMoonFace           = Color(hex: "#F5E9C4")
+    static let laMoonStroke         = Color(hex: "#3A2E5E")
+    static let laMoonCrater         = Color(hex: "#E4D4A2")
+    static let laNebula             = Color(hex: "#C5ACE2")   // used at .opacity(0.22)
+    static let laProgressFillStart  = Color(hex: "#C4B8D4")
+    static let laProgressFillEnd    = Color(hex: "#F5E9C4")
+
+    // Gratitude Jar
+    // jarInk skipped — aliases `ink` (#4A3520)
+    static let jarWallpaperTop    = Color(hex: "#D8B486")
+    static let jarWallpaperBottom = Color(hex: "#C89C6B")
+    static let jarWoodLight       = Color(hex: "#8B5A3C")
+    static let jarWoodMid         = Color(hex: "#6B3F24")
+    static let jarWoodDark        = Color(hex: "#5A3318")
+    static let jarLacePaper       = Color(hex: "#FEFBF3")
+    static let jarRoseStroke      = Color(hex: "#5C6B3A")
+    static let jarRoseBloom1      = Color(hex: "#8A4B3A")
+    static let jarRoseBloom2      = Color(hex: "#A85C47")
+    static let jarRoseBloom3      = Color(hex: "#6F3A2C")
+    static let jarMuted           = Color(hex: "#6B5A3C")
+    static let jarVignetteEdge    = Color(hex: "#2A1A0C")   // used at .opacity(0.38)
+    static let jarSunbeam         = Color(hex: "#FFE9B8")
+    static let jarHalo            = Color(hex: "#FFF4D6")
+
     // MARK: - Pastel Array
     static var pastels: [Color] { [sageGreen, lavender, peach, skyBlue, warmRose] }
 
