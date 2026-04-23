@@ -36,6 +36,7 @@ struct BreathingLiveActivity: Widget {
                     .resizable()
                     .scaledToFit()
                     .frame(width: 18, height: 18)
+                    .background(.clear)
             } compactTrailing: {
                 Text("\(context.state.currentCycle)/\(context.state.totalCycles)")
                     .font(.custom("DinoInitiativeFont-Regular", size: 18))
@@ -129,6 +130,7 @@ private struct DinoBreathingMascot: View {
             .resizable()
             .scaledToFit()
             .frame(width: size, height: size)
+            .background(.clear)
             .shadow(color: Color(hex: "#11402D").opacity(0.18), radius: 2, x: 0, y: 2)
             .rotationEffect(.degrees(reduceMotion ? 0 : (swaying ? 1.4 : -1.4)))
             .offset(y: reduceMotion ? 0 : (swaying ? -3 : 0))
@@ -208,6 +210,7 @@ struct BreathingIslandLeading: View {
                 .resizable()
                 .scaledToFit()
                 .frame(width: 64, height: 64)
+                .background(.clear)
         }
         .padding(.leading, 4)
     }

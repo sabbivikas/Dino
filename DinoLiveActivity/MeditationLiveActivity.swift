@@ -93,6 +93,7 @@ private struct MeditationScene: View {
                 .resizable()
                 .scaledToFit()
                 .frame(width: dinoSize, height: dinoSize)
+                .background(.clear)
                 .shadow(color: .black.opacity(0.3), radius: 2, x: 0, y: 2)
                 .scaleEffect(reduceMotion ? 1.0 : (breathing ? 1.03 : 0.97))
                 .offset(y: moonSize * 0.16)
