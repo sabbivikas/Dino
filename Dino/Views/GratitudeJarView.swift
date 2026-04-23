@@ -133,6 +133,12 @@ struct GratitudeJarView: View {
                     GratitudeNoteDetail(note: note)
                 }
             }
+            .onChange(of: dataManager.presentAddGratitude) { _, newValue in
+                if newValue {
+                    viewModel.showAddSheet = true
+                    dataManager.presentAddGratitude = false
+                }
+            }
             .navigationTitle("")
             .navigationBarHidden(true)
         }

@@ -97,6 +97,7 @@ final class SharedDataManager: ObservableObject {
     // MARK: - Deep Link State
     @Published var deepLinkTab: Int = 0
     @Published var showBreathingFromDeepLink: Bool = false
+    @Published var presentAddGratitude: Bool = false
 
     // MARK: - Member Since
     var memberSinceDate: Date {
