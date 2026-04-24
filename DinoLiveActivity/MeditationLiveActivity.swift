@@ -87,6 +87,17 @@ private struct MeditationScene: View {
 
     var body: some View {
         ZStack {
+            // v5 spec: three concentric lavender halos behind the moon
+            Circle()
+                .stroke(Color(hex: "#BAA9DB").opacity(0.32), lineWidth: 1)
+                .frame(width: moonSize * 1.4, height: moonSize * 1.4)
+            Circle()
+                .stroke(Color(hex: "#BAA9DB").opacity(0.22), lineWidth: 1)
+                .frame(width: moonSize * 1.7, height: moonSize * 1.7)
+            Circle()
+                .stroke(Color(hex: "#BAA9DB").opacity(0.14), lineWidth: 1)
+                .frame(width: moonSize * 2.0, height: moonSize * 2.0)
+
             MoonView(size: moonSize)
 
             Image("dino-meditation")
@@ -138,6 +149,29 @@ private struct MeditationProgressBar: View {
     }
 }
 
+// MARK: - Minute dots (progress row)
+
+private struct MinuteDotsRow: View {
+    let progress: Double
+
+    var body: some View {
+        let active = Int((max(0.0, min(1.0, progress)) * 8.0).rounded())
+        HStack(spacing: 3) {
+            ForEach(0..<8, id: \.self) { i in
+                if i < active {
+                    Circle()
+                        .fill(Color(hex: "#F5E9C4"))
+                        .frame(width: 7, height: 7)
+                } else {
+                    Circle()
+                        .stroke(Color(hex: "#BAA9DB").opacity(0.5), lineWidth: 1)
+                        .frame(width: 7, height: 7)
+                }
+            }
+        }
+    }
+}
+
 // MARK: - Lock screen
 
 struct MeditationLockScreenView: View {
@@ -147,37 +181,60 @@ struct MeditationLockScreenView: View {
         ZStack {
             NightBackground()
 
-            HStack(alignment: .top, spacing: 12) {
-                MeditationScene(moonSize: 72, dinoSize: 54)
-                    .frame(width: 96, height: 96)
+            HStack(alignment: .top, spacing: 10) {
+                // Left: scene (88 × 112)
+                MeditationScene(moonSize: 64, dinoSize: 44)
+                    .frame(width: 88, height: 112)
 
-                VStack(alignment: .leading, spacing: 3) {
+                // Middle: title + whisper + session pill
+                VStack(alignment: .leading, spacing: 4) {
                     Text(sessionTitle(isPaused: context.state.isPaused))
-                        .font(.custom("DinoInitiativeFont-Regular", size: 20))
-                        .foregroundColor(DinoPalette.laMoonFace)
-                        .shadow(color: .black.opacity(0.35), radius: 1, x: 0, y: 1)
+                        .font(.custom("DinoInitiativeFont-Regular", size: 30))
+                        .foregroundColor(Color(hex: "#F5E9C4"))
                         .lineLimit(1)
-                        .padding(.top, 6)
 
                     Text(context.state.calmMessage)
-                        .font(.system(size: 12).italic())
-                        .foregroundColor(DinoPalette.laMoonFace.opacity(0.78))
-                        .lineLimit(2)
+                        .font(.custom("DinoInitiativeFont-Regular", size: 14))
+                        .foregroundColor(Color(hex: "#F5E9C4").opacity(0.78))
+                        .lineLimit(1)
 
-                    Spacer(minLength: 0)
-
-                    HStack(alignment: .center, spacing: 8) {
-                        MeditationProgressBar(progress: context.state.progress)
-                        Text(formatMeditationTime(context.state.secondsRemaining))
-                            .font(.system(size: 18, weight: .semibold, design: .rounded))
-                            .foregroundColor(DinoPalette.laMoonFace)
-                            .monospacedDigit()
+                    HStack(spacing: 6) {
+                        Circle()
+                            .fill(Color(hex: "#BAA9DB"))
+                            .frame(width: 5, height: 5)
+                        Text(context.state.calmMessage)
+                            .font(.custom("DinoInitiativeFont-Regular", size: 12))
+                            .foregroundColor(Color(hex: "#F5E9C4"))
+                            .lineLimit(1)
                     }
-                    .padding(.bottom, 6)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(
+                        RoundedRectangle(cornerRadius: 10)
+                            .fill(Color(hex: "#BAA9DB").opacity(0.18))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10)
+                            .stroke(Color(hex: "#BAA9DB").opacity(0.4), lineWidth: 1)
+                    )
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
+
+                // Right: timer + remaining label + minute dots
+                VStack(alignment: .trailing, spacing: 6) {
+                    Text(formatMeditationTime(context.state.secondsRemaining))
+                        .font(.system(size: 26, weight: .bold, design: .rounded))
+                        .foregroundColor(Color(hex: "#F5E9C4"))
+                        .monospacedDigit()
+
+                    Text("remaining")
+                        .font(.custom("DinoInitiativeFont-Regular", size: 13))
+                        .foregroundColor(Color(hex: "#F5E9C4").opacity(0.65))
+
+                    MinuteDotsRow(progress: context.state.progress)
+                }
             }
-            .padding(.horizontal, 16)
+            .padding(EdgeInsets(top: 12, leading: 10, bottom: 12, trailing: 16))
         }
         .frame(height: 136)
     }
