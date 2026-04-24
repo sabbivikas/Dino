@@ -149,8 +149,8 @@ struct MeditationLockScreenView: View {
 
             HStack(alignment: .center, spacing: 14) {
                 // Scene: moon + dino
-                MeditationScene(moonSize: 72, dinoSize: 56)
-                    .frame(width: 96, height: 104)
+                MeditationScene(moonSize: 86, dinoSize: 67)
+                    .frame(width: 112, height: 112)
 
                 // Text column
                 VStack(alignment: .leading, spacing: 4) {
