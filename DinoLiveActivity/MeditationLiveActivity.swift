@@ -155,17 +155,17 @@ struct MeditationLockScreenView: View {
                 // Text column
                 VStack(alignment: .leading, spacing: 4) {
                     Text(sessionTitle(isPaused: context.state.isPaused))
-                        .font(.custom("DinoInitiativeFont-Regular", size: 30))
+                        .font(.custom("DinoInitiativeFont-Regular", size: 22))
                         .foregroundColor(DinoPalette.laMoonFace)
                         .shadow(color: .black.opacity(0.35), radius: 1, x: 0, y: 1)
                         .lineLimit(1)
 
                     Text(context.state.calmMessage)
-                        .font(.system(size: 16).italic())
+                        .font(.system(size: 13).italic())
                         .foregroundColor(DinoPalette.laMoonFace.opacity(0.78))
                         .lineLimit(2)
 
-                    Spacer(minLength: 2)
+                    Spacer(minLength: 0)
 
                     HStack(alignment: .center, spacing: 8) {
                         MeditationProgressBar(progress: context.state.progress)
@@ -178,7 +178,7 @@ struct MeditationLockScreenView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
             .padding(.horizontal, 16)
-            .padding(.vertical, 12)
+            .padding(.vertical, 8)
         }
         .frame(height: 136)
     }
