@@ -32,7 +32,10 @@ struct BreathingLiveActivity: Widget {
                     BreathingIslandBottom(context: context)
                 }
             } compactLeading: {
-                CanvasDinoBreathing()
+                Image("DinoFlower-cut")
+                    .renderingMode(.original)
+                    .resizable()
+                    .scaledToFit()
                     .frame(width: 18, height: 18)
                     .background(.clear)
             } compactTrailing: {
@@ -124,10 +127,12 @@ private struct DinoBreathingMascot: View {
     @State private var swaying: Bool = false
 
     var body: some View {
-        CanvasDinoBreathing()
+        Image("DinoFlower-cut")
+            .renderingMode(.original)
+            .resizable()
+            .scaledToFit()
             .frame(width: size, height: size)
             .background(.clear)
-            .shadow(color: Color(hex: "#11402D").opacity(0.18), radius: 2, x: 0, y: 2)
             .rotationEffect(.degrees(reduceMotion ? 0 : (swaying ? 1.4 : -1.4)))
             .offset(y: reduceMotion ? 0 : (swaying ? -3 : 0))
             .onAppear {
@@ -202,7 +207,10 @@ struct BreathingIslandLeading: View {
             Circle()
                 .stroke(DinoPalette.laSageRing.opacity(0.45), lineWidth: 1.2)
                 .frame(width: 66, height: 66)
-            CanvasDinoBreathing()
+            Image("DinoFlower-cut")
+                .renderingMode(.original)
+                .resizable()
+                .scaledToFit()
                 .frame(width: 64, height: 64)
                 .background(.clear)
         }
@@ -291,58 +299,3 @@ extension Color {
         )
     }
 }
-// Canvas-drawn dino used in place of the DinoFlower-cut image asset.
-// Scales to the frame it's given; no bitmap assets involved.
-private struct CanvasDinoBreathing: View {
-    var body: some View {
-        Canvas { context, canvasSize in
-            let s = min(canvasSize.width, canvasSize.height)
-            let ox = (canvasSize.width - s) / 2
-            let oy = (canvasSize.height - s) / 2
-            let green = Color(red: 17.0 / 255.0, green: 64.0 / 255.0, blue: 45.0 / 255.0)
-            let white = Color.white
-            let black = Color.black
-            let stroke: CGFloat = max(0.8, min(2.0, s / 56.0 * 2.0))
-
-            // Spikes (drawn first so the body covers their base)
-            var spikes = Path()
-            let spikeTopY = oy + 0.15 * s
-            let spikeBaseY = oy + 0.36 * s
-            let halfW = 0.06 * s
-            for cx in [0.35, 0.50, 0.65] {
-                let x = ox + cx * s
-                spikes.move(to: CGPoint(x: x - halfW, y: spikeBaseY))
-                spikes.addLine(to: CGPoint(x: x, y: spikeTopY))
-                spikes.addLine(to: CGPoint(x: x + halfW, y: spikeBaseY))
-                spikes.closeSubpath()
-            }
-            context.fill(spikes, with: .color(green))
-            context.stroke(spikes, with: .color(green), lineWidth: stroke)
-
-            // White oval body
-            let bodyRect = CGRect(x: ox + 0.15 * s, y: oy + 0.32 * s, width: 0.70 * s, height: 0.56 * s)
-            let body = Path(ellipseIn: bodyRect)
-            context.fill(body, with: .color(white))
-            context.stroke(body, with: .color(green), lineWidth: stroke)
-
-            // Dot eyes
-            let eyeR = max(0.8, 0.04 * s)
-            for ex in [0.42, 0.58] {
-                let eye = Path(ellipseIn: CGRect(
-                    x: ox + ex * s - eyeR,
-                    y: oy + 0.52 * s - eyeR,
-                    width: eyeR * 2, height: eyeR * 2))
-                context.fill(eye, with: .color(black))
-            }
-
-            // Smile
-            var smile = Path()
-            smile.move(to: CGPoint(x: ox + 0.43 * s, y: oy + 0.66 * s))
-            smile.addQuadCurve(
-                to: CGPoint(x: ox + 0.57 * s, y: oy + 0.66 * s),
-                control: CGPoint(x: ox + 0.50 * s, y: oy + 0.72 * s))
-            context.stroke(smile, with: .color(green), lineWidth: stroke)
-        }
-    }
-}
-
