@@ -89,10 +89,7 @@ private struct MeditationScene: View {
         ZStack {
             MoonView(size: moonSize)
 
-            Image("dino-meditation")
-                .renderingMode(.original)
-                .resizable()
-                .scaledToFit()
+            CanvasDinoMeditation()
                 .frame(width: dinoSize, height: dinoSize)
                 .background(.clear)
                 .shadow(color: .black.opacity(0.3), radius: 2, x: 0, y: 2)
@@ -239,3 +236,74 @@ struct MeditationIslandBottom: View {
             .padding(.bottom, 4)
     }
 }
+// Canvas-drawn meditation dino used in place of the dino-meditation image asset.
+// Scales to the frame it's given; no bitmap assets involved.
+private struct CanvasDinoMeditation: View {
+    var body: some View {
+        Canvas { context, canvasSize in
+            let s = min(canvasSize.width, canvasSize.height)
+            let ox = (canvasSize.width - s) / 2
+            let oy = (canvasSize.height - s) / 2
+            let green = Color(red: 17.0 / 255.0, green: 64.0 / 255.0, blue: 45.0 / 255.0)
+            let white = Color.white
+            let stroke: CGFloat = max(0.8, min(2.0, s / 56.0 * 2.0))
+
+            // Spikes (drawn first so the body covers their base)
+            var spikes = Path()
+            let spikeTopY = oy + 0.10 * s
+            let spikeBaseY = oy + 0.30 * s
+            let halfW = 0.05 * s
+            for cx in [0.38, 0.50, 0.62] {
+                let x = ox + cx * s
+                spikes.move(to: CGPoint(x: x - halfW, y: spikeBaseY))
+                spikes.addLine(to: CGPoint(x: x, y: spikeTopY))
+                spikes.addLine(to: CGPoint(x: x + halfW, y: spikeBaseY))
+                spikes.closeSubpath()
+            }
+            context.fill(spikes, with: .color(green))
+            context.stroke(spikes, with: .color(green), lineWidth: stroke)
+
+            // Wider white oval body (seated)
+            let bodyRect = CGRect(x: ox + 0.10 * s, y: oy + 0.28 * s, width: 0.80 * s, height: 0.60 * s)
+            let body = Path(ellipseIn: bodyRect)
+            context.fill(body, with: .color(white))
+            context.stroke(body, with: .color(green), lineWidth: stroke)
+
+            // Meditation-pose arm curves extending slightly out
+            var leftArm = Path()
+            leftArm.move(to: CGPoint(x: ox + 0.18 * s, y: oy + 0.56 * s))
+            leftArm.addQuadCurve(
+                to: CGPoint(x: ox + 0.06 * s, y: oy + 0.72 * s),
+                control: CGPoint(x: ox + 0.06 * s, y: oy + 0.62 * s))
+            context.stroke(leftArm, with: .color(green), lineWidth: stroke)
+
+            var rightArm = Path()
+            rightArm.move(to: CGPoint(x: ox + 0.82 * s, y: oy + 0.56 * s))
+            rightArm.addQuadCurve(
+                to: CGPoint(x: ox + 0.94 * s, y: oy + 0.72 * s),
+                control: CGPoint(x: ox + 0.94 * s, y: oy + 0.62 * s))
+            context.stroke(rightArm, with: .color(green), lineWidth: stroke)
+
+            // Closed peaceful eyes (∩ arcs)
+            for ex in [0.40, 0.60] {
+                var eye = Path()
+                let cx = ox + ex * s
+                let cy = oy + 0.50 * s
+                eye.move(to: CGPoint(x: cx - 0.05 * s, y: cy))
+                eye.addQuadCurve(
+                    to: CGPoint(x: cx + 0.05 * s, y: cy),
+                    control: CGPoint(x: cx, y: cy - 0.04 * s))
+                context.stroke(eye, with: .color(green), lineWidth: stroke)
+            }
+
+            // Small smile (∪ arc)
+            var smile = Path()
+            smile.move(to: CGPoint(x: ox + 0.44 * s, y: oy + 0.64 * s))
+            smile.addQuadCurve(
+                to: CGPoint(x: ox + 0.56 * s, y: oy + 0.64 * s),
+                control: CGPoint(x: ox + 0.50 * s, y: oy + 0.70 * s))
+            context.stroke(smile, with: .color(green), lineWidth: stroke)
+        }
+    }
+}
+
