@@ -147,21 +147,20 @@ struct MeditationLockScreenView: View {
         ZStack {
             NightBackground()
 
-            HStack(alignment: .center, spacing: 14) {
-                // Scene: moon + dino
-                MeditationScene(moonSize: 64, dinoSize: 48)
-                    .frame(width: 112, height: 96)
+            HStack(alignment: .top, spacing: 12) {
+                MeditationScene(moonSize: 72, dinoSize: 54)
+                    .frame(width: 96, height: 96)
 
-                // Text column
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: 3) {
                     Text(sessionTitle(isPaused: context.state.isPaused))
-                        .font(.custom("DinoInitiativeFont-Regular", size: 22))
+                        .font(.custom("DinoInitiativeFont-Regular", size: 20))
                         .foregroundColor(DinoPalette.laMoonFace)
                         .shadow(color: .black.opacity(0.35), radius: 1, x: 0, y: 1)
                         .lineLimit(1)
+                        .padding(.top, 6)
 
                     Text(context.state.calmMessage)
-                        .font(.system(size: 13).italic())
+                        .font(.system(size: 12).italic())
                         .foregroundColor(DinoPalette.laMoonFace.opacity(0.78))
                         .lineLimit(2)
 
@@ -170,15 +169,15 @@ struct MeditationLockScreenView: View {
                     HStack(alignment: .center, spacing: 8) {
                         MeditationProgressBar(progress: context.state.progress)
                         Text(formatMeditationTime(context.state.secondsRemaining))
-                            .font(.system(size: 20, weight: .semibold, design: .rounded))
+                            .font(.system(size: 18, weight: .semibold, design: .rounded))
                             .foregroundColor(DinoPalette.laMoonFace)
                             .monospacedDigit()
                     }
+                    .padding(.bottom, 6)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
             .padding(.horizontal, 16)
-            .padding(.vertical, 8)
         }
         .frame(height: 136)
     }
