@@ -33,6 +33,7 @@ struct BreathingLiveActivity: Widget {
                 }
             } compactLeading: {
                 Image("DinoFlower-cut")
+                    .renderingMode(.original)
                     .resizable()
                     .scaledToFit()
                     .frame(width: 18, height: 18)
@@ -127,6 +128,7 @@ private struct DinoBreathingMascot: View {
 
     var body: some View {
         Image("DinoFlower-cut")
+            .renderingMode(.original)
             .resizable()
             .scaledToFit()
             .frame(width: size, height: size)
@@ -207,6 +209,7 @@ struct BreathingIslandLeading: View {
                 .stroke(DinoPalette.laSageRing.opacity(0.45), lineWidth: 1.2)
                 .frame(width: 66, height: 66)
             Image("DinoFlower-cut")
+                .renderingMode(.original)
                 .resizable()
                 .scaledToFit()
                 .frame(width: 64, height: 64)

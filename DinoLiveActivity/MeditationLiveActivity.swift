@@ -90,6 +90,7 @@ private struct MeditationScene: View {
             MoonView(size: moonSize)
 
             Image("dino-meditation")
+                .renderingMode(.original)
                 .resizable()
                 .scaledToFit()
                 .frame(width: dinoSize, height: dinoSize)
