@@ -22,7 +22,7 @@ platform :ios do
       project:            "Dino.xcodeproj",
       configuration:      "Release",
       export_method:      "app-store",
-      xcargs:             "DEVELOPMENT_TEAM=BA9NL64C62 -allowProvisioningUpdates",
+      xcargs:             "DEVELOPMENT_TEAM=BA9NL64C62 CODE_SIGN_STYLE=Automatic -allowProvisioningUpdates",
       output_directory:   "build",
       output_name:        "Dino.ipa",
       clean:              true
