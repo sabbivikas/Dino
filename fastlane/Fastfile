@@ -16,17 +16,17 @@ platform :ios do
       build_number: ENV["GITHUB_RUN_NUMBER"] || Time.now.to_i.to_s
     )
 
-    # Build archive — pass api_key so xcodebuild can download provisioning profiles
+    # Build archive — pass auth key args so xcodebuild can fetch provisioning profiles
     build_app(
       scheme:             "Dino",
       project:            "Dino.xcodeproj",
       configuration:      "Release",
       export_method:      "app-store",
-      xcargs:             "DEVELOPMENT_TEAM=BA9NL64C62 CODE_SIGN_STYLE=Automatic -allowProvisioningUpdates",
+      export_team_id:     "BA9NL64C62",
+      xcargs:             "DEVELOPMENT_TEAM=BA9NL64C62 CODE_SIGN_STYLE=Automatic -allowProvisioningUpdates -authenticationKeyID #{ENV['ASC_KEY_ID']} -authenticationKeyIssuerID #{ENV['ASC_ISSUER_ID']} -authenticationKeyPath #{ENV['HOME']}/.appstoreconnect/private_keys/AuthKey_#{ENV['ASC_KEY_ID']}.p8",
       output_directory:   "build",
       output_name:        "Dino.ipa",
-      clean:              true,
-      api_key:            api_key
+      clean:              true
     )
 
     # Upload to TestFlight
