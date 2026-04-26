@@ -16,7 +16,7 @@ platform :ios do
       build_number: ENV["GITHUB_RUN_NUMBER"] || Time.now.to_i.to_s
     )
 
-    # Build archive — xcodebuild handles signing automatically via the API key
+    # Build archive — pass api_key so xcodebuild can download provisioning profiles
     build_app(
       scheme:             "Dino",
       project:            "Dino.xcodeproj",
@@ -25,7 +25,8 @@ platform :ios do
       xcargs:             "DEVELOPMENT_TEAM=BA9NL64C62 CODE_SIGN_STYLE=Automatic -allowProvisioningUpdates",
       output_directory:   "build",
       output_name:        "Dino.ipa",
-      clean:              true
+      clean:              true,
+      api_key:            api_key
     )
 
     # Upload to TestFlight
