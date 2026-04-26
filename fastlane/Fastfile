@@ -23,7 +23,7 @@ platform :ios do
       configuration:      "Release",
       export_method:      "app-store",
       export_team_id:     "BA9NL64C62",
-      xcargs:             "DEVELOPMENT_TEAM=BA9NL64C62 CODE_SIGN_STYLE=Automatic -allowProvisioningUpdates -authenticationKeyID #{ENV['ASC_KEY_ID']} -authenticationKeyIssuerID #{ENV['ASC_ISSUER_ID']} -authenticationKeyPath #{ENV['HOME']}/.appstoreconnect/private_keys/AuthKey_#{ENV['ASC_KEY_ID']}.p8",
+      xcargs:             "DEVELOPMENT_TEAM=BA9NL64C62 CODE_SIGN_STYLE=Automatic -allowProvisioningUpdates",
       output_directory:   "build",
       output_name:        "Dino.ipa",
       clean:              true
