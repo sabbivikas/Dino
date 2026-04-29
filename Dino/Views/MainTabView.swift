@@ -40,10 +40,11 @@ struct MainTabView: View {
             DinoCustomTabBar(selectedTab: $selectedTab)
         }
         .onReceive(dataManager.$deepLinkTab) { tab in
-            if tab > 0 {
-                selectedTab = tab
-                dataManager.deepLinkTab = 0
+            guard let tab, (0...4).contains(tab) else {
+                return
             }
+            selectedTab = tab
+            dataManager.deepLinkTab = nil
         }
     }
 }

@@ -76,6 +76,7 @@ struct ProfileView: View {
     @State private var showClearDataConfirm = false
     @State private var showDeleteAccountConfirm = false
     @State private var savedProfilePhoto: UIImage? = nil
+    @State private var accountDeletionErrorMessage: String?
 
     private var appVersion: String {
         Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
@@ -250,6 +251,14 @@ struct ProfileView: View {
         } message: {
             Text("this will permanently delete your account, all your data from the cloud, and sign you out. this cannot be undone. are you sure?")
         }
+        .alert("couldn't delete account", isPresented: Binding(
+            get: { accountDeletionErrorMessage != nil },
+            set: { if !$0 { accountDeletionErrorMessage = nil } }
+        )) {
+            Button("ok", role: .cancel) {}
+        } message: {
+            Text(accountDeletionErrorMessage ?? "please try again.")
+        }
     }
 
     private func deleteAccount() async {
@@ -261,6 +270,8 @@ struct ProfileView: View {
             try await AuthManager.shared.deleteAccount()
         } catch {
             print("[Profile] account deletion error: \(error)")
+            accountDeletionErrorMessage = error.localizedDescription
+            return
         }
 
         // Clear local data

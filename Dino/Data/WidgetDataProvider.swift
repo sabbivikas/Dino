@@ -45,7 +45,7 @@ struct WidgetDataProvider {
     }
 
     var userName: String {
-        defaults.string(forKey: "userName") ?? ""
+        defaults.string(forKey: userKey("userName")) ?? ""
     }
 
     var todayMoodEmoji: String {
@@ -86,7 +86,14 @@ struct WidgetDataProvider {
     }
 
     private func load<T: Decodable>(_ type: T.Type, key: String) -> T? {
-        guard let data = defaults.data(forKey: key) else { return nil }
+        guard let data = defaults.data(forKey: userKey(key)) else { return nil }
         return try? JSONDecoder().decode(type, from: data)
+    }
+
+    private func userKey(_ key: String) -> String {
+        guard let uid = defaults.string(forKey: "currentUserId"), !uid.isEmpty else {
+            return key
+        }
+        return "\(uid)_\(key)"
     }
 }

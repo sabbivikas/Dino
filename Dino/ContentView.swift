@@ -56,6 +56,7 @@ struct ContentView: View {
             dataManager.deepLinkTab = 4
         case "focus":
             dataManager.deepLinkTab = 0
+            dataManager.showFocusFromDeepLink = true
         default:
             break
         }

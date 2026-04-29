@@ -20,7 +20,8 @@ final class SharedDataManager: ObservableObject {
     /// across sessions and is available before any user signs in.
     private(set) var currentUserId: String? {
         didSet {
-            UserDefaults.standard.set(currentUserId, forKey: "currentUserId")
+            persistCurrentUserId()
+            WidgetCenter.shared.reloadAllTimelines()
         }
     }
 
@@ -95,8 +96,9 @@ final class SharedDataManager: ObservableObject {
     }
 
     // MARK: - Deep Link State
-    @Published var deepLinkTab: Int = 0
+    @Published var deepLinkTab: Int?
     @Published var showBreathingFromDeepLink: Bool = false
+    @Published var showFocusFromDeepLink: Bool = false
     @Published var presentAddGratitude: Bool = false
 
     // MARK: - Member Since
@@ -121,6 +123,7 @@ final class SharedDataManager: ObservableObject {
 
         // Restore last known userId (if any) so we load the right data on cold start
         self.currentUserId = UserDefaults.standard.string(forKey: "currentUserId")
+            ?? ud.string(forKey: "currentUserId")
 
         // Global (non-user-namespaced) flags
         self.isSignedIn = ud.bool(forKey: "isSignedIn")
@@ -148,6 +151,7 @@ final class SharedDataManager: ObservableObject {
         self.growthStats = Self.load(GrowthStats.self, from: ud, key: Self.staticUserKey(uid, "growthStats")) ?? GrowthStats()
 
         resetSelfCareIfNewDay()
+        persistCurrentUserId()
     }
 
     // Static helper used before `self` is fully initialized
@@ -253,12 +257,24 @@ final class SharedDataManager: ObservableObject {
     private func save<T: Encodable>(_ value: T, forKey key: String) {
         if let data = try? JSONEncoder().encode(value) {
             defaults.set(data, forKey: key)
+            WidgetCenter.shared.reloadAllTimelines()
         }
     }
 
     private static func load<T: Decodable>(_ type: T.Type, from ud: UserDefaults, key: String) -> T? {
         guard let data = ud.data(forKey: key) else { return nil }
         return try? JSONDecoder().decode(type, from: data)
+    }
+
+    private func persistCurrentUserId() {
+        let appGroupDefaults = UserDefaults(suiteName: suiteName) ?? defaults
+        if let currentUserId, !currentUserId.isEmpty {
+            UserDefaults.standard.set(currentUserId, forKey: "currentUserId")
+            appGroupDefaults.set(currentUserId, forKey: "currentUserId")
+        } else {
+            UserDefaults.standard.removeObject(forKey: "currentUserId")
+            appGroupDefaults.removeObject(forKey: "currentUserId")
+        }
     }
 
     // MARK: - Activity Tracking

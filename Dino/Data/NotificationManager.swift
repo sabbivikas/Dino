@@ -34,6 +34,17 @@ class NotificationManager: ObservableObject {
 
     private var isInitializing = true
 
+    private static func isPermissionGranted(_ status: UNAuthorizationStatus) -> Bool {
+        switch status {
+        case .authorized, .provisional, .ephemeral:
+            return true
+        case .notDetermined, .denied:
+            return false
+        @unknown default:
+            return false
+        }
+    }
+
     private init() {
         let ud = UserDefaults.standard
         self.notificationsEnabled = ud.object(forKey: "notif_enabled") as? Bool ?? true
@@ -97,7 +108,7 @@ class NotificationManager: ObservableObject {
         UNUserNotificationCenter.current().getNotificationSettings { settings in
             Task { @MainActor in
                 let wasGranted = self.hasPermission
-                self.hasPermission = settings.authorizationStatus == .authorized
+                self.hasPermission = Self.isPermissionGranted(settings.authorizationStatus)
                 print("[Notifications] current permission: \(self.hasPermission)")
                 // If permission just became available, schedule notifications
                 if self.hasPermission && !wasGranted {
@@ -317,7 +328,7 @@ class NotificationManager: ObservableObject {
     func userDidOpenApp() {
         UNUserNotificationCenter.current().getNotificationSettings { settings in
             Task { @MainActor in
-                self.hasPermission = settings.authorizationStatus == .authorized
+                self.hasPermission = Self.isPermissionGranted(settings.authorizationStatus)
                 print("[Notifications] app opened — permission: \(self.hasPermission)")
                 if self.hasPermission && self.notificationsEnabled {
                     self.rescheduleAll()

@@ -64,6 +64,16 @@ struct HomeView: View {
             .navigationDestination(isPresented: $viewModel.showResources) {
                 ResourcesView().environmentObject(dataManager)
             }
+            .onReceive(dataManager.$showBreathingFromDeepLink) { shouldShow in
+                guard shouldShow else { return }
+                viewModel.showBreathing = true
+                dataManager.showBreathingFromDeepLink = false
+            }
+            .onReceive(dataManager.$showFocusFromDeepLink) { shouldShow in
+                guard shouldShow else { return }
+                viewModel.showFocus = true
+                dataManager.showFocusFromDeepLink = false
+            }
         }
     }
 

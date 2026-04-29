@@ -7,30 +7,35 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		1D2444BC2F9BF8DA00A7CD7E /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = FB000010FIREBASEAUTH0001 /* FirebaseAuth */; };
+		1D2444BD2F9BF8DA00A7CD7E /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = FB000011FIREBASECORE0001 /* FirebaseCore */; };
+		1D2444BE2F9BF8DA00A7CD7E /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = FB000020GOOGLESIGNIN0001 /* GoogleSignIn */; };
+		1D2444BF2F9BF8DA00A7CD7E /* GoogleSignInSwift in Frameworks */ = {isa = PBXBuildFile; productRef = FB000021GOOGLESIGNINUI01 /* GoogleSignInSwift */; };
+		1D2444C02F9BF8DA00A7CD7E /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = FB000012FIRESTOREPROD01 /* FirebaseFirestore */; };
 		AA000021AAAA000000000001 /* DinoLiveActivityExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = AA000011AAAA000000000001 /* DinoLiveActivityExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
+		AA000001AAAA000000000001 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = E1CF60252F73C55B008D5746 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = AA000010AAAA000000000001;
+			remoteInfo = DinoLiveActivityExtension;
+		};
 		E1CF603D2F73C55D008D5746 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = E1CF60252F73C55B008D5746 /* Project object */;
 			proxyType = 1;
 			remoteGlobalIDString = E1CF602C2F73C55B008D5746;
-			remoteInfo = "Dino";
+			remoteInfo = Dino;
 		};
 		E1CF60472F73C55D008D5746 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = E1CF60252F73C55B008D5746 /* Project object */;
 			proxyType = 1;
 			remoteGlobalIDString = E1CF602C2F73C55B008D5746;
-			remoteInfo = "Dino";
-		};
-		AA000001AAAA000000000001 /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = E1CF60252F73C55B008D5746 /* Project object */;
-			proxyType = 1;
-			remoteGlobalIDString = AA000010AAAA000000000001;
-			remoteInfo = "DinoLiveActivityExtension";
+			remoteInfo = Dino;
 		};
 /* End PBXContainerItemProxy section */
 
@@ -49,14 +54,14 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		E1CF602D2F73C55B008D5746 /* Dino.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Dino.app"; sourceTree = BUILT_PRODUCTS_DIR; };
-		E1CF603C2F73C55D008D5746 /* DinoTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "DinoTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
-		E1CF60462F73C55D008D5746 /* DinoUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "DinoUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
-		AA000011AAAA000000000001 /* DinoLiveActivityExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = "DinoLiveActivityExtension.appex"; sourceTree = BUILT_PRODUCTS_DIR; };
+		AA000011AAAA000000000001 /* DinoLiveActivityExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = DinoLiveActivityExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		E1CF602D2F73C55B008D5746 /* Dino.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Dino.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		E1CF603C2F73C55D008D5746 /* DinoTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DinoTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		E1CF60462F73C55D008D5746 /* DinoUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DinoUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		AA000099AAAA000000000001 /* PBXFileSystemSynchronizedBuildFileExceptionSet */ = {
+		AA000099AAAA000000000001 /* Exceptions for "DinoLiveActivity" folder in "DinoLiveActivityExtension" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
@@ -66,36 +71,48 @@
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
+		AA000030AAAA000000000001 /* DinoLiveActivity */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				AA000099AAAA000000000001 /* Exceptions for "DinoLiveActivity" folder in "DinoLiveActivityExtension" target */,
+			);
+			path = DinoLiveActivity;
+			sourceTree = "<group>";
+		};
 		E1CF602F2F73C55B008D5746 /* Dino */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			path = "Dino";
+			path = Dino;
 			sourceTree = "<group>";
 		};
 		E1CF603F2F73C55D008D5746 /* DinoTests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			path = "DinoTests";
+			path = DinoTests;
 			sourceTree = "<group>";
 		};
 		E1CF60492F73C55D008D5746 /* DinoUITests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			path = "DinoUITests";
-			sourceTree = "<group>";
-		};
-		AA000030AAAA000000000001 /* DinoLiveActivity */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-				AA000099AAAA000000000001 /* PBXFileSystemSynchronizedBuildFileExceptionSet */,
-			);
-			path = "DinoLiveActivity";
+			path = DinoUITests;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		AA000040AAAA000000000001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		E1CF602A2F73C55B008D5746 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				1D2444C02F9BF8DA00A7CD7E /* FirebaseFirestore in Frameworks */,
+				1D2444BF2F9BF8DA00A7CD7E /* GoogleSignInSwift in Frameworks */,
+				1D2444BE2F9BF8DA00A7CD7E /* GoogleSignIn in Frameworks */,
+				1D2444BD2F9BF8DA00A7CD7E /* FirebaseCore in Frameworks */,
+				1D2444BC2F9BF8DA00A7CD7E /* FirebaseAuth in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -107,13 +124,6 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		E1CF60432F73C55D008D5746 /* Frameworks */ = {
-			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		AA000040AAAA000000000001 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -148,6 +158,28 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		AA000010AAAA000000000001 /* DinoLiveActivityExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = AA000060AAAA000000000001 /* Build configuration list for PBXNativeTarget "DinoLiveActivityExtension" */;
+			buildPhases = (
+				AA000050AAAA000000000001 /* Sources */,
+				AA000040AAAA000000000001 /* Frameworks */,
+				AA000051AAAA000000000001 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				AA000030AAAA000000000001 /* DinoLiveActivity */,
+			);
+			name = DinoLiveActivityExtension;
+			packageProductDependencies = (
+			);
+			productName = DinoLiveActivityExtension;
+			productReference = AA000011AAAA000000000001 /* DinoLiveActivityExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 		E1CF602C2F73C55B008D5746 /* Dino */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = E1CF60502F73C55D008D5746 /* Build configuration list for PBXNativeTarget "Dino" */;
@@ -165,7 +197,7 @@
 			fileSystemSynchronizedGroups = (
 				E1CF602F2F73C55B008D5746 /* Dino */,
 			);
-			name = "Dino";
+			name = Dino;
 			packageProductDependencies = (
 				FB000010FIREBASEAUTH0001 /* FirebaseAuth */,
 				FB000011FIREBASECORE0001 /* FirebaseCore */,
@@ -173,31 +205,9 @@
 				FB000021GOOGLESIGNINUI01 /* GoogleSignInSwift */,
 				FB000012FIRESTOREPROD01 /* FirebaseFirestore */,
 			);
-			productName = "Dino";
+			productName = Dino;
 			productReference = E1CF602D2F73C55B008D5746 /* Dino.app */;
 			productType = "com.apple.product-type.application";
-		};
-		AA000010AAAA000000000001 /* DinoLiveActivityExtension */ = {
-			isa = PBXNativeTarget;
-			buildConfigurationList = AA000060AAAA000000000001 /* Build configuration list for PBXNativeTarget "DinoLiveActivityExtension" */;
-			buildPhases = (
-				AA000050AAAA000000000001 /* Sources */,
-				AA000040AAAA000000000001 /* Frameworks */,
-				AA000051AAAA000000000001 /* Resources */,
-			);
-			buildRules = (
-			);
-			dependencies = (
-			);
-			fileSystemSynchronizedGroups = (
-				AA000030AAAA000000000001 /* DinoLiveActivity */,
-			);
-			name = "DinoLiveActivityExtension";
-			packageProductDependencies = (
-			);
-			productName = "DinoLiveActivityExtension";
-			productReference = AA000011AAAA000000000001 /* DinoLiveActivityExtension.appex */;
-			productType = "com.apple.product-type.app-extension";
 		};
 		E1CF603B2F73C55D008D5746 /* DinoTests */ = {
 			isa = PBXNativeTarget;
@@ -215,10 +225,10 @@
 			fileSystemSynchronizedGroups = (
 				E1CF603F2F73C55D008D5746 /* DinoTests */,
 			);
-			name = "DinoTests";
+			name = DinoTests;
 			packageProductDependencies = (
 			);
-			productName = "DinoTests";
+			productName = DinoTests;
 			productReference = E1CF603C2F73C55D008D5746 /* DinoTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
@@ -238,10 +248,10 @@
 			fileSystemSynchronizedGroups = (
 				E1CF60492F73C55D008D5746 /* DinoUITests */,
 			);
-			name = "DinoUITests";
+			name = DinoUITests;
 			packageProductDependencies = (
 			);
-			productName = "DinoUITests";
+			productName = DinoUITests;
 			productReference = E1CF60462F73C55D008D5746 /* DinoUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
@@ -255,10 +265,10 @@
 				LastSwiftUpdateCheck = 2640;
 				LastUpgradeCheck = 2640;
 				TargetAttributes = {
-					E1CF602C2F73C55B008D5746 = {
+					AA000010AAAA000000000001 = {
 						CreatedOnToolsVersion = 26.4;
 					};
-					AA000010AAAA000000000001 = {
+					E1CF602C2F73C55B008D5746 = {
 						CreatedOnToolsVersion = 26.4;
 					};
 					E1CF603B2F73C55D008D5746 = {
@@ -280,14 +290,14 @@
 			);
 			mainGroup = E1CF60242F73C55B008D5746;
 			minimizedProjectReferenceProxies = 1;
-			preferredProjectObjectVersion = 77;
-			productRefGroup = E1CF602E2F73C55B008D5746 /* Products */;
-			projectDirPath = "";
-			projectRoot = "";
 			packageReferences = (
 				FB000001FIREBASE000000001 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
 				FB000002GOOGLE0000000001 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */,
 			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = E1CF602E2F73C55B008D5746 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
 			targets = (
 				E1CF602C2F73C55B008D5746 /* Dino */,
 				AA000010AAAA000000000001 /* DinoLiveActivityExtension */,
@@ -298,14 +308,14 @@
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
-		E1CF602B2F73C55B008D5746 /* Resources */ = {
+		AA000051AAAA000000000001 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		AA000051AAAA000000000001 /* Resources */ = {
+		E1CF602B2F73C55B008D5746 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -329,14 +339,14 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
-		E1CF60292F73C55B008D5746 /* Sources */ = {
+		AA000050AAAA000000000001 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		AA000050AAAA000000000001 /* Sources */ = {
+		E1CF60292F73C55B008D5746 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -378,6 +388,56 @@
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
+		AA000061AAAA000000000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CODE_SIGN_ENTITLEMENTS = DinoLiveActivity/DinoLiveActivityExtension.entitlements;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = BA9NL64C62;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = DinoLiveActivity/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.vikassabbi.dino.LiveActivity;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		AA000062AAAA000000000001 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CODE_SIGN_ENTITLEMENTS = DinoLiveActivity/DinoLiveActivityExtension.entitlements;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = BA9NL64C62;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = DinoLiveActivity/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.vikassabbi.dino.LiveActivity;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 		E1CF604E2F73C55D008D5746 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -504,13 +564,14 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Dino uses your microphone to record voice journal entries. Recordings are saved privately on your device.";
-				INFOPLIST_FILE = Info.plist;
+				CODE_SIGN_ENTITLEMENTS = Dino/Dino.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = BA9NL64C62;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Info.plist;
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Dino uses your microphone to record voice journal entries. Recordings are saved privately on your device.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -521,7 +582,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.vikassabbi.dino";
+				PRODUCT_BUNDLE_IDENTIFIER = com.vikassabbi.dino;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -537,13 +598,15 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Dino uses your microphone to record voice journal entries. Recordings are saved privately on your device.";
-				INFOPLIST_FILE = Info.plist;
+				CODE_SIGN_ENTITLEMENTS = Dino/Dino.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Distribution";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = BA9NL64C62;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Info.plist;
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Dino uses your microphone to record voice journal entries. Recordings are saved privately on your device.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -554,60 +617,13 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.vikassabbi.dino";
+				PRODUCT_BUNDLE_IDENTIFIER = com.vikassabbi.dino;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
-			};
-			name = Release;
-		};
-		AA000061AAAA000000000001 /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
-				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = DinoLiveActivity/Info.plist;
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/Frameworks",
-					"@executable_path/../../Frameworks",
-				);
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.vikassabbi.dino.LiveActivity";
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SKIP_INSTALL = YES;
-				SWIFT_APPROACHABLE_CONCURRENCY = YES;
-				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
-			};
-			name = Debug;
-		};
-		AA000062AAAA000000000001 /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
-				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = DinoLiveActivity/Info.plist;
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/Frameworks",
-					"@executable_path/../../Frameworks",
-				);
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.vikassabbi.dino.LiveActivity";
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SKIP_INSTALL = YES;
-				SWIFT_APPROACHABLE_CONCURRENCY = YES;
-				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
@@ -623,7 +639,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.vikassabbi.dino.DinoTests";
+				PRODUCT_BUNDLE_IDENTIFIER = com.vikassabbi.dino.DinoTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
@@ -642,7 +658,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.vikassabbi.dino.DinoTests";
+				PRODUCT_BUNDLE_IDENTIFIER = com.vikassabbi.dino.DinoTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
@@ -659,7 +675,7 @@
 				DEVELOPMENT_TEAM = "";
 				GENERATE_INFOPLIST_FILE = YES;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.vikassabbi.dino.DinoUITests";
+				PRODUCT_BUNDLE_IDENTIFIER = com.vikassabbi.dino.DinoUITests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
@@ -676,7 +692,7 @@
 				DEVELOPMENT_TEAM = "";
 				GENERATE_INFOPLIST_FILE = YES;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.vikassabbi.dino.DinoUITests";
+				PRODUCT_BUNDLE_IDENTIFIER = com.vikassabbi.dino.DinoUITests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
@@ -688,6 +704,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		AA000060AAAA000000000001 /* Build configuration list for PBXNativeTarget "DinoLiveActivityExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AA000061AAAA000000000001 /* Debug */,
+				AA000062AAAA000000000001 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		E1CF60282F73C55B008D5746 /* Build configuration list for PBXProject "Dino" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
@@ -702,15 +727,6 @@
 			buildConfigurations = (
 				E1CF60512F73C55D008D5746 /* Debug */,
 				E1CF60522F73C55D008D5746 /* Release */,
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
-		};
-		AA000060AAAA000000000001 /* Build configuration list for PBXNativeTarget "DinoLiveActivityExtension" */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				AA000061AAAA000000000001 /* Debug */,
-				AA000062AAAA000000000001 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
@@ -765,6 +781,11 @@
 			package = FB000001FIREBASE000000001 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
 			productName = FirebaseCore;
 		};
+		FB000012FIRESTOREPROD01 /* FirebaseFirestore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = FB000001FIREBASE000000001 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseFirestore;
+		};
 		FB000020GOOGLESIGNIN0001 /* GoogleSignIn */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = FB000002GOOGLE0000000001 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */;
@@ -775,13 +796,7 @@
 			package = FB000002GOOGLE0000000001 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */;
 			productName = GoogleSignInSwift;
 		};
-		FB000012FIRESTOREPROD01 /* FirebaseFirestore */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = FB000001FIREBASE000000001 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
-			productName = FirebaseFirestore;
-		};
 /* End XCSwiftPackageProductDependency section */
-
 	};
 	rootObject = E1CF60252F73C55B008D5746 /* Project object */;
 }
