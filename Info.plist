@@ -27,6 +27,7 @@
 			<string>Editor</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
+				<string>dino</string>
 				<string>com.googleusercontent.apps.511622456990-6oil9b7rmfosk0gqtotj5o6b9brqjcl3</string>
 			</array>
 		</dict>
