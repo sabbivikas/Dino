@@ -183,7 +183,7 @@ struct MeditationLockScreenView: View {
 
             HStack(alignment: .top, spacing: 10) {
                 // Left: scene (88 × 112)
-                MeditationScene(moonSize: 64, dinoSize: 44)
+                MeditationScene(moonSize: 86, dinoSize: 44)
                     .frame(width: 88, height: 112)
 
                 // Middle: title + whisper + session pill
@@ -202,7 +202,7 @@ struct MeditationLockScreenView: View {
                         Circle()
                             .fill(Color(hex: "#BAA9DB"))
                             .frame(width: 5, height: 5)
-                        Text(context.state.calmMessage)
+                        Text(context.state.isPaused ? "paused" : "meditating")
                             .font(.custom("DinoInitiativeFont-Regular", size: 12))
                             .foregroundColor(Color(hex: "#F5E9C4"))
                             .lineLimit(1)
