@@ -14,6 +14,7 @@ struct LetterView: View {
     @State private var showCursor = true
     @State private var showButton = false
     @State private var typewriterTask: Task<Void, Never>?
+    @State private var cursorTimer: Timer?
 
     private let fullText = "hey, you.\n\nthe fact that you're here means something.\nmaybe things feel heavy. maybe you're just curious.\neither way, you showed up. that matters.\n\ndino is your space.\nno pressure. no judgment.\njust a place to breathe, reflect, and grow.\n\nlet's take this one step at a time."
 
@@ -80,12 +81,15 @@ struct LetterView: View {
 
             startTypewriter()
             // Blinking cursor
-            Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { _ in
+            cursorTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { _ in
                 showCursor.toggle()
             }
         }
         .onDisappear {
             audioManager.fadeOut(duration: 2.0)
+            cursorTimer?.invalidate()
+            cursorTimer = nil
+            typewriterTask?.cancel()
         }
     }
 

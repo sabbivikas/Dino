@@ -116,6 +116,7 @@ private struct SkyPalette {
 struct DinoSkyBackground: View {
     let currentTheme: DinoAppTheme
     @State private var timeOfDay: SkyTimeOfDay = .current()
+    @State private var skyTimer: Timer?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
@@ -162,11 +163,15 @@ struct DinoSkyBackground: View {
         .ignoresSafeArea(.all)
         .animation(.easeInOut(duration: 60.0), value: timeOfDay)
         .onAppear { startTimeUpdater() }
+        .onDisappear {
+            skyTimer?.invalidate()
+            skyTimer = nil
+        }
     }
 
     private func startTimeUpdater() {
-        // Update every 60 seconds
-        Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { _ in
+        skyTimer?.invalidate()
+        skyTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { _ in
             let newTod = SkyTimeOfDay.current()
             if newTod != timeOfDay {
                 timeOfDay = newTod
