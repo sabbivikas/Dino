@@ -64,14 +64,14 @@ class HomeViewModel: ObservableObject {
         let calendar = Calendar.current
         let today = Date()
         let weekday = calendar.component(.weekday, from: today) // 1=Sun, 7=Sat
-        let startOfWeek = calendar.date(byAdding: .day, value: -(weekday - 1), to: today)!
+        let startOfWeek = calendar.date(byAdding: .day, value: -(weekday - 1), to: today) ?? today
 
         let labels = ["S", "M", "T", "W", "T", "F", "S"]
 
         return (0..<7).map { offset in
-            let day = calendar.date(byAdding: .day, value: offset, to: startOfWeek)!
+            let day = calendar.date(byAdding: .day, value: offset, to: startOfWeek) ?? startOfWeek
             let dayStart = calendar.startOfDay(for: day)
-            let dayEnd = calendar.date(byAdding: .day, value: 1, to: dayStart)!
+            let dayEnd = calendar.date(byAdding: .day, value: 1, to: dayStart) ?? dayStart
 
             let hasMood = dataManager.moodEntries.contains { $0.date >= dayStart && $0.date < dayEnd }
             let hasJournal = dataManager.journalEntries.contains { $0.date >= dayStart && $0.date < dayEnd }

@@ -298,7 +298,10 @@ final class SharedDataManager: ObservableObject {
             return
         }
 
-        let yesterday = calendar.date(byAdding: .day, value: -1, to: today)!
+        guard let yesterday = calendar.date(byAdding: .day, value: -1, to: today) else {
+            streakData.currentStreak = 1
+            return
+        }
 
         if calendar.isDate(lastActive, inSameDayAs: yesterday) {
             streakData.currentStreak += 1
