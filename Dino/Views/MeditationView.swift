@@ -171,22 +171,14 @@ struct MeditationView: View {
                     }
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    if viewModel.isRunning {
-                        Button(action: {
-                            if audio.isPlaying {
-                                audio.pause()
-                            } else {
-                                audio.resume()
-                            }
-                        }) {
-                            Image(systemName: audio.isPlaying ? "speaker.wave.2" : "speaker.slash")
-                                .font(DinoTheme.subheadlineFont())
-                                .foregroundColor(.white.opacity(0.7))
-                        }
-                        .buttonStyle(ScaleButtonStyle())
+                    Button(action: { dismiss() }) {
+                        Image(systemName: "chevron.backward")
+                            .font(DinoTheme.dinoFont(size: 16))
+                            .foregroundColor(.white.opacity(0.8))
                     }
                 }
             }
+            .navigationBarBackButtonHidden(true)
         }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)) { _ in
             print("[Meditation] app going to background")

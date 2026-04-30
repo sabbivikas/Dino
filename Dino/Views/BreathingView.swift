@@ -180,22 +180,14 @@ struct BreathingView: View {
                     }
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    if viewModel.isRunning {
-                        Button(action: {
-                            if audio.isPlaying {
-                                audio.pause()
-                            } else {
-                                audio.resume()
-                            }
-                        }) {
-                            Image(systemName: audio.isPlaying ? "speaker.wave.2" : "speaker.slash")
-                                .font(DinoTheme.subheadlineFont())
-                                .foregroundColor(DinoTheme.textSecondary.opacity(0.7))
-                        }
-                        .buttonStyle(ScaleButtonStyle())
+                    Button(action: { dismiss() }) {
+                        Image(systemName: "chevron.backward")
+                            .font(DinoTheme.dinoFont(size: 16))
+                            .foregroundColor(DinoTheme.textSecondary)
                     }
                 }
             }
+            .navigationBarBackButtonHidden(true)
         }
         .onDisappear {
             viewModel.stop()
