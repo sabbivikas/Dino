@@ -89,6 +89,62 @@ struct DailyAffirmationProvider: TimelineProvider {
     }
 }
 
+// MARK: - Visual primitives
+
+private let affirmationBackground = LinearGradient(
+    colors: [Color(hex: "#EEE4F5"), Color(hex: "#DCC9E8")],
+    startPoint: .topLeading,
+    endPoint: .bottomTrailing
+)
+
+private let affirmationInk      = Color(hex: "#3D2A5A")
+private let affirmationInkSoft  = Color(hex: "#6F5FB3")
+private let affirmationAccent   = Color(hex: "#8B6FD1")
+
+private struct SparkleGlyph: View {
+    var size: CGFloat = 18
+    var color: Color = affirmationAccent
+
+    var body: some View {
+        ZStack {
+            Capsule()
+                .fill(color)
+                .frame(width: size * 0.18, height: size)
+            Capsule()
+                .fill(color)
+                .frame(width: size, height: size * 0.18)
+            Circle()
+                .fill(color)
+                .frame(width: size * 0.32, height: size * 0.32)
+        }
+        .frame(width: size, height: size)
+    }
+}
+
+private struct QuoteMark: View {
+    var size: CGFloat
+    var closing: Bool = false
+
+    var body: some View {
+        Text(closing ? "\u{201D}" : "\u{201C}")
+            .font(.custom("DinoInitiativeFont-Regular", size: size))
+            .foregroundColor(affirmationAccent.opacity(0.55))
+    }
+}
+
+private struct AffirmationDateText: View {
+    var body: some View {
+        let formatter: DateFormatter = {
+            let f = DateFormatter()
+            f.dateFormat = "EEEE, MMM d"
+            return f
+        }()
+        return Text(formatter.string(from: Date()).lowercased())
+            .font(.custom("DinoInitiativeFont-Regular", size: 12))
+            .foregroundColor(affirmationInkSoft)
+    }
+}
+
 // MARK: - Widget Views
 
 struct DailyAffirmationSmallView: View {
@@ -96,24 +152,30 @@ struct DailyAffirmationSmallView: View {
     let theme: WidgetTheme
 
     var body: some View {
-        VStack(spacing: 6) {
-            Text("✨")
-                .font(.system(size: 22))
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 4) {
+                SparkleGlyph(size: 16)
+                SparkleGlyph(size: 10, color: affirmationAccent.opacity(0.6))
+                    .offset(y: -4)
+            }
 
             Text(affirmation)
-                .font(.custom("DinoInitiativeFont-Regular", size: 10))
-                .foregroundColor(theme.textPrimary)
-                .multilineTextAlignment(.center)
+                .font(.custom("DinoInitiativeFont-Regular", size: 16))
+                .foregroundColor(affirmationInk)
+                .multilineTextAlignment(.leading)
                 .lineLimit(4)
                 .minimumScaleFactor(0.8)
+                .fixedSize(horizontal: false, vertical: true)
 
-            Text("daily affirmation")
-                .font(.custom("DinoInitiativeFont-Regular", size: 8))
-                .foregroundColor(theme.textSecondary)
+            Spacer(minLength: 0)
+
+            Text("today")
+                .font(.custom("DinoInitiativeFont-Regular", size: 10))
+                .foregroundColor(affirmationInkSoft)
         }
-        .padding(10)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(theme.cardBackground)
+        .padding(12)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(affirmationBackground)
     }
 }
 
@@ -122,38 +184,40 @@ struct DailyAffirmationMediumView: View {
     let theme: WidgetTheme
 
     var body: some View {
-        HStack(spacing: 14) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("✨")
-                    .font(.system(size: 28))
-                Text("daily\naffirmation")
-                    .font(.custom("DinoInitiativeFont-Regular", size: 11))
-                    .foregroundColor(theme.accent)
-                    .lineLimit(2)
+        HStack(alignment: .top, spacing: 14) {
+            VStack(alignment: .leading, spacing: 6) {
+                QuoteMark(size: 36)
+                SparkleGlyph(size: 22, color: affirmationAccent.opacity(0.75))
+                Spacer(minLength: 0)
+                Text("today")
+                    .font(.custom("DinoInitiativeFont-Regular", size: 10))
+                    .foregroundColor(affirmationInkSoft)
             }
+            .frame(width: 56)
 
             Divider()
-                .background(theme.divider)
-                .frame(height: 60)
+                .background(affirmationAccent.opacity(0.25))
+                .frame(height: 90)
 
-            VStack(alignment: .leading, spacing: 6) {
-                Text("\u{201C}")
-                    .font(.custom("DinoInitiativeFont-Regular", size: 28))
-                    .foregroundColor(theme.accent.opacity(0.5))
-                    .offset(y: 4)
-
+            VStack(alignment: .leading, spacing: 8) {
                 Text(affirmation)
-                    .font(.custom("DinoInitiativeFont-Regular", size: 13))
-                    .foregroundColor(theme.textPrimary)
+                    .font(.custom("DinoInitiativeFont-Regular", size: 19))
+                    .foregroundColor(affirmationInk)
                     .multilineTextAlignment(.leading)
-                    .lineLimit(3)
+                    .lineLimit(4)
                     .minimumScaleFactor(0.8)
                     .fixedSize(horizontal: false, vertical: true)
+
+                Spacer(minLength: 0)
+
+                Text("sit with it for a breath")
+                    .font(.custom("DinoInitiativeFont-Regular", size: 11))
+                    .foregroundColor(affirmationInkSoft)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(14)
-        .background(theme.cardBackground)
+        .background(affirmationBackground)
     }
 }
 
@@ -162,65 +226,48 @@ struct DailyAffirmationLargeView: View {
     let theme: WidgetTheme
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            // Header
-            HStack(spacing: 8) {
-                Text("✨")
-                    .font(.system(size: 32))
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .center, spacing: 10) {
+                SparkleGlyph(size: 28)
                 VStack(alignment: .leading, spacing: 2) {
                     Text("daily affirmation")
                         .font(.custom("DinoInitiativeFont-Regular", size: 18))
-                        .foregroundColor(theme.textPrimary)
-                    Text(Date(), style: .date)
-                        .font(.custom("DinoInitiativeFont-Regular", size: 12))
-                        .foregroundColor(theme.textSecondary)
+                        .foregroundColor(affirmationInk)
+                    AffirmationDateText()
                 }
                 Spacer()
+                SparkleGlyph(size: 14, color: affirmationAccent.opacity(0.6))
             }
 
-            Divider()
-                .background(theme.divider)
+            QuoteMark(size: 28)
+                .padding(.top, -6)
 
-            // Quote
-            VStack(alignment: .leading, spacing: 8) {
-                Text("\u{201C}")
-                    .font(.custom("DinoInitiativeFont-Regular", size: 48))
-                    .foregroundColor(theme.accent.opacity(0.4))
-                    .offset(y: 8)
+            Text(affirmation)
+                .font(.custom("DinoInitiativeFont-Regular", size: 30))
+                .foregroundColor(affirmationInk)
+                .multilineTextAlignment(.leading)
+                .lineLimit(5)
+                .minimumScaleFactor(0.8)
+                .fixedSize(horizontal: false, vertical: true)
 
-                Text(affirmation)
-                    .font(.custom("DinoInitiativeFont-Regular", size: 18))
-                    .foregroundColor(theme.textPrimary)
-                    .multilineTextAlignment(.leading)
-                    .lineLimit(4)
-                    .minimumScaleFactor(0.85)
-                    .fixedSize(horizontal: false, vertical: true)
+            QuoteMark(size: 28, closing: true)
+                .frame(maxWidth: .infinity, alignment: .trailing)
 
-                Text("\u{201D}")
-                    .font(.custom("DinoInitiativeFont-Regular", size: 48))
-                    .foregroundColor(theme.accent.opacity(0.4))
-                    .frame(maxWidth: .infinity, alignment: .trailing)
-                    .offset(y: -8)
-            }
+            Spacer(minLength: 0)
 
-            Spacer()
-
-            Divider()
-                .background(theme.divider)
-
-            // Footer
             HStack {
                 Text("reflect on this today")
                     .font(.custom("DinoInitiativeFont-Regular", size: 12))
-                    .foregroundColor(theme.textSecondary)
+                    .foregroundColor(affirmationInkSoft)
                 Spacer()
-                Text("tap to read more")
-                    .font(.custom("DinoInitiativeFont-Regular", size: 11))
-                    .foregroundColor(theme.accent)
+                Text("tap to journal →")
+                    .font(.custom("DinoInitiativeFont-Regular", size: 12))
+                    .foregroundColor(affirmationAccent)
             }
         }
         .padding(16)
-        .background(theme.cardBackground)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(affirmationBackground)
     }
 }
 
