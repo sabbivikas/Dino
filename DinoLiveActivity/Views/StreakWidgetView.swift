@@ -20,7 +20,7 @@ struct StreakSmallView: View {
 
             VStack(alignment: .leading, spacing: 4) {
                 FlameShape(flickerPhase: entry.flickerPhase)
-                    .frame(width: 56, height: 56)
+                    .frame(width: 64, height: 64)
 
                 HStack(alignment: .firstTextBaseline, spacing: 4) {
                     Text("\(entry.currentStreak)")
@@ -78,7 +78,7 @@ struct StreakMediumView: View {
                 // Left: flame + count
                 VStack(spacing: 2) {
                     FlameShape(flickerPhase: entry.flickerPhase)
-                        .frame(width: 60, height: 60)
+                        .frame(width: 64, height: 64)
 
                     Text("\(entry.currentStreak)")
                         .font(WidgetTheme.widgetFont(size: 34))
@@ -89,6 +89,10 @@ struct StreakMediumView: View {
                         .foregroundColor(DinoPalette.streakInkMid)
                 }
                 .frame(width: 82)
+
+                Divider()
+                    .frame(height: 110)
+                    .background(DinoPalette.flameBrown.opacity(0.18))
 
                 // Right: encouragement + weekly dots
                 VStack(alignment: .leading, spacing: 6) {
@@ -111,11 +115,14 @@ struct StreakMediumView: View {
                                 ZStack {
                                     if isToday {
                                         Circle()
-                                            .stroke(DinoPalette.flameBrown, lineWidth: 2)
-                                            .frame(width: 22, height: 22)
+                                            .stroke(
+                                                DinoPalette.flameBrown,
+                                                style: StrokeStyle(lineWidth: 1, dash: [3, 3])
+                                            )
+                                            .frame(width: 26, height: 26)
                                         Circle()
                                             .fill(DinoPalette.flameOrange)
-                                            .frame(width: 9, height: 9)
+                                            .frame(width: 14, height: 14)
                                     } else if isActive {
                                         Circle()
                                             .fill(DinoPalette.flameOrange)
@@ -125,14 +132,11 @@ struct StreakMediumView: View {
                                             .frame(width: 20, height: 20)
                                     } else {
                                         Circle()
-                                            .fill(Color.white)
-                                            .frame(width: 19, height: 19)
-                                        Circle()
                                             .stroke(
                                                 DinoPalette.flameBrown.opacity(0.55),
-                                                style: StrokeStyle(lineWidth: 1.5, dash: [2, 2])
+                                                style: StrokeStyle(lineWidth: 1, dash: [3, 3])
                                             )
-                                            .frame(width: 19, height: 19)
+                                            .frame(width: 20, height: 20)
                                     }
                                 }
 

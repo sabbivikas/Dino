@@ -48,6 +48,102 @@ struct GratitudeProvider: TimelineProvider {
     }
 }
 
+// MARK: - Visual primitives
+
+private let gratitudeBackground = LinearGradient(
+    colors: [Color(hex: "#FDEBE0"), Color(hex: "#F7D5C5")],
+    startPoint: .topLeading,
+    endPoint: .bottomTrailing
+)
+
+private struct JarView: View {
+    var size: CGFloat = 80
+
+    private var height: CGFloat { size * 110.0 / 80.0 }
+
+    var body: some View {
+        let glass = Color(hex: "#F4D8C8").opacity(0.55)
+        let stroke = Color(hex: "#C26A1E").opacity(0.55)
+        let cork = Color(hex: "#C26A1E")
+        let slipColors: [Color] = [
+            Color(hex: "#F5A245"),
+            Color(hex: "#FCD56B"),
+            Color(hex: "#F4A79A"),
+            Color(hex: "#FBE3C2")
+        ]
+
+        ZStack {
+            // Cork / lid
+            RoundedRectangle(cornerRadius: size * 0.10)
+                .fill(cork)
+                .frame(width: size * 0.55, height: size * 0.13)
+                .offset(y: -height * 0.46)
+
+            // Jar body
+            RoundedRectangle(cornerRadius: size * 0.18)
+                .fill(glass)
+                .overlay(
+                    RoundedRectangle(cornerRadius: size * 0.18)
+                        .stroke(stroke, lineWidth: 1.5)
+                )
+                .frame(width: size, height: height * 0.82)
+                .offset(y: height * 0.04)
+
+            // Paper slips inside
+            ZStack {
+                slip(color: slipColors[0], width: size * 0.55, rotation: -8)
+                    .offset(x: -size * 0.06, y: height * 0.06)
+                slip(color: slipColors[1], width: size * 0.5, rotation: 6)
+                    .offset(x: size * 0.10, y: height * 0.14)
+                slip(color: slipColors[2], width: size * 0.45, rotation: -4)
+                    .offset(x: -size * 0.04, y: height * 0.22)
+                slip(color: slipColors[3], width: size * 0.4, rotation: 10)
+                    .offset(x: size * 0.07, y: height * 0.30)
+            }
+        }
+        .frame(width: size, height: height)
+    }
+
+    private func slip(color: Color, width: CGFloat, rotation: Double) -> some View {
+        RoundedRectangle(cornerRadius: 2)
+            .fill(color)
+            .frame(width: width, height: 6)
+            .rotationEffect(.degrees(rotation))
+    }
+}
+
+private struct DualStrokeProgressBar: View {
+    let progress: Double
+    var height: CGFloat = 10
+
+    var body: some View {
+        GeometryReader { geo in
+            let clamped = max(0.0, min(1.0, progress))
+            ZStack(alignment: .leading) {
+                Capsule()
+                    .fill(Color(hex: "#F4D8C8").opacity(0.5))
+                    .frame(height: height)
+                Capsule()
+                    .stroke(Color(hex: "#C26A1E").opacity(0.55), lineWidth: 1)
+                    .frame(height: height)
+
+                ZStack(alignment: .leading) {
+                    Capsule()
+                        .fill(Color(hex: "#F5A245"))
+                        .frame(height: height)
+                    Capsule()
+                        .stroke(Color(hex: "#C26A1E"), lineWidth: 1.2)
+                        .frame(height: height)
+                        .offset(x: 1, y: 1)
+                }
+                .frame(width: max(height, geo.size.width * clamped))
+                .clipShape(Capsule())
+            }
+        }
+        .frame(height: height + 1)
+    }
+}
+
 // MARK: - Widget Views
 
 struct GratitudeSmallView: View {
@@ -55,21 +151,20 @@ struct GratitudeSmallView: View {
     let theme: WidgetTheme
 
     var body: some View {
-        VStack(spacing: 6) {
-            Text("🫙")
-                .font(.system(size: 32))
+        VStack(spacing: 4) {
+            JarView(size: 56)
 
             Text("\(todayCount)")
                 .font(.custom("DinoInitiativeFont-Regular", size: 32))
-                .foregroundColor(theme.accent)
+                .foregroundColor(Color(hex: "#C26A1E"))
 
             Text(todayCount == 1 ? "gratitude today" : "gratitudes today")
                 .font(.custom("DinoInitiativeFont-Regular", size: 10))
-                .foregroundColor(theme.textSecondary)
+                .foregroundColor(Color(hex: "#8A4A1A"))
                 .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(theme.cardBackground)
+        .background(gratitudeBackground)
     }
 }
 
@@ -78,78 +173,55 @@ struct GratitudeMediumView: View {
     let totalCount: Int
     let theme: WidgetTheme
 
-    // Target: 3 gratitudes per day is "full"
     private let dailyGoal = 3
     private var fillFraction: Double {
         min(Double(todayCount) / Double(dailyGoal), 1.0)
     }
 
+    private var encouragement: String {
+        switch todayCount {
+        case 0:  return "what are you grateful\nfor today?"
+        case 1:  return "a great start —\nwhat else?"
+        case 2:  return "almost there —\none more slip?"
+        default: return "your jar is full of\ngood things ✨"
+        }
+    }
+
     var body: some View {
-        HStack(spacing: 16) {
-            // Left: jar + count
+        HStack(alignment: .top, spacing: 14) {
+            JarView(size: 80)
+
             VStack(alignment: .leading, spacing: 6) {
-                HStack(spacing: 6) {
-                    Text("🫙")
-                        .font(.system(size: 28))
+                Text("today's jar")
+                    .font(.custom("DinoInitiativeFont-Regular", size: 11))
+                    .foregroundColor(Color(hex: "#8A4A1A"))
+
+                HStack(alignment: .firstTextBaseline, spacing: 4) {
                     Text("\(todayCount)")
                         .font(.custom("DinoInitiativeFont-Regular", size: 34))
-                        .foregroundColor(theme.accent)
+                        .foregroundColor(Color(hex: "#C26A1E"))
+                    Text("of \(dailyGoal)")
+                        .font(.custom("DinoInitiativeFont-Regular", size: 13))
+                        .foregroundColor(Color(hex: "#8A4A1A"))
                 }
 
-                Text(todayCount == 1 ? "gratitude today" : "gratitudes today")
-                    .font(.custom("DinoInitiativeFont-Regular", size: 11))
-                    .foregroundColor(theme.textSecondary)
+                Text(encouragement)
+                    .font(.custom("DinoInitiativeFont-Regular", size: 13))
+                    .foregroundColor(Color(hex: "#4A2A10"))
+                    .lineLimit(2)
 
-                Spacer()
+                Spacer(minLength: 4)
 
-                Text("\(totalCount) total")
+                DualStrokeProgressBar(progress: fillFraction, height: 8)
+
+                Text("\(totalCount) slips total")
                     .font(.custom("DinoInitiativeFont-Regular", size: 10))
-                    .foregroundColor(theme.textSecondary.opacity(0.6))
-            }
-
-            Divider()
-                .background(theme.divider)
-                .frame(height: 60)
-
-            // Right: progress + CTA
-            VStack(alignment: .leading, spacing: 8) {
-                Text("today's jar")
-                    .font(.custom("DinoInitiativeFont-Regular", size: 10))
-                    .foregroundColor(theme.textSecondary)
-
-                // Progress bar representing today's jar fill
-                GeometryReader { geo in
-                    ZStack(alignment: .leading) {
-                        RoundedRectangle(cornerRadius: 6)
-                            .fill(theme.divider)
-                            .frame(height: 10)
-
-                        RoundedRectangle(cornerRadius: 6)
-                            .fill(theme.accent)
-                            .frame(width: geo.size.width * fillFraction, height: 10)
-                    }
-                }
-                .frame(height: 10)
-
-                Text("\(todayCount)/\(dailyGoal) slips added")
-                    .font(.custom("DinoInitiativeFont-Regular", size: 10))
-                    .foregroundColor(theme.textSecondary.opacity(0.7))
-
-                Spacer()
-
-                HStack(spacing: 4) {
-                    Image(systemName: "plus.circle.fill")
-                        .font(.custom("DinoInitiativeFont-Regular", size: 12))
-                        .foregroundColor(theme.accent)
-                    Text("add today's gratitude")
-                        .font(.custom("DinoInitiativeFont-Regular", size: 11))
-                        .foregroundColor(theme.accent)
-                }
+                    .foregroundColor(Color(hex: "#8A4A1A").opacity(0.7))
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(14)
-        .background(theme.cardBackground)
+        .background(gratitudeBackground)
     }
 }
 
@@ -168,85 +240,60 @@ struct GratitudeLargeView: View {
         case 0:  return "what are you grateful for today?"
         case 1:  return "a great start — what else?"
         case 2:  return "almost there — one more slip?"
-        default: return "your jar is full of good things. ✨"
+        default: return "your jar is full of good things ✨"
         }
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            // Header
-            HStack(spacing: 10) {
-                Text("🫙")
-                    .font(.system(size: 36))
-                VStack(alignment: .leading, spacing: 2) {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .top, spacing: 12) {
+                JarView(size: 86)
+
+                VStack(alignment: .leading, spacing: 4) {
                     Text("gratitude jar")
-                        .font(.custom("DinoInitiativeFont-Regular", size: 18))
-                        .foregroundColor(theme.textPrimary)
+                        .font(.custom("DinoInitiativeFont-Regular", size: 22))
+                        .foregroundColor(Color(hex: "#4A2A10"))
                     Text("\(totalCount) slips total")
                         .font(.custom("DinoInitiativeFont-Regular", size: 12))
-                        .foregroundColor(theme.textSecondary)
+                        .foregroundColor(Color(hex: "#8A4A1A"))
+                    Spacer(minLength: 0)
                 }
                 Spacer()
                 VStack(alignment: .trailing, spacing: 2) {
                     Text("\(todayCount)")
-                        .font(.custom("DinoInitiativeFont-Regular", size: 28))
-                        .foregroundColor(theme.accent)
-                    Text("today")
-                        .font(.custom("DinoInitiativeFont-Regular", size: 10))
-                        .foregroundColor(theme.textSecondary)
+                        .font(.custom("DinoInitiativeFont-Regular", size: 36))
+                        .foregroundColor(Color(hex: "#C26A1E"))
+                    Text("of \(dailyGoal)")
+                        .font(.custom("DinoInitiativeFont-Regular", size: 11))
+                        .foregroundColor(Color(hex: "#8A4A1A"))
                 }
             }
 
-            Divider()
-                .background(theme.divider)
-
-            // Today's progress
             VStack(alignment: .leading, spacing: 8) {
                 Text("today's progress")
                     .font(.custom("DinoInitiativeFont-Regular", size: 12))
-                    .foregroundColor(theme.textSecondary)
+                    .foregroundColor(Color(hex: "#8A4A1A"))
 
-                GeometryReader { geo in
-                    ZStack(alignment: .leading) {
-                        RoundedRectangle(cornerRadius: 8)
-                            .fill(theme.divider)
-                            .frame(height: 14)
-
-                        RoundedRectangle(cornerRadius: 8)
-                            .fill(theme.accent)
-                            .frame(width: geo.size.width * fillFraction, height: 14)
-                    }
-                }
-                .frame(height: 14)
+                DualStrokeProgressBar(progress: fillFraction, height: 12)
 
                 Text("\(todayCount) of \(dailyGoal) daily gratitudes added")
                     .font(.custom("DinoInitiativeFont-Regular", size: 11))
-                    .foregroundColor(theme.textSecondary.opacity(0.7))
+                    .foregroundColor(Color(hex: "#8A4A1A").opacity(0.7))
             }
 
-            Divider()
-                .background(theme.divider)
-
-            // Encouragement
             Text(encouragement)
-                .font(.custom("DinoInitiativeFont-Regular", size: 14))
-                .foregroundColor(theme.textSecondary)
+                .font(.custom("DinoInitiativeFont-Regular", size: 16))
+                .foregroundColor(Color(hex: "#4A2A10"))
                 .multilineTextAlignment(.leading)
 
             Spacer()
 
-            // CTA
-            HStack(spacing: 6) {
-                Image(systemName: "plus.circle.fill")
-                    .font(.custom("DinoInitiativeFont-Regular", size: 16))
-                    .foregroundColor(theme.accent)
-                Text("tap to add a gratitude")
-                    .font(.custom("DinoInitiativeFont-Regular", size: 13))
-                    .foregroundColor(theme.accent)
-            }
+            Text("tap to add a gratitude →")
+                .font(.custom("DinoInitiativeFont-Regular", size: 13))
+                .foregroundColor(Color(hex: "#C26A1E"))
         }
         .padding(16)
-        .background(theme.cardBackground)
+        .background(gratitudeBackground)
     }
 }
 
