@@ -31,26 +31,24 @@ struct MeditationLiveActivity: Widget {
                     MeditationIslandBottom(context: context)
                 }
             } compactLeading: {
-                // Lightweight moon icon (stroke + fill), no SwiftUI animations.
-                Circle()
-                    .fill(DinoPalette.laMoonFace)
-                    .overlay(Circle().stroke(DinoPalette.laMoonStroke, lineWidth: 1.2))
-                    .frame(width: 18, height: 18)
+                HStack(spacing: 4) {
+                    Circle()
+                        .fill(Color(hex: "#F5E9C4"))
+                        .frame(width: 22, height: 22)
+                    Text("stillness")
+                        .font(.custom("DinoInitiativeFont-Regular", size: 14))
+                        .foregroundColor(Color(hex: "#F5E9C4"))
+                }
             } compactTrailing: {
-                Text(meditationTrailingText(context.state.secondsRemaining))
-                    .font(.custom("DinoInitiativeFont-Regular", size: 18))
-                    .foregroundColor(DinoPalette.laMoonFace)
+                Text(formatMeditationTime(context.state.secondsRemaining))
+                    .font(.system(size: 13, weight: .semibold, design: .rounded))
+                    .foregroundColor(Color(hex: "#F5E9C4"))
                     .monospacedDigit()
             } minimal: {
-                ZStack {
-                    Circle()
-                        .stroke(DinoPalette.laSageRing.opacity(0.3), lineWidth: 2)
-                    Circle()
-                        .trim(from: 0, to: max(0.0, min(1.0, context.state.progress)))
-                        .stroke(DinoPalette.laSageRing, style: StrokeStyle(lineWidth: 2, lineCap: .round))
-                        .rotationEffect(.degrees(-90))
-                }
-                .frame(width: 14, height: 14)
+                Circle()
+                    .fill(Color(hex: "#F5E9C4"))
+                    .frame(width: 24, height: 24)
+                    .shadow(color: Color(hex: "#F5E9C4").opacity(0.6), radius: 4)
             }
         }
     }
@@ -246,9 +244,17 @@ struct MeditationIslandLeading: View {
     let context: ActivityViewContext<MeditationActivityAttributes>
 
     var body: some View {
-        MeditationScene(moonSize: 48, dinoSize: 32)
-            .frame(width: 62, height: 62)
-            .padding(.leading, 4)
+        ZStack {
+            MoonView(size: 58)
+            Image("dino-meditation")
+                .renderingMode(.original)
+                .resizable()
+                .scaledToFit()
+                .frame(width: 30)
+                .offset(y: 12)
+        }
+        .frame(width: 72, height: 58)
+        .padding(.leading, 4)
     }
 }
 
@@ -259,11 +265,11 @@ struct MeditationIslandTrailing: View {
         VStack(alignment: .trailing, spacing: 3) {
             Text(formatMeditationTime(context.state.secondsRemaining))
                 .font(.system(size: 22, weight: .semibold, design: .rounded))
-                .foregroundColor(DinoPalette.laMoonFace)
+                .foregroundColor(Color(hex: "#F5E9C4"))
                 .monospacedDigit()
-            Text("stillness")
+            Text("\(max(1, context.attributes.totalDurationSeconds / 60)) min")
                 .font(.custom("DinoInitiativeFont-Regular", size: 11))
-                .foregroundColor(DinoPalette.laProgressFillStart.opacity(0.85))
+                .foregroundColor(Color(hex: "#BAA9DB").opacity(0.7))
         }
         .padding(.trailing, 4)
     }
@@ -273,13 +279,14 @@ struct MeditationIslandCenter: View {
     let context: ActivityViewContext<MeditationActivityAttributes>
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
+        VStack(alignment: .leading, spacing: 4) {
             Text(sessionTitle(isPaused: context.state.isPaused))
                 .font(.custom("DinoInitiativeFont-Regular", size: 22))
-                .foregroundColor(DinoPalette.laMoonFace)
+                .foregroundColor(Color(hex: "#F5E9C4"))
+                .lineLimit(1)
             Text(context.state.calmMessage)
-                .font(.system(size: 12).italic())
-                .foregroundColor(DinoPalette.laProgressFillStart.opacity(0.85))
+                .font(.custom("DinoInitiativeFont-Regular", size: 13).italic())
+                .foregroundColor(Color(hex: "#BAA9DB").opacity(0.85))
                 .lineLimit(1)
         }
     }
@@ -289,8 +296,37 @@ struct MeditationIslandBottom: View {
     let context: ActivityViewContext<MeditationActivityAttributes>
 
     var body: some View {
-        MeditationProgressBar(progress: context.state.progress)
-            .padding(.horizontal, 4)
-            .padding(.bottom, 4)
+        VStack(spacing: 4) {
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    Capsule()
+                        .fill(Color(hex: "#BAA9DB").opacity(0.15))
+                        .frame(height: 4)
+                    Capsule()
+                        .fill(
+                            LinearGradient(
+                                colors: [Color(hex: "#BAA9DB"), Color(hex: "#F5E9C4")],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .frame(
+                            width: max(2, geo.size.width * max(0.0, min(1.0, context.state.progress))),
+                            height: 4
+                        )
+                }
+            }
+            .frame(height: 4)
+
+            HStack {
+                Text("evening stillness")
+                Spacer()
+                Text("stillness · dino")
+            }
+            .font(.custom("DinoInitiativeFont-Regular", size: 11))
+            .foregroundColor(.white.opacity(0.4))
+        }
+        .padding(.horizontal, 4)
+        .padding(.bottom, 4)
     }
 }

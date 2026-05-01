@@ -32,26 +32,27 @@ struct BreathingLiveActivity: Widget {
                     BreathingIslandBottom(context: context)
                 }
             } compactLeading: {
+                HStack(spacing: 4) {
+                    Image("DinoFlower-cut")
+                        .renderingMode(.original)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(height: 24)
+                    Text(phaseDisplayText(context.state.phase))
+                        .font(.custom("DinoInitiativeFont-Regular", size: 14))
+                        .foregroundColor(Color(hex: "#B9D3A8"))
+                }
+            } compactTrailing: {
+                Text(formatBreathingTime(context.state.secondsRemaining))
+                    .font(.system(size: 13, weight: .semibold, design: .rounded))
+                    .foregroundColor(Color(hex: "#B9D3A8"))
+                    .monospacedDigit()
+            } minimal: {
                 Image("DinoFlower-cut")
                     .renderingMode(.original)
                     .resizable()
                     .scaledToFit()
-                    .frame(width: 18, height: 18)
-                    .background(.clear)
-            } compactTrailing: {
-                Text("\(context.state.currentCycle)/\(context.state.totalCycles)")
-                    .font(.custom("DinoInitiativeFont-Regular", size: 18))
-                    .foregroundColor(DinoPalette.laInk)
-            } minimal: {
-                ZStack {
-                    Circle()
-                        .stroke(DinoPalette.laSageRing.opacity(0.3), lineWidth: 2)
-                    Circle()
-                        .trim(from: 0, to: max(0.0, min(1.0, context.state.progress)))
-                        .stroke(DinoPalette.laSageRing, style: StrokeStyle(lineWidth: 2, lineCap: .round))
-                        .rotationEffect(.degrees(-90))
-                }
-                .frame(width: 14, height: 14)
+                    .frame(height: 26)
             }
         }
     }
@@ -203,18 +204,14 @@ struct BreathingIslandLeading: View {
     let context: ActivityViewContext<BreathingActivityAttributes>
 
     var body: some View {
-        ZStack {
-            Circle()
-                .stroke(DinoPalette.laSageRing.opacity(0.45), lineWidth: 1.2)
-                .frame(width: 66, height: 66)
-            Image("DinoFlower-cut")
-                .renderingMode(.original)
-                .resizable()
-                .scaledToFit()
-                .frame(width: 64, height: 64)
-                .background(.clear)
-        }
-        .padding(.leading, 4)
+        Image("DinoFlower-cut")
+            .renderingMode(.original)
+            .resizable()
+            .scaledToFit()
+            .frame(height: 62)
+            .shadow(color: Color(hex: "#B9D3A8").opacity(0.55), radius: 4)
+            .frame(width: 72, alignment: .center)
+            .padding(.leading, 4)
     }
 }
 
@@ -229,7 +226,7 @@ struct BreathingIslandTrailing: View {
                 .monospacedDigit()
             Text("\(context.state.currentCycle)/\(context.state.totalCycles)")
                 .font(.custom("DinoInitiativeFont-Regular", size: 11))
-                .foregroundColor(DinoPalette.laHillFar)
+                .foregroundColor(Color(hex: "#B9D3A8").opacity(0.85))
         }
         .padding(.trailing, 4)
     }
@@ -239,12 +236,13 @@ struct BreathingIslandCenter: View {
     let context: ActivityViewContext<BreathingActivityAttributes>
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
+        VStack(alignment: .leading, spacing: 4) {
             Text(phaseDisplayText(context.state.phase))
                 .font(.custom("DinoInitiativeFont-Regular", size: 24))
-                .foregroundColor(DinoPalette.laHillFar)
+                .foregroundColor(Color(hex: "#B9D3A8"))
+                .lineLimit(1)
             Text(phaseCueText(context.state.phase, isPaused: context.state.isPaused))
-                .font(.system(size: 13))
+                .font(.custom("DinoInitiativeFont-Regular", size: 13))
                 .foregroundColor(.white.opacity(0.55))
                 .lineLimit(1)
         }
@@ -254,11 +252,35 @@ struct BreathingIslandCenter: View {
 struct BreathingIslandBottom: View {
     let context: ActivityViewContext<BreathingActivityAttributes>
 
+    private var sessionProgress: Double {
+        let total = max(1, context.state.totalCycles)
+        let phase = max(0.0, min(1.0, context.state.progress))
+        let cycles = Double(max(0, context.state.currentCycle - 1)) + phase
+        return max(0.0, min(1.0, cycles / Double(total)))
+    }
+
     var body: some View {
         VStack(spacing: 4) {
-            CycleDotsRow(total: context.state.totalCycles, current: context.state.currentCycle)
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    Capsule()
+                        .fill(Color(hex: "#B9D3A8").opacity(0.18))
+                        .frame(height: 4)
+                    Capsule()
+                        .fill(
+                            LinearGradient(
+                                colors: [Color(hex: "#B9D3A8"), Color(hex: "#E8B4B8")],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .frame(width: max(2, geo.size.width * sessionProgress), height: 4)
+                }
+            }
+            .frame(height: 4)
+
             HStack {
-                Text(patternText(context.attributes.sessionType))
+                Text(context.attributes.sessionType.split(separator: "-").joined(separator: " · "))
                 Spacer()
                 Text("breathe with dino")
             }
