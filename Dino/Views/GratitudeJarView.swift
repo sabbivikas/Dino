@@ -270,12 +270,21 @@ private struct JarStackView: View {
                             containerWidth: w,
                             containerHeight: h
                         )
-                        JarTokenView(
+                        let isNew = note.id == justAddedId
+                        let token = JarTokenView(
                             assetName: tokenAssetFor(index: index),
                             indexInJar: index,
                             totalInJar: min(notes.count, 30),
-                            isNewDrop: note.id == justAddedId
+                            isNewDrop: false
                         )
+
+                        Group {
+                            if isNew {
+                                token.modifier(JarDropKeyframeModifier(dropDistance: pos.y))
+                            } else {
+                                token
+                            }
+                        }
                         .position(x: pos.x, y: pos.y)
                     }
                 }
@@ -343,6 +352,68 @@ private struct JarStackView: View {
     private func jitter(seed: Int, range: Double) -> Double {
         let bucket = Double((abs(seed) % 1000)) / 1000.0
         return (bucket - 0.5) * 2.0 * range
+    }
+}
+
+// MARK: - Jar drop keyframe animation
+
+/// Animatable values for the jar-drop sequence.
+private struct JarDropValues {
+    var opacity: Double = 0
+    var translateY: CGFloat = 0
+    var rotation: Double = -8
+    var scale: CGFloat = 0.85
+}
+
+/// Plays a one-shot keyframe animation when the token first appears:
+/// opacity 0 → 1, translateY from above the jar to its rest position
+/// with a gravity arc + bounce, slight rotation wobble, scale squash.
+private struct JarDropKeyframeModifier: ViewModifier {
+    /// Final y-position of the token inside the jar, used to compute
+    /// how far above the jar the token should start.
+    let dropDistance: CGFloat
+
+    func body(content: Content) -> some View {
+        let startY = -(dropDistance + 80)
+        return content
+            .keyframeAnimator(
+                initialValue: JarDropValues(translateY: startY)
+            ) { view, value in
+                view
+                    .opacity(value.opacity)
+                    .scaleEffect(value.scale)
+                    .rotationEffect(.degrees(value.rotation))
+                    .offset(y: value.translateY)
+            } keyframes: { _ in
+                // Opacity: fade in quickly, stay visible.
+                KeyframeTrack(\JarDropValues.opacity) {
+                    LinearKeyframe(0.0, duration: 0.05)
+                    LinearKeyframe(1.0, duration: 0.18)
+                    LinearKeyframe(1.0, duration: 0.85)
+                }
+                // TranslateY: gravity drop from above jar, overshoot below
+                // rest, bounce back, settle.
+                KeyframeTrack(\JarDropValues.translateY) {
+                    CubicKeyframe(startY, duration: 0.05)
+                    CubicKeyframe(12, duration: 0.55)   // gravity arc, slight overshoot
+                    SpringKeyframe(-4, duration: 0.20)  // bounce up
+                    SpringKeyframe(0,  duration: 0.28)  // settle at rest
+                }
+                // Rotation: arrives slightly tilted, wobbles, settles upright.
+                KeyframeTrack(\JarDropValues.rotation) {
+                    LinearKeyframe(-8, duration: 0.05)
+                    CubicKeyframe(6,  duration: 0.55)
+                    SpringKeyframe(-3, duration: 0.20)
+                    SpringKeyframe(0,  duration: 0.28)
+                }
+                // Scale: squash on impact, then settle.
+                KeyframeTrack(\JarDropValues.scale) {
+                    LinearKeyframe(0.85, duration: 0.05)
+                    CubicKeyframe(1.10, duration: 0.55)  // impact squash
+                    SpringKeyframe(0.96, duration: 0.20) // recoil
+                    SpringKeyframe(1.00, duration: 0.28) // rest
+                }
+            }
     }
 }
 
