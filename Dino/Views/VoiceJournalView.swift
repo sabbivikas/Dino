@@ -6,6 +6,7 @@
 import SwiftUI
 import UIKit
 import AVFoundation
+import PhotosUI
 
 // MARK: - Root View
 struct VoiceJournalView: View {
@@ -247,6 +248,10 @@ private struct JournalComposerCard: View {
     @State private var promptIndex: Int = 0
     @State private var composerText: String = ""
     @State private var micPulse: CGFloat = 1.0
+    @State private var selectedImage: UIImage? = nil
+    @State private var selectedMood: String? = nil
+    @State private var showPhotoPicker: Bool = false
+    @State private var showMoodSheet: Bool = false
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -374,49 +379,34 @@ private struct JournalComposerCard: View {
                     .padding(.trailing, 16)
 
                 // Action row
-                HStack(alignment: .top, spacing: 14) {
-                    // Mic (active)
-                    VStack(spacing: 4) {
-                        ComposerActionButton(
-                            system: "mic.fill",
-                            bg: Color(hex: "#C7DEBB"),
-                            stroke: Color(hex: "#7BA872"),
-                            disabled: false,
-                            action: onMic
-                        )
-                        .scaleEffect(micPulse)
-                        Spacer().frame(height: 12)
-                    }
+                HStack(alignment: .center, spacing: 14) {
+                    // Mic
+                    ComposerActionButton(
+                        system: "mic.fill",
+                        bg: Color(hex: "#C7DEBB"),
+                        stroke: Color(hex: "#7BA872"),
+                        disabled: false,
+                        action: onMic
+                    )
+                    .scaleEffect(micPulse)
 
-                    // Camera (disabled)
-                    VStack(spacing: 4) {
-                        ComposerActionButton(
-                            system: "camera.fill",
-                            bg: DinoTheme.paper,
-                            stroke: DinoTheme.peach,
-                            disabled: true,
-                            action: {}
-                        )
-                        .opacity(0.5)
-                        Text("soon")
-                            .font(.system(size: 11))
-                            .foregroundColor(Color(hex: "#A8A29A"))
-                    }
+                    // Camera
+                    ComposerActionButton(
+                        system: "camera.fill",
+                        bg: DinoTheme.paper,
+                        stroke: DinoTheme.peach,
+                        disabled: false,
+                        action: { showPhotoPicker = true }
+                    )
 
-                    // Mood (disabled)
-                    VStack(spacing: 4) {
-                        ComposerActionButton(
-                            system: "face.smiling",
-                            bg: DinoTheme.paper,
-                            stroke: DinoTheme.warmRose,
-                            disabled: true,
-                            action: {}
-                        )
-                        .opacity(0.5)
-                        Text("soon")
-                            .font(.system(size: 11))
-                            .foregroundColor(Color(hex: "#A8A29A"))
-                    }
+                    // Mood
+                    ComposerActionButton(
+                        system: selectedMood == nil ? "face.smiling" : "face.smiling.inverse",
+                        bg: DinoTheme.paper,
+                        stroke: DinoTheme.warmRose,
+                        disabled: false,
+                        action: { showMoodSheet = true }
+                    )
 
                     Spacer()
 
@@ -451,6 +441,15 @@ private struct JournalComposerCard: View {
         }
         .onAppear {
             startMicPulse()
+        }
+        .sheet(isPresented: $showPhotoPicker) {
+            PhotoPicker(image: $selectedImage)
+                .ignoresSafeArea()
+        }
+        .sheet(isPresented: $showMoodSheet) {
+            MoodSheet(selected: $selectedMood)
+                .presentationDetents([.height(260)])
+                .presentationDragIndicator(.visible)
         }
     }
 
@@ -889,6 +888,33 @@ private struct MoodVignette: View {
                 Circle()
                     .fill(Color(hex: "#FFF2B3"))
                     .frame(width: 40, height: 40)
+                // Layered hills (back: lighter sage, front: darker sage)
+                GeometryReader { geo in
+                    let w = geo.size.width
+                    let h = geo.size.height
+                    Path { p in
+                        p.move(to: CGPoint(x: 0, y: h * 0.75))
+                        p.addQuadCurve(to: CGPoint(x: w * 0.5, y: h * 0.72),
+                                       control: CGPoint(x: w * 0.25, y: h * 0.68))
+                        p.addQuadCurve(to: CGPoint(x: w, y: h * 0.70),
+                                       control: CGPoint(x: w * 0.75, y: h * 0.76))
+                        p.addLine(to: CGPoint(x: w, y: h))
+                        p.addLine(to: CGPoint(x: 0, y: h))
+                        p.closeSubpath()
+                    }
+                    .fill(Color(hex: "#A8C5A0"))
+                    Path { p in
+                        p.move(to: CGPoint(x: 0, y: h * 0.85))
+                        p.addQuadCurve(to: CGPoint(x: w * 0.55, y: h * 0.83),
+                                       control: CGPoint(x: w * 0.30, y: h * 0.80))
+                        p.addQuadCurve(to: CGPoint(x: w, y: h * 0.82),
+                                       control: CGPoint(x: w * 0.80, y: h * 0.86))
+                        p.addLine(to: CGPoint(x: w, y: h))
+                        p.addLine(to: CGPoint(x: 0, y: h))
+                        p.closeSubpath()
+                    }
+                    .fill(Color(hex: "#7BA872"))
+                }
             }
         case .partly:
             ZStack {
@@ -911,6 +937,33 @@ private struct MoodVignette: View {
                     .fill(Color.white.opacity(0.7))
                     .frame(width: 50, height: 24)
                     .offset(x: -8, y: 18)
+                // Earthy horizons (back: warm tan, front: deeper umber)
+                GeometryReader { geo in
+                    let w = geo.size.width
+                    let h = geo.size.height
+                    Path { p in
+                        p.move(to: CGPoint(x: 0, y: h * 0.72))
+                        p.addQuadCurve(to: CGPoint(x: w * 0.4, y: h * 0.68),
+                                       control: CGPoint(x: w * 0.20, y: h * 0.65))
+                        p.addQuadCurve(to: CGPoint(x: w, y: h * 0.66),
+                                       control: CGPoint(x: w * 0.60, y: h * 0.71))
+                        p.addLine(to: CGPoint(x: w, y: h))
+                        p.addLine(to: CGPoint(x: 0, y: h))
+                        p.closeSubpath()
+                    }
+                    .fill(Color(hex: "#C68B5B").opacity(0.55))
+                    Path { p in
+                        p.move(to: CGPoint(x: 0, y: h * 0.82))
+                        p.addQuadCurve(to: CGPoint(x: w * 0.5, y: h * 0.80),
+                                       control: CGPoint(x: w * 0.25, y: h * 0.78))
+                        p.addQuadCurve(to: CGPoint(x: w, y: h * 0.78),
+                                       control: CGPoint(x: w * 0.75, y: h * 0.82))
+                        p.addLine(to: CGPoint(x: w, y: h))
+                        p.addLine(to: CGPoint(x: 0, y: h))
+                        p.closeSubpath()
+                    }
+                    .fill(Color(hex: "#8B5A3C").opacity(0.7))
+                }
             }
         case .cloudy:
             ZStack {
@@ -931,6 +984,19 @@ private struct MoodVignette: View {
                     .fill(Color.white.opacity(0.7))
                     .frame(width: 60, height: 26)
                     .offset(x: -6, y: 24)
+                // Dark green horizon strip
+                GeometryReader { geo in
+                    let w = geo.size.width
+                    let h = geo.size.height
+                    Path { p in
+                        p.move(to: CGPoint(x: 0, y: h * 0.80))
+                        p.addLine(to: CGPoint(x: w, y: h * 0.80))
+                        p.addLine(to: CGPoint(x: w, y: h))
+                        p.addLine(to: CGPoint(x: 0, y: h))
+                        p.closeSubpath()
+                    }
+                    .fill(Color(hex: "#6B8577").opacity(0.85))
+                }
             }
         }
     }
@@ -1013,6 +1079,95 @@ fileprivate func moodPhotoGradient(_ tag: String) -> LinearGradient {
             colors: [Color(hex: "#C8D9E6"), Color(hex: "#A8C0D4")],
             startPoint: .top, endPoint: .bottom
         )
+    }
+}
+
+// MARK: - Photo Picker (PHPickerViewController wrapper)
+private struct PhotoPicker: UIViewControllerRepresentable {
+    @Binding var image: UIImage?
+
+    func makeUIViewController(context: Context) -> PHPickerViewController {
+        var config = PHPickerConfiguration()
+        config.filter = .images
+        config.selectionLimit = 1
+        let picker = PHPickerViewController(configuration: config)
+        picker.delegate = context.coordinator
+        return picker
+    }
+
+    func updateUIViewController(_ uiViewController: PHPickerViewController, context: Context) {}
+
+    func makeCoordinator() -> Coordinator { Coordinator(self) }
+
+    final class Coordinator: NSObject, PHPickerViewControllerDelegate {
+        let parent: PhotoPicker
+        init(_ parent: PhotoPicker) { self.parent = parent }
+
+        func picker(_ picker: PHPickerViewController, didFinishPicking results: [PHPickerResult]) {
+            picker.dismiss(animated: true)
+            guard let provider = results.first?.itemProvider,
+                  provider.canLoadObject(ofClass: UIImage.self) else { return }
+            provider.loadObject(ofClass: UIImage.self) { [weak self] object, _ in
+                guard let image = object as? UIImage else { return }
+                DispatchQueue.main.async { self?.parent.image = image }
+            }
+        }
+    }
+}
+
+// MARK: - Mood Sheet
+private struct MoodSheet: View {
+    @Binding var selected: String?
+    @Environment(\.dismiss) private var dismiss
+
+    private let options: [(label: String, emoji: String)] = [
+        ("happy", "😊"),
+        ("calm", "🌿"),
+        ("okay", "😐"),
+        ("low", "🌧"),
+        ("stressed", "⚡️")
+    ]
+
+    var body: some View {
+        VStack(spacing: 18) {
+            Text("how are you feeling?")
+                .font(.custom(DinoTheme.customFontName, size: 20))
+                .foregroundColor(DinoTheme.ink)
+                .padding(.top, 28)
+
+            HStack(spacing: 10) {
+                ForEach(options, id: \.label) { option in
+                    Button {
+                        selected = option.label
+                        dismiss()
+                    } label: {
+                        VStack(spacing: 6) {
+                            Text(option.emoji).font(.system(size: 32))
+                            Text(option.label)
+                                .font(.system(size: 12))
+                                .foregroundColor(DinoTheme.muted)
+                        }
+                        .frame(width: 60, height: 84)
+                        .background(
+                            RoundedRectangle(cornerRadius: 14)
+                                .fill(selected == option.label
+                                      ? Color(hex: "#C7DEBB").opacity(0.5)
+                                      : DinoTheme.paper)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 14)
+                                        .stroke(Color(hex: "#A8A29A").opacity(0.25), lineWidth: 1)
+                                )
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 16)
+
+            Spacer()
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(DinoTheme.paper)
     }
 }
 
