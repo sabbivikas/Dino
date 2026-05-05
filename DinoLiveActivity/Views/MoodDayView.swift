@@ -55,6 +55,66 @@ struct MoodDaySmallView: View {
     }
 }
 
+// MARK: - Large (day)
+
+struct MoodDayLargeView: View {
+    let entry: MoodSnapshot
+
+    private let pills = ["calm", "happy", "okay", "low"]
+
+    var body: some View {
+        ZStack {
+            WidgetGradients.moodDay
+
+            CloudsShape()
+                .frame(height: 110)
+                .frame(maxHeight: .infinity, alignment: .top)
+
+            VStack {
+                Spacer()
+                HillsShape(palette: .day)
+                    .frame(height: 110)
+            }
+
+            VStack {
+                Spacer()
+                HStack {
+                    Spacer()
+                    Image("WidgetMascotDay")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 170, height: 170)
+                        .offset(x: 22, y: 22)
+                }
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text("mood check-in")
+                    .font(WidgetTheme.widgetFont(size: 12))
+                    .foregroundColor(DinoPalette.dinoInk.opacity(0.75))
+                    .textCase(.uppercase)
+
+                Text("how are you\nfeeling today?")
+                    .font(WidgetTheme.widgetFont(size: 30))
+                    .foregroundColor(DinoPalette.dinoInk)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Spacer(minLength: 0)
+
+                HStack(spacing: 6) {
+                    ForEach(pills, id: \.self) { label in
+                        MoodPillDashed(label: label)
+                    }
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        }
+    }
+}
+
 // MARK: - Medium (day)
 
 struct MoodDayMediumView: View {

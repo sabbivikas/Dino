@@ -62,6 +62,78 @@ struct MoodMorningSmallView: View {
     }
 }
 
+// MARK: - Large (morning)
+
+struct MoodMorningLargeView: View {
+    let entry: MoodSnapshot
+
+    private let pills = ["calm", "happy", "okay", "low"]
+
+    var body: some View {
+        ZStack {
+            WidgetGradients.moodMorning
+
+            // Sun, larger, slowly rotating per timeline phase
+            SunShape(rotationDegrees: Double(entry.sceneAnimPhase) * 6.0)
+                .frame(width: 110, height: 110)
+                .offset(x: -110, y: -120)
+
+            // Hills across the bottom
+            VStack {
+                Spacer()
+                HillsShape(palette: .morning)
+                    .frame(height: 130)
+            }
+
+            // Mascot bottom-right, bleeds past the edge
+            VStack {
+                Spacer()
+                HStack {
+                    Spacer()
+                    Image("WidgetMascotMorning")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 180, height: 180)
+                        .offset(x: 24, y: 24)
+                }
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text("morning")
+                    .font(WidgetTheme.widgetFont(size: 12))
+                    .foregroundColor(DinoPalette.morningInkSoft)
+                    .textCase(.uppercase)
+
+                Text("good morning")
+                    .font(WidgetTheme.widgetFont(size: 30))
+                    .foregroundColor(DinoPalette.morningInk)
+                    .lineLimit(1)
+
+                Text("a new day begins.")
+                    .font(WidgetTheme.widgetFont(size: 14))
+                    .foregroundColor(DinoPalette.morningInk.opacity(0.85))
+
+                Text("how are you showing up today?")
+                    .font(WidgetTheme.widgetFont(size: 13))
+                    .foregroundColor(DinoPalette.morningInkSoft)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Spacer(minLength: 0)
+
+                HStack(spacing: 6) {
+                    ForEach(pills, id: \.self) { label in
+                        MoodPillDashed(label: label)
+                    }
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        }
+    }
+}
+
 // MARK: - Medium (morning)
 
 struct MoodMorningMediumView: View {

@@ -31,3 +31,27 @@ struct MoodPill: View {
             )
     }
 }
+
+/// Dashed-border mood pill used by the systemLarge mood scenes,
+/// matching the v5 spec (white .55 fill + dashed ink stroke).
+struct MoodPillDashed: View {
+    let label: String
+    var textColor: Color = DinoPalette.dinoInk
+    var strokeColor: Color = Color(hex: "#11402D").opacity(0.35)
+
+    var body: some View {
+        Text(label)
+            .font(WidgetTheme.widgetFont(size: 13))
+            .foregroundColor(textColor)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 5)
+            .background(
+                Capsule()
+                    .fill(Color.white.opacity(0.55))
+            )
+            .overlay(
+                Capsule()
+                    .stroke(strokeColor, style: StrokeStyle(lineWidth: 1.2, dash: [3, 2]))
+            )
+    }
+}

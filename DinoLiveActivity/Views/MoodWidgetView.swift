@@ -37,6 +37,12 @@ struct MoodWidgetEntryView: View {
             MoodNightSmallView(entry: entry)
         case (.night, .systemMedium):
             MoodNightMediumView(entry: entry)
+        case (.morning, .systemLarge):
+            MoodMorningLargeView(entry: entry)
+        case (.day, .systemLarge):
+            MoodDayLargeView(entry: entry)
+        case (.night, .systemLarge):
+            MoodNightLargeView(entry: entry)
         default:
             // Fallback for unsupported families
             MoodDaySmallView(entry: entry)

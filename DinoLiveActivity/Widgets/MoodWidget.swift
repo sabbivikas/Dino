@@ -115,7 +115,7 @@ struct MoodWidget: Widget {
         }
         .configurationDisplayName("mood check-in")
         .description("quick tap to log how you're feeling")
-        .supportedFamilies([.systemSmall, .systemMedium])
+        .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
     }
 }
 
