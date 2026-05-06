@@ -1,8 +1,9 @@
 //
 //  DinoActivityAttributes.swift
-//  Dino
+//  Shared (Dino + DinoLiveActivityExtension)
 //
-//  Activity attributes shared between the main app and the Live Activity widget extension.
+//  Single source of truth for ActivityKit attributes used by the main app
+//  and the Live Activity widget extension.
 //
 
 import ActivityKit

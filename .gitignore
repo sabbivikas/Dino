@@ -23,3 +23,6 @@ DerivedData/
 # Firebase
 # GoogleService-Info.plist  # keeping tracked since it's needed for builds
 .claude/
+
+# Node (Firestore rules tests)
+firebase-rules-tests/node_modules/

@@ -1,0 +1,13 @@
+{
+  "name": "dino-firestore-rules-tests",
+  "private": true,
+  "scripts": {
+    "test": "cd .. && firebase emulators:exec --only firestore --project demo-dino-rules-test \"cd firebase-rules-tests && npx jest --runInBand\""
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^4.0.1",
+    "firebase": "^11.10.0",
+    "firebase-tools": "^13.35.1",
+    "jest": "^29.7.0"
+  }
+}

@@ -79,6 +79,11 @@
 			path = DinoLiveActivity;
 			sourceTree = "<group>";
 		};
+		E1CF60602F73C55D008D5746 /* Shared */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Shared;
+			sourceTree = "<group>";
+		};
 		E1CF602F2F73C55B008D5746 /* Dino */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = Dino;
@@ -137,6 +142,7 @@
 			isa = PBXGroup;
 			children = (
 				E1CF602F2F73C55B008D5746 /* Dino */,
+				E1CF60602F73C55D008D5746 /* Shared */,
 				AA000030AAAA000000000001 /* DinoLiveActivity */,
 				E1CF603F2F73C55D008D5746 /* DinoTests */,
 				E1CF60492F73C55D008D5746 /* DinoUITests */,
@@ -172,6 +178,7 @@
 			);
 			fileSystemSynchronizedGroups = (
 				AA000030AAAA000000000001 /* DinoLiveActivity */,
+				E1CF60602F73C55D008D5746 /* Shared */,
 			);
 			name = DinoLiveActivityExtension;
 			packageProductDependencies = (
@@ -196,6 +203,7 @@
 			);
 			fileSystemSynchronizedGroups = (
 				E1CF602F2F73C55B008D5746 /* Dino */,
+				E1CF60602F73C55D008D5746 /* Shared */,
 			);
 			name = Dino;
 			packageProductDependencies = (
