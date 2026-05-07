@@ -8,17 +8,19 @@ import Combine
 import UIKit
 
 enum MoodPaintingError: Error, LocalizedError {
-    case invalidResponse
+    case invalidResponse(Int)
     case modelNotReady
     case decodeFailed
+    case serviceUnavailable
     case network(String)
 
     var errorDescription: String? {
         switch self {
-        case .invalidResponse: return "invalid response from painting service"
-        case .modelNotReady:   return "painting model is still warming up"
-        case .decodeFailed:    return "couldn't decode painting image"
-        case .network(let m):  return m
+        case .invalidResponse(let code): return "invalid response from painting service (\(code))"
+        case .modelNotReady:       return "painting model is still warming up"
+        case .decodeFailed:        return "couldn't decode painting image"
+        case .serviceUnavailable:  return "painting service is temporarily unavailable"
+        case .network(let m):      return m
         }
     }
 }
@@ -38,7 +40,7 @@ final class MoodPaintingService: ObservableObject {
     @Published var monthlyPaintings: [(date: Date, image: UIImage)] = []
 
     private let hfToken = "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"
-    private let modelURL = URL(string: "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-xl-base-1.0")!
+    private let modelURL = URL(string: "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-2-1")!
 
     private init() {
         _ = loadAllPaintings()
@@ -147,27 +149,32 @@ final class MoodPaintingService: ObservableObject {
             throw MoodPaintingError.network(error.localizedDescription)
         }
 
-        guard let http = response as? HTTPURLResponse else {
-            throw MoodPaintingError.invalidResponse
+        let statusCode = (response as? HTTPURLResponse)?.statusCode ?? -1
+
+        // Detect HTML error pages (e.g. gateway / service unavailable) before anything else
+        let prefixBytes = data.prefix(200)
+        if let prefixString = String(data: prefixBytes, encoding: .ascii) {
+            let trimmed = prefixString.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            if trimmed.hasPrefix("<!doctype") || trimmed.hasPrefix("<html") {
+                throw MoodPaintingError.serviceUnavailable
+            }
         }
 
-        if http.statusCode == 503 {
+        switch statusCode {
+        case 200:
+            guard let img = UIImage(data: data) else {
+                throw MoodPaintingError.decodeFailed
+            }
+            return img
+        case 503:
             if retryOn503 {
-                try await Task.sleep(nanoseconds: 20 * 1_000_000_000)
+                try await Task.sleep(nanoseconds: 20_000_000_000)
                 return try await callHuggingFace(prompt: prompt, retryOn503: false)
             }
             throw MoodPaintingError.modelNotReady
+        default:
+            throw MoodPaintingError.invalidResponse(statusCode)
         }
-
-        guard (200..<300).contains(http.statusCode) else {
-            let msg = String(data: data, encoding: .utf8) ?? "http \(http.statusCode)"
-            throw MoodPaintingError.network(msg)
-        }
-
-        guard let img = UIImage(data: data) else {
-            throw MoodPaintingError.decodeFailed
-        }
-        return img
     }
 
     // MARK: - Persistence

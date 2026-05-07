@@ -148,26 +148,15 @@ struct MoodPaintingGeneratorView: View {
     // MARK: - Error
 
     private func errorView(_ message: String) -> some View {
-        VStack(spacing: 18) {
-            Text("couldn't generate painting, try again")
-                .font(.custom(DinoTheme.customFontName, size: 16))
-                .foregroundColor(GeneratorPalette.cream)
-                .multilineTextAlignment(.center)
-            Text(message)
-                .font(.custom(DinoTheme.customFontName, size: 12))
-                .foregroundColor(GeneratorPalette.cream.opacity(0.5))
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 40)
-            Button(action: retry) {
-                Text("try again")
-                    .font(.custom(DinoTheme.customFontName, size: 15))
-                    .foregroundColor(GeneratorPalette.bg)
-                    .padding(.horizontal, 22)
-                    .padding(.vertical, 10)
-                    .background(Capsule().fill(GeneratorPalette.cream))
+        Text("painting will be ready soon 🎨")
+            .font(.custom(DinoTheme.customFontName, size: 18))
+            .foregroundColor(GeneratorPalette.cream)
+            .multilineTextAlignment(.center)
+            .padding(.horizontal, 40)
+            .task {
+                try? await Task.sleep(nanoseconds: 3_000_000_000)
+                dismiss()
             }
-            .buttonStyle(.plain)
-        }
     }
 
     // MARK: - Logic
@@ -216,12 +205,6 @@ struct MoodPaintingGeneratorView: View {
         withAnimation(.easeInOut(duration: 0.5)) {
             generatedImage = img
         }
-    }
-
-    private func retry() {
-        errorText = nil
-        startStageCycle()
-        kickOffGeneration()
     }
 
     private func stop() {
