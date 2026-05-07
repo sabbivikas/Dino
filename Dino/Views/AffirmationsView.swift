@@ -196,6 +196,25 @@ struct AffirmationsView: View {
                     }
                 }
 
+                // Back button — top-left
+                VStack {
+                    HStack {
+                        Button(action: { dismiss() }) {
+                            Image(systemName: "chevron.left")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundColor(Color(hex: "#8B7A6A"))
+                                .frame(width: 34, height: 34)
+                                .background(Circle().fill(Color(hex: "#F5F0E8")))
+                                .shadow(color: .black.opacity(0.10), radius: 4, x: 0, y: 2)
+                        }
+                        .buttonStyle(.plain)
+                        .padding(.leading, 20)
+                        .padding(.top, 16)
+                        Spacer()
+                    }
+                    Spacer()
+                }
+
                 // Bottom strip
                 VStack {
                     Spacer()
