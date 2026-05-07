@@ -52,7 +52,9 @@ struct VoiceJournalView: View {
                         // Composer card
                         JournalComposerCard(
                             onMic: { toggleRecording() },
-                            onDevelop: { toggleRecording() }
+                            onDevelop: { text, mood in
+                                saveTextEntry(text: text, mood: mood)
+                            }
                         )
 
                         // Timeline header
@@ -101,6 +103,32 @@ struct VoiceJournalView: View {
         } else {
             viewModel.startRecording()
         }
+    }
+
+    private func saveTextEntry(text: String, mood: String?) {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateStyle = .medium
+        let dateStr = dateFormatter.string(from: Date())
+        let title = "journal entry \u{2014} \(dateStr)"
+
+        let entry = JournalEntry(
+            date: Date(),
+            audioFileName: "",
+            title: title,
+            summary: trimmed,
+            moodTag: mood ?? "reflective",
+            durationSeconds: 0
+        )
+        dataManager.addJournalEntry(entry)
+
+        // Dismiss keyboard
+        UIApplication.shared.sendAction(
+            #selector(UIResponder.resignFirstResponder),
+            to: nil, from: nil, for: nil
+        )
     }
 }
 
@@ -243,7 +271,7 @@ private struct HeroRecordButton: View {
 // MARK: - Journal Composer Card
 private struct JournalComposerCard: View {
     let onMic: () -> Void
-    let onDevelop: () -> Void
+    let onDevelop: (String, String?) -> Void
 
     @State private var promptIndex: Int = 0
     @State private var composerText: String = ""
@@ -411,7 +439,15 @@ private struct JournalComposerCard: View {
                     Spacer()
 
                     // Develop pill
-                    Button(action: onDevelop) {
+                    Button(action: {
+                        let textToSave = composerText
+                        let moodToSave = selectedMood
+                        let trimmed = textToSave.trimmingCharacters(in: .whitespacesAndNewlines)
+                        guard !trimmed.isEmpty else { return }
+                        onDevelop(textToSave, moodToSave)
+                        composerText = ""
+                        selectedMood = nil
+                    }) {
                         HStack(spacing: 6) {
                             Text("develop")
                                 .font(.system(size: 14, weight: .semibold))
