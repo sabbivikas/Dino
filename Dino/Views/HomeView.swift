@@ -10,6 +10,9 @@ struct HomeView: View {
 
     @EnvironmentObject var dataManager: SharedDataManager
     @StateObject private var viewModel: HomeViewModel = HomeViewModel(dataManager: SharedDataManager.shared)
+    @StateObject private var notificationStore = NotificationStore.shared
+    @StateObject private var paintingService = MoodPaintingService.shared
+    @State private var showNotificationCenter = false
 
     var body: some View {
         NavigationStack {
@@ -74,7 +77,29 @@ struct HomeView: View {
                 viewModel.showFocus = true
                 dataManager.showFocusFromDeepLink = false
             }
+            .sheet(isPresented: $showNotificationCenter) {
+                NotificationCenterView()
+            }
+            .onAppear { refreshNotifications() }
+            .onChange(of: dataManager.streakData.currentStreak) { _, _ in refreshNotifications() }
+            .onChange(of: dataManager.journalEntries.count) { _, _ in refreshNotifications() }
+            .onChange(of: dataManager.gratitudeNotes.count) { _, _ in refreshNotifications() }
+            .onChange(of: paintingService.monthlyPaintings.count) { _, _ in refreshNotifications() }
         }
+    }
+
+    private func refreshNotifications() {
+        let today = Date()
+        let hasPainting = paintingService.hasPainting(for: today)
+        let lastJournalDate = dataManager.journalEntries.first?.date
+        notificationStore.refreshFromData(
+            streakDays: dataManager.streakData.currentStreak,
+            journalCount: dataManager.journalEntries.count,
+            gratitudeCount: dataManager.gratitudeNotes.count,
+            lastJournalDate: lastJournalDate,
+            hasMonthlyPainting: hasPainting,
+            paintingMonthKey: paintingService.monthKey(today)
+        )
     }
 
     // MARK: - Header Leading (Avatar)
@@ -107,6 +132,26 @@ struct HomeView: View {
                         .font(DinoTheme.numericFont(size: 10))
                         .foregroundColor(DinoTheme.textPrimary)
                         .offset(y: 1)
+                }
+            }
+
+            Button {
+                showNotificationCenter = true
+            } label: {
+                ZStack(alignment: .topTrailing) {
+                    Image(systemName: "bell.fill")
+                        .font(DinoTheme.dinoFont(size: 18))
+                        .foregroundColor(Color(hex: "#8B7A6A"))
+                        .frame(width: 22, height: 22)
+
+                    if notificationStore.unreadCount > 0 {
+                        Text("\(min(notificationStore.unreadCount, 9))")
+                            .font(.system(size: 8, weight: .bold, design: .rounded))
+                            .foregroundColor(.white)
+                            .frame(width: 12, height: 12)
+                            .background(Circle().fill(Color(hex: "#E8746A")))
+                            .offset(x: 4, y: -4)
+                    }
                 }
             }
 
