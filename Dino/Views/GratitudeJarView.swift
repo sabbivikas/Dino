@@ -75,6 +75,8 @@ struct GratitudeJarView: View {
                     Spacer(minLength: 8)
 
                     // Jar + contents + halo
+                    // Offset down so the jar's bottom edge rests on the
+                    // wooden shelf / doily of the grandma's-room backdrop.
                     ZStack {
                         // Halo behind jar
                         JarHaloView(reduceMotion: reduceMotion)
@@ -99,6 +101,7 @@ struct GratitudeJarView: View {
                             }
                         }
                     }
+                    .offset(y: 70)
 
                     // Count caption under jar
                     if viewModel.totalCount > 0 {

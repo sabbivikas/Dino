@@ -51,7 +51,6 @@ struct VoiceJournalView: View {
 
                         // Composer card
                         JournalComposerCard(
-                            onMic: { toggleRecording() },
                             onDevelop: { text, mood in
                                 saveTextEntry(text: text, mood: mood)
                             }
@@ -94,14 +93,6 @@ struct VoiceJournalView: View {
             .onChange(of: viewModel.permissionDenied) { _, denied in
                 if denied { showPermissionAlert = true }
             }
-        }
-    }
-
-    private func toggleRecording() {
-        if viewModel.isRecording {
-            viewModel.stopRecording()
-        } else {
-            viewModel.startRecording()
         }
     }
 
@@ -270,7 +261,6 @@ private struct HeroRecordButton: View {
 
 // MARK: - Journal Composer Card
 private struct JournalComposerCard: View {
-    let onMic: () -> Void
     let onDevelop: (String, String?) -> Void
 
     @State private var promptIndex: Int = 0
@@ -279,7 +269,12 @@ private struct JournalComposerCard: View {
     @State private var selectedImage: UIImage? = nil
     @State private var selectedMood: String? = nil
     @State private var showPhotoPicker: Bool = false
+    @State private var showCamera: Bool = false
+    @State private var showCameraDialog: Bool = false
     @State private var showMoodSheet: Bool = false
+    @State private var isTranscribing: Bool = false
+
+    @StateObject private var transcriber = SpeechTranscriber()
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -408,24 +403,26 @@ private struct JournalComposerCard: View {
 
                 // Action row
                 HStack(alignment: .center, spacing: 14) {
-                    // Mic
+                    // Mic — toggles live speech-to-text into composerText
                     ComposerActionButton(
-                        system: "mic.fill",
-                        bg: Color(hex: "#C7DEBB"),
-                        stroke: Color(hex: "#7BA872"),
+                        system: isTranscribing ? "stop.fill" : "mic.fill",
+                        bg: isTranscribing ? Color(hex: "#F5C6AA") : Color(hex: "#C7DEBB"),
+                        stroke: isTranscribing ? Color.red : Color(hex: "#7BA872"),
                         disabled: false,
-                        action: onMic
+                        action: { toggleTranscription() }
                     )
                     .scaleEffect(micPulse)
+                    .contentShape(Circle())
 
-                    // Camera
+                    // Camera — opens action sheet (camera vs library)
                     ComposerActionButton(
                         system: "camera.fill",
                         bg: DinoTheme.paper,
                         stroke: DinoTheme.peach,
                         disabled: false,
-                        action: { showPhotoPicker = true }
+                        action: { showCameraDialog = true }
                     )
+                    .contentShape(Circle())
 
                     // Mood
                     ComposerActionButton(
@@ -438,12 +435,22 @@ private struct JournalComposerCard: View {
 
                     Spacer()
 
-                    // Develop pill
+                    // Develop pill — saves composerText as a journal entry
                     Button(action: {
+                        // Stop transcription if running so we capture the
+                        // final text before saving.
+                        if isTranscribing {
+                            transcriber.stop()
+                            isTranscribing = false
+                        }
                         let textToSave = composerText
                         let moodToSave = selectedMood
                         let trimmed = textToSave.trimmingCharacters(in: .whitespacesAndNewlines)
-                        guard !trimmed.isEmpty else { return }
+                        guard !trimmed.isEmpty else {
+                            print("[Develop] Skipped: composerText is empty/whitespace")
+                            return
+                        }
+                        print("[Develop] Saving entry, chars=\(trimmed.count) mood=\(moodToSave ?? "nil")")
                         onDevelop(textToSave, moodToSave)
                         composerText = ""
                         selectedMood = nil
@@ -478,14 +485,49 @@ private struct JournalComposerCard: View {
         .onAppear {
             startMicPulse()
         }
+        .onDisappear {
+            if isTranscribing {
+                transcriber.stop()
+                isTranscribing = false
+            }
+        }
+        .onChange(of: transcriber.transcript) { _, newValue in
+            // Stream live partial results into the composer text field.
+            if isTranscribing {
+                composerText = newValue
+            }
+        }
+        .confirmationDialog(
+            "add a photo",
+            isPresented: $showCameraDialog,
+            titleVisibility: .visible
+        ) {
+            Button("take photo") { showCamera = true }
+            Button("choose from library") { showPhotoPicker = true }
+            Button("cancel", role: .cancel) { }
+        }
         .sheet(isPresented: $showPhotoPicker) {
             PhotoPicker(image: $selectedImage)
+                .ignoresSafeArea()
+        }
+        .sheet(isPresented: $showCamera) {
+            JournalCameraPicker(image: $selectedImage)
                 .ignoresSafeArea()
         }
         .sheet(isPresented: $showMoodSheet) {
             MoodSheet(selected: $selectedMood)
                 .presentationDetents([.height(260)])
                 .presentationDragIndicator(.visible)
+        }
+    }
+
+    private func toggleTranscription() {
+        if isTranscribing {
+            transcriber.stop()
+            isTranscribing = false
+        } else {
+            isTranscribing = true
+            transcriber.start(initialText: composerText)
         }
     }
 
@@ -1137,6 +1179,45 @@ fileprivate func moodPhotoGradient(_ tag: String) -> LinearGradient {
             colors: [Color(hex: "#C8D9E6"), Color(hex: "#A8C0D4")],
             startPoint: .top, endPoint: .bottom
         )
+    }
+}
+
+// MARK: - Journal Camera Picker (UIImagePickerController wrapper, .camera source)
+private struct JournalCameraPicker: UIViewControllerRepresentable {
+    @Binding var image: UIImage?
+
+    func makeUIViewController(context: Context) -> UIImagePickerController {
+        let picker = UIImagePickerController()
+        if UIImagePickerController.isSourceTypeAvailable(.camera) {
+            picker.sourceType = .camera
+        } else {
+            picker.sourceType = .photoLibrary
+        }
+        picker.delegate = context.coordinator
+        return picker
+    }
+
+    func updateUIViewController(_ uiViewController: UIImagePickerController, context: Context) {}
+
+    func makeCoordinator() -> Coordinator { Coordinator(self) }
+
+    final class Coordinator: NSObject, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
+        let parent: JournalCameraPicker
+        init(_ parent: JournalCameraPicker) { self.parent = parent }
+
+        func imagePickerController(
+            _ picker: UIImagePickerController,
+            didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]
+        ) {
+            if let img = info[.originalImage] as? UIImage {
+                parent.image = img
+            }
+            picker.dismiss(animated: true)
+        }
+
+        func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
+            picker.dismiss(animated: true)
+        }
     }
 }
 
