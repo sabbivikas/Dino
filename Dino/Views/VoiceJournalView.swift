@@ -609,7 +609,7 @@ private struct JournalPolaroidCard: View {
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    @State private var flipped: Bool = false
+    @State private var flipped: Bool = false  // front face shows first
     @State private var visible: Bool = false
 
     private var rotation: Double {
@@ -621,6 +621,28 @@ private struct JournalPolaroidCard: View {
         // Deterministic small tape rotation
         let v = Double((entry.id.hashValue % 14) - 7) * 0.5
         return v
+    }
+
+    /// Journal text truncated to ~80 chars for the vellum snippet bar
+    private var snippetText: String {
+        let text = entry.summary
+        guard text.count > 80 else { return text }
+        let idx = text.index(text.startIndex, offsetBy: 80)
+        return String(text[..<idx]) + "…"
+    }
+
+    /// Friendly lowercase caption with a decorative floral/seasonal suffix
+    private var friendlyCaption: String {
+        let base = entry.title.lowercased()
+        let hour = Calendar.current.component(.hour, from: entry.date)
+        let suffix: String
+        switch hour {
+        case 5..<12:  suffix = " ✿"
+        case 12..<17: suffix = " ☀︎"
+        case 17..<21: suffix = " ⋆"
+        default:      suffix = " ◦"
+        }
+        return base + suffix
     }
 
     var body: some View {
@@ -703,12 +725,12 @@ private struct JournalPolaroidCard: View {
                     .frame(width: 140, height: 140)
                     .clipShape(RoundedRectangle(cornerRadius: 8))
 
-                    // Vellum snippet bar
+                    // Vellum snippet bar — shows truncated journal text
                     Rectangle()
                         .fill(DinoTheme.paper.opacity(0.82))
                         .frame(width: 140, height: 24)
                         .overlay(
-                            Text(entry.summary)
+                            Text(snippetText)
                                 .font(.system(size: 11))
                                 .foregroundColor(Color(hex: "#3D3A35"))
                                 .lineLimit(1)
@@ -721,8 +743,8 @@ private struct JournalPolaroidCard: View {
                 }
                 .frame(width: 140, height: 140)
 
-                // Caption
-                Text(entry.title)
+                // Caption — friendly lowercase title with floral accent
+                Text(friendlyCaption)
                     .font(.custom(DinoTheme.customFontName, size: 14))
                     .foregroundColor(Color(hex: "#3D3A35"))
                     .lineLimit(2)
