@@ -78,6 +78,14 @@ struct VoiceJournalView: View {
                     .padding(.top, 16)
                     .padding(.bottom, 40)
                 }
+                .scrollDismissesKeyboard(.interactively)
+            }
+            .contentShape(Rectangle())
+            .onTapGesture {
+                UIApplication.shared.sendAction(
+                    #selector(UIResponder.resignFirstResponder),
+                    to: nil, from: nil, for: nil
+                )
             }
             .navigationBarHidden(true)
             .alert("Microphone Access Needed", isPresented: $showPermissionAlert) {
@@ -392,6 +400,13 @@ private struct JournalComposerCard: View {
                         .scrollContentBackground(.hidden)
                         .background(Color.clear)
                         .frame(minHeight: 140, maxHeight: 240)
+                        .submitLabel(.done)
+                        .onSubmit {
+                            UIApplication.shared.sendAction(
+                                #selector(UIResponder.resignFirstResponder),
+                                to: nil, from: nil, for: nil
+                            )
+                        }
                 }
                 .padding(.leading, 56)
                 .padding(.trailing, 16)
