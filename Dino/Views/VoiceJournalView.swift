@@ -14,9 +14,6 @@ struct VoiceJournalView: View {
 
     @EnvironmentObject var dataManager: SharedDataManager
     @StateObject private var viewModel: JournalViewModel = JournalViewModel(dataManager: SharedDataManager.shared)
-    @State private var showPermissionAlert: Bool = false
-
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         NavigationStack {
@@ -32,22 +29,6 @@ struct VoiceJournalView: View {
                             .foregroundColor(DinoTheme.ink)
                             .frame(maxWidth: .infinity, alignment: .center)
                             .padding(.top, 4)
-
-                        // Hero record button
-                        HeroRecordButton(viewModel: viewModel)
-
-                        // Timer caption
-                        Group {
-                            if viewModel.isRecording {
-                                Text(viewModel.formattedRecordingDuration)
-                                    .font(DinoTheme.numericFont(size: 22))
-                                    .foregroundColor(.red)
-                            } else {
-                                Text("tap to record")
-                                    .font(.custom(DinoTheme.customFontName, size: 16))
-                                    .foregroundColor(DinoTheme.muted)
-                            }
-                        }
 
                         // Composer card
                         JournalComposerCard(
@@ -88,19 +69,6 @@ struct VoiceJournalView: View {
                 )
             }
             .navigationBarHidden(true)
-            .alert("Microphone Access Needed", isPresented: $showPermissionAlert) {
-                Button("Open Settings") {
-                    if let url = URL(string: UIApplication.openSettingsURLString) {
-                        UIApplication.shared.open(url)
-                    }
-                }
-                Button("Cancel", role: .cancel) {}
-            } message: {
-                Text("Dino needs microphone access to record your voice journal entries.")
-            }
-            .onChange(of: viewModel.permissionDenied) { _, denied in
-                if denied { showPermissionAlert = true }
-            }
         }
     }
 
@@ -166,104 +134,6 @@ private struct JournalPaperBackdrop: View {
                 .opacity(0.04)
                 .allowsHitTesting(false)
         }
-    }
-}
-
-// MARK: - Hero Record Button (preserved UX)
-private struct HeroRecordButton: View {
-    @ObservedObject var viewModel: JournalViewModel
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    @State private var ring1Scale: CGFloat = 1.0
-    @State private var ring1Opacity: Double = 0.6
-    @State private var ring2Scale: CGFloat = 1.0
-    @State private var ring2Opacity: Double = 0.6
-
-    var body: some View {
-        ZStack {
-            if viewModel.isRecording {
-                if reduceMotion {
-                    // Static single ring
-                    Circle()
-                        .stroke(Color.red, lineWidth: 2)
-                        .frame(width: 90, height: 90)
-                        .scaleEffect(1.2)
-                        .opacity(0.3)
-                } else {
-                    // Ring 1
-                    Circle()
-                        .stroke(Color.red, lineWidth: 2)
-                        .frame(width: 90, height: 90)
-                        .scaleEffect(ring1Scale)
-                        .opacity(ring1Opacity)
-                    // Ring 2 (delayed)
-                    Circle()
-                        .stroke(Color.red, lineWidth: 2)
-                        .frame(width: 90, height: 90)
-                        .scaleEffect(ring2Scale)
-                        .opacity(ring2Opacity)
-                }
-            }
-
-            Button(action: toggle) {
-                ZStack {
-                    Circle()
-                        .fill(viewModel.isRecording ? Color.red : DinoTheme.sageGreen)
-                        .frame(width: 90, height: 90)
-                        .shadow(
-                            color: (viewModel.isRecording ? Color.red : DinoTheme.sageGreen).opacity(0.4),
-                            radius: 16, y: 4
-                        )
-
-                    Image(systemName: viewModel.isRecording ? "stop.fill" : "mic.fill")
-                        .font(.system(size: 36, weight: .semibold))
-                        .foregroundColor(.white)
-                }
-            }
-            .buttonStyle(ScaleButtonStyle())
-        }
-        .frame(height: 160)
-        .onAppear {
-            if viewModel.isRecording { startPulse() }
-        }
-        .onChange(of: viewModel.isRecording) { _, recording in
-            if recording {
-                startPulse()
-            } else {
-                stopPulse()
-            }
-        }
-    }
-
-    private func toggle() {
-        if viewModel.isRecording {
-            viewModel.stopRecording()
-        } else {
-            viewModel.startRecording()
-        }
-    }
-
-    private func startPulse() {
-        guard !reduceMotion else { return }
-        ring1Scale = 1.0
-        ring1Opacity = 0.6
-        ring2Scale = 1.0
-        ring2Opacity = 0.6
-        withAnimation(.easeOut(duration: 1.4).repeatForever(autoreverses: false)) {
-            ring1Scale = 2.0
-            ring1Opacity = 0.0
-        }
-        withAnimation(.easeOut(duration: 1.4).repeatForever(autoreverses: false).delay(0.7)) {
-            ring2Scale = 2.0
-            ring2Opacity = 0.0
-        }
-    }
-
-    private func stopPulse() {
-        ring1Scale = 1.0
-        ring1Opacity = 0.6
-        ring2Scale = 1.0
-        ring2Opacity = 0.6
     }
 }
 
