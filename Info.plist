@@ -8,6 +8,10 @@
 	<string>Dino uses motion to create a gentle parallax effect in the ambient background.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Dino uses your microphone to record voice journal entries. Recordings are saved privately on your device.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Dino uses the camera so you can capture a photo of your finished month-long mirror of affirmations.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Dino saves your finished mirror photo to your camera roll so you can keep the memory.</string>
 	<key>UIAppFonts</key>
 	<array>
 		<string>DinoInitiativeFont-Regular.ttf</string>
