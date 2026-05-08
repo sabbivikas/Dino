@@ -165,7 +165,9 @@ final class NotificationStore: ObservableObject {
         gratitudeCount: Int,
         lastJournalDate: Date?,
         hasMonthlyPainting: Bool,
-        paintingMonthKey: String
+        paintingMonthKey: String,
+        breathingSessionCount: Int,
+        meditationSessionCount: Int
     ) {
         let countBefore = notifications.count
 
@@ -234,6 +236,42 @@ final class NotificationStore: ObservableObject {
                 title: "\(m) tokens in the jar",
                 subtitle: "the jar is filling up with small good things.",
                 dedupeKey: "gratitude-\(m)"
+            )
+        }
+
+        // Breathing milestones
+        if breathingSessionCount >= 1 {
+            insertIfNew(
+                category: .growth,
+                title: "you took your first breath with dino 🫁",
+                subtitle: "small breaths, big shifts.",
+                dedupeKey: "breathing-first"
+            )
+        }
+        if breathingSessionCount >= 10 {
+            insertIfNew(
+                category: .growth,
+                title: "10 breathing sessions — your lungs thank you 🌿",
+                subtitle: "a steady rhythm is taking root.",
+                dedupeKey: "breathing-10"
+            )
+        }
+
+        // Meditation milestones
+        if meditationSessionCount >= 1 {
+            insertIfNew(
+                category: .growth,
+                title: "you meditated for the first time 🧘",
+                subtitle: "one quiet minute is its own kind of brave.",
+                dedupeKey: "meditation-first"
+            )
+        }
+        if meditationSessionCount >= 10 {
+            insertIfNew(
+                category: .growth,
+                title: "stillness is a superpower — 10 sessions done ✨",
+                subtitle: "you keep coming back to the quiet.",
+                dedupeKey: "meditation-10"
             )
         }
 

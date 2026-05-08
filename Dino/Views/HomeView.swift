@@ -85,6 +85,8 @@ struct HomeView: View {
             .onChange(of: dataManager.journalEntries.count) { _, _ in refreshNotifications() }
             .onChange(of: dataManager.gratitudeNotes.count) { _, _ in refreshNotifications() }
             .onChange(of: paintingService.monthlyPaintings.count) { _, _ in refreshNotifications() }
+            .onChange(of: dataManager.breathingSessions.count) { _, _ in refreshNotifications() }
+            .onChange(of: dataManager.meditationSessions.count) { _, _ in refreshNotifications() }
         }
     }
 
@@ -98,7 +100,9 @@ struct HomeView: View {
             gratitudeCount: dataManager.gratitudeNotes.count,
             lastJournalDate: lastJournalDate,
             hasMonthlyPainting: hasPainting,
-            paintingMonthKey: paintingService.monthKey(today)
+            paintingMonthKey: paintingService.monthKey(today),
+            breathingSessionCount: dataManager.breathingSessions.count,
+            meditationSessionCount: dataManager.meditationSessions.count
         )
     }
 
