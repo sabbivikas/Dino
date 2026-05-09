@@ -79,11 +79,6 @@
 			path = DinoLiveActivity;
 			sourceTree = "<group>";
 		};
-		E1CF60602F73C55D008D5746 /* Shared */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = Shared;
-			sourceTree = "<group>";
-		};
 		E1CF602F2F73C55B008D5746 /* Dino */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = Dino;
@@ -97,6 +92,11 @@
 		E1CF60492F73C55D008D5746 /* DinoUITests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = DinoUITests;
+			sourceTree = "<group>";
+		};
+		E1CF60602F73C55D008D5746 /* Shared */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Shared;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */

@@ -10,16 +10,17 @@ import SwiftUI
 
 struct NotificationCenterView: View {
     @Environment(\.dismiss) private var dismiss
+    @ObservedObject private var themeManager = ThemeManager.shared
     @StateObject private var store = NotificationStore.shared
     @State private var filter: FilterOption = .all
     @State private var hasAppeared = false
     @State private var showClearConfirm = false
 
     // ── Spec colors (exact, from notifications.jsx) ─────────────────────
-    private let pageBG       = Color(hex: "#FAF6EC")
-    private let titleInk     = Color(hex: "#2E2A24")
-    private let dateInk      = Color(hex: "#9A9085")
-    private let mutedInk     = Color(hex: "#857C70")
+    private var pageBG: Color   { DinoTheme.background }
+    private var titleInk: Color { DinoTheme.textPrimary }
+    private var dateInk: Color  { DinoTheme.textSecondary }
+    private var mutedInk: Color { DinoTheme.textSecondary }
     private let veryMutedInk = Color(hex: "#B8B0A4")
     private let pillActiveBG = Color(hex: "#3D3A35")
     private let pillInactiveText = Color(hex: "#7A7266")
