@@ -482,7 +482,7 @@ private struct JournalTimelineStrip: View {
         if entries.isEmpty {
             EmptyMemoriesCard()
         } else {
-            ScrollView(.horizontal, showsIndicators: false) {
+            ScrollView(.horizontal) {
                 ZStack(alignment: .top) {
                     // String curve overlay
                     GeometryReader { geo in
@@ -520,6 +520,7 @@ private struct JournalTimelineStrip: View {
                     .padding(.top, 8)
                 }
             }
+            .scrollIndicators(.hidden)
             .frame(minHeight: 260)
         }
     }

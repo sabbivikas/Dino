@@ -113,7 +113,7 @@ struct HomeView: View {
         Button {
             dataManager.deepLinkTab = 4
         } label: {
-            Image("DinoMascot")
+            Image.cached("DinoMascot")
                 .resizable()
                 .scaledToFill()
                 .frame(width: 36, height: 36)
@@ -180,7 +180,7 @@ struct HomeView: View {
 
             Spacer()
 
-            Image("DinoMascot")
+            Image.cached("DinoMascot")
                 .resizable()
                 .scaledToFit()
                 .frame(height: 64)

@@ -33,7 +33,7 @@ struct StreakCalendarView: View {
         ZStack {
             Self.CREAM.ignoresSafeArea()
 
-            ScrollView(.vertical, showsIndicators: false) {
+            ScrollView(.vertical) {
                 VStack(spacing: 0) {
                     HeroHeader(displayedMonth: displayedMonth)
                         .frame(height: 220)
@@ -59,6 +59,7 @@ struct StreakCalendarView: View {
                 }
                 .padding(.bottom, 24)
             }
+            .scrollIndicators(.hidden)
         }
         .navigationBarBackButtonHidden(true)
         .toolbar {
@@ -100,7 +101,7 @@ private struct HeroHeader: View {
                 .frame(width: 70, height: 70)
                 .position(x: UIScreen.main.bounds.width - 55, y: 60)
 
-            Image("cut-DinoChecklist")
+            Image.cached("cut-DinoChecklist")
                 .resizable()
                 .scaledToFit()
                 .frame(width: 120)
@@ -579,7 +580,7 @@ private struct ClosingNote: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
-            Image("dino-only")
+            Image.cached("dino-only")
                 .resizable()
                 .scaledToFit()
                 .frame(width: 54, height: 54)

@@ -954,7 +954,7 @@ private struct DinoPolaroid: View {
                         .frame(width: 114, height: 114)
                         .clipShape(RoundedRectangle(cornerRadius: 2, style: .continuous))
                 } else {
-                    Image("DinoMascot")
+                    Image.cached("DinoMascot")
                         .resizable()
                         .aspectRatio(contentMode: .fit)
                         .frame(width: 114, height: 114)

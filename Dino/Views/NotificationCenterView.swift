@@ -154,7 +154,7 @@ struct NotificationCenterView: View {
     // MARK: - Pills — horizontally scrollable filter row
     // Spec: padding 12px 22px 10px, gap 8, pill padding 7px 14px, fontSize 14 dino, radius 999
     private var pills: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
+        ScrollView(.horizontal) {
             HStack(spacing: 8) {
                 ForEach(FilterOption.allCases) { opt in
                     pillButton(opt)
@@ -162,6 +162,7 @@ struct NotificationCenterView: View {
             }
             .padding(.horizontal, 22)
         }
+        .scrollIndicators(.hidden)
         .padding(.top, 12)
         .padding(.bottom, 10)
     }
