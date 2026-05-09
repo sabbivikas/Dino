@@ -159,13 +159,6 @@ struct HomeView: View {
                 }
             }
 
-            Button {
-                dataManager.deepLinkTab = 4
-            } label: {
-                Image(systemName: "gearshape")
-                    .font(DinoTheme.dinoFont(size: 18))
-                    .foregroundColor(DinoTheme.textSecondary)
-            }
         }
     }
 

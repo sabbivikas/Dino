@@ -172,7 +172,6 @@ struct ProfileView: View {
                     sectionPractice
                     sectionPaintings
                     sectionJourney
-                    sectionSelfCare
                     sectionAppearance
                     sectionAccount
                     sectionWellness
@@ -212,7 +211,7 @@ struct ProfileView: View {
             case .growth:        NavigationStack { GrowthView().environmentObject(dataManager) }
             case .profileDetails: ProfileDetailsView().environmentObject(dataManager)
             case .gentleReminders:
-                SettingsView().environmentObject(dataManager)
+                NavigationStack { SelfCareRemindersView() }
             case .windDown:      WindDownView()
             case .textSize:      TextSizeView()
             case .paintingGallery:
@@ -507,40 +506,6 @@ struct ProfileView: View {
                             .font(DinoTheme.dinoFont(size: 16))
                             .foregroundColor(SB.nearBlack)
                         Text("last 8 weeks of mood + assessments")
-                            .font(DinoTheme.dinoFont(size: 12))
-                            .foregroundColor(SB.sage)
-                    }
-                    Spacer()
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundColor(SB.sage)
-                }
-                .padding(.vertical, 2)
-            }
-            .buttonStyle(.plain)
-        }
-    }
-
-    private var sectionSelfCare: some View {
-        PaperSection(
-            label: "self-care reminders \u{1F33F}",
-            tapeColor: SB.sage,
-            tilt: -0.5
-        ) {
-            NavigationLink {
-                SelfCareRemindersView()
-            } label: {
-                HStack(spacing: 12) {
-                    Image(systemName: "bell.badge")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundColor(SB.peach)
-                        .frame(width: 36, height: 36)
-                        .background(Circle().fill(SB.peach.opacity(0.20)))
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("water, food, rest, check-in")
-                            .font(DinoTheme.dinoFont(size: 16))
-                            .foregroundColor(SB.nearBlack)
-                        Text("gentle daily nudges from dino")
                             .font(DinoTheme.dinoFont(size: 12))
                             .foregroundColor(SB.sage)
                     }
