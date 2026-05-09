@@ -11,6 +11,20 @@ import FirebaseCore
 import FirebaseAuth
 import GoogleSignIn
 
+enum AccountDeletionError: LocalizedError {
+    case requiresReauthentication
+    case noProvider
+    case reauthFailed
+
+    var errorDescription: String? {
+        switch self {
+        case .requiresReauthentication: return "please sign in again to confirm account deletion."
+        case .noProvider: return "couldn't determine your sign-in method."
+        case .reauthFailed: return "reauthentication failed. please try again."
+        }
+    }
+}
+
 @MainActor
 class AuthManager: ObservableObject {
 
@@ -39,7 +53,9 @@ class AuthManager: ObservableObject {
                 self?.displayName = user?.displayName ?? ""
                 self?.email = user?.email ?? ""
                 self?.photoURL = user?.photoURL
-                print("[Auth] state changed — signed in: \(user != nil), user: \(user?.email ?? "none")")
+                #if DEBUG
+                print("[Auth] state changed — signed in: \(user != nil)")
+                #endif
 
                 if let user = user {
                     SharedDataManager.shared.loadDataForUser(user.uid)
@@ -59,23 +75,27 @@ class AuthManager: ObservableObject {
     func signInWithGoogle() async {
         isLoading = true
         errorMessage = nil
+        #if DEBUG
         print("[Auth] Google Sign-In started")
+        #endif
 
         guard let app = FirebaseApp.app() else {
             errorMessage = "Firebase not configured"
             isLoading = false
-            print("[Auth] ERROR: FirebaseApp.app() is nil — FirebaseApp.configure() may not have been called")
+            #if DEBUG
+            print("[Auth] ERROR: FirebaseApp not configured")
+            #endif
             return
         }
 
         guard let clientID = app.options.clientID else {
             errorMessage = "Missing Google client ID — check GoogleService-Info.plist has CLIENT_ID"
             isLoading = false
-            print("[Auth] ERROR: Firebase clientID not found in options. Available keys: \(app.options.googleAppID)")
+            #if DEBUG
+            print("[Auth] ERROR: Firebase clientID missing")
+            #endif
             return
         }
-
-        print("[Auth] Firebase clientID found: \(clientID.prefix(20))...")
 
         let config = GIDConfiguration(clientID: clientID)
         GIDSignIn.sharedInstance.configuration = config
@@ -84,7 +104,9 @@ class AuthManager: ObservableObject {
               let rootViewController = windowScene.windows.first?.rootViewController else {
             errorMessage = "Cannot find root view controller"
             isLoading = false
+            #if DEBUG
             print("[Auth] ERROR: no root view controller")
+            #endif
             return
         }
 
@@ -94,7 +116,9 @@ class AuthManager: ObservableObject {
             guard let idToken = result.user.idToken?.tokenString else {
                 errorMessage = "Failed to get ID token"
                 isLoading = false
+                #if DEBUG
                 print("[Auth] ERROR: no ID token from Google")
+                #endif
                 return
             }
 
@@ -104,12 +128,16 @@ class AuthManager: ObservableObject {
                 accessToken: accessToken
             )
 
-            let authResult = try await Auth.auth().signIn(with: credential)
-            print("[Auth] Google Sign-In SUCCESS — user: \(authResult.user.email ?? "unknown")")
+            _ = try await Auth.auth().signIn(with: credential)
+            #if DEBUG
+            print("[Auth] Google Sign-In succeeded")
+            #endif
 
         } catch {
             errorMessage = error.localizedDescription
-            print("[Auth] Google Sign-In FAILED — error: \(error)")
+            #if DEBUG
+            print("[Auth] Google Sign-In failed")
+            #endif
         }
 
         isLoading = false
@@ -120,14 +148,20 @@ class AuthManager: ObservableObject {
     func signUpWithEmail(email: String, password: String) async {
         isLoading = true
         errorMessage = nil
-        print("[Auth] email sign-up started for \(email)")
+        #if DEBUG
+        print("[Auth] email sign-up started")
+        #endif
 
         do {
-            let result = try await Auth.auth().createUser(withEmail: email, password: password)
-            print("[Auth] email sign-up SUCCESS: \(result.user.email ?? "unknown")")
+            _ = try await Auth.auth().createUser(withEmail: email, password: password)
+            #if DEBUG
+            print("[Auth] email sign-up succeeded")
+            #endif
         } catch {
             errorMessage = error.localizedDescription
-            print("[Auth] email sign-up FAILED: \(error)")
+            #if DEBUG
+            print("[Auth] email sign-up failed")
+            #endif
         }
 
         isLoading = false
@@ -138,14 +172,20 @@ class AuthManager: ObservableObject {
     func signInWithEmail(email: String, password: String) async {
         isLoading = true
         errorMessage = nil
-        print("[Auth] email sign-in started for \(email)")
+        #if DEBUG
+        print("[Auth] email sign-in started")
+        #endif
 
         do {
-            let result = try await Auth.auth().signIn(withEmail: email, password: password)
-            print("[Auth] email sign-in SUCCESS: \(result.user.email ?? "unknown")")
+            _ = try await Auth.auth().signIn(withEmail: email, password: password)
+            #if DEBUG
+            print("[Auth] email sign-in succeeded")
+            #endif
         } catch {
             errorMessage = error.localizedDescription
-            print("[Auth] email sign-in FAILED: \(error)")
+            #if DEBUG
+            print("[Auth] email sign-in failed")
+            #endif
         }
 
         isLoading = false
@@ -153,21 +193,106 @@ class AuthManager: ObservableObject {
 
     // MARK: - Delete Account
 
-    func deleteAccount() async throws {
+    /// Returns the provider ID for the current user, e.g. "password" or "google.com".
+    var currentProviderID: String? {
+        Auth.auth().currentUser?.providerData.first?.providerID
+    }
+
+    /// Reauthenticate an email/password user. Throws on failure.
+    func reauthenticateEmailUser(password: String) async throws {
+        guard let user = Auth.auth().currentUser, let userEmail = user.email else {
+            throw AccountDeletionError.noProvider
+        }
+        let credential = EmailAuthProvider.credential(withEmail: userEmail, password: password)
+        do {
+            _ = try await user.reauthenticate(with: credential)
+            #if DEBUG
+            print("[Auth] reauthentication succeeded")
+            #endif
+        } catch {
+            #if DEBUG
+            print("[Auth] reauthentication failed")
+            #endif
+            throw AccountDeletionError.reauthFailed
+        }
+    }
+
+    /// Reauthenticate a Google user by triggering a fresh Google sign-in flow.
+    func reauthenticateGoogleUser() async throws {
         guard let user = Auth.auth().currentUser else {
-            print("[Auth] deleteAccount — no user")
+            throw AccountDeletionError.noProvider
+        }
+        guard let app = FirebaseApp.app(), let clientID = app.options.clientID else {
+            throw AccountDeletionError.reauthFailed
+        }
+        let config = GIDConfiguration(clientID: clientID)
+        GIDSignIn.sharedInstance.configuration = config
+
+        guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+              let rootViewController = windowScene.windows.first?.rootViewController else {
+            throw AccountDeletionError.reauthFailed
+        }
+        do {
+            let result = try await GIDSignIn.sharedInstance.signIn(withPresenting: rootViewController)
+            guard let idToken = result.user.idToken?.tokenString else {
+                throw AccountDeletionError.reauthFailed
+            }
+            let accessToken = result.user.accessToken.tokenString
+            let credential = GoogleAuthProvider.credential(withIDToken: idToken, accessToken: accessToken)
+            _ = try await user.reauthenticate(with: credential)
+            #if DEBUG
+            print("[Auth] Google reauthentication succeeded")
+            #endif
+        } catch {
+            #if DEBUG
+            print("[Auth] Google reauthentication failed")
+            #endif
+            throw AccountDeletionError.reauthFailed
+        }
+    }
+
+    /// Deletes the Firebase Auth account ONLY. Caller is responsible for
+    /// deleting Firestore + local data ONLY after this succeeds.
+    /// Throws AccountDeletionError.requiresReauthentication if Firebase
+    /// requires a recent login — caller should reauthenticate and retry.
+    func deleteAuthAccount() async throws {
+        guard let user = Auth.auth().currentUser else {
+            #if DEBUG
+            print("[Auth] deleteAuthAccount — no user")
+            #endif
             return
         }
-        print("[Auth] deleting account for \(user.email ?? "unknown")")
-        try await user.delete()
+        do {
+            try await user.delete()
+            #if DEBUG
+            print("[Auth] auth account deleted")
+            #endif
+        } catch let error as NSError {
+            if error.code == AuthErrorCode.requiresRecentLogin.rawValue {
+                #if DEBUG
+                print("[Auth] reauthentication required")
+                #endif
+                throw AccountDeletionError.requiresReauthentication
+            }
+            throw error
+        }
+    }
+
+    /// Clear local auth-related session state. Call AFTER auth + data deletes succeed.
+    func clearLocalAuthSession() {
         GIDSignIn.sharedInstance.signOut()
-        try? await GIDSignIn.sharedInstance.disconnect()
+        Task { try? await GIDSignIn.sharedInstance.disconnect() }
         isSignedIn = false
         currentUser = nil
         displayName = ""
         email = ""
         photoURL = nil
-        print("[Auth] account deleted")
+    }
+
+    /// Legacy entry point kept for compatibility — prefer the new ordered flow in ProfileView.
+    func deleteAccount() async throws {
+        try await deleteAuthAccount()
+        clearLocalAuthSession()
     }
 
     // MARK: - Sign Out
@@ -182,9 +307,13 @@ class AuthManager: ObservableObject {
             displayName = ""
             email = ""
             photoURL = nil
-            print("[Auth] signed out and disconnected")
+            #if DEBUG
+            print("[Auth] signed out")
+            #endif
         } catch {
-            print("[Auth] sign out error: \(error)")
+            #if DEBUG
+            print("[Auth] sign out error")
+            #endif
         }
     }
 }

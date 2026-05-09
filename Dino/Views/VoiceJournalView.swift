@@ -332,10 +332,14 @@ private struct JournalComposerCard: View {
                         let moodToSave = selectedMood
                         let trimmed = textToSave.trimmingCharacters(in: .whitespacesAndNewlines)
                         guard !trimmed.isEmpty else {
-                            print("[Develop] Skipped: composerText is empty/whitespace")
+                            #if DEBUG
+                            print("[Develop] Skipped: composer empty")
+                            #endif
                             return
                         }
-                        print("[Develop] Saving entry, chars=\(trimmed.count) mood=\(moodToSave ?? "nil")")
+                        #if DEBUG
+                        print("[Develop] Saving entry, chars=\(trimmed.count)")
+                        #endif
                         HapticManager.shared.success()
                         onDevelop(textToSave, moodToSave)
                         composerText = ""

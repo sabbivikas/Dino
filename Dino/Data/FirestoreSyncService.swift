@@ -27,10 +27,14 @@ class FirestoreSyncService: ObservableObject {
         authListener = Auth.auth().addStateDidChangeListener { [weak self] _, user in
             Task { @MainActor in
                 if let user = user {
-                    print("[Firestore] user signed in: \(user.uid) — starting cloud sync")
+                    #if DEBUG
+                    print("[Firestore] user signed in — starting cloud sync")
+                    #endif
                     await self?.syncFromCloud(uid: user.uid)
                 } else {
+                    #if DEBUG
                     print("[Firestore] user signed out — cloud sync disabled")
+                    #endif
                 }
             }
         }
@@ -52,12 +56,16 @@ class FirestoreSyncService: ObservableObject {
     /// Force immediate sync to cloud
     func syncToCloud() async {
         guard let uid = Auth.auth().currentUser?.uid else {
+            #if DEBUG
             print("[Firestore] syncToCloud skipped — no user")
+            #endif
             return
         }
 
         isSyncing = true
-        print("[Firestore] syncToCloud started for \(uid)")
+        #if DEBUG
+        print("[Firestore] syncToCloud started")
+        #endif
 
         let dm = SharedDataManager.shared
         let userRef = db.collection("users").document(uid)
@@ -137,9 +145,13 @@ class FirestoreSyncService: ObservableObject {
             }
 
             lastSyncDate = Date()
+            #if DEBUG
             print("[Firestore] syncToCloud completed successfully")
+            #endif
         } catch {
-            print("[Firestore] syncToCloud ERROR: \(error)")
+            #if DEBUG
+            print("[Firestore] syncToCloud error")
+            #endif
         }
 
         isSyncing = false
@@ -148,7 +160,9 @@ class FirestoreSyncService: ObservableObject {
     /// Pull data from cloud and merge into local
     func syncFromCloud(uid: String) async {
         isSyncing = true
-        print("[Firestore] syncFromCloud started for \(uid)")
+        #if DEBUG
+        print("[Firestore] syncFromCloud started")
+        #endif
 
         let dm = SharedDataManager.shared
         let userRef = db.collection("users").document(uid)
@@ -166,63 +180,81 @@ class FirestoreSyncService: ObservableObject {
                 if let skin = data["dinoSkin"] as? String, !skin.isEmpty {
                     dm.dinoSkin = skin
                 }
+                #if DEBUG
                 print("[Firestore] profile loaded from cloud")
+                #endif
             }
 
             // Mood entries
             let moods: [MoodEntry] = try await fetchCollection(parentRef: userRef, name: "moods")
             if !moods.isEmpty {
                 dm.moodEntries = mergeById(local: dm.moodEntries, cloud: moods)
+                #if DEBUG
                 print("[Firestore] moods synced: \(dm.moodEntries.count) entries")
+                #endif
             }
 
             // Journal entries
             let journals: [JournalEntry] = try await fetchCollection(parentRef: userRef, name: "journals")
             if !journals.isEmpty {
                 dm.journalEntries = mergeById(local: dm.journalEntries, cloud: journals)
+                #if DEBUG
                 print("[Firestore] journals synced: \(dm.journalEntries.count) entries")
+                #endif
             }
 
             // Gratitude notes
             let gratitude: [GratitudeNote] = try await fetchCollection(parentRef: userRef, name: "gratitude")
             if !gratitude.isEmpty {
                 dm.gratitudeNotes = mergeById(local: dm.gratitudeNotes, cloud: gratitude)
+                #if DEBUG
                 print("[Firestore] gratitude synced: \(dm.gratitudeNotes.count) entries")
+                #endif
             }
 
             // Saved affirmations
             let affirmations: [SavedAffirmation] = try await fetchCollection(parentRef: userRef, name: "affirmations")
             if !affirmations.isEmpty {
                 dm.savedAffirmations = mergeById(local: dm.savedAffirmations, cloud: affirmations)
+                #if DEBUG
                 print("[Firestore] affirmations synced: \(dm.savedAffirmations.count) entries")
+                #endif
             }
 
             // Breathing sessions
             let breathing: [BreathingSession] = try await fetchCollection(parentRef: userRef, name: "breathing")
             if !breathing.isEmpty {
                 dm.breathingSessions = mergeById(local: dm.breathingSessions, cloud: breathing)
+                #if DEBUG
                 print("[Firestore] breathing synced: \(dm.breathingSessions.count) entries")
+                #endif
             }
 
             // Focus sessions
             let focus: [FocusSession] = try await fetchCollection(parentRef: userRef, name: "focus")
             if !focus.isEmpty {
                 dm.focusSessions = mergeById(local: dm.focusSessions, cloud: focus)
+                #if DEBUG
                 print("[Firestore] focus synced: \(dm.focusSessions.count) entries")
+                #endif
             }
 
             // Meditation sessions
             let meditation: [MeditationSession] = try await fetchCollection(parentRef: userRef, name: "meditation")
             if !meditation.isEmpty {
                 dm.meditationSessions = mergeById(local: dm.meditationSessions, cloud: meditation)
+                #if DEBUG
                 print("[Firestore] meditation synced: \(dm.meditationSessions.count) entries")
+                #endif
             }
 
             // Assessment results
             let assessments: [AssessmentResult] = try await fetchCollection(parentRef: userRef, name: "assessments")
             if !assessments.isEmpty {
                 dm.assessmentResults = mergeById(local: dm.assessmentResults, cloud: assessments)
+                #if DEBUG
                 print("[Firestore] assessments synced: \(dm.assessmentResults.count) entries")
+                #endif
             }
 
             // Streak data
@@ -236,7 +268,9 @@ class FirestoreSyncService: ObservableObject {
                     dm.streakData.longestStreak = streak.longestStreak
                 }
                 dm.streakData.activeDates = dm.streakData.activeDates.union(streak.activeDates)
+                #if DEBUG
                 print("[Firestore] streak data synced")
+                #endif
             }
 
             // Growth stats
@@ -245,13 +279,19 @@ class FirestoreSyncService: ObservableObject {
                 // Keep higher values
                 if growth.level > dm.growthStats.level { dm.growthStats.level = growth.level }
                 if growth.xp > dm.growthStats.xp { dm.growthStats.xp = growth.xp }
+                #if DEBUG
                 print("[Firestore] growth stats synced")
+                #endif
             }
 
             lastSyncDate = Date()
+            #if DEBUG
             print("[Firestore] syncFromCloud completed successfully")
+            #endif
         } catch {
-            print("[Firestore] syncFromCloud ERROR: \(error)")
+            #if DEBUG
+            print("[Firestore] syncFromCloud error")
+            #endif
         }
 
         isSyncing = false
@@ -260,13 +300,17 @@ class FirestoreSyncService: ObservableObject {
     // MARK: - Delete All User Data
 
     /// Deletes all Firestore data for the current user
-    func deleteAllUserData() async {
+    func deleteAllUserData() async throws {
         guard let uid = Auth.auth().currentUser?.uid else {
+            #if DEBUG
             print("[Firestore] deleteAllUserData skipped — no user")
+            #endif
             return
         }
 
-        print("[Firestore] deleting all data for \(uid)")
+        #if DEBUG
+        print("[Firestore] deleting all user data")
+        #endif
         let userRef = db.collection("users").document(uid)
 
         do {
@@ -282,9 +326,14 @@ class FirestoreSyncService: ObservableObject {
 
             // Delete user document
             try await userRef.delete()
+            #if DEBUG
             print("[Firestore] all user data deleted")
+            #endif
         } catch {
-            print("[Firestore] deleteAllUserData ERROR: \(error)")
+            #if DEBUG
+            print("[Firestore] deleteAllUserData error")
+            #endif
+            throw error
         }
     }
 
@@ -328,7 +377,9 @@ class FirestoreSyncService: ObservableObject {
             let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
             return json
         } catch {
-            print("[Firestore] encode error: \(error)")
+            #if DEBUG
+            print("[Firestore] encode error")
+            #endif
             return nil
         }
     }
@@ -339,7 +390,9 @@ class FirestoreSyncService: ObservableObject {
             let data = try JSONSerialization.data(withJSONObject: dict)
             return try JSONDecoder().decode(T.self, from: data)
         } catch {
-            print("[Firestore] decode error for \(T.self): \(error)")
+            #if DEBUG
+            print("[Firestore] decode error for \(T.self)")
+            #endif
             return nil
         }
     }

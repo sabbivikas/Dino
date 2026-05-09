@@ -67,13 +67,25 @@ class JournalViewModel: NSObject, ObservableObject {
             isRecording = true
             recordingDuration = 0
 
-            recordingTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
+            // Apply file protection + exclude from iCloud backup for the recording.
+            var protectedURL = url
+            var values = URLResourceValues()
+            values.isExcludedFromBackup = true
+            try? protectedURL.setResourceValues(values)
+            try? FileManager.default.setAttributes(
+                [.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication],
+                ofItemAtPath: url.path
+            )
+
+            recordingTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
                 DispatchQueue.main.async {
-                    self?.recordingDuration += 0.1
+                    self?.recordingDuration += 1.0
                 }
             }
         } catch {
-            print("Recording failed: \(error)")
+            #if DEBUG
+            print("Recording failed")
+            #endif
         }
     }
 
@@ -124,7 +136,9 @@ class JournalViewModel: NSObject, ObservableObject {
             isPlaying = true
             playingEntryId = entry.id
         } catch {
-            print("Playback failed: \(error)")
+            #if DEBUG
+            print("Playback failed")
+            #endif
         }
     }
 

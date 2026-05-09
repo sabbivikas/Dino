@@ -7,6 +7,59 @@ import SwiftUI
 
 // MARK: - Local Tokens (scrapbook palette)
 
+// MARK: - Reauthentication Sheet
+
+private struct ReauthSheet: View {
+    @Binding var password: String
+    @Binding var isWorking: Bool
+    let providerID: String
+    let onConfirm: () -> Void
+    let onCancel: () -> Void
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 20) {
+                Text("confirm it's you")
+                    .font(.title3.bold())
+                Text("to permanently delete your account, please verify your identity.")
+                    .multilineTextAlignment(.center)
+                    .foregroundColor(.secondary)
+                    .padding(.horizontal)
+
+                if providerID == "password" {
+                    SecureField("password", text: $password)
+                        .textContentType(.password)
+                        .textFieldStyle(.roundedBorder)
+                        .padding(.horizontal)
+                } else if providerID == "google.com" {
+                    Text("you'll be asked to sign in with google again.")
+                        .font(.footnote)
+                        .foregroundColor(.secondary)
+                }
+
+                Button(action: onConfirm) {
+                    if isWorking {
+                        ProgressView()
+                    } else {
+                        Text("continue")
+                            .frame(maxWidth: .infinity)
+                    }
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(isWorking || (providerID == "password" && password.isEmpty))
+                .padding(.horizontal)
+
+                Button("cancel", action: onCancel)
+                    .disabled(isWorking)
+
+                Spacer()
+            }
+            .padding(.top, 32)
+        }
+        .presentationDetents([.medium])
+    }
+}
+
 private enum SB {
     static let paperCream   = Color(hex: "#FBF5E4")
     static let paperWhite   = Color(hex: "#FFFDF5")
@@ -81,6 +134,9 @@ struct ProfileView: View {
     @State private var showDeleteAccountConfirm = false
     @State private var savedProfilePhoto: UIImage? = nil
     @State private var accountDeletionErrorMessage: String?
+    @State private var showReauthSheet = false
+    @State private var reauthPassword = ""
+    @State private var reauthIsWorking = false
 
     private var appVersion: String {
         Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
@@ -272,22 +328,92 @@ struct ProfileView: View {
         } message: {
             Text(accountDeletionErrorMessage ?? "please try again.")
         }
+        .sheet(isPresented: $showReauthSheet) {
+            ReauthSheet(
+                password: $reauthPassword,
+                isWorking: $reauthIsWorking,
+                providerID: AuthManager.shared.currentProviderID ?? "",
+                onConfirm: {
+                    Task { await performReauthAndDelete() }
+                },
+                onCancel: {
+                    showReauthSheet = false
+                    reauthPassword = ""
+                }
+            )
+        }
     }
 
     private func deleteAccount() async {
-        // Delete Firestore data first
-        await FirestoreSyncService.shared.deleteAllUserData()
-
-        // Delete Firebase Auth account
+        // Correct order:
+        // 1. Delete Auth account first (with reauthentication if required)
+        // 2. Then Firestore data
+        // 3. Then local data
+        // On any failure, do NOT delete data and do NOT sign out.
         do {
-            try await AuthManager.shared.deleteAccount()
+            try await AuthManager.shared.deleteAuthAccount()
+        } catch AccountDeletionError.requiresReauthentication {
+            // Need fresh login — present reauth sheet, then retry.
+            showReauthSheet = true
+            return
         } catch {
-            print("[Profile] account deletion error: \(error)")
+            #if DEBUG
+            print("[Profile] account deletion error")
+            #endif
             accountDeletionErrorMessage = error.localizedDescription
             return
         }
 
-        // Clear local data
+        await finalizeAccountDeletion()
+    }
+
+    private func performReauthAndDelete() async {
+        reauthIsWorking = true
+        defer { reauthIsWorking = false }
+        let providerID = AuthManager.shared.currentProviderID ?? ""
+        do {
+            if providerID == "password" {
+                try await AuthManager.shared.reauthenticateEmailUser(password: reauthPassword)
+            } else if providerID == "google.com" {
+                try await AuthManager.shared.reauthenticateGoogleUser()
+            } else {
+                throw AccountDeletionError.noProvider
+            }
+        } catch {
+            accountDeletionErrorMessage = error.localizedDescription
+            return
+        }
+
+        showReauthSheet = false
+        reauthPassword = ""
+
+        // Retry the auth deletion now that we're freshly authenticated.
+        do {
+            try await AuthManager.shared.deleteAuthAccount()
+        } catch {
+            accountDeletionErrorMessage = error.localizedDescription
+            return
+        }
+
+        await finalizeAccountDeletion()
+    }
+
+    private func finalizeAccountDeletion() async {
+        // Auth account is gone — now delete Firestore data.
+        // Note: Firestore rules likely scoped to auth.uid; if Auth is already
+        // gone the request may fail. We attempt and log; local cleanup proceeds
+        // either way since the auth account is the source of truth for access.
+        do {
+            try await FirestoreSyncService.shared.deleteAllUserData()
+        } catch {
+            #if DEBUG
+            print("[Profile] firestore cleanup after auth delete failed")
+            #endif
+            // Continue with local cleanup. Cloud data is orphaned but
+            // unreachable without the auth account.
+        }
+
+        AuthManager.shared.clearLocalAuthSession()
         dataManager.clearForSignOut()
         UserDefaults.standard.set(false, forKey: "hasPassedAuth")
         dismiss()

@@ -299,6 +299,16 @@ final class ThemeManager: ObservableObject {
 
     static let shared = ThemeManager()
 
+    private var widgetReloadTask: Task<Void, Never>?
+    private func scheduleWidgetReload() {
+        widgetReloadTask?.cancel()
+        widgetReloadTask = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 2_000_000_000)
+            guard !Task.isCancelled else { return }
+            WidgetCenter.shared.reloadAllTimelines()
+        }
+    }
+
     private let defaults = UserDefaults(suiteName: "group.com.vikassabbi.dino") ?? .standard
     private let themeModeKey = "dino.themeMode"
     private let manualThemeKey = "dino.selectedManualTheme"
@@ -405,7 +415,7 @@ final class ThemeManager: ObservableObject {
             currentTheme = target
         }
         defaults.set(currentTheme.rawValue, forKey: "dino.currentThemeForWidget")
-        WidgetCenter.shared.reloadAllTimelines()
+        scheduleWidgetReload()
     }
 
     // MARK: - Preview API
@@ -434,7 +444,7 @@ final class ThemeManager: ObservableObject {
         }
         // Sync to widgets
         defaults.set(currentTheme.rawValue, forKey: "dino.currentThemeForWidget")
-        WidgetCenter.shared.reloadAllTimelines()
+        scheduleWidgetReload()
     }
 
     // MARK: - Weather Theme Update
@@ -448,7 +458,7 @@ final class ThemeManager: ObservableObject {
                 currentTheme = theme
             }
             defaults.set(currentTheme.rawValue, forKey: "dino.currentThemeForWidget")
-            WidgetCenter.shared.reloadAllTimelines()
+            scheduleWidgetReload()
         }
     }
 }

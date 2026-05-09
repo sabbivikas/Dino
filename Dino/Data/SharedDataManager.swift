@@ -163,6 +163,36 @@ final class SharedDataManager: ObservableObject {
 
         resetSelfCareIfNewDay()
         persistCurrentUserId()
+        applyFileProtectionToExistingAudio()
+        excludeDocumentsFromBackup()
+    }
+
+    // MARK: - File Protection / Backup Exclusion (one-time on launch)
+
+    private func applyFileProtectionToExistingAudio() {
+        Task.detached(priority: .background) {
+            guard let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else { return }
+            guard let files = try? FileManager.default.contentsOfDirectory(at: docs, includingPropertiesForKeys: nil) else { return }
+            let audioExts: Set<String> = ["m4a", "caf", "wav", "aac", "mp3"]
+            for var url in files where audioExts.contains(url.pathExtension.lowercased()) {
+                var v = URLResourceValues()
+                v.isExcludedFromBackup = true
+                try? url.setResourceValues(v)
+                try? FileManager.default.setAttributes(
+                    [.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication],
+                    ofItemAtPath: url.path
+                )
+            }
+        }
+    }
+
+    private func excludeDocumentsFromBackup() {
+        Task.detached(priority: .background) {
+            guard var docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else { return }
+            var v = URLResourceValues()
+            v.isExcludedFromBackup = true
+            try? docs.setResourceValues(v)
+        }
     }
 
     // Static helper used before `self` is fully initialized
@@ -176,7 +206,9 @@ final class SharedDataManager: ObservableObject {
     /// Call when a Firebase user signs in. Clears in-memory data if this is a
     /// different user than the previous session, then loads from namespaced keys.
     func loadDataForUser(_ userId: String) {
-        print("[DataManager] loading data for user: \(userId)")
+        #if DEBUG
+        print("[DataManager] loading data for user")
+        #endif
         let previousUser = currentUserId
         currentUserId = userId
 
@@ -190,7 +222,9 @@ final class SharedDataManager: ObservableObject {
 
     /// Call on sign-out. Clears in-memory data and forgets the current user.
     func clearForSignOut() {
+        #if DEBUG
         print("[DataManager] clearing data for sign-out")
+        #endif
         // IMPORTANT: nil out the userId FIRST so clearInMemoryData()'s
         // didSet writes go to un-namespaced keys (throwaway) and don't
         // overwrite the real user's persisted data with empty values.
@@ -235,7 +269,9 @@ final class SharedDataManager: ObservableObject {
         growthStats = Self.load(GrowthStats.self, from: ud, key: userKey("growthStats")) ?? GrowthStats()
 
         resetSelfCareIfNewDay()
-        print("[DataManager] data loaded — onboarding: \(onboardingComplete), entries: \(moodEntries.count) moods")
+        #if DEBUG
+        print("[DataManager] data loaded — entries: \(moodEntries.count) moods")
+        #endif
     }
 
     /// Zero out all in-memory user data without touching UserDefaults.
