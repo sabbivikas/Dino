@@ -159,6 +159,7 @@ struct AddGratitudeSheet: View {
 
     private func submit() {
         guard !isEmpty else { return }
+        HapticManager.shared.success()
         viewModel.addNote()
         onSaved?()
     }

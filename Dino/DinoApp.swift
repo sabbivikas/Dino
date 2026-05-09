@@ -75,6 +75,7 @@ struct DinoApp: App {
                 }
                 .task {
                     notificationManager.userDidOpenApp()
+                    ImageCache.shared.preload(["DinoMascot", "dino-meditation", "DinoFlower-cut", "cut-DinoChecklist", "dino-only"])
                 }
         }
     }

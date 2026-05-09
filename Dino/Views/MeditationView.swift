@@ -435,6 +435,7 @@ class MeditationViewModel: ObservableObject {
         isDone = true
         endLiveActivity()
         dataManager.logMeditationSession(MeditationSession(durationSeconds: totalElapsed, completed: true))
+        HapticManager.shared.success()
     }
 
     // MARK: - Live Activity

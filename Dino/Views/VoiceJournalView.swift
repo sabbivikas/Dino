@@ -336,6 +336,7 @@ private struct JournalComposerCard: View {
                             return
                         }
                         print("[Develop] Saving entry, chars=\(trimmed.count) mood=\(moodToSave ?? "nil")")
+                        HapticManager.shared.success()
                         onDevelop(textToSave, moodToSave)
                         composerText = ""
                         selectedMood = nil

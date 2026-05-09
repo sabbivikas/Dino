@@ -42,13 +42,15 @@ extension DinoAppTheme {
 struct AmbientBackgroundView: View {
     @ObservedObject private var themeManager = ThemeManager.shared
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var isAnimating: Bool = true
 
     var body: some View {
         ZStack {
             DinoTheme.background
                 .ignoresSafeArea()
 
-            if !reduceMotion {
+            if !reduceMotion && isAnimating {
                 Group {
                     switch themeManager.currentTheme.ambientStyle {
                     case .fireflies:  FireflyView()
@@ -67,6 +69,13 @@ struct AmbientBackgroundView: View {
         .ignoresSafeArea()
         .allowsHitTesting(false)
         .animation(.easeInOut(duration: 1.5), value: themeManager.currentTheme)
+        .onChange(of: scenePhase) { _, newPhase in
+            if newPhase == .active {
+                isAnimating = true
+            } else {
+                isAnimating = false
+            }
+        }
     }
 }
 

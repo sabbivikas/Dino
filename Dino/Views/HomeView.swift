@@ -37,6 +37,7 @@ struct HomeView: View {
                     }
                     .padding(.horizontal, DinoTheme.padding)
                 }
+                .scrollIndicators(.hidden)
             }
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
@@ -300,7 +301,10 @@ struct HomeView: View {
         let isPressed = viewModel.tappedCard == item.id
 
         return Button {
-            viewModel.animateCardTap(item.id)
+            HapticManager.shared.light()
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                viewModel.animateCardTap(item.id)
+            }
             handleCardTap(item)
         } label: {
             VStack(spacing: 10) {

@@ -217,6 +217,7 @@ class BreathingViewModel: ObservableObject {
             type: "\(inhaleSeconds)-\(holdSeconds)-\(exhaleSeconds)"
         )
         dataManager.logBreathingSession(session)
+        HapticManager.shared.success()
     }
 
     // MARK: - Live Activity Integration

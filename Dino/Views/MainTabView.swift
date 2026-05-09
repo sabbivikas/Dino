@@ -35,6 +35,7 @@ struct MainTabView: View {
                     .tag(4)
             }
             .toolbar(.hidden, for: .tabBar)
+            .animation(.spring(response: 0.25, dampingFraction: 0.8), value: selectedTab)
 
             // Custom tab bar
             DinoCustomTabBar(selectedTab: $selectedTab)
@@ -79,6 +80,7 @@ private struct DinoCustomTabBar: View {
                     )
                     .onTapGesture {
                         guard selectedTab != tab.tag else { return }
+                        HapticManager.shared.light()
                         selectedTab = tab.tag
                         guard !reduceMotion else { return }
                         animatingTab = tab.tag

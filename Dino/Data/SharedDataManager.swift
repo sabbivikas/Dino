@@ -21,7 +21,18 @@ final class SharedDataManager: ObservableObject {
     private(set) var currentUserId: String? {
         didSet {
             persistCurrentUserId()
-            WidgetCenter.shared.reloadAllTimelines()
+            scheduleWidgetReload()
+        }
+    }
+
+    private var widgetReloadTask: Task<Void, Never>?
+
+    func scheduleWidgetReload() {
+        widgetReloadTask?.cancel()
+        widgetReloadTask = Task {
+            try? await Task.sleep(nanoseconds: 2_000_000_000)
+            guard !Task.isCancelled else { return }
+            await MainActor.run { WidgetCenter.shared.reloadAllTimelines() }
         }
     }
 
@@ -254,11 +265,15 @@ final class SharedDataManager: ObservableObject {
     }
 
     // MARK: - Generic Save/Load
-    private func save<T: Encodable>(_ value: T, forKey key: String) {
-        if let data = try? JSONEncoder().encode(value) {
-            defaults.set(data, forKey: key)
-            WidgetCenter.shared.reloadAllTimelines()
+    private func save<T: Encodable & Sendable>(_ value: T, forKey key: String) {
+        let snapshot = value
+        let ud = defaults
+        Task.detached(priority: .background) {
+            if let data = try? JSONEncoder().encode(snapshot) {
+                ud.set(data, forKey: key)
+            }
         }
+        scheduleWidgetReload()
     }
 
     private static func load<T: Decodable>(_ type: T.Type, from ud: UserDefaults, key: String) -> T? {
@@ -331,7 +346,7 @@ final class SharedDataManager: ObservableObject {
         addXP(10)
         recordActivity()
         NotificationManager.shared.userDidLogMood()
-        WidgetCenter.shared.reloadAllTimelines()
+        scheduleWidgetReload()
     }
 
     // MARK: - Journal
@@ -339,7 +354,7 @@ final class SharedDataManager: ObservableObject {
         journalEntries.insert(entry, at: 0)
         addXP(15)
         recordActivity()
-        WidgetCenter.shared.reloadAllTimelines()
+        scheduleWidgetReload()
     }
 
     func deleteJournalEntry(_ entry: JournalEntry) {
@@ -404,7 +419,7 @@ final class SharedDataManager: ObservableObject {
         breathingSessions.insert(session, at: 0)
         addXP(20)
         recordActivity()
-        WidgetCenter.shared.reloadAllTimelines()
+        scheduleWidgetReload()
     }
 
     // MARK: - Focus

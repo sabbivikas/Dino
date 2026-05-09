@@ -33,6 +33,7 @@ struct EmotionalWeatherView: View {
                                 weather: weather,
                                 isSelected: viewModel.selectedWeather == weather,
                                 onTap: {
+                                    HapticManager.shared.light()
                                     withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                                         viewModel.selectedWeather = weather
                                     }
@@ -82,7 +83,10 @@ struct EmotionalWeatherView: View {
                     .padding(.horizontal, DinoTheme.padding)
 
                     // Save button
-                    Button(action: { viewModel.saveMood() }) {
+                    Button(action: {
+                        HapticManager.shared.success()
+                        viewModel.saveMood()
+                    }) {
                         HStack(spacing: 10) {
                             if viewModel.saved {
                                 Image(systemName: "checkmark.circle.fill")
@@ -120,6 +124,7 @@ struct EmotionalWeatherView: View {
                         .padding(.bottom, 20)
                 }
             }
+            .scrollIndicators(.hidden)
             .background(DinoTheme.background.ignoresSafeArea())
             .navigationTitle("")
             .navigationBarHidden(true)
