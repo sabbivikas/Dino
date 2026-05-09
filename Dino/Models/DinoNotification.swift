@@ -73,12 +73,16 @@ final class NotificationStore: ObservableObject {
     static let shared = NotificationStore()
 
     @Published private(set) var notifications: [DinoNotification] = []
+    private(set) var firedDedupeKeys: Set<String> = []
 
     private let storageKey = "DinoNotifications"
+    private let firedKeysStorageKey = "dino.firedDedupeKeys"
+    private let seedAddedKey = "dino.seedNotificationsAdded"
     private let defaults: UserDefaults = .standard
 
     private init() {
         load()
+        loadFiredKeys()
     }
 
     var unreadCount: Int { notifications.filter { !$0.isRead }.count }
@@ -143,6 +147,21 @@ final class NotificationStore: ObservableObject {
         }
     }
 
+    private func loadFiredKeys() {
+        guard let data = defaults.data(forKey: firedKeysStorageKey),
+              let decoded = try? JSONDecoder().decode([String].self, from: data) else {
+            firedDedupeKeys = []
+            return
+        }
+        firedDedupeKeys = Set(decoded)
+    }
+
+    private func saveFiredKeys() {
+        if let data = try? JSONEncoder().encode(Array(firedDedupeKeys)) {
+            defaults.set(data, forKey: firedKeysStorageKey)
+        }
+    }
+
     // MARK: - Auto-generation
 
     /// Insert only if dedupeKey isn't already present.
@@ -153,6 +172,7 @@ final class NotificationStore: ObservableObject {
         dedupeKey: String,
         timestamp: Date = Date()
     ) {
+        if firedDedupeKeys.contains(dedupeKey) { return }
         if notifications.contains(where: { $0.dedupeKey == dedupeKey }) { return }
         notifications.append(
             DinoNotification(
@@ -164,6 +184,7 @@ final class NotificationStore: ObservableObject {
                 dedupeKey: dedupeKey
             )
         )
+        firedDedupeKeys.insert(dedupeKey)
     }
 
     /// Refresh notifications based on current app data. Idempotent — safe to call repeatedly.
@@ -178,22 +199,24 @@ final class NotificationStore: ObservableObject {
         meditationSessionCount: Int
     ) {
         let countBefore = notifications.count
+        let firedCountBefore = firedDedupeKeys.count
 
-        // Welcome — Dino Says
-        insertIfNew(
-            category: .dinoSays,
-            title: "welcome to dino",
-            subtitle: "a small, soft place to land. take your time.",
-            dedupeKey: "welcome"
-        )
-
-        // World welcome
-        insertIfNew(
-            category: .world,
-            title: "the world is breathing with you",
-            subtitle: "thousands of dinos are checking in alongside you today.",
-            dedupeKey: "world-welcome"
-        )
+        // One-time seeds (welcome, world-welcome) — only added on first launch ever.
+        if !defaults.bool(forKey: seedAddedKey) {
+            insertIfNew(
+                category: .dinoSays,
+                title: "welcome to dino",
+                subtitle: "a small, soft place to land. take your time.",
+                dedupeKey: "welcome"
+            )
+            insertIfNew(
+                category: .world,
+                title: "the world is breathing with you",
+                subtitle: "thousands of dinos are checking in alongside you today.",
+                dedupeKey: "world-welcome"
+            )
+            defaults.set(true, forKey: seedAddedKey)
+        }
 
         // Streak milestones
         let streakMilestones: [Int] = [3, 7, 14, 30]
@@ -295,6 +318,9 @@ final class NotificationStore: ObservableObject {
 
         if notifications.count != countBefore {
             save()
+        }
+        if firedDedupeKeys.count != firedCountBefore {
+            saveFiredKeys()
         }
     }
 
