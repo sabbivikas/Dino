@@ -83,9 +83,13 @@ class DinoLiveActivityManager: ObservableObject {
                 pushType: nil
             )
             breathingActivity = activity
+            #if DEBUG
             print("[Dino] Breathing Live Activity started: \(activity.id)")
+            #endif
         } catch {
-            print("[Dino] Failed to start breathing Live Activity: \(error)")
+            #if DEBUG
+            print("[Dino] Failed to start breathing Live Activity")
+            #endif
         }
     }
 
@@ -153,9 +157,13 @@ class DinoLiveActivityManager: ObservableObject {
                 pushType: nil
             )
             meditationActivity = activity
+            #if DEBUG
             print("[Dino] Meditation Live Activity started: \(activity.id)")
+            #endif
         } catch {
-            print("[Dino] Failed to start meditation Live Activity: \(error)")
+            #if DEBUG
+            print("[Dino] Failed to start meditation Live Activity")
+            #endif
         }
     }
 
@@ -214,9 +222,13 @@ class DinoLiveActivityManager: ObservableObject {
                 pushType: nil
             )
             focusActivity = activity
+            #if DEBUG
             print("[Dino] Focus Live Activity started: \(activity.id)")
+            #endif
         } catch {
-            print("[Dino] Failed to start focus Live Activity: \(error)")
+            #if DEBUG
+            print("[Dino] Failed to start focus Live Activity")
+            #endif
         }
     }
 

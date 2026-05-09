@@ -164,6 +164,7 @@ final class SharedDataManager: ObservableObject {
         resetSelfCareIfNewDay()
         persistCurrentUserId()
         applyFileProtectionToExistingAudio()
+        applyFileProtectionToExistingPaintings()
         excludeDocumentsFromBackup()
     }
 
@@ -175,6 +176,22 @@ final class SharedDataManager: ObservableObject {
             guard let files = try? FileManager.default.contentsOfDirectory(at: docs, includingPropertiesForKeys: nil) else { return }
             let audioExts: Set<String> = ["m4a", "caf", "wav", "aac", "mp3"]
             for var url in files where audioExts.contains(url.pathExtension.lowercased()) {
+                var v = URLResourceValues()
+                v.isExcludedFromBackup = true
+                try? url.setResourceValues(v)
+                try? FileManager.default.setAttributes(
+                    [.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication],
+                    ofItemAtPath: url.path
+                )
+            }
+        }
+    }
+
+    private func applyFileProtectionToExistingPaintings() {
+        Task.detached(priority: .background) {
+            guard let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else { return }
+            guard let files = try? FileManager.default.contentsOfDirectory(at: docs, includingPropertiesForKeys: nil) else { return }
+            for var url in files where url.lastPathComponent.hasPrefix("painting_") && ["jpg", "jpeg", "png"].contains(url.pathExtension.lowercased()) {
                 var v = URLResourceValues()
                 v.isExcludedFromBackup = true
                 try? url.setResourceValues(v)

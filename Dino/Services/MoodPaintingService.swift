@@ -181,8 +181,17 @@ final class MoodPaintingService: ObservableObject {
 
     func savePainting(_ image: UIImage, for month: Date) {
         guard let data = image.jpegData(compressionQuality: 0.85) else { return }
-        let url = paintingURL(for: month)
+        var url = paintingURL(for: month)
         try? data.write(to: url, options: .atomic)
+
+        var values = URLResourceValues()
+        values.isExcludedFromBackup = true
+        try? url.setResourceValues(values)
+
+        try? FileManager.default.setAttributes(
+            [.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication],
+            ofItemAtPath: url.path
+        )
     }
 
     func loadPainting(for month: Date) -> UIImage? {

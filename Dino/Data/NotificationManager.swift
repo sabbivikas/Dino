@@ -82,7 +82,9 @@ class NotificationManager: ObservableObject {
                 if granted { rescheduleAll() }
                 return PermissionResult(granted: granted, shouldShowSettingsAlert: false)
             } catch {
-                print("[Notifications] permission error: \(error)")
+                #if DEBUG
+                print("[Notifications] permission error")
+                #endif
                 return PermissionResult(granted: false, shouldShowSettingsAlert: false)
             }
         case .denied:
@@ -198,11 +200,13 @@ class NotificationManager: ObservableObject {
                                             trigger: trigger)
 
         UNUserNotificationCenter.current().add(request) { error in
+            #if DEBUG
             if let error = error {
                 print("[Notifications] wind-down (configurable) schedule ERROR: \(error)")
             } else {
                 print("[Notifications] wind-down (configurable) scheduled at \(hour):\(String(format: "%02d", minute))")
             }
+            #endif
         }
     }
 
@@ -235,11 +239,13 @@ class NotificationManager: ObservableObject {
         let request = UNNotificationRequest(identifier: "daily_checkin", content: content, trigger: trigger)
 
         UNUserNotificationCenter.current().add(request) { error in
+            #if DEBUG
             if let error = error {
                 print("[Notifications] daily check-in schedule ERROR: \(error)")
             } else {
                 print("[Notifications] daily check-in scheduled at \(dateComponents.hour ?? 0):\(String(format: "%02d", dateComponents.minute ?? 0))")
             }
+            #endif
         }
     }
 
@@ -272,11 +278,13 @@ class NotificationManager: ObservableObject {
         let request = UNNotificationRequest(identifier: "streak_reminder", content: content, trigger: trigger)
 
         UNUserNotificationCenter.current().add(request) { error in
+            #if DEBUG
             if let error = error {
                 print("[Notifications] streak reminder schedule ERROR: \(error)")
             } else {
                 print("[Notifications] streak reminder scheduled at \(dateComponents.hour ?? 0):\(String(format: "%02d", dateComponents.minute ?? 0))")
             }
+            #endif
         }
     }
 
@@ -308,11 +316,13 @@ class NotificationManager: ObservableObject {
         let request = UNNotificationRequest(identifier: "wind_down", content: content, trigger: trigger)
 
         UNUserNotificationCenter.current().add(request) { error in
+            #if DEBUG
             if let error = error {
                 print("[Notifications] wind-down schedule ERROR: \(error)")
             } else {
                 print("[Notifications] wind-down scheduled at 21:30")
             }
+            #endif
         }
     }
 
@@ -352,11 +362,13 @@ class NotificationManager: ObservableObject {
         let request = UNNotificationRequest(identifier: "test_notification", content: content, trigger: trigger)
 
         UNUserNotificationCenter.current().add(request) { error in
+            #if DEBUG
             if let error = error {
                 print("[Notifications] test ERROR: \(error)")
             } else {
                 print("[Notifications] test notification scheduled in 5s")
             }
+            #endif
         }
     }
 
@@ -396,11 +408,13 @@ class NotificationManager: ObservableObject {
         let request = UNNotificationRequest(identifier: "re_engagement", content: content, trigger: trigger)
 
         UNUserNotificationCenter.current().add(request) { error in
+            #if DEBUG
             if let error = error {
                 print("[Notifications] re-engagement schedule ERROR: \(error)")
             } else {
                 print("[Notifications] re-engagement scheduled for 3 days from now")
             }
+            #endif
         }
     }
 }

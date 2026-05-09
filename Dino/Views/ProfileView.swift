@@ -400,17 +400,15 @@ struct ProfileView: View {
 
     private func finalizeAccountDeletion() async {
         // Auth account is gone — now delete Firestore data.
-        // Note: Firestore rules likely scoped to auth.uid; if Auth is already
-        // gone the request may fail. We attempt and log; local cleanup proceeds
-        // either way since the auth account is the source of truth for access.
+        // Local clear ONLY runs on Firestore success.
         do {
             try await FirestoreSyncService.shared.deleteAllUserData()
         } catch {
             #if DEBUG
             print("[Profile] firestore cleanup after auth delete failed")
             #endif
-            // Continue with local cleanup. Cloud data is orphaned but
-            // unreachable without the auth account.
+            accountDeletionErrorMessage = error.localizedDescription
+            return
         }
 
         AuthManager.shared.clearLocalAuthSession()

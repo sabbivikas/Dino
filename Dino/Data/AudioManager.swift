@@ -44,7 +44,9 @@ final class AudioManager: ObservableObject {
             }
             try session.setActive(true)
         } catch {
-            print("[AudioManager] Failed to configure AVAudioSession: \(error)")
+            #if DEBUG
+            print("[AudioManager] Failed to configure AVAudioSession")
+            #endif
         }
     }
 
@@ -68,7 +70,9 @@ final class AudioManager: ObservableObject {
         configureAudioSession(forPlayback: playback)
 
         guard let url = Bundle.main.url(forResource: track, withExtension: "mp3") else {
+            #if DEBUG
             print("[AudioManager] Could not find track: \(track).mp3")
+            #endif
             return
         }
 
@@ -80,9 +84,13 @@ final class AudioManager: ObservableObject {
             player?.play()
             currentTrack = track
             isPlaying = true
+            #if DEBUG
             print("[AudioManager] playing: \(track) (playback: \(playback), vol: \(volume))")
+            #endif
         } catch {
-            print("[AudioManager] Failed to create player for \(track): \(error)")
+            #if DEBUG
+            print("[AudioManager] Failed to create player for \(track)")
+            #endif
         }
     }
 
