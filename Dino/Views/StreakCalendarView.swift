@@ -2,8 +2,8 @@
 //  StreakCalendarView.swift
 //  Dino
 //
-//  Pixel-faithful port of the v8 streak-calendar design.
-//  Source: /tmp/dino_design_v8/preview/streak-calendar v2.html
+//  Phone-optimized streak calendar (iPhone 15 Pro 393x852pt).
+//  Source spec: /tmp/dino_design_v8/preview/streak-calendar v2.html
 //
 
 import SwiftUI
@@ -11,15 +11,16 @@ import SwiftUI
 struct StreakCalendarView: View {
     @EnvironmentObject var dataManager: SharedDataManager
     @Environment(\.dismiss) private var dismiss
+    @ObservedObject private var themeManager = ThemeManager.shared
 
     @State private var displayedMonth: Date = Calendar.current.startOfDay(for: Date())
 
-    // ── Spec colors (from streak-calendar v2.html) ──────────────────
+    // ── Spec colors (from streak-calendar v2.html) ────────────────
     fileprivate static let INK     = Color(hex: "#3D3A35")
     fileprivate static let INK2    = Color(hex: "#7A7266")
     fileprivate static let INK3    = Color(hex: "#A8A29A")
-    fileprivate static let CREAM   = Color(hex: "#FAF6EC")
-    fileprivate static let PAPER   = Color(hex: "#FEFBF3")
+    fileprivate static var CREAM: Color { DinoTheme.background }
+    fileprivate static var PAPER: Color { DinoTheme.cardBackground }
     fileprivate static let PAPER2  = Color(hex: "#F3EDDC")
     fileprivate static let SAGE    = Color(hex: "#A8C5A0")
     fileprivate static let SAGE_D  = Color(hex: "#7BA872")
@@ -32,10 +33,10 @@ struct StreakCalendarView: View {
         ZStack {
             Self.CREAM.ignoresSafeArea()
 
-            ScrollView {
+            ScrollView(.vertical, showsIndicators: false) {
                 VStack(spacing: 0) {
                     HeroHeader(displayedMonth: displayedMonth)
-                        .frame(height: 150)
+                        .frame(height: 220)
 
                     StatCardsRow(
                         currentStreak: dataManager.streakData.currentStreak,
@@ -43,7 +44,7 @@ struct StreakCalendarView: View {
                         totalVisits: dataManager.streakData.activeDates.count
                     )
                     .padding(.horizontal, 16)
-                    .padding(.top, 14)
+                    .padding(.top, 12)
 
                     CalendarCard(
                         displayedMonth: $displayedMonth,
@@ -55,8 +56,8 @@ struct StreakCalendarView: View {
                     ClosingNote(currentStreak: dataManager.streakData.currentStreak)
                         .padding(.horizontal, 16)
                         .padding(.top, 16)
-                        .padding(.bottom, 26)
                 }
+                .padding(.bottom, 24)
             }
         }
         .navigationBarBackButtonHidden(true)
@@ -72,17 +73,12 @@ struct StreakCalendarView: View {
     }
 }
 
-// MARK: - Hero header
-//
-// Spec: 150pt tall, layered radial+linear gradients (peach + golden),
-// rolling dotted hills, sun w/ 8 rays top-right, dino mascot bottom-right,
-// "<month> · <year>" top-left, "your streaks" + subtitle bottom-left.
+// MARK: - Hero header (capped at 220pt)
 private struct HeroHeader: View {
     let displayedMonth: Date
 
     var body: some View {
         ZStack(alignment: .topLeading) {
-            // Background gradient stack — radial peach over golden linear
             LinearGradient(
                 colors: [Color(hex: "#FBE9C4"), Color(hex: "#F5C6AA").opacity(0.33), StreakCalendarView.CREAM],
                 startPoint: .top, endPoint: .bottom
@@ -96,45 +92,39 @@ private struct HeroHeader: View {
                 center: UnitPoint(x: 0.80, y: 0.10), startRadius: 0, endRadius: 230
             )
 
-            // dotted rolling hills bottom
             Hills()
-                .frame(height: 80)
-                .frame(maxWidth: .infinity, alignment: .bottom)
-                .frame(maxHeight: .infinity, alignment: .bottom)
+                .frame(height: 90)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
 
-            // Sun — top right
             Sun()
                 .frame(width: 70, height: 70)
-                .position(x: UIScreen.main.bounds.width - 55, y: 49)
+                .position(x: UIScreen.main.bounds.width - 55, y: 60)
 
-            // Mascot — bottom right (cut-DinoChecklist)
             Image("cut-DinoChecklist")
                 .resizable()
                 .scaledToFit()
-                .frame(width: 110)
+                .frame(width: 120)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
                 .padding(.trailing, 16)
                 .offset(y: 6)
                 .allowsHitTesting(false)
 
-            // Top-left date
             Text(monthYearLabel)
                 .font(.custom(DinoTheme.customFontName, size: 13))
                 .tracking(0.5)
                 .foregroundColor(Color(hex: "#8A5A28"))
-                .padding(.top, 20)
+                .padding(.top, 24)
                 .padding(.leading, 20)
 
-            // Bottom-left titles
             VStack(alignment: .leading, spacing: 4) {
                 Spacer()
                 Text("your streaks")
-                    .font(.custom(DinoTheme.customFontName, size: 30))
+                    .font(.custom(DinoTheme.customFontName, size: 32))
                     .foregroundColor(StreakCalendarView.INK)
                 Text("a gentle nudge, not a scoreboard")
                     .font(.custom(DinoTheme.customFontName, size: 13))
                     .foregroundColor(StreakCalendarView.INK2)
-                    .padding(.bottom, 22)
+                    .padding(.bottom, 24)
             }
             .padding(.leading, 20)
         }
@@ -152,7 +142,7 @@ private struct HeroHeader: View {
     }
 }
 
-// MARK: - Hills SVG path → SwiftUI Path
+// MARK: - Hills
 private struct Hills: View {
     var body: some View {
         GeometryReader { geo in
@@ -160,67 +150,46 @@ private struct Hills: View {
             let h = geo.size.height
 
             ZStack {
-                // back hill — #F5D28A 0.55
                 Path { p in
-                    let s = CGSize(width: w, height: h)
-                    let scaleX = s.width / 390
-                    let scaleY = s.height / 120
+                    let scaleX = w / 390
+                    let scaleY = h / 120
                     p.move(to: CGPoint(x: 0, y: 90 * scaleY))
-                    p.addQuadCurve(
-                        to: CGPoint(x: 130 * scaleX, y: 75 * scaleY),
-                        control: CGPoint(x: 60 * scaleX, y: 55 * scaleY)
-                    )
-                    p.addQuadCurve(
-                        to: CGPoint(x: 290 * scaleX, y: 60 * scaleY),
-                        control: CGPoint(x: 210 * scaleX, y: 95 * scaleY)
-                    )
-                    p.addQuadCurve(
-                        to: CGPoint(x: 390 * scaleX, y: 70 * scaleY),
-                        control: CGPoint(x: 350 * scaleX, y: 40 * scaleY)
-                    )
+                    p.addQuadCurve(to: CGPoint(x: 130 * scaleX, y: 75 * scaleY),
+                                   control: CGPoint(x: 60 * scaleX, y: 55 * scaleY))
+                    p.addQuadCurve(to: CGPoint(x: 290 * scaleX, y: 60 * scaleY),
+                                   control: CGPoint(x: 210 * scaleX, y: 95 * scaleY))
+                    p.addQuadCurve(to: CGPoint(x: 390 * scaleX, y: 70 * scaleY),
+                                   control: CGPoint(x: 350 * scaleX, y: 40 * scaleY))
                     p.addLine(to: CGPoint(x: 390 * scaleX, y: 120 * scaleY))
                     p.addLine(to: CGPoint(x: 0, y: 120 * scaleY))
                     p.closeSubpath()
                 }
                 .fill(Color(hex: "#F5D28A").opacity(0.55))
 
-                // front hill — #E8B98A 0.65
                 Path { p in
-                    let s = CGSize(width: w, height: h)
-                    let scaleX = s.width / 390
-                    let scaleY = s.height / 120
+                    let scaleX = w / 390
+                    let scaleY = h / 120
                     p.move(to: CGPoint(x: 0, y: 105 * scaleY))
-                    p.addQuadCurve(
-                        to: CGPoint(x: 160 * scaleX, y: 95 * scaleY),
-                        control: CGPoint(x: 80 * scaleX, y: 80 * scaleY)
-                    )
-                    p.addQuadCurve(
-                        to: CGPoint(x: 320 * scaleX, y: 85 * scaleY),
-                        control: CGPoint(x: 240 * scaleX, y: 108 * scaleY)
-                    )
-                    p.addQuadCurve(
-                        to: CGPoint(x: 390 * scaleX, y: 90 * scaleY),
-                        control: CGPoint(x: 370 * scaleX, y: 74 * scaleY)
-                    )
+                    p.addQuadCurve(to: CGPoint(x: 160 * scaleX, y: 95 * scaleY),
+                                   control: CGPoint(x: 80 * scaleX, y: 80 * scaleY))
+                    p.addQuadCurve(to: CGPoint(x: 320 * scaleX, y: 85 * scaleY),
+                                   control: CGPoint(x: 240 * scaleX, y: 108 * scaleY))
+                    p.addQuadCurve(to: CGPoint(x: 390 * scaleX, y: 90 * scaleY),
+                                   control: CGPoint(x: 370 * scaleX, y: 74 * scaleY))
                     p.addLine(to: CGPoint(x: 390 * scaleX, y: 120 * scaleY))
                     p.addLine(to: CGPoint(x: 0, y: 120 * scaleY))
                     p.closeSubpath()
                 }
                 .fill(Color(hex: "#E8B98A").opacity(0.65))
 
-                // dotted horizon
                 Path { p in
                     let scaleX = w / 390
                     let scaleY = h / 120
                     p.move(to: CGPoint(x: 0, y: 78 * scaleY))
-                    p.addQuadCurve(
-                        to: CGPoint(x: 200 * scaleX, y: 70 * scaleY),
-                        control: CGPoint(x: 100 * scaleX, y: 55 * scaleY)
-                    )
-                    p.addQuadCurve(
-                        to: CGPoint(x: 390 * scaleX, y: 60 * scaleY),
-                        control: CGPoint(x: 295 * scaleX, y: 65 * scaleY)
-                    )
+                    p.addQuadCurve(to: CGPoint(x: 200 * scaleX, y: 70 * scaleY),
+                                   control: CGPoint(x: 100 * scaleX, y: 55 * scaleY))
+                    p.addQuadCurve(to: CGPoint(x: 390 * scaleX, y: 60 * scaleY),
+                                   control: CGPoint(x: 295 * scaleX, y: 65 * scaleY))
                 }
                 .stroke(
                     Color(hex: "#C4925A").opacity(0.6),
@@ -231,7 +200,7 @@ private struct Hills: View {
     }
 }
 
-// MARK: - Sun — circle + 8 rays
+// MARK: - Sun
 private struct Sun: View {
     var body: some View {
         ZStack {
@@ -259,216 +228,72 @@ private struct Sun: View {
 }
 
 // MARK: - Stat cards row
-//
-// Spec: 3 cards, gap 10, padding 14 16 0; each card paper bg + colored tint wash,
-// numeric value 22pt, label 12pt dino, caption 10pt. Tints: PEACH / SAGE / SKY.
 private struct StatCardsRow: View {
     let currentStreak: Int
     let longestStreak: Int
     let totalVisits: Int
 
     var body: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 8) {
             StatCard(
-                tint: StreakCalendarView.PEACH,
-                ring: StreakCalendarView.PEACH.opacity(0.53),
+                background: Color(hex: "#F5C6AA"),
+                iconName: "flame.fill",
+                iconColor: Color(hex: "#A8503A"),
                 value: currentStreak,
-                label: "current",
-                caption: "days blooming"
-            ) { StreakIcon() }
+                label: "days blooming"
+            )
             StatCard(
-                tint: StreakCalendarView.SAGE,
-                ring: StreakCalendarView.SAGE.opacity(0.53),
+                background: Color(hex: "#A8C5A0"),
+                iconName: "trophy.fill",
+                iconColor: Color(hex: "#5A7A50"),
                 value: longestStreak,
-                label: "longest",
-                caption: "personal best"
-            ) { TrophyIcon() }
+                label: "personal best"
+            )
             StatCard(
-                tint: StreakCalendarView.SKY,
-                ring: StreakCalendarView.SKY.opacity(0.53),
+                background: Color(hex: "#A8D4E6"),
+                iconName: "calendar",
+                iconColor: Color(hex: "#3F6F88"),
                 value: totalVisits,
-                label: "total",
-                caption: "visits"
-            ) { CalIcon() }
+                label: "total visits"
+            )
         }
     }
 }
 
-private struct StatCard<Icon: View>: View {
-    let tint: Color
-    let ring: Color
+private struct StatCard: View {
+    let background: Color
+    let iconName: String
+    let iconColor: Color
     let value: Int
     let label: String
-    let caption: String
-    @ViewBuilder let icon: () -> Icon
 
     var body: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 18)
-                .fill(StreakCalendarView.PAPER)
-            RoundedRectangle(cornerRadius: 18)
-                .fill(tint.opacity(0.35))
+        VStack(spacing: 4) {
+            Image(systemName: iconName)
+                .font(.system(size: 20, weight: .semibold))
+                .foregroundColor(iconColor)
+            Text("\(value)")
+                .font(.custom(DinoTheme.customFontName, size: 32))
+                .foregroundColor(Color(hex: "#2E2A24"))
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
+            Text(label)
+                .font(.custom(DinoTheme.customFontName, size: 10))
+                .foregroundColor(Color(hex: "#7A7266"))
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
         }
-        .overlay(
-            RoundedRectangle(cornerRadius: 18)
-                .strokeBorder(ring, lineWidth: 1)
-        )
-        .overlay(
-            VStack(spacing: 2) {
-                icon().frame(width: 32, height: 32)
-                Text("\(value)")
-                    .font(.system(size: 22, weight: .semibold, design: .rounded))
-                    .foregroundColor(StreakCalendarView.INK)
-                    .padding(.top, 2)
-                Text(label)
-                    .font(.custom(DinoTheme.customFontName, size: 12))
-                    .foregroundColor(StreakCalendarView.INK2)
-                    .padding(.top, 2)
-                Text(caption)
-                    .font(.custom(DinoTheme.customFontName, size: 10))
-                    .foregroundColor(StreakCalendarView.INK3)
-            }
-            .padding(.vertical, 10)
-            .padding(.horizontal, 8)
-        )
-        .shadow(color: Color.black.opacity(0.04), radius: 5, x: 0, y: 3)
         .frame(maxWidth: .infinity)
-    }
-}
-
-private struct StreakIcon: View {
-    var body: some View {
-        ZStack {
-            Path { p in
-                p.move(to: CGPoint(x: 16, y: 26))
-                p.addQuadCurve(to: CGPoint(x: 8, y: 16), control: CGPoint(x: 8, y: 24))
-                p.addQuadCurve(to: CGPoint(x: 12, y: 8), control: CGPoint(x: 8, y: 11))
-                p.addQuadCurve(to: CGPoint(x: 14, y: 14), control: CGPoint(x: 11, y: 13))
-                p.addQuadCurve(to: CGPoint(x: 16, y: 4), control: CGPoint(x: 12, y: 8))
-                p.addQuadCurve(to: CGPoint(x: 22, y: 12), control: CGPoint(x: 18, y: 10))
-                p.addQuadCurve(to: CGPoint(x: 22, y: 18), control: CGPoint(x: 20, y: 15))
-                p.addQuadCurve(to: CGPoint(x: 22, y: 24), control: CGPoint(x: 24, y: 21))
-                p.addQuadCurve(to: CGPoint(x: 16, y: 26), control: CGPoint(x: 20, y: 26))
-                p.closeSubpath()
-            }
-            .fill(StreakCalendarView.PEACH)
-            .overlay(
-                Path { p in
-                    p.move(to: CGPoint(x: 16, y: 26))
-                    p.addQuadCurve(to: CGPoint(x: 8, y: 16), control: CGPoint(x: 8, y: 24))
-                    p.addQuadCurve(to: CGPoint(x: 12, y: 8), control: CGPoint(x: 8, y: 11))
-                    p.addQuadCurve(to: CGPoint(x: 14, y: 14), control: CGPoint(x: 11, y: 13))
-                    p.addQuadCurve(to: CGPoint(x: 16, y: 4), control: CGPoint(x: 12, y: 8))
-                    p.addQuadCurve(to: CGPoint(x: 22, y: 12), control: CGPoint(x: 18, y: 10))
-                    p.addQuadCurve(to: CGPoint(x: 22, y: 18), control: CGPoint(x: 20, y: 15))
-                    p.addQuadCurve(to: CGPoint(x: 22, y: 24), control: CGPoint(x: 24, y: 21))
-                    p.addQuadCurve(to: CGPoint(x: 16, y: 26), control: CGPoint(x: 20, y: 26))
-                    p.closeSubpath()
-                }
-                .stroke(StreakCalendarView.PEACH_D, lineWidth: 1.4)
-            )
-        }
-        .frame(width: 32, height: 32)
-    }
-}
-
-private struct TrophyIcon: View {
-    var body: some View {
-        ZStack {
-            // cup
-            Path { p in
-                p.move(to: CGPoint(x: 10, y: 8))
-                p.addLine(to: CGPoint(x: 22, y: 8))
-                p.addLine(to: CGPoint(x: 21, y: 16))
-                p.addQuadCurve(to: CGPoint(x: 16, y: 20), control: CGPoint(x: 20, y: 20))
-                p.addQuadCurve(to: CGPoint(x: 11, y: 16), control: CGPoint(x: 12, y: 20))
-                p.closeSubpath()
-            }
-            .fill(StreakCalendarView.SAGE)
-            .overlay(
-                Path { p in
-                    p.move(to: CGPoint(x: 10, y: 8))
-                    p.addLine(to: CGPoint(x: 22, y: 8))
-                    p.addLine(to: CGPoint(x: 21, y: 16))
-                    p.addQuadCurve(to: CGPoint(x: 16, y: 20), control: CGPoint(x: 20, y: 20))
-                    p.addQuadCurve(to: CGPoint(x: 11, y: 16), control: CGPoint(x: 12, y: 20))
-                    p.closeSubpath()
-                }
-                .stroke(StreakCalendarView.SAGE_D, lineWidth: 1.4)
-            )
-            // base
-            Rectangle()
-                .fill(StreakCalendarView.SAGE_D)
-                .frame(width: 6, height: 3)
-                .offset(x: 0, y: 5.5)
-            RoundedRectangle(cornerRadius: 1)
-                .fill(StreakCalendarView.SAGE_D)
-                .frame(width: 12, height: 2.5)
-                .offset(x: 0, y: 8)
-            // gem
-            Circle()
-                .fill(Color(hex: "#FFE082"))
-                .frame(width: 3, height: 3)
-                .offset(x: 0, y: -3)
-        }
-        .frame(width: 32, height: 32)
-    }
-}
-
-private struct CalIcon: View {
-    var body: some View {
-        ZStack {
-            // body
-            RoundedRectangle(cornerRadius: 3)
-                .fill(StreakCalendarView.SKY)
-                .frame(width: 22, height: 18)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 3)
-                        .strokeBorder(Color(hex: "#4A7A95"), lineWidth: 1.3)
-                )
-            // header
-            RoundedRectangle(cornerRadius: 3)
-                .fill(Color(hex: "#87B8CF"))
-                .frame(width: 22, height: 6)
-                .offset(y: -6)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 3)
-                        .strokeBorder(Color(hex: "#4A7A95"), lineWidth: 1.3)
-                        .frame(width: 22, height: 6)
-                        .offset(y: -6)
-                )
-            // hangers
-            Capsule()
-                .fill(Color(hex: "#4A7A95"))
-                .frame(width: 1.6, height: 6)
-                .offset(x: -5, y: -10)
-            Capsule()
-                .fill(Color(hex: "#4A7A95"))
-                .frame(width: 1.6, height: 6)
-                .offset(x: 7, y: -10)
-            // dots
-            HStack(spacing: 3) {
-                Circle().fill(Color(hex: "#4A7A95")).frame(width: 2.6, height: 2.6)
-                Circle().fill(Color(hex: "#4A7A95")).frame(width: 2.6, height: 2.6)
-                Circle().fill(Color(hex: "#4A7A95")).frame(width: 2.6, height: 2.6)
-            }
-            .offset(y: 3)
-            HStack(spacing: 3) {
-                Circle().fill(Color(hex: "#4A7A95").opacity(0.5)).frame(width: 2.6, height: 2.6)
-                Circle().fill(Color(hex: "#4A7A95")).frame(width: 2.6, height: 2.6)
-                Circle().fill(Color(hex: "#4A7A95").opacity(0.3)).frame(width: 2.6, height: 2.6)
-            }
-            .offset(y: 7)
-        }
-        .frame(width: 32, height: 32)
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(background)
+        )
+        .shadow(color: .black.opacity(0.06), radius: 6, x: 0, y: 2)
     }
 }
 
 // MARK: - Calendar card
-//
-// Spec: paper bg, radius 24, dashed sage inner frame, month nav row, dotted underline,
-// 7-col grid with weekday labels (s/m/t/w/t/f/s), filled circles for active days,
-// dashed sage ring for today, paper-fold corner top-right.
 private struct CalendarCard: View {
     @Binding var displayedMonth: Date
     let activeDates: Set<String>
@@ -482,7 +307,6 @@ private struct CalendarCard: View {
                     .padding(.horizontal, 6)
                     .padding(.bottom, 12)
 
-                // dotted underline doodle
                 UnderlineDoodle()
                     .stroke(StreakCalendarView.SAGE.opacity(0.6), lineWidth: 1.2)
                     .frame(height: 6)
@@ -490,7 +314,6 @@ private struct CalendarCard: View {
                     .padding(.horizontal, 28)
                     .padding(.bottom, 10)
 
-                // weekday header
                 HStack(spacing: 0) {
                     ForEach(Array(dayLabels.enumerated()), id: \.offset) { idx, d in
                         Text(d)
@@ -502,7 +325,6 @@ private struct CalendarCard: View {
                 .padding(.horizontal, 2)
                 .padding(.bottom, 6)
 
-                // grid
                 grid
                     .padding(.horizontal, 2)
                     .padding(.top, 4)
@@ -517,7 +339,6 @@ private struct CalendarCard: View {
                     .strokeBorder(StreakCalendarView.BORDER, lineWidth: 1)
             )
             .overlay(
-                // dashed sage inner frame
                 RoundedRectangle(cornerRadius: 20)
                     .strokeBorder(
                         StreakCalendarView.SAGE_D.opacity(0.35),
@@ -527,7 +348,6 @@ private struct CalendarCard: View {
             )
             .shadow(color: Color.black.opacity(0.05), radius: 9, x: 0, y: 6)
 
-            // paper-fold corner
             PaperFoldCorner()
                 .frame(width: 38, height: 38)
         }
@@ -607,13 +427,13 @@ private struct CalendarCard: View {
                     cell: cell,
                     activeDates: activeDates
                 )
-                .frame(height: 48)
+                .frame(height: 44)
             }
         }
     }
 
     fileprivate struct CellModel {
-        let date: Date?       // nil = leading/trailing placeholder
+        let date: Date?
         let dayNumber: Int?
         let inMonth: Bool
         let isToday: Bool
@@ -628,8 +448,6 @@ private struct CalendarCard: View {
         let firstOfMonth = monthInterval.start
 
         let daysInMonth = cal.range(of: .day, in: .month, for: firstOfMonth)?.count ?? 30
-
-        // Sunday-first: weekday is 1..7, Sunday = 1
         let firstWeekday = cal.component(.weekday, from: firstOfMonth) - 1
 
         var cells: [CellModel] = []
@@ -662,7 +480,6 @@ private struct DayCell: View {
                 let isFuture = cell.isFuture
 
                 if isActive {
-                    // bloom halo
                     Circle()
                         .fill(
                             RadialGradient(
@@ -672,7 +489,6 @@ private struct DayCell: View {
                         )
                         .frame(width: 40, height: 40)
 
-                    // filled dot
                     Circle()
                         .fill(StreakCalendarView.SAGE)
                         .frame(width: 28, height: 28)
@@ -680,7 +496,6 @@ private struct DayCell: View {
                             Circle().strokeBorder(StreakCalendarView.SAGE_D, lineWidth: 1.3)
                         )
                         .overlay(
-                            // inner highlight
                             Ellipse()
                                 .fill(Color.white.opacity(0.45))
                                 .frame(width: 10, height: 7)
