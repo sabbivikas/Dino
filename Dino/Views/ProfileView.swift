@@ -211,7 +211,7 @@ struct ProfileView: View {
             case .growth:        NavigationStack { GrowthView().environmentObject(dataManager) }
             case .profileDetails: ProfileDetailsView().environmentObject(dataManager)
             case .gentleReminders:
-                NavigationStack { SelfCareRemindersView() }
+                SettingsView().environmentObject(dataManager)
             case .windDown:      WindDownView()
             case .textSize:      TextSizeView()
             case .paintingGallery:

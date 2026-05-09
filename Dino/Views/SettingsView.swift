@@ -86,6 +86,36 @@ struct SettingsView: View {
                         .foregroundColor(DinoTheme.textSecondary)
                 }
                 .listRowBackground(DinoTheme.cardBackground)
+
+                // Self-care reminders
+                Section {
+                    NavigationLink {
+                        SelfCareRemindersView()
+                    } label: {
+                        HStack(spacing: 14) {
+                            Image(systemName: "heart.text.square.fill")
+                                .font(DinoTheme.dinoFont(size: 16))
+                                .foregroundColor(DinoTheme.warmRose)
+                                .frame(width: 32, height: 32)
+                                .background(DinoTheme.warmRose.opacity(0.12))
+                                .cornerRadius(8)
+
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("self-care reminders")
+                                    .font(DinoTheme.bodyFont())
+                                    .foregroundColor(DinoTheme.textPrimary)
+                                Text("water, food, rest, check-in")
+                                    .font(DinoTheme.captionFont())
+                                    .foregroundColor(DinoTheme.textSecondary)
+                            }
+                        }
+                    }
+                } header: {
+                    Text("self-care")
+                        .font(DinoTheme.captionFont())
+                        .foregroundColor(DinoTheme.textSecondary)
+                }
+                .listRowBackground(DinoTheme.cardBackground)
             }
             .listStyle(.insetGrouped)
             .background(DinoTheme.background.ignoresSafeArea())
