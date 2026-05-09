@@ -4,6 +4,7 @@
 //
 
 import SwiftUI
+import UIKit
 import Combine
 import WidgetKit
 
@@ -327,10 +328,41 @@ final class ThemeManager: ObservableObject {
     @Published var isLoadingWeather: Bool = false
 
     private var weatherTheme: DinoAppTheme = .defaultDino
+    private var weatherService: WeatherService?
+    private var foregroundObserver: NSObjectProtocol?
 
     private init() {
         loadPersistedSettings()
         applyTheme()
+        registerForegroundObserver()
+    }
+
+    deinit {
+        if let obs = foregroundObserver {
+            NotificationCenter.default.removeObserver(obs)
+        }
+    }
+
+    private func registerForegroundObserver() {
+        foregroundObserver = NotificationCenter.default.addObserver(
+            forName: UIApplication.willEnterForegroundNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                self?.refreshWeatherIfNeeded()
+            }
+        }
+    }
+
+    /// Re-fetch weather and re-apply the theme if we're in weather mode.
+    /// Called automatically on app foreground; safe to call manually too.
+    func refreshWeatherIfNeeded() {
+        guard themeMode == .weather else { return }
+        if weatherService == nil {
+            weatherService = WeatherService(themeManager: self)
+        }
+        weatherService?.requestLocation()
     }
 
     // MARK: - Persistence
@@ -367,15 +399,10 @@ final class ThemeManager: ObservableObject {
     /// Apply the correct theme based on current state.
     /// If previewTheme is set, use it. Otherwise use normal mode logic.
     private func applyTheme() {
-        if let preview = previewTheme {
-            currentTheme = preview
-            return
-        }
-        switch themeMode {
-        case .manual:
-            currentTheme = selectedManualTheme
-        case .weather:
-            currentTheme = weatherTheme
+        let target: DinoAppTheme = previewTheme
+            ?? (themeMode == .manual ? selectedManualTheme : weatherTheme)
+        withAnimation(.easeInOut(duration: 0.6)) {
+            currentTheme = target
         }
         defaults.set(currentTheme.rawValue, forKey: "dino.currentThemeForWidget")
         WidgetCenter.shared.reloadAllTimelines()
@@ -386,7 +413,9 @@ final class ThemeManager: ObservableObject {
     /// Begin previewing a theme — updates currentTheme live so the whole app reflects it.
     func startPreview(_ theme: DinoAppTheme) {
         previewTheme = theme
-        currentTheme = theme
+        withAnimation(.easeInOut(duration: 0.6)) {
+            currentTheme = theme
+        }
     }
 
     /// Cancel preview and revert to the actual applied theme.
@@ -400,7 +429,9 @@ final class ThemeManager: ObservableObject {
         guard let preview = previewTheme else { return }
         previewTheme = nil
         selectedManualTheme = preview
-        currentTheme = preview
+        withAnimation(.easeInOut(duration: 0.6)) {
+            currentTheme = preview
+        }
         // Sync to widgets
         defaults.set(currentTheme.rawValue, forKey: "dino.currentThemeForWidget")
         WidgetCenter.shared.reloadAllTimelines()
@@ -413,7 +444,11 @@ final class ThemeManager: ObservableObject {
         weatherCondition = condition
         persistWeatherTheme(theme)
         if themeMode == .weather {
-            currentTheme = theme
+            withAnimation(.easeInOut(duration: 0.6)) {
+                currentTheme = theme
+            }
+            defaults.set(currentTheme.rawValue, forKey: "dino.currentThemeForWidget")
+            WidgetCenter.shared.reloadAllTimelines()
         }
     }
 }

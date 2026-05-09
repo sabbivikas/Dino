@@ -13,6 +13,7 @@ struct NotificationCenterView: View {
     @StateObject private var store = NotificationStore.shared
     @State private var filter: FilterOption = .all
     @State private var hasAppeared = false
+    @State private var showClearConfirm = false
 
     // ── Spec colors (exact, from notifications.jsx) ─────────────────────
     private let pageBG       = Color(hex: "#FAF6EC")
@@ -72,6 +73,16 @@ struct NotificationCenterView: View {
                 hasAppeared = true
             }
         }
+        .alert("clear all notifications?", isPresented: $showClearConfirm) {
+            Button("cancel", role: .cancel) { }
+            Button("clear", role: .destructive) {
+                withAnimation(.easeInOut(duration: 0.25)) {
+                    store.clearAll()
+                }
+            }
+        } message: {
+            Text("this can't be undone.")
+        }
     }
 
     // MARK: - Header — “from dino” + date + “mark all read”
@@ -89,17 +100,29 @@ struct NotificationCenterView: View {
                     .tracking(0.12)
             }
             Spacer()
-            if store.unreadCount > 0 {
-                Button {
-                    withAnimation(.easeInOut(duration: 0.2)) { store.markAllRead() }
-                } label: {
-                    Text("mark all read")
-                        .font(.system(size: 11))
-                        .tracking(0.44) // 0.04em ~ 0.44pt at 11
-                        .foregroundColor(dateInk)
-                        .padding(.vertical, 4)
+            HStack(spacing: 14) {
+                if store.unreadCount > 0 {
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.2)) { store.markAllRead() }
+                    } label: {
+                        Text("mark all read")
+                            .font(.system(size: 11))
+                            .tracking(0.44)
+                            .foregroundColor(dateInk)
+                            .padding(.vertical, 4)
+                    }
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
+                if !store.notifications.isEmpty {
+                    Button { showClearConfirm = true } label: {
+                        Text("clear all")
+                            .font(.system(size: 11))
+                            .tracking(0.44)
+                            .foregroundColor(dateInk)
+                            .padding(.vertical, 4)
+                    }
+                    .buttonStyle(.plain)
+                }
             }
             // Back chevron — present in app context, not in design (which is in a phone shell).
             // Provide a tiny back affordance below the title for navigation.
@@ -264,7 +287,7 @@ private struct LetterCard: View {
     var body: some View {
         let cat = LettersCat.from(note.category)
         let unread = !note.isRead
-        let cardBG: Color = unread ? cat.cardUnread : .white
+        let cardBG: Color = unread ? cat.cardUnread : DinoTheme.cardBackground
         let titleColor: Color = unread ? Color(hex: "#2E2A24") : Color(hex: "#5A544B")
         let isAirmail = note.category == .dinoSays
 

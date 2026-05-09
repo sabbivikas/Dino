@@ -117,6 +117,14 @@ final class NotificationStore: ObservableObject {
         save()
     }
 
+    /// Wipe every notification across all categories. Convenience for the
+    /// notification-center "clear all" action.
+    func clearAll() {
+        guard !notifications.isEmpty else { return }
+        notifications.removeAll()
+        save()
+    }
+
     // MARK: - Persistence
 
     private func load() {
