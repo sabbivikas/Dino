@@ -382,6 +382,37 @@ class NotificationManager: ObservableObject {
         }
     }
 
+    /// Debug helper — dumps pending notification requests. Logs only in DEBUG.
+    func debugPendingNotifications() {
+        UNUserNotificationCenter.current().getPendingNotificationRequests { requests in
+            #if DEBUG
+            print("[Reminders] Pending: \(requests.count)")
+            for r in requests {
+                print("[Reminders] - \(r.identifier): \(String(describing: r.trigger))")
+            }
+            #endif
+        }
+    }
+
+    #if DEBUG
+    /// Fires a test notification 15s out to verify scheduling works.
+    func scheduleTestNotification() {
+        let content = UNMutableNotificationContent()
+        content.title = "dino test 🦕"
+        content.body = "self-care reminders are working!"
+        content.sound = .default
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 15, repeats: false)
+        let request = UNNotificationRequest(identifier: "dino.test", content: content, trigger: trigger)
+        UNUserNotificationCenter.current().add(request) { error in
+            if let error = error {
+                print("[Reminders] Test schedule failed: \(error)")
+            } else {
+                print("[Reminders] Test scheduled for 15s")
+            }
+        }
+    }
+    #endif
+
     // MARK: - Re-engagement
 
     /// Schedule a gentle re-engagement notification for users inactive for 3+ days.

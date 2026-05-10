@@ -135,6 +135,12 @@ private struct SelfCareReminderRow: View {
                         enabled = newValue
                         if newValue {
                             schedule()
+                            Task { @MainActor in
+                                NotificationManager.shared.debugPendingNotifications()
+                                #if DEBUG
+                                NotificationManager.shared.scheduleTestNotification()
+                                #endif
+                            }
                         } else {
                             cancel()
                         }
