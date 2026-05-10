@@ -14,6 +14,7 @@ struct VoiceJournalView: View {
 
     @EnvironmentObject var dataManager: SharedDataManager
     @StateObject private var viewModel: JournalViewModel = JournalViewModel(dataManager: SharedDataManager.shared)
+    @State private var showAllMemories: Bool = false
 
     var body: some View {
         NavigationStack {
@@ -52,7 +53,11 @@ struct VoiceJournalView: View {
 
                         JournalTimelineStrip(
                             entries: dataManager.journalEntries,
-                            viewModel: viewModel
+                            viewModel: viewModel,
+                            onSeeAll: {
+                                HapticManager.shared.light()
+                                showAllMemories = true
+                            }
                         )
                     }
                     .padding(.horizontal, 20)
@@ -69,6 +74,10 @@ struct VoiceJournalView: View {
                 )
             }
             .navigationBarHidden(true)
+            .fullScreenCover(isPresented: $showAllMemories) {
+                JournalAllEntriesView(viewModel: viewModel)
+                    .environmentObject(dataManager)
+            }
         }
     }
 
@@ -477,6 +486,7 @@ private struct DashedDivider: View {
 private struct JournalTimelineStrip: View {
     let entries: [JournalEntry]
     @ObservedObject var viewModel: JournalViewModel
+    let onSeeAll: () -> Void
 
     var body: some View {
         if entries.isEmpty {
@@ -514,7 +524,7 @@ private struct JournalTimelineStrip: View {
                         }
 
                         // See all card
-                        SeeAllCard(count: entries.count)
+                        SeeAllCard(count: entries.count, onTap: onSeeAll)
                     }
                     .padding(.horizontal, 12)
                     .padding(.top, 8)
@@ -554,24 +564,28 @@ private struct EmptyMemoriesCard: View {
 // MARK: - See All Card
 private struct SeeAllCard: View {
     let count: Int
+    let onTap: () -> Void
 
     var body: some View {
-        RoundedRectangle(cornerRadius: 10)
-            .stroke(style: StrokeStyle(lineWidth: 1, dash: [6, 4]))
-            .foregroundColor(Color(hex: "#A8A29A").opacity(0.4))
-            .frame(width: 180, height: 228)
-            .overlay(
-                Text("see all —\n\(count) memories →")
-                    .font(.system(size: 13))
-                    .foregroundColor(Color(hex: "#7A7266"))
-                    .multilineTextAlignment(.center)
-            )
-            .rotationEffect(.degrees(1.5))
+        Button(action: onTap) {
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(style: StrokeStyle(lineWidth: 1, dash: [6, 4]))
+                .foregroundColor(Color(hex: "#A8A29A").opacity(0.4))
+                .frame(width: 180, height: 228)
+                .overlay(
+                    Text("see all —\n\(count) memories →")
+                        .font(.system(size: 13))
+                        .foregroundColor(Color(hex: "#7A7266"))
+                        .multilineTextAlignment(.center)
+                )
+                .rotationEffect(.degrees(1.5))
+        }
+        .buttonStyle(.plain)
     }
 }
 
 // MARK: - Polaroid Card
-private struct JournalPolaroidCard: View {
+struct JournalPolaroidCard: View {
     let entry: JournalEntry
     let index: Int
     @ObservedObject var viewModel: JournalViewModel
