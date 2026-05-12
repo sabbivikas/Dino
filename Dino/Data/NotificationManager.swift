@@ -394,24 +394,52 @@ class NotificationManager: ObservableObject {
         }
     }
 
-    #if DEBUG
-    /// Fires a test notification 15s out to verify scheduling works.
-    func scheduleTestNotification() {
-        let content = UNMutableNotificationContent()
-        content.title = "dino test 🦕"
-        content.body = "self-care reminders are working!"
-        content.sound = .default
-        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 15, repeats: false)
-        let request = UNNotificationRequest(identifier: "dino.test", content: content, trigger: trigger)
-        UNUserNotificationCenter.current().add(request) { error in
-            if let error = error {
-                print("[Reminders] Test schedule failed: \(error)")
-            } else {
-                print("[Reminders] Test scheduled for 15s")
+    // MARK: - Self-care reminders
+
+    /// Schedule a single repeating self-care reminder. Calls completion on
+    /// the main queue with `true` on success, `false` if permission is
+    /// denied or scheduling failed. Respects the master `notificationsEnabled`
+    /// toggle the same way `rescheduleAll` does.
+    func setSelfCareReminder(id: String, body: String, hour: Int, minute: Int, completion: @escaping (Bool) -> Void) {
+        let masterEnabled = notificationsEnabled
+        UNUserNotificationCenter.current().getNotificationSettings { settings in
+            DispatchQueue.main.async {
+                guard masterEnabled, Self.isPermissionGranted(settings.authorizationStatus) else {
+                    completion(false)
+                    return
+                }
+
+                let content = UNMutableNotificationContent()
+                content.title = "dino"
+                content.body = body
+                content.sound = .default
+
+                var dc = DateComponents()
+                dc.hour = hour
+                dc.minute = minute
+
+                let trigger = UNCalendarNotificationTrigger(dateMatching: dc, repeats: true)
+                let request = UNNotificationRequest(identifier: id, content: content, trigger: trigger)
+
+                let center = UNUserNotificationCenter.current()
+                center.removePendingNotificationRequests(withIdentifiers: [id])
+                center.add(request) { error in
+                    #if DEBUG
+                    if error != nil {
+                        print("[Reminders] schedule failed")
+                    }
+                    #endif
+                    DispatchQueue.main.async {
+                        completion(error == nil)
+                    }
+                }
             }
         }
     }
-    #endif
+
+    func cancelSelfCareReminder(id: String) {
+        UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: [id])
+    }
 
     // MARK: - Re-engagement
 

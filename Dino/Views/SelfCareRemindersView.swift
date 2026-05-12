@@ -3,12 +3,13 @@
 //  Dino
 //
 //  Four daily self-care nudges (water, eat, wind down, check-in). Toggling
-//  a reminder schedules a repeating UNCalendarNotificationTrigger; toggling
-//  off cancels it.
+//  a reminder schedules a repeating UNCalendarNotificationTrigger via
+//  NotificationManager; toggling off cancels it. Permission-denied surfaces
+//  a Settings-deep-link alert and reverts the toggle.
 //
 
 import SwiftUI
-import UserNotifications
+import UIKit
 
 private struct SelfCareReminder: Identifiable {
     let id: String
@@ -70,10 +71,8 @@ struct SelfCareRemindersView: View {
         .background(DinoTheme.background.ignoresSafeArea())
         .navigationTitle("self-care reminders")
         .navigationBarTitleDisplayMode(.inline)
-        .onAppear {
-            UNUserNotificationCenter.current().requestAuthorization(
-                options: [.alert, .badge, .sound]
-            ) { _, _ in }
+        .task {
+            _ = await NotificationManager.shared.requestPermissionDetailed()
         }
     }
 }
@@ -83,6 +82,7 @@ private struct SelfCareReminderRow: View {
     @AppStorage private var enabled: Bool
     @AppStorage private var hour: Int
     @AppStorage private var minute: Int
+    @State private var showPermissionAlert: Bool = false
 
     init(reminder: SelfCareReminder) {
         self.reminder = reminder
@@ -135,12 +135,6 @@ private struct SelfCareReminderRow: View {
                         enabled = newValue
                         if newValue {
                             schedule()
-                            Task { @MainActor in
-                                NotificationManager.shared.debugPendingNotifications()
-                                #if DEBUG
-                                NotificationManager.shared.scheduleTestNotification()
-                                #endif
-                            }
                         } else {
                             cancel()
                         }
@@ -166,6 +160,16 @@ private struct SelfCareReminderRow: View {
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .strokeBorder(DinoTheme.cardBorder, lineWidth: 1)
         )
+        .alert("notifications are off", isPresented: $showPermissionAlert) {
+            Button("open settings") {
+                if let url = URL(string: UIApplication.openSettingsURLString) {
+                    UIApplication.shared.open(url)
+                }
+            }
+            Button("cancel", role: .cancel) {}
+        } message: {
+            Text("to receive self-care reminders, enable notifications for Dino in iPhone Settings → Notifications → Dino")
+        }
     }
 
     private var timeString: String {
@@ -175,29 +179,24 @@ private struct SelfCareReminderRow: View {
     }
 
     private func schedule() {
-        let content = UNMutableNotificationContent()
-        content.title = "dino"
-        content.body = reminder.body
-        content.sound = .default
-
-        var dc = DateComponents()
-        dc.hour = hour
-        dc.minute = minute
-
-        let trigger = UNCalendarNotificationTrigger(dateMatching: dc, repeats: true)
-        let request = UNNotificationRequest(
-            identifier: reminder.id,
-            content: content,
-            trigger: trigger
-        )
-
-        let center = UNUserNotificationCenter.current()
-        center.removePendingNotificationRequests(withIdentifiers: [reminder.id])
-        center.add(request)
+        NotificationManager.shared.setSelfCareReminder(
+            id: reminder.id,
+            body: reminder.body,
+            hour: hour,
+            minute: minute
+        ) { success in
+            if !success {
+                enabled = false
+                showPermissionAlert = true
+            } else {
+                #if DEBUG
+                NotificationManager.shared.debugPendingNotifications()
+                #endif
+            }
+        }
     }
 
     private func cancel() {
-        UNUserNotificationCenter.current()
-            .removePendingNotificationRequests(withIdentifiers: [reminder.id])
+        NotificationManager.shared.cancelSelfCareReminder(id: reminder.id)
     }
 }
