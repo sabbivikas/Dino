@@ -398,13 +398,17 @@ class NotificationManager: ObservableObject {
 
     /// Schedule a single repeating self-care reminder. Calls completion on
     /// the main queue with `true` on success, `false` if permission is
-    /// denied or scheduling failed. Respects the master `notificationsEnabled`
-    /// toggle the same way `rescheduleAll` does.
+    /// denied or scheduling failed. Self-care reminders are an explicit
+    /// per-reminder opt-in by the user (they tap a toggle), so this
+    /// intentionally bypasses the master `notificationsEnabled` flag —
+    /// system-level authorization is the only gate.
     func setSelfCareReminder(id: String, body: String, hour: Int, minute: Int, completion: @escaping (Bool) -> Void) {
-        let masterEnabled = notificationsEnabled
         UNUserNotificationCenter.current().getNotificationSettings { settings in
             DispatchQueue.main.async {
-                guard masterEnabled, Self.isPermissionGranted(settings.authorizationStatus) else {
+                guard Self.isPermissionGranted(settings.authorizationStatus) else {
+                    #if DEBUG
+                    print("[SelfCare] permission gate failed status=\(settings.authorizationStatus.rawValue)")
+                    #endif
                     completion(false)
                     return
                 }
@@ -425,8 +429,16 @@ class NotificationManager: ObservableObject {
                 center.removePendingNotificationRequests(withIdentifiers: [id])
                 center.add(request) { error in
                     #if DEBUG
-                    if error != nil {
-                        print("[Reminders] schedule failed")
+                    if let error = error {
+                        print("[SelfCare] add failed for \(id): \(error)")
+                    } else {
+                        print("[SelfCare] add succeeded for \(id) at \(hour):\(String(format: "%02d", minute))")
+                        UNUserNotificationCenter.current().getPendingNotificationRequests { reqs in
+                            print("[SelfCare] pending count: \(reqs.count)")
+                            for r in reqs where r.identifier.hasPrefix("selfcare-") {
+                                print("[SelfCare]   \(r.identifier) trigger=\(String(describing: r.trigger))")
+                            }
+                        }
                     }
                     #endif
                     DispatchQueue.main.async {

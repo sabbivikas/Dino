@@ -9,6 +9,7 @@
 //
 
 import SwiftUI
+import UserNotifications
 import UIKit
 
 private struct SelfCareReminder: Identifiable {
@@ -134,6 +135,15 @@ private struct SelfCareReminderRow: View {
                     set: { newValue in
                         enabled = newValue
                         if newValue {
+                            #if DEBUG
+                            let content = UNMutableNotificationContent()
+                            content.title = "dino self-care test 🦕"
+                            content.body = "if you see this, notifications work — your scheduled reminder is queued"
+                            content.sound = .default
+                            let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 10, repeats: false)
+                            let request = UNNotificationRequest(identifier: "dino.selfcare.test", content: content, trigger: trigger)
+                            UNUserNotificationCenter.current().add(request)
+                            #endif
                             schedule()
                         } else {
                             cancel()
