@@ -74,7 +74,7 @@ struct OnboardingView: View {
     @State private var dinoNameInput: String = ""
     @State private var showSettingsAlert: Bool = false
 
-    private var totalSteps: Int { 9 }
+    private var totalSteps: Int { 11 }
 
     var body: some View {
         ZStack {
@@ -110,7 +110,7 @@ struct OnboardingView: View {
             }
 
             // Step 8 confetti sits above the content
-            if currentStep == 8 {
+            if currentStep == 10 {
                 Confetti()
                     .allowsHitTesting(false)
             }
@@ -196,7 +196,9 @@ struct OnboardingView: View {
         case 5: StepReferralPage(selectedReferral: $selectedReferral)
         case 6: StepNotificationsPage()
         case 7: StepNamePage(userName: $dinoNameInput)
-        case 8: StepDisclaimerPage()
+        case 8: StepAnxietyUseCasePage()
+        case 9: StepRoughDayUseCasePage()
+        case 10: StepDisclaimerPage()
         default: EmptyView()
         }
     }
@@ -239,7 +241,7 @@ struct OnboardingView: View {
                 }
                 .buttonStyle(ScaleButtonStyle())
             }
-        } else if currentStep == 8 {
+        } else if currentStep == 10 {
             primarySageButton(label: "let's begin") { finish() }
         } else {
             primarySageButton(label: "next") { advance() }
@@ -877,3 +879,209 @@ private struct StepDisclaimerPage: View {
     }
 }
 
+
+// MARK: - Step 8: Anxiety use case
+private struct StepAnxietyUseCasePage: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var pulsing: Bool = false
+
+    var body: some View {
+        ZStack {
+            LinearGradient(
+                colors: [Color(hex: "#E8F0E2"), Color(hex: "#D6E5CC")],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .ignoresSafeArea()
+            .opacity(0.85)
+
+            VStack(spacing: 24) {
+                Spacer(minLength: 12)
+
+                ZStack {
+                    Circle()
+                        .fill(OnboardingColors.sage.opacity(0.18))
+                        .frame(width: 200, height: 200)
+                        .blur(radius: 18)
+
+                    Circle()
+                        .fill(OnboardingColors.sage.opacity(0.6))
+                        .frame(width: 140, height: 140)
+                        .scaleEffect(pulsing && !reduceMotion ? 1.18 : 1.0)
+                        .shadow(color: OnboardingColors.sage.opacity(0.45), radius: 20, x: 0, y: 6)
+                        .animation(
+                            reduceMotion
+                                ? .default
+                                : .easeInOut(duration: 3).repeatForever(autoreverses: true),
+                            value: pulsing
+                        )
+                }
+                .frame(height: 220)
+
+                Text("when anxiety hits")
+                    .font(.custom(DinoTheme.customFontName, size: 28))
+                    .foregroundColor(OnboardingColors.textPrimary)
+                    .multilineTextAlignment(.center)
+
+                Text("4 minutes of breathing activates your body's calm response. dino will guide you through it.")
+                    .font(.system(size: 14, design: .rounded))
+                    .italic()
+                    .foregroundColor(OnboardingColors.textSecondary)
+                    .multilineTextAlignment(.center)
+                    .lineSpacing(4)
+                    .padding(.horizontal, 32)
+
+                Text("used by people before meetings, after hard news, during panic moments")
+                    .font(.system(size: 11, design: .rounded))
+                    .foregroundColor(OnboardingColors.textSecondary.opacity(0.65))
+                    .multilineTextAlignment(.center)
+                    .lineSpacing(3)
+                    .padding(.horizontal, 36)
+
+                Spacer()
+            }
+        }
+        .onAppear {
+            if !reduceMotion { pulsing = true }
+        }
+    }
+}
+
+// MARK: - Step 9: Rough day use case
+private struct StepRoughDayUseCasePage: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var appeared: Bool = false
+
+    private let tokenColors: [Color] = [
+        Color(hex: "#F5C6AA"),
+        Color(hex: "#A8D4E6"),
+        Color(hex: "#C4B8D4"),
+        Color(hex: "#E8B4B8"),
+        Color(hex: "#A8C5A0")
+    ]
+
+    var body: some View {
+        ZStack {
+            LinearGradient(
+                colors: [Color(hex: "#FAF6EC"), Color(hex: "#F5C6AA").opacity(0.45)],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .ignoresSafeArea()
+
+            VStack(spacing: 24) {
+                Spacer(minLength: 12)
+
+                jarVisual
+                    .frame(width: 180, height: 220)
+
+                Text("one small good thing")
+                    .font(.custom(DinoTheme.customFontName, size: 28))
+                    .foregroundColor(OnboardingColors.textPrimary)
+                    .multilineTextAlignment(.center)
+
+                Text("on hard days, dropping one moment into your jar shifts something. it doesn't have to be big.")
+                    .font(.system(size: 14, design: .rounded))
+                    .italic()
+                    .foregroundColor(OnboardingColors.textSecondary)
+                    .multilineTextAlignment(.center)
+                    .lineSpacing(4)
+                    .padding(.horizontal, 32)
+
+                Text("people who do this 3x a week report feeling more grounded")
+                    .font(.system(size: 11, design: .rounded))
+                    .foregroundColor(OnboardingColors.textSecondary.opacity(0.65))
+                    .multilineTextAlignment(.center)
+                    .lineSpacing(3)
+                    .padding(.horizontal, 36)
+
+                Spacer()
+            }
+        }
+        .onAppear { appeared = true }
+    }
+
+    private var jarVisual: some View {
+        ZStack(alignment: .bottom) {
+            ForEach(0..<tokenColors.count, id: \.self) { i in
+                FallingToken(
+                    color: tokenColors[i],
+                    index: i,
+                    appeared: appeared,
+                    reduceMotion: reduceMotion
+                )
+            }
+
+            VStack(spacing: 0) {
+                Capsule()
+                    .fill(OnboardingColors.sage.opacity(0.85))
+                    .frame(width: 90, height: 16)
+                    .shadow(color: OnboardingColors.textPrimary.opacity(0.10), radius: 2, x: 0, y: 1)
+
+                Rectangle()
+                    .fill(Color(hex: "#FEFBF3").opacity(0.9))
+                    .frame(width: 70, height: 10)
+                    .overlay(
+                        Rectangle()
+                            .stroke(OnboardingColors.sage.opacity(0.35), lineWidth: 1)
+                    )
+
+                ZStack(alignment: .bottom) {
+                    RoundedRectangle(cornerRadius: 22)
+                        .fill(Color(hex: "#FEFBF3").opacity(0.75))
+                        .frame(width: 130, height: 140)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 22)
+                                .stroke(OnboardingColors.sage.opacity(0.45), lineWidth: 1.4)
+                        )
+                        .shadow(color: OnboardingColors.textPrimary.opacity(0.10), radius: 8, x: 0, y: 4)
+
+                    HStack(spacing: 6) {
+                        ForEach(0..<3, id: \.self) { i in
+                            Circle()
+                                .fill(tokenColors[i].opacity(0.8))
+                                .frame(width: 14, height: 14)
+                        }
+                    }
+                    .padding(.bottom, 14)
+                }
+            }
+        }
+    }
+}
+
+private struct FallingToken: View {
+    @State private var dropped: Bool = false
+    let color: Color
+    let index: Int
+    let appeared: Bool
+    let reduceMotion: Bool
+
+    var body: some View {
+        let xOffsets: [CGFloat] = [-30, -10, 10, 30, 0]
+        let startX = xOffsets[index % xOffsets.count]
+        let delay = Double(index) * 0.6
+
+        Circle()
+            .fill(color)
+            .frame(width: 12, height: 12)
+            .shadow(color: color.opacity(0.5), radius: 3, x: 0, y: 1)
+            .offset(x: startX, y: dropped ? 90 : -120)
+            .opacity(dropped ? 0 : (appeared ? 1 : 0))
+            .rotationEffect(.degrees(dropped ? 180 : 0))
+            .onAppear {
+                guard appeared else { return }
+                if reduceMotion {
+                    dropped = false
+                    return
+                }
+                withAnimation(
+                    .easeIn(duration: 1.4)
+                        .delay(delay)
+                        .repeatForever(autoreverses: false)
+                ) {
+                    dropped = true
+                }
+            }
+    }
+}
