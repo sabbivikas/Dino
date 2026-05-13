@@ -193,34 +193,39 @@ struct HomeView: View {
 
     private var focusCard: some View {
         VStack(spacing: 0) {
-            // Golden weather scene
+            // Golden weather scene (130pt) — sun, drifting clouds, parallax hills,
+            // ground line, and a walking stickman traveler.
             FocusCardScene()
+                .frame(height: 130)
 
             // Content section
-            VStack(alignment: .leading, spacing: 16) {
-                HStack {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("today's focus")
-                            .font(DinoTheme.dinoLabelFont(size: 13))
-                            .foregroundColor(DinoTheme.textSecondary)
+            VStack(alignment: .leading, spacing: 12) {
+                Text("today's focus")
+                    .font(DinoTheme.dinoLabelFont(size: 15))
+                    .foregroundColor(DinoTheme.textSecondary)
+                    .tracking(0.3)
 
-                        HStack(spacing: 8) {
-                            Text(viewModel.todaysFocusEmoji)
-                                .font(DinoTheme.dinoFont(size: 22))
-                            Text(viewModel.todaysFocus)
-                                .font(DinoTheme.dinoDisplayFont(size: 22))
-                                .foregroundColor(DinoTheme.textPrimary)
-                        }
-                    }
-                    Spacer()
+                HStack(spacing: 8) {
+                    Text(viewModel.todaysFocusEmoji)
+                        .font(DinoTheme.dinoFont(size: 24))
+                    Text(viewModel.todaysFocus)
+                        .font(DinoTheme.dinoDisplayFont(size: 26))
+                        .foregroundColor(DinoTheme.textPrimary)
                 }
+                .padding(.top, -4)
 
                 weeklyTracker
+                    .padding(.top, 4)
             }
-            .padding(DinoTheme.padding)
+            .padding(EdgeInsets(top: 14, leading: 20, bottom: 14, trailing: 20))
+            .frame(maxWidth: .infinity, alignment: .leading)
             .background(DinoTheme.surfacePrimary)
         }
-        .clipShape(RoundedRectangle(cornerRadius: DinoDesignSystem.radiusLG, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .strokeBorder(Color(hex: "#D1D5DB"), lineWidth: 1)
+        )
         .shadow(
             color: Color.black.opacity(0.06),
             radius: DinoDesignSystem.cardShadowRadius,
@@ -228,35 +233,44 @@ struct HomeView: View {
         )
     }
 
-    // MARK: - Weekly Tracker
+    // MARK: - Weekly Tracker (v9 spec)
 
     private var weeklyTracker: some View {
         let days = viewModel.weeklyActivity()
+        let peach = Color(hex: "#F5C6AA")
         return HStack(spacing: 0) {
-            ForEach(Array(days.enumerated()), id: \.offset) { index, day in
+            ForEach(Array(days.enumerated()), id: \.offset) { _, day in
                 VStack(spacing: 6) {
                     Text(day.label)
-                        .font(DinoTheme.dinoFont(size: 11))
+                        .font(DinoTheme.dinoFont(size: 12))
                         .foregroundColor(DinoTheme.textSecondary)
 
                     ZStack {
-                        Circle()
-                            .fill(day.isCompleted || day.isToday ? DinoTheme.peach : DinoTheme.surfaceSecondary)
-                            .frame(width: day.isToday ? 30 : 26, height: day.isToday ? 30 : 26)
-
                         if day.isToday {
                             Circle()
-                                .strokeBorder(DinoTheme.peach, lineWidth: 2)
-                                .frame(width: 30, height: 30)
+                                .fill(peach.opacity(0.25))
+                                .frame(width: 40, height: 40)
                         }
-
-                        if day.isCompleted {
+                        Circle()
+                            .fill((day.isCompleted || day.isToday) ? peach : DinoTheme.surfaceSecondary)
+                            .frame(
+                                width: day.isToday ? 32 : 28,
+                                height: day.isToday ? 32 : 28
+                            )
+                        if day.isCompleted || day.isToday {
                             Image(systemName: "checkmark")
-                                .font(DinoTheme.numericFont(size: 11))
+                                .font(.system(size: 12, weight: .bold))
                                 .foregroundColor(.white)
                         }
                     }
-                    .animation(.spring(response: DinoDesignSystem.interactiveSpringResponse, dampingFraction: DinoDesignSystem.interactiveSpringDamping), value: day.isCompleted)
+                    .frame(height: 40)
+                    .animation(
+                        .spring(
+                            response: DinoDesignSystem.interactiveSpringResponse,
+                            dampingFraction: DinoDesignSystem.interactiveSpringDamping
+                        ),
+                        value: day.isCompleted
+                    )
                 }
                 .frame(maxWidth: .infinity)
             }
@@ -401,143 +415,176 @@ struct HomeView: View {
     }
 }
 
-// MARK: - Focus Card Golden Scene
+// MARK: - Focus Card Golden Scene (v9 spec)
+//
+// Layout matches preview/focus-card.html: 130pt height, gradient sky
+// #FEF0D0 -> #FEF6E8, an animated sun with rays/blink/smile up top,
+// two parallax drifting clouds, two layers of rolling hills, a ground
+// line with pebbles, and a small walking stickman traveler.
 
 private struct FocusCardScene: View {
-    @State private var sunBounce = false
-    @State private var cloudDrift: CGFloat = -0.2
+    @State private var animate = false
 
     var body: some View {
-        ZStack {
-            // Golden gradient background
-            LinearGradient(
-                colors: [Color(hex: "#FFF3D6"), Color(hex: "#F5E6B8")],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-
-            // Drifting cloud
-            GeometryReader { geo in
-                FocusCardCloud()
-                    .frame(width: 60, height: 22)
-                    .opacity(0.85)
-                    .position(x: geo.size.width * cloudDrift, y: 24)
-            }
-            .onAppear {
-                cloudDrift = CGFloat.random(in: -0.1...0.3)
-                withAnimation(.linear(duration: 22).repeatForever(autoreverses: false)) {
-                    cloudDrift = 1.2
-                }
-            }
-
-            // Animated cartoon sun
-            FocusCardSun()
-                .frame(width: 44, height: 44)
-                .scaleEffect(sunBounce ? 1.06 : 1.0)
-                .animation(
-                    .easeInOut(duration: 1.5).repeatForever(autoreverses: true),
-                    value: sunBounce
+        GeometryReader { geo in
+            let w = geo.size.width
+            ZStack {
+                LinearGradient(
+                    colors: [Color(hex: "#FEF0D0"), Color(hex: "#FEF6E8")],
+                    startPoint: .top,
+                    endPoint: .bottom
                 )
-                .offset(y: -8)
-                .onAppear { sunBounce = true }
 
-            // Wavy landscape at bottom
-            VStack {
-                Spacer()
-                FocusCardHills()
-                    .frame(height: 30)
+                // Sun, centered horizontally near the top
+                FocusCardSun()
+                    .frame(width: 44, height: 44)
+                    .position(x: w / 2, y: 32)
+
+                // Two drifting clouds — primary and a smaller dimmer one
+                FocusCardCloudLayer(width: w, topOffset: 18, duration: 22, scale: 1.0, opacity: 0.85, phase: 0)
+                FocusCardCloudLayer(width: w, topOffset: 32, duration: 32, scale: 0.7, opacity: 0.6, phase: 0.45)
+
+                // Parallax hills + ground sit at the bottom of the scene
+                VStack(spacing: 0) {
+                    Spacer(minLength: 0)
+                    ZStack(alignment: .bottom) {
+                        FocusCardHillLayer(
+                            color: Color(hex: "#D4C490"),
+                            height: 28,
+                            opacity: 0.55,
+                            duration: 14,
+                            backLayer: true
+                        )
+                        .frame(height: 28)
+                        .offset(y: -22)
+
+                        FocusCardHillLayer(
+                            color: Color(hex: "#E8D9A8"),
+                            height: 22,
+                            opacity: 1.0,
+                            duration: 8,
+                            backLayer: false
+                        )
+                        .frame(height: 22)
+                        .offset(y: -16)
+
+                        // Ground line + pebbles
+                        FocusCardGround(width: w)
+                    }
+                }
+
+                // Walking stickman traveler — sits on the ground line, ~38pt from left
+                FocusCardWalker()
+                    .frame(width: 44, height: 52)
+                    .position(x: 38 + 22, y: geo.size.height - 10 - 26)
             }
+            .clipped()
         }
-        .frame(height: 100)
+        .onAppear { animate = true }
     }
 }
 
-// MARK: - Cartoon Sun (Canvas)
+// MARK: - Sun (Canvas) — rays spin slowly, body pulses, eyes blink occasionally
 
 private struct FocusCardSun: View {
+    @State private var rayAngle: Double = 0
+    @State private var pulse: CGFloat = 1.0
+    @State private var blink: CGFloat = 1.0
+
     var body: some View {
         Canvas { context, size in
             let cx = size.width / 2
             let cy = size.height / 2
-            let sunColor = Color(hex: "#F5C842")
             let strokeColor = Color(hex: "#D4920A")
+            let bodyFill = Color(hex: "#FFD89B")
             let eyeColor = Color(hex: "#8B5530")
             let blushColor = Color(hex: "#F5B4B8")
 
-            // Rays (8 lines around the sun)
-            let innerRadius: CGFloat = 13
-            let outerRadius: CGFloat = 19
+            // Rays
+            context.translateBy(x: cx, y: cy)
+            context.rotate(by: .degrees(rayAngle))
+            let rayInner: CGFloat = 13
+            let rayOuter: CGFloat = 19
             for i in 0..<8 {
-                let angle = Double(i) * .pi / 4
+                let a = Double(i) * .pi / 4
                 var ray = Path()
-                ray.move(to: CGPoint(
-                    x: cx + innerRadius * cos(angle),
-                    y: cy + innerRadius * sin(angle)
-                ))
-                ray.addLine(to: CGPoint(
-                    x: cx + outerRadius * cos(angle),
-                    y: cy + outerRadius * sin(angle)
-                ))
-                context.stroke(ray, with: .color(strokeColor),
-                               style: StrokeStyle(lineWidth: 1.8, lineCap: .round))
+                ray.move(to: CGPoint(x: rayInner * cos(a), y: rayInner * sin(a)))
+                ray.addLine(to: CGPoint(x: rayOuter * cos(a), y: rayOuter * sin(a)))
+                context.stroke(ray, with: .color(strokeColor), style: StrokeStyle(lineWidth: 1.8, lineCap: .round))
             }
+            context.rotate(by: .degrees(-rayAngle))
 
-            // Sun body circle
-            let bodyRect = CGRect(x: cx - 10, y: cy - 10, width: 20, height: 20)
+            // Body (pulsing)
+            let r: CGFloat = 10 * pulse
+            let bodyRect = CGRect(x: -r, y: -r, width: r * 2, height: r * 2)
             let body = Path(ellipseIn: bodyRect)
-            context.fill(body, with: .color(Color(hex: "#FFD89B")))
-            context.stroke(body, with: .color(strokeColor),
-                           style: StrokeStyle(lineWidth: 1.8, lineCap: .round))
+            context.fill(body, with: .color(bodyFill))
+            context.stroke(body, with: .color(strokeColor), style: StrokeStyle(lineWidth: 1.8))
 
-            // Eyes (two small dots)
-            let leftEye = Path(ellipseIn: CGRect(x: cx - 3, y: cy - 2, width: 2, height: 2))
-            let rightEye = Path(ellipseIn: CGRect(x: cx + 1, y: cy - 2, width: 2, height: 2))
+            // Eyes — scaleY-blink
+            let eyeH: CGFloat = 2 * blink
+            let leftEye = Path(ellipseIn: CGRect(x: -3 - 0.5, y: -2 - eyeH / 2, width: 1.6, height: eyeH))
+            let rightEye = Path(ellipseIn: CGRect(x: 3 - 1.1, y: -2 - eyeH / 2, width: 1.6, height: eyeH))
             context.fill(leftEye, with: .color(eyeColor))
             context.fill(rightEye, with: .color(eyeColor))
 
             // Smile
             var smile = Path()
-            smile.move(to: CGPoint(x: cx - 3, y: cy + 2))
-            smile.addQuadCurve(to: CGPoint(x: cx + 3, y: cy + 2),
-                               control: CGPoint(x: cx, y: cy + 5))
-            context.stroke(smile, with: .color(eyeColor),
-                           style: StrokeStyle(lineWidth: 1.2, lineCap: .round))
+            smile.move(to: CGPoint(x: -3, y: 2))
+            smile.addQuadCurve(to: CGPoint(x: 3, y: 2), control: CGPoint(x: 0, y: 5))
+            context.stroke(smile, with: .color(eyeColor), style: StrokeStyle(lineWidth: 1.2, lineCap: .round))
 
             // Blush cheeks
-            let leftBlush = Path(ellipseIn: CGRect(x: cx - 5, y: cy + 2, width: 2.6, height: 2.6))
-            let rightBlush = Path(ellipseIn: CGRect(x: cx + 3, y: cy + 2, width: 2.6, height: 2.6))
+            let leftBlush = Path(ellipseIn: CGRect(x: -5 - 1.3, y: 2, width: 2.6, height: 2.6))
+            let rightBlush = Path(ellipseIn: CGRect(x: 3 + 0, y: 2, width: 2.6, height: 2.6))
             context.fill(leftBlush, with: .color(blushColor.opacity(0.6)))
             context.fill(rightBlush, with: .color(blushColor.opacity(0.6)))
         }
-    }
-}
-
-// MARK: - Wavy Hills
-
-private struct FocusCardHills: View {
-    var body: some View {
-        GeometryReader { geo in
-            let w = geo.size.width
-            let h = geo.size.height
-            Canvas { context, _ in
-                var hills = Path()
-                hills.move(to: CGPoint(x: 0, y: h))
-                hills.addQuadCurve(to: CGPoint(x: w * 0.38, y: h * 0.45),
-                                   control: CGPoint(x: w * 0.19, y: h * 0.2))
-                hills.addQuadCurve(to: CGPoint(x: w * 0.76, y: h * 0.35),
-                                   control: CGPoint(x: w * 0.57, y: h * 0.7))
-                hills.addQuadCurve(to: CGPoint(x: w, y: h * 0.50),
-                                   control: CGPoint(x: w * 0.95, y: h * 0.15))
-                hills.addLine(to: CGPoint(x: w, y: h))
-                hills.closeSubpath()
-                context.fill(hills, with: .color(Color(hex: "#E8D5A0")))
+        .onAppear {
+            withAnimation(.linear(duration: 14).repeatForever(autoreverses: false)) {
+                rayAngle = 360
             }
-            .frame(width: w, height: h)
+            withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
+                pulse = 1.08
+            }
+            // Blink: hold open, then snap shut briefly, repeat every ~4s
+            Timer.scheduledTimer(withTimeInterval: 4, repeats: true) { _ in
+                withAnimation(.easeIn(duration: 0.08)) { blink = 0.1 }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
+                    withAnimation(.easeOut(duration: 0.1)) { blink = 1.0 }
+                }
+            }
         }
     }
 }
 
-// MARK: - Focus Card Cloud
+// MARK: - Drifting cloud layer
+
+private struct FocusCardCloudLayer: View {
+    let width: CGFloat
+    let topOffset: CGFloat
+    let duration: Double
+    let scale: CGFloat
+    let opacity: Double
+    let phase: Double
+
+    @State private var x: CGFloat = -1
+
+    var body: some View {
+        FocusCardCloud()
+            .frame(width: 60, height: 22)
+            .scaleEffect(scale)
+            .opacity(opacity)
+            .position(x: x, y: topOffset + 11)
+            .onAppear {
+                let span = width + 100
+                x = -50 + span * CGFloat(phase)
+                withAnimation(.linear(duration: duration).repeatForever(autoreverses: false)) {
+                    x = width + 50
+                }
+            }
+    }
+}
 
 private struct FocusCardCloud: View {
     var body: some View {
@@ -566,7 +613,249 @@ private struct FocusCardCloud: View {
             cloud.closeSubpath()
             context.fill(cloud, with: .color(.white.opacity(0.95)))
             context.stroke(cloud, with: .color(Color(hex: "#B8C4D0")),
-                           style: StrokeStyle(lineWidth: 1.5, lineCap: .round))
+                           style: StrokeStyle(lineWidth: 1.5, lineCap: .round, lineJoin: .round))
+        }
+    }
+}
+
+// MARK: - Parallax hill layer (scrolling tiled wave)
+
+private struct FocusCardHillLayer: View {
+    let color: Color
+    let height: CGFloat
+    let opacity: Double
+    let duration: Double
+    let backLayer: Bool
+
+    @State private var offsetX: CGFloat = 0
+
+    var body: some View {
+        GeometryReader { geo in
+            let tileW: CGFloat = 420
+            HStack(spacing: 0) {
+                hillTile(width: tileW, height: height)
+                hillTile(width: tileW, height: height)
+            }
+            .frame(width: tileW * 2, height: height)
+            .offset(x: offsetX)
+            .frame(width: geo.size.width, height: height, alignment: .leading)
+            .clipped()
+            .onAppear {
+                withAnimation(.linear(duration: duration).repeatForever(autoreverses: false)) {
+                    offsetX = -tileW
+                }
+            }
+        }
+        .frame(height: height)
+        .opacity(opacity)
+    }
+
+    private func hillTile(width: CGFloat, height: CGFloat) -> some View {
+        Canvas { context, size in
+            let w = size.width
+            let h = size.height
+            var p = Path()
+            if backLayer {
+                p.move(to: CGPoint(x: 0, y: h))
+                p.addQuadCurve(to: CGPoint(x: w * (140.0/420.0), y: h * (18.0/28.0)),
+                               control: CGPoint(x: w * (70.0/420.0), y: h * (8.0/28.0)))
+                p.addQuadCurve(to: CGPoint(x: w * (280.0/420.0), y: h * (14.0/28.0)),
+                               control: CGPoint(x: w * (210.0/420.0), y: h))
+                p.addQuadCurve(to: CGPoint(x: w, y: h * (18.0/28.0)),
+                               control: CGPoint(x: w * (350.0/420.0), y: h * (6.0/28.0)))
+            } else {
+                p.move(to: CGPoint(x: 0, y: h))
+                p.addQuadCurve(to: CGPoint(x: w * (160.0/420.0), y: h * (14.0/22.0)),
+                               control: CGPoint(x: w * (80.0/420.0), y: h * (6.0/22.0)))
+                p.addQuadCurve(to: CGPoint(x: w * (320.0/420.0), y: h * (10.0/22.0)),
+                               control: CGPoint(x: w * (240.0/420.0), y: h))
+                p.addQuadCurve(to: CGPoint(x: w, y: h * (14.0/22.0)),
+                               control: CGPoint(x: w * (400.0/420.0), y: h * (6.0/22.0)))
+            }
+            p.addLine(to: CGPoint(x: w, y: h))
+            p.closeSubpath()
+            context.fill(p, with: .color(color))
+        }
+        .frame(width: width, height: height)
+    }
+}
+
+// MARK: - Ground line + pebbles
+
+private struct FocusCardGround: View {
+    let width: CGFloat
+    @State private var pebbleOffset: CGFloat = 0
+
+    var body: some View {
+        ZStack(alignment: .leading) {
+            // Ground line — fades at the edges
+            LinearGradient(
+                stops: [
+                    .init(color: .clear, location: 0),
+                    .init(color: Color(hex: "#A88A4A"), location: 0.06),
+                    .init(color: Color(hex: "#A88A4A"), location: 0.94),
+                    .init(color: .clear, location: 1)
+                ],
+                startPoint: .leading,
+                endPoint: .trailing
+            )
+            .frame(height: 2)
+            .opacity(0.5)
+            .offset(y: -4)
+
+            // Pebbles — tile of 60pt, scrolls slowly leftward
+            HStack(spacing: 0) {
+                ForEach(0..<(Int(width / 60) + 3), id: \.self) { _ in
+                    PebbleTile()
+                        .frame(width: 60, height: 4)
+                }
+            }
+            .offset(x: pebbleOffset)
+            .onAppear {
+                withAnimation(.linear(duration: 1.6).repeatForever(autoreverses: false)) {
+                    pebbleOffset = -60
+                }
+            }
+        }
+        .frame(height: 4)
+        .offset(y: -10)
+        .frame(maxWidth: .infinity)
+    }
+}
+
+private struct PebbleTile: View {
+    var body: some View {
+        Canvas { context, _ in
+            let stone = Color(hex: "#A88A4A")
+            let pebbles: [(CGFloat, CGFloat, CGFloat, Double)] = [
+                (4, 2, 0.8, 0.55),
+                (22, 3, 0.6, 0.45),
+                (38, 2, 0.7, 0.5),
+                (52, 3, 0.5, 0.4)
+            ]
+            for (x, y, r, o) in pebbles {
+                let rect = CGRect(x: x - r, y: y - r, width: r * 2, height: r * 2)
+                context.fill(Path(ellipseIn: rect), with: .color(stone.opacity(o)))
+            }
+        }
+        .frame(width: 60, height: 4)
+    }
+}
+
+// MARK: - Walking stickman traveler
+
+private struct FocusCardWalker: View {
+    @State private var phase: Double = 0
+    @State private var bob: CGFloat = 0
+
+    var body: some View {
+        Canvas { context, size in
+            // viewBox 0..60 mapped into size
+            let sx = size.width / 60
+            let sy = size.height / 60
+            func pt(_ x: Double, _ y: Double) -> CGPoint {
+                CGPoint(x: CGFloat(x) * sx, y: CGFloat(y) * sy)
+            }
+
+            let ink = Color(hex: "#2D3142")
+            let skin = Color(hex: "#FDE6CB")
+            let pack = Color(hex: "#A8C5A0")
+            let hatColor = Color(hex: "#8B6E4E")
+
+            // Ground shadow
+            let shadow = Path(ellipseIn: CGRect(
+                x: (30 - 13) * sx, y: (58 - 1.6) * sy,
+                width: 26 * sx, height: 3.2 * sy))
+            context.fill(shadow, with: .color(.black.opacity(0.10)))
+
+            // Backpack
+            let packRect = CGRect(x: 16 * sx, y: 22 * sy, width: 11 * sx, height: 16 * sy)
+            let packPath = Path(roundedRect: packRect, cornerRadius: 2.6 * sx)
+            context.fill(packPath, with: .color(pack))
+            context.stroke(packPath, with: .color(ink), style: StrokeStyle(lineWidth: 1.8))
+
+            // Hat brim + crown
+            let brim = Path(ellipseIn: CGRect(
+                x: (30 - 9) * sx, y: (16 - 2) * sy,
+                width: 18 * sx, height: 4 * sy))
+            context.fill(brim, with: .color(hatColor))
+            context.stroke(brim, with: .color(ink), style: StrokeStyle(lineWidth: 1.8))
+
+            var crown = Path()
+            crown.move(to: pt(25, 15))
+            crown.addQuadCurve(to: pt(35, 15), control: pt(30, 8))
+            crown.closeSubpath()
+            context.fill(crown, with: .color(hatColor))
+            context.stroke(crown, with: .color(ink), style: StrokeStyle(lineWidth: 1.8, lineJoin: .round))
+
+            // Head
+            let head = Path(ellipseIn: CGRect(
+                x: (30 - 4.2) * sx, y: (20 - 4.2) * sy,
+                width: 8.4 * sx, height: 8.4 * sy))
+            context.fill(head, with: .color(skin))
+            context.stroke(head, with: .color(ink), style: StrokeStyle(lineWidth: 1.8))
+
+            // Torso
+            var torso = Path()
+            torso.move(to: pt(30, 24))
+            torso.addLine(to: pt(30, 42))
+            context.stroke(torso, with: .color(ink), style: StrokeStyle(lineWidth: 2.2, lineCap: .round))
+
+            // Limbs swing around pivots at shoulder (30,22) and hip (30,42)
+            let swing = sin(phase) * (24.0 * .pi / 180.0)
+
+            func rotated(from origin: CGPoint, to end: CGPoint, by angle: Double) -> CGPoint {
+                let dx = end.x - origin.x
+                let dy = end.y - origin.y
+                let ca = CGFloat(cos(angle))
+                let sa = CGFloat(sin(angle))
+                return CGPoint(x: origin.x + dx * ca - dy * sa,
+                               y: origin.y + dx * sa + dy * ca)
+            }
+
+            let shoulder = pt(30, 22)
+            let hip = pt(30, 42)
+
+            // Arm L (swing A), Arm R (swing B = -swing)
+            let armLEnd = rotated(from: shoulder, to: pt(24, 34), by: swing)
+            var armL = Path(); armL.move(to: shoulder); armL.addLine(to: armLEnd)
+            context.stroke(armL, with: .color(ink), style: StrokeStyle(lineWidth: 2.2, lineCap: .round))
+            let handLRect = CGRect(x: armLEnd.x - 1.4 * sx, y: armLEnd.y - 1.4 * sy, width: 2.8 * sx, height: 2.8 * sy)
+            context.fill(Path(ellipseIn: handLRect), with: .color(skin))
+            context.stroke(Path(ellipseIn: handLRect), with: .color(ink), style: StrokeStyle(lineWidth: 1))
+
+            let armREnd = rotated(from: shoulder, to: pt(36, 34), by: -swing)
+            var armR = Path(); armR.move(to: shoulder); armR.addLine(to: armREnd)
+            context.stroke(armR, with: .color(ink), style: StrokeStyle(lineWidth: 2.2, lineCap: .round))
+            let handRRect = CGRect(x: armREnd.x - 1.4 * sx, y: armREnd.y - 1.4 * sy, width: 2.8 * sx, height: 2.8 * sy)
+            context.fill(Path(ellipseIn: handRRect), with: .color(skin))
+            context.stroke(Path(ellipseIn: handRRect), with: .color(ink), style: StrokeStyle(lineWidth: 1))
+
+            // Leg L (paired with arm R: -swing), Leg R (paired with arm L: +swing)
+            let legLEnd = rotated(from: hip, to: pt(24, 56), by: -swing)
+            var legL = Path(); legL.move(to: hip); legL.addLine(to: legLEnd)
+            context.stroke(legL, with: .color(ink), style: StrokeStyle(lineWidth: 2.2, lineCap: .round))
+            var footL = Path()
+            footL.move(to: CGPoint(x: legLEnd.x - 2 * sx, y: legLEnd.y))
+            footL.addLine(to: CGPoint(x: legLEnd.x + 2 * sx, y: legLEnd.y))
+            context.stroke(footL, with: .color(ink), style: StrokeStyle(lineWidth: 2.2, lineCap: .round))
+
+            let legREnd = rotated(from: hip, to: pt(36, 56), by: swing)
+            var legR = Path(); legR.move(to: hip); legR.addLine(to: legREnd)
+            context.stroke(legR, with: .color(ink), style: StrokeStyle(lineWidth: 2.2, lineCap: .round))
+            var footR = Path()
+            footR.move(to: CGPoint(x: legREnd.x - 2 * sx, y: legREnd.y))
+            footR.addLine(to: CGPoint(x: legREnd.x + 2 * sx, y: legREnd.y))
+            context.stroke(footR, with: .color(ink), style: StrokeStyle(lineWidth: 2.2, lineCap: .round))
+        }
+        .offset(y: bob)
+        .onAppear {
+            // Drive limb phase via a Timer (Canvas doesn't react to @State without redraw)
+            Timer.scheduledTimer(withTimeInterval: 1.0 / 30.0, repeats: true) { _ in
+                phase += 0.22
+                let b = sin(phase) * 0.75 - 0.75
+                bob = CGFloat(b)
+            }
         }
     }
 }
