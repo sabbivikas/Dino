@@ -52,7 +52,7 @@ struct SunShape: View {
 
     private func polar(center: CGPoint, radius: CGFloat, angleDeg: Double) -> CGPoint {
         let rad = angleDeg * .pi / 180.0
-        return CGPoint(x: center.x + radius * cos(rad), y: center.y + radius * sin(rad))
+        return CGPoint(x: center.x + radius * CGFloat(cos(rad)), y: center.y + radius * CGFloat(sin(rad)))
     }
 }
 
