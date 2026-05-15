@@ -35,6 +35,10 @@ private struct ReauthSheet: View {
                     Text("you'll be asked to sign in with google again.")
                         .font(.footnote)
                         .foregroundColor(.secondary)
+                } else if providerID == "apple.com" {
+                    Text("you'll be asked to sign in with apple again.")
+                        .font(.footnote)
+                        .foregroundColor(.secondary)
                 }
 
                 Button(action: onConfirm) {
@@ -46,7 +50,7 @@ private struct ReauthSheet: View {
                     }
                 }
                 .buttonStyle(.borderedProminent)
-                .disabled(isWorking || (providerID == "password" && password.isEmpty))
+                .disabled(isWorking || (providerID == "password" && password.isEmpty) || (providerID == "apple.com" && isWorking))
                 .padding(.horizontal)
 
                 Button("cancel", action: onCancel)
@@ -376,6 +380,8 @@ struct ProfileView: View {
                 try await AuthManager.shared.reauthenticateEmailUser(password: reauthPassword)
             } else if providerID == "google.com" {
                 try await AuthManager.shared.reauthenticateGoogleUser()
+            } else if providerID == "apple.com" {
+                try await AuthManager.shared.reauthenticateAppleUser()
             } else {
                 throw AccountDeletionError.noProvider
             }

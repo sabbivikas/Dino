@@ -2,11 +2,13 @@
 //  AuthManager.swift
 //  Dino
 //
-//  Firebase Authentication manager — handles Google Sign-In and auth state.
+//  Firebase Authentication manager — handles Google Sign-In, Apple Sign-In, and auth state.
 //
 
 import SwiftUI
 import Combine
+import CryptoKit
+import AuthenticationServices
 import FirebaseCore
 import FirebaseAuth
 import GoogleSignIn
@@ -41,11 +43,11 @@ class AuthManager: ObservableObject {
     @Published var errorMessage: String?
 
     private var authStateListener: AuthStateDidChangeListenerHandle?
+    private var appleCoordinator: AppleSignInCoordinator?
 
     // MARK: - Init
 
     private init() {
-        // Listen for auth state changes
         authStateListener = Auth.auth().addStateDidChangeListener { [weak self] _, user in
             Task { @MainActor in
                 self?.currentUser = user
@@ -68,6 +70,74 @@ class AuthManager: ObservableObject {
         if let listener = authStateListener {
             Auth.auth().removeStateDidChangeListener(listener)
         }
+    }
+
+    // MARK: - Apple Sign-In helpers
+
+    private func randomNonceString(length: Int = 32) -> String {
+        var randomBytes = [UInt8](repeating: 0, count: length)
+        _ = SecRandomCopyBytes(kSecRandomDefault, randomBytes.count, &randomBytes)
+        let charset = Array("0123456789ABCDEFGHIJKLMNOPQRSTUVXYZabcdefghijklmnopqrstuvwxyz-._")
+        return String(randomBytes.map { charset[Int($0) % charset.count] })
+    }
+
+    private func sha256(_ input: String) -> String {
+        SHA256.hash(data: Data(input.utf8))
+            .compactMap { String(format: "%02x", $0) }
+            .joined()
+    }
+
+    // MARK: - Apple Sign-In
+
+    func signInWithApple() async {
+        isLoading = true
+        errorMessage = nil
+        #if DEBUG
+        print("[Auth] Apple Sign-In started")
+        #endif
+
+        let nonce = randomNonceString()
+        let request = ASAuthorizationAppleIDProvider().createRequest()
+        request.requestedScopes = [.fullName, .email]
+        request.nonce = sha256(nonce)
+
+        do {
+            let credential: ASAuthorizationAppleIDCredential = try await withCheckedThrowingContinuation { continuation in
+                let coordinator = AppleSignInCoordinator(continuation: continuation)
+                self.appleCoordinator = coordinator
+                let controller = ASAuthorizationController(authorizationRequests: [request])
+                controller.delegate = coordinator
+                controller.presentationContextProvider = coordinator
+                controller.performRequests()
+            }
+            self.appleCoordinator = nil
+
+            guard let tokenData = credential.identityToken,
+                  let tokenString = String(data: tokenData, encoding: .utf8) else {
+                errorMessage = "Failed to get Apple identity token"
+                isLoading = false
+                return
+            }
+
+            let firebaseCredential = OAuthProvider.appleCredential(
+                withIDToken: tokenString,
+                rawNonce: nonce,
+                fullName: credential.fullName
+            )
+            _ = try await Auth.auth().signIn(with: firebaseCredential)
+            #if DEBUG
+            print("[Auth] Apple Sign-In succeeded")
+            #endif
+
+        } catch {
+            self.appleCoordinator = nil
+            errorMessage = error.localizedDescription
+            #if DEBUG
+            print("[Auth] Apple Sign-In failed: \(error.localizedDescription)")
+            #endif
+        }
+
+        isLoading = false
     }
 
     // MARK: - Google Sign-In
@@ -193,7 +263,7 @@ class AuthManager: ObservableObject {
 
     // MARK: - Delete Account
 
-    /// Returns the provider ID for the current user, e.g. "password" or "google.com".
+    /// Returns the provider ID for the current user, e.g. "password", "google.com", or "apple.com".
     var currentProviderID: String? {
         Auth.auth().currentUser?.providerData.first?.providerID
     }
@@ -212,6 +282,50 @@ class AuthManager: ObservableObject {
         } catch {
             #if DEBUG
             print("[Auth] reauthentication failed")
+            #endif
+            throw AccountDeletionError.reauthFailed
+        }
+    }
+
+    /// Reauthenticate an Apple user by triggering a fresh Apple sign-in flow.
+    func reauthenticateAppleUser() async throws {
+        guard let user = Auth.auth().currentUser else {
+            throw AccountDeletionError.noProvider
+        }
+
+        let nonce = randomNonceString()
+        let request = ASAuthorizationAppleIDProvider().createRequest()
+        request.requestedScopes = [.fullName, .email]
+        request.nonce = sha256(nonce)
+
+        do {
+            let credential: ASAuthorizationAppleIDCredential = try await withCheckedThrowingContinuation { continuation in
+                let coordinator = AppleSignInCoordinator(continuation: continuation)
+                self.appleCoordinator = coordinator
+                let controller = ASAuthorizationController(authorizationRequests: [request])
+                controller.delegate = coordinator
+                controller.presentationContextProvider = coordinator
+                controller.performRequests()
+            }
+            self.appleCoordinator = nil
+
+            guard let tokenData = credential.identityToken,
+                  let tokenString = String(data: tokenData, encoding: .utf8) else {
+                throw AccountDeletionError.reauthFailed
+            }
+            let firebaseCredential = OAuthProvider.appleCredential(
+                withIDToken: tokenString,
+                rawNonce: nonce,
+                fullName: credential.fullName
+            )
+            _ = try await user.reauthenticate(with: firebaseCredential)
+            #if DEBUG
+            print("[Auth] Apple reauthentication succeeded")
+            #endif
+        } catch {
+            self.appleCoordinator = nil
+            #if DEBUG
+            print("[Auth] Apple reauthentication failed")
             #endif
             throw AccountDeletionError.reauthFailed
         }
@@ -315,5 +429,41 @@ class AuthManager: ObservableObject {
             print("[Auth] sign out error")
             #endif
         }
+    }
+}
+
+// MARK: - Apple Sign-In Coordinator
+
+private class AppleSignInCoordinator: NSObject,
+    ASAuthorizationControllerDelegate,
+    ASAuthorizationControllerPresentationContextProviding {
+
+    let continuation: CheckedContinuation<ASAuthorizationAppleIDCredential, Error>
+
+    init(continuation: CheckedContinuation<ASAuthorizationAppleIDCredential, Error>) {
+        self.continuation = continuation
+    }
+
+    func authorizationController(controller: ASAuthorizationController,
+                                 didCompleteWithAuthorization authorization: ASAuthorization) {
+        if let credential = authorization.credential as? ASAuthorizationAppleIDCredential {
+            continuation.resume(returning: credential)
+        } else {
+            continuation.resume(throwing: NSError(
+                domain: "AppleSignIn", code: -1,
+                userInfo: [NSLocalizedDescriptionKey: "Invalid credential type"]
+            ))
+        }
+    }
+
+    func authorizationController(controller: ASAuthorizationController,
+                                 didCompleteWithError error: Error) {
+        continuation.resume(throwing: error)
+    }
+
+    func presentationAnchor(for controller: ASAuthorizationController) -> ASPresentationAnchor {
+        UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .first?.windows.first ?? UIWindow()
     }
 }

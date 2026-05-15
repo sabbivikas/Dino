@@ -90,6 +90,42 @@ struct SignInView: View {
 
                 // Sign-in buttons
                 VStack(spacing: 14) {
+                    // Continue with Apple
+                    Button {
+                        Task {
+                            await authManager.signInWithApple()
+                            if authManager.isSignedIn {
+                                dataManager.userName = authManager.displayName
+                                hasPassedAuth = true
+                            }
+                        }
+                    } label: {
+                        HStack(spacing: 10) {
+                            if authManager.isLoading {
+                                ProgressView()
+                                    .tint(DinoTheme.textSecondary)
+                                    .scaleEffect(0.8)
+                            } else {
+                                Image(systemName: "applelogo")
+                                    .font(DinoTheme.dinoFont(size: 16))
+                                    .foregroundColor(DinoTheme.textPrimary)
+                            }
+                            Text("continue with apple")
+                                .font(DinoTheme.headlineFont())
+                                .foregroundColor(DinoTheme.textPrimary)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 18)
+                        .background(DinoTheme.surfacePrimary)
+                        .cornerRadius(DinoTheme.cornerRadius)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: DinoTheme.cornerRadius)
+                                .stroke(DinoTheme.cardBorder, lineWidth: 1.5)
+                        )
+                    }
+                    .buttonStyle(ScaleButtonStyle())
+                    .disabled(authManager.isLoading)
+
                     // Continue with Google
                     Button {
                         Task {
