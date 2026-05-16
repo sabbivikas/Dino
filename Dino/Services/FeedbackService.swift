@@ -3,11 +3,13 @@
 //  Dino
 //
 
-// Firestore rules required for /feedback:
+// Firestore rules required for /feedback (already added to firestore.rules):
 //   match /feedback/{docId} {
 //     allow create: if request.auth != null;
 //     allow read, update, delete: if false;
 //   }
+// Deploy rules: `firebase deploy --only firestore:rules`
+//   or Firebase Console → Firestore → Rules → paste contents of firestore.rules → Publish
 // View submissions: Firebase Console → Firestore → feedback collection
 
 import Foundation
@@ -81,6 +83,12 @@ final class FeedbackService {
             try await db.collection("feedback").document(submission.id).setData(payload)
             AnalyticsManager.shared.trackFeedbackSubmitted(category: category)
         } catch {
+            #if DEBUG
+            print("[Feedback] submission failed: \(error)")
+            print("[Feedback]   domain: \((error as NSError).domain)")
+            print("[Feedback]   code: \((error as NSError).code)")
+            print("[Feedback]   description: \(error.localizedDescription)")
+            #endif
             throw FeedbackError.submissionFailed
         }
     }
