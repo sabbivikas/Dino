@@ -4,6 +4,7 @@
 //
 
 import SwiftUI
+import StoreKit
 
 // MARK: - Local Tokens (scrapbook palette)
 
@@ -104,6 +105,7 @@ private enum ProfileSheet: Identifiable {
     case textSize
     case paintingGallery
     case paintingGenerator
+    case feedback
     case stub(ComingSoonContent)
 
     var id: String {
@@ -120,6 +122,7 @@ private enum ProfileSheet: Identifiable {
         case .textSize:      return "textSize"
         case .paintingGallery: return "paintingGallery"
         case .paintingGenerator: return "paintingGenerator"
+        case .feedback: return "feedback"
         case .stub(let c):   return "stub-\(c.id)"
         }
     }
@@ -131,8 +134,10 @@ struct ProfileView: View {
     @ObservedObject private var themeManager = ThemeManager.shared
     @EnvironmentObject var dataManager: SharedDataManager
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.requestReview) private var requestReview
 
     @State private var activeSheet: ProfileSheet?
+    @State private var showRateAlert: Bool = false
     @State private var showSignOutConfirm = false
     @State private var showClearDataConfirm = false
     @State private var showDeleteAccountConfirm = false
@@ -282,8 +287,15 @@ struct ProfileView: View {
                     month: Date(),
                     moods: moodsForCurrentMonth()
                 )
+            case .feedback: FeedbackView()
             case .stub(let content): ComingSoonView(content: content)
             }
+        }
+        .alert("enjoying dino?", isPresented: $showRateAlert) {
+            Button("rate now") { requestReview() }
+            Button("maybe later", role: .cancel) {}
+        } message: {
+            Text("your rating helps us reach more people 🌿")
         }
         .confirmationDialog(
             "sign out?",
@@ -665,16 +677,7 @@ struct ProfileView: View {
             ) {
                 activeSheet = .gentleReminders
             }
-            SBRow(
-                icon: "music.note",
-                iconColor: SB.peach,
-                title: "ambient sounds",
-                subtitle: "rain, forest, soft piano"
-            ) {
-                activeSheet = .stub(ComingSoonContent(
-                    "ambient sounds", "a quiet soundtrack for your garden"
-                ))
-            }
+            AmbientSoundsRow()
             SBRow(
                 icon: "moon.stars.fill",
                 iconColor: SB.lavender,
@@ -764,16 +767,6 @@ struct ProfileView: View {
             }
             SBAnalyticsToggleRow()
             SBRow(
-                icon: "arrow.down.doc.fill",
-                iconColor: SB.peach,
-                title: "export your garden",
-                subtitle: "take your notes with you"
-            ) {
-                activeSheet = .stub(ComingSoonContent(
-                    "export your garden", "your notes, portable"
-                ))
-            }
-            SBRow(
                 icon: "trash",
                 iconColor: SB.rose,
                 title: "clear all data",
@@ -837,9 +830,7 @@ struct ProfileView: View {
                 title: "help & feedback",
                 subtitle: "tell us what's growing"
             ) {
-                activeSheet = .stub(ComingSoonContent(
-                    "help & feedback", "tell dino how it's growing"
-                ))
+                activeSheet = .feedback
             }
             SBRow(
                 icon: "heart.fill",
@@ -847,9 +838,7 @@ struct ProfileView: View {
                 title: "rate dino",
                 subtitle: "if it's helping your days"
             ) {
-                activeSheet = .stub(ComingSoonContent(
-                    "rate dino", "if dino has helped you bloom"
-                ))
+                showRateAlert = true
             }
 
             HStack(spacing: 12) {
@@ -1134,6 +1123,44 @@ private struct SBAnalyticsToggleRow: View {
                 .onChange(of: isOn) { _, newValue in
                     AnalyticsManager.shared.setEnabled(newValue)
                 }
+        }
+        .padding(.vertical, 6)
+    }
+}
+
+// MARK: - Ambient Sounds Row (coming soon, non-tappable)
+
+private struct AmbientSoundsRow: View {
+    var body: some View {
+        HStack(spacing: 12) {
+            ZStack {
+                Circle()
+                    .fill(SB.peach)
+                    .frame(width: 36, height: 36)
+                Image(systemName: "music.note")
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundColor(.white)
+            }
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("ambient sounds")
+                    .font(DinoTheme.dinoFont(size: 16))
+                    .foregroundColor(SB.nearBlack)
+                Text("rain, forest, soft piano")
+                    .font(DinoTheme.dinoFont(size: 12))
+                    .foregroundColor(SB.sage)
+            }
+
+            Spacer(minLength: 0)
+
+            Text("coming soon")
+                .font(DinoTheme.dinoFont(size: 10))
+                .foregroundColor(SB.sage)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 3)
+                .background(
+                    Capsule().fill(SB.sage.opacity(0.12))
+                )
         }
         .padding(.vertical, 6)
     }

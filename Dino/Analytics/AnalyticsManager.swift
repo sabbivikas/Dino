@@ -224,6 +224,10 @@ final class AnalyticsManager {
 
     // MARK: - Profile
 
+    func trackFeedbackSubmitted(category: String) {
+        capture("feedback_submitted", properties: ["category": category])
+    }
+
     func trackProfileOpened() {
         capture("profile_opened")
     }
