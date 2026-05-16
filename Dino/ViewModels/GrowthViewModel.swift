@@ -175,11 +175,7 @@ final class GrowthViewModel: ObservableObject {
         }
         let newStage = growthStage
         if newStage != previousStage {
-            PostHogSDK.shared.capture("growth_stage_advanced", properties: [
-                "from_stage": previousStage.displayName,
-                "to_stage": newStage.displayName,
-                "total_sessions": totalSessions,
-            ])
+            AnalyticsManager.shared.trackGrowthStageReached(stage: newStage.displayName)
         }
         updateStreak()
     }

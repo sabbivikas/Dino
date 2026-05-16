@@ -394,6 +394,7 @@ private struct GardenPanel: View {
             withAnimation(.spring(response: 0.8, dampingFraction: 0.7)) {
                 appeared = true
             }
+            AnalyticsManager.shared.trackGrowthGardenOpened()
         }
     }
 }

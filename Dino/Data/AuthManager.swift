@@ -127,8 +127,8 @@ class AuthManager: ObservableObject {
             )
             let result = try await Auth.auth().signIn(with: firebaseCredential)
             let uid = result.user.uid
-            PostHogSDK.shared.identify(uid, userProperties: ["sign_in_provider": "apple"])
-            PostHogSDK.shared.capture("user_signed_in", properties: ["sign_in_provider": "apple"])
+            AnalyticsManager.shared.identify(uid: uid)
+            AnalyticsManager.shared.trackSignIn(method: "apple")
             #if DEBUG
             print("[Auth] Apple Sign-In succeeded")
             #endif
@@ -204,8 +204,8 @@ class AuthManager: ObservableObject {
 
             let appleResult = try await Auth.auth().signIn(with: credential)
             let uid = appleResult.user.uid
-            PostHogSDK.shared.identify(uid, userProperties: ["sign_in_provider": "google"])
-            PostHogSDK.shared.capture("user_signed_in", properties: ["sign_in_provider": "google"])
+            AnalyticsManager.shared.identify(uid: uid)
+            AnalyticsManager.shared.trackSignIn(method: "google")
             #if DEBUG
             print("[Auth] Google Sign-In succeeded")
             #endif
@@ -232,8 +232,8 @@ class AuthManager: ObservableObject {
         do {
             let result = try await Auth.auth().createUser(withEmail: email, password: password)
             let uid = result.user.uid
-            PostHogSDK.shared.identify(uid, userProperties: ["sign_in_provider": "email", "email": email])
-            PostHogSDK.shared.capture("user_signed_in", properties: ["sign_in_provider": "email", "is_new_user": true])
+            AnalyticsManager.shared.identify(uid: uid)
+            AnalyticsManager.shared.trackSignUp(method: "email")
             #if DEBUG
             print("[Auth] email sign-up succeeded")
             #endif
@@ -259,8 +259,8 @@ class AuthManager: ObservableObject {
         do {
             let result = try await Auth.auth().signIn(withEmail: email, password: password)
             let uid = result.user.uid
-            PostHogSDK.shared.identify(uid, userProperties: ["sign_in_provider": "email"])
-            PostHogSDK.shared.capture("user_signed_in", properties: ["sign_in_provider": "email"])
+            AnalyticsManager.shared.identify(uid: uid)
+            AnalyticsManager.shared.trackSignIn(method: "email")
             #if DEBUG
             print("[Auth] email sign-in succeeded")
             #endif
@@ -429,8 +429,8 @@ class AuthManager: ObservableObject {
             try Auth.auth().signOut()
             GIDSignIn.sharedInstance.signOut()
             Task { try? await GIDSignIn.sharedInstance.disconnect() }
-            PostHogSDK.shared.capture("user_signed_out")
-            PostHogSDK.shared.reset()
+            AnalyticsManager.shared.trackSignOut()
+            AnalyticsManager.shared.reset()
             isSignedIn = false
             currentUser = nil
             displayName = ""

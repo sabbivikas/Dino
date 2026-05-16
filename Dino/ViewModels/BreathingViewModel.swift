@@ -77,12 +77,19 @@ class BreathingViewModel: ObservableObject {
         currentCycle = 1
         isPaused = false
         isRunning = true
+        AnalyticsManager.shared.trackBreathingSessionStarted(
+            duration: selectedDuration,
+            pattern: "\(inhaleSeconds)-\(holdSeconds)-\(exhaleSeconds)"
+        )
         startLiveActivity()
         beginCycle()
         startMainTimer()
     }
 
     func stop() {
+        let elapsedAtStop = totalElapsed
+        let wasRunning = isRunning
+        let wasFinished = phase == .done
         mainTimer?.invalidate()
         phaseTimer?.invalidate()
         mainTimer = nil
@@ -94,6 +101,9 @@ class BreathingViewModel: ObservableObject {
         circleOpacity = 0.6
         phaseCountdown = 4
         endLiveActivity()
+        if wasRunning && !wasFinished && elapsedAtStop > 0 {
+            AnalyticsManager.shared.trackBreathingSessionAbandoned(atSecond: elapsedAtStop)
+        }
     }
 
     func pause() {
@@ -218,11 +228,7 @@ class BreathingViewModel: ObservableObject {
             type: "\(inhaleSeconds)-\(holdSeconds)-\(exhaleSeconds)"
         )
         dataManager.logBreathingSession(session)
-        PostHogSDK.shared.capture("breathing_session_completed", properties: [
-            "duration_seconds": totalElapsed,
-            "cycles_completed": currentCycle,
-            "session_type": "\(inhaleSeconds)-\(holdSeconds)-\(exhaleSeconds)",
-        ])
+        AnalyticsManager.shared.trackBreathingSessionCompleted(duration: totalElapsed)
         HapticManager.shared.success()
     }
 

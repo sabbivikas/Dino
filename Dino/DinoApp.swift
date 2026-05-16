@@ -52,6 +52,8 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
 @main
 struct DinoApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var delegate
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var sessionStartTime: Date = Date()
 
     init() {
         let config = PostHogConfig(
@@ -85,7 +87,21 @@ struct DinoApp: App {
                 }
                 .task {
                     notificationManager.userDidOpenApp()
+                    AnalyticsManager.shared.trackAppOpened()
                     ImageCache.shared.preload(["DinoMascot", "dino-meditation", "DinoFlower-cut", "cut-DinoChecklist", "dino-only"])
+                }
+                .onChange(of: scenePhase) { _, newPhase in
+                    switch newPhase {
+                    case .active:
+                        sessionStartTime = Date()
+                    case .inactive, .background:
+                        let duration = Date().timeIntervalSince(sessionStartTime)
+                        if duration > 0 {
+                            AnalyticsManager.shared.trackAppBackgrounded(sessionDuration: duration)
+                        }
+                    @unknown default:
+                        break
+                    }
                 }
         }
     }

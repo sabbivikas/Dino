@@ -14,6 +14,7 @@ struct AssessmentView: View {
 
     var body: some View {
         NavigationStack {
+            Group {
             if viewModel.isComplete, let result = viewModel.savedResult {
                 AssessmentResultView(
                     result: result,
@@ -165,6 +166,8 @@ struct AssessmentView: View {
                     }
                 }
             }
+            }
+            .onAppear { AnalyticsManager.shared.trackAssessmentStarted() }
         }
     }
 }

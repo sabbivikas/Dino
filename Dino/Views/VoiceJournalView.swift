@@ -56,6 +56,7 @@ struct VoiceJournalView: View {
                             viewModel: viewModel,
                             onSeeAll: {
                                 HapticManager.shared.light()
+                                AnalyticsManager.shared.trackSeeAllMemoriesTapped(count: dataManager.journalEntries.count)
                                 showAllMemories = true
                             }
                         )
@@ -74,6 +75,7 @@ struct VoiceJournalView: View {
                 )
             }
             .navigationBarHidden(true)
+            .onAppear { AnalyticsManager.shared.trackJournalOpened() }
             .fullScreenCover(isPresented: $showAllMemories) {
                 JournalAllEntriesView(viewModel: viewModel)
                     .environmentObject(dataManager)
@@ -99,6 +101,7 @@ struct VoiceJournalView: View {
             durationSeconds: 0
         )
         dataManager.addJournalEntry(entry)
+        AnalyticsManager.shared.trackJournalEntryCreated(type: "text")
 
         // Dismiss keyboard
         UIApplication.shared.sendAction(

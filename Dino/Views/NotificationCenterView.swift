@@ -70,6 +70,7 @@ struct NotificationCenterView: View {
         }
         .navigationBarBackButtonHidden(true)
         .onAppear {
+            AnalyticsManager.shared.trackNotificationCenterOpened()
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
                 hasAppeared = true
             }

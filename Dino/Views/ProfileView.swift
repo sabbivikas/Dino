@@ -251,6 +251,7 @@ struct ProfileView: View {
             if UserDefaults.standard.object(forKey: "userJoinDate") == nil {
                 UserDefaults.standard.set(Date(), forKey: "userJoinDate")
             }
+            AnalyticsManager.shared.trackProfileOpened()
         }
         .sheet(item: $activeSheet, onDismiss: {
             savedProfilePhoto = PhotoStore.load()
@@ -761,6 +762,7 @@ struct ProfileView: View {
             ) {
                 activeSheet = .privacyPolicy
             }
+            SBAnalyticsToggleRow()
             SBRow(
                 icon: "arrow.down.doc.fill",
                 iconColor: SB.peach,
@@ -1097,6 +1099,43 @@ private struct PaperSection<Content: View>: View {
         }
         .rotationEffect(.degrees(tilt))
         .padding(.top, 6)
+    }
+}
+
+// MARK: - Analytics Opt-Out Toggle Row
+
+private struct SBAnalyticsToggleRow: View {
+    @State private var isOn: Bool = AnalyticsManager.shared.isEnabled
+
+    var body: some View {
+        HStack(spacing: 12) {
+            ZStack {
+                Circle()
+                    .fill(SB.sage)
+                    .frame(width: 36, height: 36)
+                Image(systemName: "chart.bar.fill")
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundColor(.white)
+            }
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("share anonymous analytics")
+                    .font(DinoTheme.dinoFont(size: 16))
+                    .foregroundColor(SB.nearBlack)
+                Text("helps us improve dino · no journal content")
+                    .font(DinoTheme.dinoFont(size: 12))
+                    .foregroundColor(SB.sage)
+            }
+
+            Spacer(minLength: 0)
+
+            Toggle("", isOn: $isOn)
+                .labelsHidden()
+                .onChange(of: isOn) { _, newValue in
+                    AnalyticsManager.shared.setEnabled(newValue)
+                }
+        }
+        .padding(.vertical, 6)
     }
 }
 

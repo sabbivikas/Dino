@@ -298,6 +298,7 @@ struct OnboardingView: View {
         withAnimation(.timingCurve(0.22, 1, 0.36, 1, duration: 0.52)) {
             currentStep += 1
         }
+        AnalyticsManager.shared.trackOnboardingStep(currentStep, total: totalSteps)
     }
 
     private func goBack() {
@@ -315,10 +316,7 @@ struct OnboardingView: View {
         dataManager.userName = name.isEmpty ? "" : name
         dataManager.dinoName = "Dino"
         dataManager.onboardingComplete = true
-        var props: [String: Any] = ["referral_source": selectedReferral]
-        if !selectedFeeling.isEmpty { props["user_feeling"] = selectedFeeling }
-        if !selectedChallenge.isEmpty { props["user_challenge"] = selectedChallenge }
-        PostHogSDK.shared.capture("onboarding_completed", properties: props)
+        AnalyticsManager.shared.trackOnboardingComplete()
     }
 
     private func progressDotColor(for index: Int) -> Color {

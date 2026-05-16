@@ -39,6 +39,7 @@ struct WellnessProgressView: View {
         .background(DinoTheme.background.ignoresSafeArea())
         .navigationTitle("")
         .navigationBarBackButtonHidden(false)
+        .onAppear { AnalyticsManager.shared.trackWellnessProgressOpened() }
     }
 
     // MARK: - Header

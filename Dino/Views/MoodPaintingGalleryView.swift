@@ -80,7 +80,10 @@ struct MoodPaintingGalleryView: View {
         .fullScreenCover(item: $fullscreenItem) { item in
             PaintingZoomView(image: item.image, caption: caption(for: item.date))
         }
-        .onAppear { _ = service.loadAllPaintings() }
+        .onAppear {
+            _ = service.loadAllPaintings()
+            AnalyticsManager.shared.trackPaintingGalleryOpened()
+        }
     }
 
     private var header: some View {

@@ -43,6 +43,7 @@ struct JournalAllEntriesView: View {
                 }
             }
         }
+        .onAppear { AnalyticsManager.shared.trackScreenViewed("all_memories") }
     }
 
     private var header: some View {

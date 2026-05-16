@@ -327,9 +327,7 @@ class MeditationViewModel: ObservableObject {
         sessionStartDate = Date()
         pauseAccumulated = 0
         lastPauseDate = nil
-        PostHogSDK.shared.capture("meditation_session_started", properties: [
-            "duration_seconds": selectedDuration,
-        ])
+        AnalyticsManager.shared.trackMeditationSessionStarted(scene: "default", duration: selectedDuration)
         print("[Meditation] session started — duration: \(selectedDuration)s")
         startLiveActivity()
         startMainTimer()
@@ -342,12 +340,16 @@ class MeditationViewModel: ObservableObject {
     }
 
     func stop() {
+        let elapsedAtStop = totalElapsed
         stopTimers()
         isRunning = false
         isPaused = false
         sessionStartDate = nil
         endLiveActivity()
         AudioManager.shared.stop()
+        if elapsedAtStop > 0 {
+            AnalyticsManager.shared.trackMeditationSessionAbandoned(atSecond: elapsedAtStop)
+        }
         print("[Meditation] session stopped")
     }
 
@@ -439,10 +441,7 @@ class MeditationViewModel: ObservableObject {
         isDone = true
         endLiveActivity()
         dataManager.logMeditationSession(MeditationSession(durationSeconds: totalElapsed, completed: true))
-        PostHogSDK.shared.capture("meditation_session_completed", properties: [
-            "duration_seconds": totalElapsed,
-            "planned_duration_seconds": selectedDuration,
-        ])
+        AnalyticsManager.shared.trackMeditationSessionCompleted(duration: totalElapsed)
         HapticManager.shared.success()
     }
 

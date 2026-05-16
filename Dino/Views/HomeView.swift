@@ -81,7 +81,10 @@ struct HomeView: View {
             .sheet(isPresented: $showNotificationCenter) {
                 NotificationCenterView()
             }
-            .onAppear { refreshNotifications() }
+            .onAppear {
+                refreshNotifications()
+                AnalyticsManager.shared.trackHomeOpened()
+            }
             .onChange(of: dataManager.streakData.currentStreak) { _, _ in refreshNotifications() }
             .onChange(of: dataManager.journalEntries.count) { _, _ in refreshNotifications() }
             .onChange(of: dataManager.gratitudeNotes.count) { _, _ in refreshNotifications() }
@@ -376,6 +379,7 @@ struct HomeView: View {
     // MARK: - Card Tap Handler
 
     private func handleCardTap(_ item: ActionItem) {
+        AnalyticsManager.shared.trackActionCardTapped(feature: item.id)
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
             if let tab = item.tab {
                 dataManager.deepLinkTab = tab

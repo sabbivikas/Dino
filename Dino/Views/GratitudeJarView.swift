@@ -179,6 +179,7 @@ struct GratitudeJarView: View {
             }
             .onAppear {
                 lastKnownNoteIds = viewModel.notes.map(\.id)
+                AnalyticsManager.shared.trackGratitudeJarOpened()
             }
             .navigationTitle("")
             .navigationBarHidden(true)

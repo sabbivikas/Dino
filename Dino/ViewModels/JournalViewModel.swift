@@ -112,9 +112,7 @@ class JournalViewModel: NSObject, ObservableObject {
             durationSeconds: recordingDuration
         )
         dataManager.addJournalEntry(entry)
-        PostHogSDK.shared.capture("journal_entry_saved", properties: [
-            "duration_seconds": Int(entry.durationSeconds),
-        ])
+        AnalyticsManager.shared.trackJournalEntryCreated(type: "voice")
         recordingDuration = 0
         currentRecordingURL = nil
 

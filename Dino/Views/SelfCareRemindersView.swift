@@ -134,6 +134,7 @@ private struct SelfCareReminderRow: View {
                     get: { enabled },
                     set: { newValue in
                         enabled = newValue
+                        AnalyticsManager.shared.trackSelfCareReminderToggled(type: reminder.id, enabled: newValue)
                         if newValue {
                             #if DEBUG
                             let content = UNMutableNotificationContent()

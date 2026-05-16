@@ -442,6 +442,7 @@ final class ThemeManager: ObservableObject {
         withAnimation(.easeInOut(duration: 0.6)) {
             currentTheme = preview
         }
+        AnalyticsManager.shared.trackThemeChanged(theme: preview.rawValue)
         // Sync to widgets
         defaults.set(currentTheme.rawValue, forKey: "dino.currentThemeForWidget")
         scheduleWidgetReload()

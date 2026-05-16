@@ -358,16 +358,22 @@ class FocusViewModel: ObservableObject {
         isPaused = false
         isDone = false
         isRunning = true
+        AnalyticsManager.shared.trackFocusSessionStarted(duration: selectedDuration)
         startLiveActivity()
         startMainTimer()
         startMessageTimer()
     }
 
     func stop() {
+        let elapsedAtStop = totalElapsed
+        let wasRunning = isRunning
         stopTimers()
         isRunning = false
         isPaused = false
         endLiveActivity()
+        if wasRunning && !isDone && elapsedAtStop > 0 {
+            AnalyticsManager.shared.trackFocusSessionAbandoned(atMinute: elapsedAtStop / 60)
+        }
     }
 
     func pause() {
@@ -431,10 +437,7 @@ class FocusViewModel: ObservableObject {
         isDone = true
         endLiveActivity()
         dataManager.logFocusSession(FocusSession(durationSeconds: totalElapsed, completed: true))
-        PostHogSDK.shared.capture("focus_session_completed", properties: [
-            "duration_seconds": totalElapsed,
-            "planned_duration_seconds": selectedDuration,
-        ])
+        AnalyticsManager.shared.trackFocusSessionCompleted(duration: totalElapsed)
     }
 
     // MARK: - Live Activity

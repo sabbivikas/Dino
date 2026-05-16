@@ -89,9 +89,7 @@ final class MirrorStore: ObservableObject {
             favorites.remove(text)
         } else {
             favorites.insert(text)
-            PostHogSDK.shared.capture("affirmation_saved", properties: [
-                "total_saved": favorites.count,
-            ])
+            AnalyticsManager.shared.trackAffirmationFavorited()
         }
         UserDefaults.standard.set(Array(favorites), forKey: Self.favoritesKey)
     }
@@ -268,7 +266,10 @@ struct AffirmationsView: View {
                     .transition(.opacity)
                 }
             }
-            .onAppear { onScreenAppear() }
+            .onAppear {
+                onScreenAppear()
+                AnalyticsManager.shared.trackAffirmationsOpened()
+            }
             .sheet(isPresented: $showCamera) {
                 CameraPicker(device: cameraDevice) { image in
                     showCamera = false

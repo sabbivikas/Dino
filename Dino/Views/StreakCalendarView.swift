@@ -36,6 +36,9 @@ struct StreakCalendarView: View {
             ScrollView(.vertical) {
                 VStack(spacing: 0) {
                     HeroHeader(displayedMonth: displayedMonth)
+                        .onAppear {
+                            AnalyticsManager.shared.trackStreakCalendarOpened()
+                        }
                         .frame(height: 220)
 
                     StatCardsRow(
