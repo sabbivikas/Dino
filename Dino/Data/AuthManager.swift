@@ -45,9 +45,6 @@ class AuthManager: ObservableObject {
     private var authStateListener: AuthStateDidChangeListenerHandle?
     private var appleCoordinator: AppleSignInCoordinator?
 
-    // Unhashed nonce used for the in-flight Sign in with Apple request.
-    fileprivate var currentNonce: String?
-
     // MARK: - Init
 
     private init() {
@@ -214,122 +211,6 @@ class AuthManager: ObservableObject {
         }
 
         isLoading = false
-    }
-
-    // MARK: - Sign in with Apple
-
-    /// Generate a fresh nonce, store it, and return the SHA256 hash to send with the Apple request.
-    func prepareAppleSignInNonce() -> String {
-        let nonce = Self.randomNonceString()
-        currentNonce = nonce
-        return Self.sha256(nonce)
-    }
-
-    func handleSignInWithApple(_ authorization: ASAuthorization) async {
-        isLoading = true
-        errorMessage = nil
-        #if DEBUG
-        print("[Auth] Apple Sign-In started")
-        #endif
-
-        guard let appleIDCredential = authorization.credential as? ASAuthorizationAppleIDCredential else {
-            errorMessage = "Apple sign-in failed: unexpected credential type"
-            isLoading = false
-            return
-        }
-
-        guard let nonce = currentNonce else {
-            errorMessage = "Apple sign-in failed: missing nonce"
-            isLoading = false
-            return
-        }
-
-        guard let appleIDToken = appleIDCredential.identityToken else {
-            errorMessage = "Apple sign-in failed: missing identity token"
-            isLoading = false
-            return
-        }
-
-        guard let idTokenString = String(data: appleIDToken, encoding: .utf8) else {
-            errorMessage = "Apple sign-in failed: token not utf8"
-            isLoading = false
-            return
-        }
-
-        let credential = OAuthProvider.credential(
-            withProviderID: "apple.com",
-            idToken: idTokenString,
-            rawNonce: nonce
-        )
-
-        do {
-            let result = try await Auth.auth().signIn(with: credential)
-
-            // Apple only provides fullName on the FIRST sign-in. Persist it to the Firebase profile.
-            if let fullName = appleIDCredential.fullName {
-                let formatter = PersonNameComponentsFormatter()
-                let displayName = formatter.string(from: fullName).trimmingCharacters(in: .whitespaces)
-                if !displayName.isEmpty {
-                    let change = result.user.createProfileChangeRequest()
-                    change.displayName = displayName
-                    try? await change.commitChanges()
-                    self.displayName = displayName
-                }
-            }
-
-            currentNonce = nil
-            #if DEBUG
-            print("[Auth] Apple Sign-In succeeded")
-            #endif
-        } catch {
-            errorMessage = error.localizedDescription
-            #if DEBUG
-            print("[Auth] Apple Sign-In failed: \(error.localizedDescription)")
-            #endif
-        }
-
-        isLoading = false
-    }
-
-    func handleSignInWithAppleError(_ error: Error) {
-        errorMessage = error.localizedDescription
-        #if DEBUG
-        print("[Auth] Apple Sign-In error: \(error.localizedDescription)")
-        #endif
-    }
-
-    // MARK: - Nonce helpers (Sign in with Apple)
-
-    private static func randomNonceString(length: Int = 32) -> String {
-        precondition(length > 0)
-        let charset: [Character] = Array("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-._")
-        var result = ""
-        var remainingLength = length
-
-        while remainingLength > 0 {
-            let randoms: [UInt8] = (0..<16).map { _ in
-                var random: UInt8 = 0
-                let errorCode = SecRandomCopyBytes(kSecRandomDefault, 1, &random)
-                if errorCode != errSecSuccess {
-                    fatalError("Unable to generate nonce. SecRandomCopyBytes failed with OSStatus \(errorCode)")
-                }
-                return random
-            }
-
-            for random in randoms where remainingLength > 0 {
-                if random < charset.count {
-                    result.append(charset[Int(random)])
-                    remainingLength -= 1
-                }
-            }
-        }
-        return result
-    }
-
-    private static func sha256(_ input: String) -> String {
-        let inputData = Data(input.utf8)
-        let hashed = SHA256.hash(data: inputData)
-        return hashed.compactMap { String(format: "%02x", $0) }.joined()
     }
 
     // MARK: - Email Sign Up

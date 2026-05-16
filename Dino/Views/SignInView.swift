@@ -4,13 +4,11 @@
 //
 
 import SwiftUI
-import AuthenticationServices
 
 struct SignInView: View {
     @ObservedObject private var themeManager = ThemeManager.shared
     @EnvironmentObject var dataManager: SharedDataManager
     @EnvironmentObject var authManager: AuthManager
-    @Environment(\.colorScheme) private var colorScheme
 
     @AppStorage("hasPassedAuth") private var hasPassedAuth = false
 
@@ -167,34 +165,6 @@ struct SignInView: View {
                         )
                     }
                     .buttonStyle(ScaleButtonStyle())
-                    .disabled(authManager.isLoading)
-
-                    // Continue with Apple
-                    SignInWithAppleButton(
-                        .signIn,
-                        onRequest: { request in
-                            request.requestedScopes = [.fullName, .email]
-                            request.nonce = authManager.prepareAppleSignInNonce()
-                        },
-                        onCompletion: { result in
-                            Task {
-                                switch result {
-                                case .success(let authorization):
-                                    await authManager.handleSignInWithApple(authorization)
-                                    if authManager.isSignedIn {
-                                        dataManager.userName = authManager.displayName
-                                        hasPassedAuth = true
-                                    }
-                                case .failure(let error):
-                                    authManager.handleSignInWithAppleError(error)
-                                }
-                            }
-                        }
-                    )
-                    .signInWithAppleButtonStyle(colorScheme == .dark ? .white : .black)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 58)
-                    .cornerRadius(DinoTheme.cornerRadius)
                     .disabled(authManager.isLoading)
 
                     // Sign up with email
