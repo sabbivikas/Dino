@@ -8,6 +8,7 @@ import FirebaseCore
 import FirebaseFirestore
 import GoogleSignIn
 import UserNotifications
+import PostHog
 
 class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
     func application(_ application: UIApplication,
@@ -51,6 +52,15 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
 @main
 struct DinoApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var delegate
+
+    init() {
+        let config = PostHogConfig(
+            apiKey: "phc_sjfNi7Wc5A9EKLuAcDN8LPUaCGcXnywCmryM6aWz2obb",
+            host: "https://us.i.posthog.com"
+        )
+        config.captureApplicationLifecycleEvents = true
+        PostHogSDK.shared.setup(config)
+    }
     @StateObject private var dataManager = SharedDataManager.shared
     @StateObject private var themeManager = ThemeManager.shared
     @StateObject private var authManager = AuthManager.shared

@@ -5,6 +5,7 @@
 
 import SwiftUI
 import Combine
+import PostHog
 
 @MainActor
 class MoodViewModel: ObservableObject {
@@ -47,6 +48,11 @@ class MoodViewModel: ObservableObject {
             intensityLevel: Int(intensityLevel.rounded())
         )
         dataManager.logMood(entry)
+        PostHogSDK.shared.capture("mood_logged", properties: [
+            "weather_type": weather.rawValue,
+            "energy_level": Int(energyLevel.rounded()),
+            "intensity_level": Int(intensityLevel.rounded()),
+        ])
         saved = true
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in

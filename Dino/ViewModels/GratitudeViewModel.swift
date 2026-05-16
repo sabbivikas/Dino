@@ -5,6 +5,7 @@
 
 import SwiftUI
 import Combine
+import PostHog
 
 @MainActor
 class GratitudeViewModel: ObservableObject {
@@ -33,6 +34,9 @@ class GratitudeViewModel: ObservableObject {
         let text = newNoteText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
         dataManager.addGratitudeNote(text)
+        PostHogSDK.shared.capture("gratitude_note_added", properties: [
+            "total_notes": dataManager.gratitudeNotes.count + 1,
+        ])
         newNoteText = ""
         showAddSheet = false
     }

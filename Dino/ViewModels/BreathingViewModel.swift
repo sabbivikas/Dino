@@ -5,6 +5,7 @@
 
 import SwiftUI
 import Combine
+import PostHog
 
 enum BreathingPhase: String {
     case idle
@@ -217,6 +218,11 @@ class BreathingViewModel: ObservableObject {
             type: "\(inhaleSeconds)-\(holdSeconds)-\(exhaleSeconds)"
         )
         dataManager.logBreathingSession(session)
+        PostHogSDK.shared.capture("breathing_session_completed", properties: [
+            "duration_seconds": totalElapsed,
+            "cycles_completed": currentCycle,
+            "session_type": "\(inhaleSeconds)-\(holdSeconds)-\(exhaleSeconds)",
+        ])
         HapticManager.shared.success()
     }
 

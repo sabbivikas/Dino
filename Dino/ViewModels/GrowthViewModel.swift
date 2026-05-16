@@ -5,6 +5,7 @@
 
 import SwiftUI
 import Combine
+import PostHog
 
 // MARK: - PracticeType
 
@@ -165,11 +166,20 @@ final class GrowthViewModel: ObservableObject {
 
     /// Record a practice activity and award XP appropriate for the type.
     func recordGrowthActivity(_ practice: PracticeType) {
+        let previousStage = growthStage
         switch practice {
         case .journal:   addXP(15)
         case .mood:      addXP(10)
         case .gratitude: addXP(5)
         case .breathing: addXP(20)
+        }
+        let newStage = growthStage
+        if newStage != previousStage {
+            PostHogSDK.shared.capture("growth_stage_advanced", properties: [
+                "from_stage": previousStage.displayName,
+                "to_stage": newStage.displayName,
+                "total_sessions": totalSessions,
+            ])
         }
         updateStreak()
     }

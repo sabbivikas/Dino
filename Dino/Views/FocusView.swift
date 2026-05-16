@@ -1,4 +1,5 @@
 import Combine
+import PostHog
 //
 //  FocusView.swift
 //  Dino
@@ -430,6 +431,10 @@ class FocusViewModel: ObservableObject {
         isDone = true
         endLiveActivity()
         dataManager.logFocusSession(FocusSession(durationSeconds: totalElapsed, completed: true))
+        PostHogSDK.shared.capture("focus_session_completed", properties: [
+            "duration_seconds": totalElapsed,
+            "planned_duration_seconds": selectedDuration,
+        ])
     }
 
     // MARK: - Live Activity

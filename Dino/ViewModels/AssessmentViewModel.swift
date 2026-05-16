@@ -5,6 +5,7 @@
 
 import SwiftUI
 import Combine
+import PostHog
 
 struct AssessmentQuestion {
     let topic: String
@@ -76,6 +77,14 @@ class AssessmentViewModel: ObservableObject {
         let result = AssessmentResult(score: totalScore, answers: answers)
         dataManager.saveAssessmentResult(result)
         savedResult = result
+        PostHogSDK.shared.capture("assessment_completed", properties: [
+            "total_score": totalScore,
+            "sleep_score": answers[0],
+            "energy_score": answers[1],
+            "stress_score": answers[2],
+            "mood_score": answers[3],
+            "connection_score": answers[4],
+        ])
         withAnimation {
             isComplete = true
         }

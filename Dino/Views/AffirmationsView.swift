@@ -11,6 +11,7 @@
 import SwiftUI
 import UIKit
 import Combine
+import PostHog
 
 // MARK: - Storage
 
@@ -84,7 +85,14 @@ final class MirrorStore: ObservableObject {
     func isFavorite(_ text: String) -> Bool { favorites.contains(text) }
 
     func toggleFavorite(_ text: String) {
-        if favorites.contains(text) { favorites.remove(text) } else { favorites.insert(text) }
+        if favorites.contains(text) {
+            favorites.remove(text)
+        } else {
+            favorites.insert(text)
+            PostHogSDK.shared.capture("affirmation_saved", properties: [
+                "total_saved": favorites.count,
+            ])
+        }
         UserDefaults.standard.set(Array(favorites), forKey: Self.favoritesKey)
     }
 

@@ -6,6 +6,7 @@
 import SwiftUI
 import AVFoundation
 import Combine
+import PostHog
 
 @MainActor
 class JournalViewModel: NSObject, ObservableObject {
@@ -111,6 +112,9 @@ class JournalViewModel: NSObject, ObservableObject {
             durationSeconds: recordingDuration
         )
         dataManager.addJournalEntry(entry)
+        PostHogSDK.shared.capture("journal_entry_saved", properties: [
+            "duration_seconds": Int(entry.durationSeconds),
+        ])
         recordingDuration = 0
         currentRecordingURL = nil
 

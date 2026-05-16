@@ -1,4 +1,5 @@
 import Combine
+import PostHog
 //
 //  MeditationView.swift
 //  Dino
@@ -326,6 +327,9 @@ class MeditationViewModel: ObservableObject {
         sessionStartDate = Date()
         pauseAccumulated = 0
         lastPauseDate = nil
+        PostHogSDK.shared.capture("meditation_session_started", properties: [
+            "duration_seconds": selectedDuration,
+        ])
         print("[Meditation] session started — duration: \(selectedDuration)s")
         startLiveActivity()
         startMainTimer()
@@ -435,6 +439,10 @@ class MeditationViewModel: ObservableObject {
         isDone = true
         endLiveActivity()
         dataManager.logMeditationSession(MeditationSession(durationSeconds: totalElapsed, completed: true))
+        PostHogSDK.shared.capture("meditation_session_completed", properties: [
+            "duration_seconds": totalElapsed,
+            "planned_duration_seconds": selectedDuration,
+        ])
         HapticManager.shared.success()
     }
 

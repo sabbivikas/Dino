@@ -12,6 +12,7 @@
 		1D2444BE2F9BF8DA00A7CD7E /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = FB000020GOOGLESIGNIN0001 /* GoogleSignIn */; };
 		1D2444BF2F9BF8DA00A7CD7E /* GoogleSignInSwift in Frameworks */ = {isa = PBXBuildFile; productRef = FB000021GOOGLESIGNINUI01 /* GoogleSignInSwift */; };
 		1D2444C02F9BF8DA00A7CD7E /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = FB000012FIRESTOREPROD01 /* FirebaseFirestore */; };
+		1DE98E532FB82FF80005AC59 /* PostHog in Frameworks */ = {isa = PBXBuildFile; productRef = 1DE98E522FB82FF80005AC59 /* PostHog */; };
 		AA000021AAAA000000000001 /* DinoLiveActivityExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = AA000011AAAA000000000001 /* DinoLiveActivityExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
@@ -116,6 +117,7 @@
 				1D2444C02F9BF8DA00A7CD7E /* FirebaseFirestore in Frameworks */,
 				1D2444BF2F9BF8DA00A7CD7E /* GoogleSignInSwift in Frameworks */,
 				1D2444BE2F9BF8DA00A7CD7E /* GoogleSignIn in Frameworks */,
+				1DE98E532FB82FF80005AC59 /* PostHog in Frameworks */,
 				1D2444BD2F9BF8DA00A7CD7E /* FirebaseCore in Frameworks */,
 				1D2444BC2F9BF8DA00A7CD7E /* FirebaseAuth in Frameworks */,
 			);
@@ -138,6 +140,13 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		1DE98E512FB82FF80005AC59 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
 		E1CF60242F73C55B008D5746 = {
 			isa = PBXGroup;
 			children = (
@@ -146,6 +155,7 @@
 				AA000030AAAA000000000001 /* DinoLiveActivity */,
 				E1CF603F2F73C55D008D5746 /* DinoTests */,
 				E1CF60492F73C55D008D5746 /* DinoUITests */,
+				1DE98E512FB82FF80005AC59 /* Frameworks */,
 				E1CF602E2F73C55B008D5746 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -212,6 +222,7 @@
 				FB000020GOOGLESIGNIN0001 /* GoogleSignIn */,
 				FB000021GOOGLESIGNINUI01 /* GoogleSignInSwift */,
 				FB000012FIRESTOREPROD01 /* FirebaseFirestore */,
+				1DE98E522FB82FF80005AC59 /* PostHog */,
 			);
 			productName = Dino;
 			productReference = E1CF602D2F73C55B008D5746 /* Dino.app */;
@@ -301,6 +312,7 @@
 			packageReferences = (
 				FB000001FIREBASE000000001 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
 				FB000002GOOGLE0000000001 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */,
+				1DE98E502FB823480005AC59 /* XCRemoteSwiftPackageReference "posthog-ios" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = E1CF602E2F73C55B008D5746 /* Products */;
@@ -760,6 +772,14 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		1DE98E502FB823480005AC59 /* XCRemoteSwiftPackageReference "posthog-ios" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/PostHog/posthog-ios.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 3.58.3;
+			};
+		};
 		FB000001FIREBASE000000001 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/firebase/firebase-ios-sdk";
@@ -779,6 +799,11 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		1DE98E522FB82FF80005AC59 /* PostHog */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 1DE98E502FB823480005AC59 /* XCRemoteSwiftPackageReference "posthog-ios" */;
+			productName = PostHog;
+		};
 		FB000010FIREBASEAUTH0001 /* FirebaseAuth */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = FB000001FIREBASE000000001 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
