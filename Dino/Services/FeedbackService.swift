@@ -33,7 +33,7 @@ final class FeedbackService {
         let device = await MainActor.run { UIDevice.current.model }
 
         let serviceID = Self.config("EMAILJS_SERVICE_ID", fallback: "service_bmmdob8")
-        let templateID = Self.config("EMAILJS_TEMPLATE_ID", fallback: "template_14m442q")
+        let templateID = Self.config("EMAILJS_TEMPLATE_ID", fallback: "template_dkc4sqt")
         let publicKey = Self.config("EMAILJS_PUBLIC_KEY", fallback: "RtQfJvwvxaAyIwlsh")
 
         let params: [String: Any] = [
