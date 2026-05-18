@@ -611,10 +611,15 @@ struct JournalPolaroidCard: View {
 
     /// Journal text truncated to ~80 chars for the vellum snippet bar
     private var snippetText: String {
-        let text = entry.summary
-        guard text.count > 80 else { return text }
-        let idx = text.index(text.startIndex, offsetBy: 80)
-        return String(text[..<idx]) + "…"
+        let summary = entry.summary.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !summary.isEmpty {
+            return summary.count > 80 ? String(summary.prefix(80)) + "\u{2026}" : summary
+        }
+        let title = entry.title.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !title.isEmpty {
+            return title.count > 80 ? String(title.prefix(80)) + "\u{2026}" : title
+        }
+        return "voice note recorded"
     }
 
     /// Friendly lowercase caption with a decorative floral/seasonal suffix
@@ -853,15 +858,31 @@ private struct JournalPolaroidBack: View {
                     .font(.custom(DinoTheme.customFontName, size: 13))
                     .foregroundColor(Color(hex: "#3D3A35"))
 
-                Text("mood: \(entry.moodTag)")
-                    .font(.system(size: 11))
-                    .foregroundColor(Color(hex: "#7A7266"))
+                HStack(spacing: 8) {
+                    Text("mood: \(entry.moodTag)")
+                    if entry.durationSeconds > 0 {
+                        Text("\u{00B7}")
+                        Text(formatDuration(entry.durationSeconds))
+                    } else {
+                        Text("\u{00B7}")
+                        Text("text entry")
+                    }
+                }
+                .font(.system(size: 11))
+                .foregroundColor(Color(hex: "#7A7266"))
 
-                Text("duration: \(formatDuration(entry.durationSeconds))")
-                    .font(.system(size: 11))
-                    .foregroundColor(Color(hex: "#7A7266"))
+                ScrollView {
+                    Text(entry.summary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                         ? "voice note recorded"
+                         : entry.summary)
+                        .font(.system(size: 12))
+                        .foregroundColor(Color(hex: "#3D3A35"))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .scrollIndicators(.hidden)
 
-                Spacer()
+                Spacer(minLength: 0)
             }
             .padding(14)
         }
