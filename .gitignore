@@ -26,3 +26,6 @@ DerivedData/
 
 # Node (Firestore rules tests)
 firebase-rules-tests/node_modules/
+
+# Secrets — do not commit (contains real API keys)
+Secrets.xcconfig

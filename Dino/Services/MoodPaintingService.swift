@@ -39,9 +39,6 @@ final class MoodPaintingService: ObservableObject {
 
     @Published var monthlyPaintings: [(date: Date, image: UIImage)] = []
 
-    private let hfToken = "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"
-    private let modelURL = URL(string: "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-2-1")!
-
     private init() {
         _ = loadAllPaintings()
     }
@@ -113,68 +110,98 @@ final class MoodPaintingService: ObservableObject {
         let pattern = analyzeMoods(entries: moods)
         let prompt = buildArtisticPrompt(pattern: pattern)
 
-        let image = try await callHuggingFace(prompt: prompt, retryOn503: true)
+        let image = try await callDALLE(prompt: prompt)
         savePainting(image, for: month)
         _ = loadAllPaintings()
         return image
     }
 
-    private func callHuggingFace(prompt: String, retryOn503: Bool) async throws -> UIImage {
-        var request = URLRequest(url: modelURL)
+    private func callDALLE(prompt: String) async throws -> UIImage {
+        let apiKey = Self.config("OPENAI_API_KEY", fallback: "")
+        guard !apiKey.isEmpty else {
+            #if DEBUG
+            print("[Painting] OPENAI_API_KEY missing — set in Secrets.xcconfig or Xcode scheme environment variables")
+            #endif
+            throw MoodPaintingError.network("missing OPENAI_API_KEY")
+        }
+
+        guard let url = URL(string: "https://api.openai.com/v1/images/generations") else {
+            throw MoodPaintingError.invalidResponse(-1)
+        }
+
+        var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.timeoutInterval = 60
-        request.setValue("Bearer \(hfToken)", forHTTPHeaderField: "Authorization")
+        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("image/jpeg", forHTTPHeaderField: "Accept")
 
         let body: [String: Any] = [
-            "inputs": prompt,
-            "parameters": [
-                "num_inference_steps": 25,
-                "guidance_scale": 7.5,
-                "width": 512,
-                "height": 512
-            ]
+            "model": "dall-e-3",
+            "prompt": prompt,
+            "n": 1,
+            "size": "1024x1024",
+            "quality": "standard",
+            "style": "vivid"
         ]
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
-        let config = URLSessionConfiguration.default
-        config.timeoutIntervalForRequest = 60
-        let session = URLSession(configuration: config)
-
         let (data, response): (Data, URLResponse)
         do {
-            (data, response) = try await session.data(for: request)
+            (data, response) = try await URLSession.shared.data(for: request)
         } catch {
             throw MoodPaintingError.network(error.localizedDescription)
         }
 
-        let statusCode = (response as? HTTPURLResponse)?.statusCode ?? -1
-
-        // Detect HTML error pages (e.g. gateway / service unavailable) before anything else
-        let prefixBytes = data.prefix(200)
-        if let prefixString = String(data: prefixBytes, encoding: .ascii) {
-            let trimmed = prefixString.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-            if trimmed.hasPrefix("<!doctype") || trimmed.hasPrefix("<html") {
-                throw MoodPaintingError.serviceUnavailable
-            }
+        guard let http = response as? HTTPURLResponse else {
+            throw MoodPaintingError.invalidResponse(-1)
+        }
+        guard http.statusCode == 200 else {
+            #if DEBUG
+            let bodyString = String(data: data, encoding: .utf8) ?? "<no body>"
+            print("[Painting] DALL-E request failed status=\(http.statusCode) body=\(bodyString)")
+            #endif
+            throw MoodPaintingError.invalidResponse(http.statusCode)
         }
 
-        switch statusCode {
-        case 200:
-            guard let img = UIImage(data: data) else {
-                throw MoodPaintingError.decodeFailed
-            }
-            return img
-        case 503:
-            if retryOn503 {
-                try await Task.sleep(nanoseconds: 20_000_000_000)
-                return try await callHuggingFace(prompt: prompt, retryOn503: false)
-            }
-            throw MoodPaintingError.modelNotReady
-        default:
-            throw MoodPaintingError.invalidResponse(statusCode)
+        struct OAIResp: Decodable {
+            struct Item: Decodable { let url: String }
+            let data: [Item]
         }
+        let decoded: OAIResp
+        do {
+            decoded = try JSONDecoder().decode(OAIResp.self, from: data)
+        } catch {
+            #if DEBUG
+            print("[Painting] DALL-E response decode failed: \(error)")
+            #endif
+            throw MoodPaintingError.decodeFailed
+        }
+        guard let imageURLString = decoded.data.first?.url,
+              let imageURL = URL(string: imageURLString) else {
+            throw MoodPaintingError.decodeFailed
+        }
+
+        let (imageData, imageResponse): (Data, URLResponse)
+        do {
+            (imageData, imageResponse) = try await URLSession.shared.data(from: imageURL)
+        } catch {
+            throw MoodPaintingError.network(error.localizedDescription)
+        }
+        guard let imageHTTP = imageResponse as? HTTPURLResponse, imageHTTP.statusCode == 200 else {
+            throw MoodPaintingError.invalidResponse((imageResponse as? HTTPURLResponse)?.statusCode ?? -1)
+        }
+        guard let image = UIImage(data: imageData) else {
+            throw MoodPaintingError.decodeFailed
+        }
+        return image
+    }
+
+    private static func config(_ key: String, fallback: String) -> String {
+        guard let value = Bundle.main.object(forInfoDictionaryKey: key) as? String,
+              !value.isEmpty, !value.hasPrefix("$(") else {
+            return fallback
+        }
+        return value
     }
 
     // MARK: - Persistence
