@@ -18,7 +18,7 @@ struct MainTabView: View {
                     .environmentObject(dataManager)
                     .tag(0)
 
-                VoiceJournalView()
+                VoiceJournalView(selectedTab: $selectedTab)
                     .environmentObject(dataManager)
                     .tag(1)
 

@@ -17,6 +17,8 @@ struct VoiceJournalView: View {
     @StateObject private var viewModel: JournalViewModel = JournalViewModel(dataManager: SharedDataManager.shared)
     @State private var showAllMemories: Bool = false
 
+    var selectedTab: Binding<Int>? = nil
+
     var body: some View {
         NavigationStack {
             ZStack {
@@ -70,7 +72,14 @@ struct VoiceJournalView: View {
 
                 VStack {
                     HStack {
-                        Button { dismiss() } label: {
+                        Button {
+                            HapticManager.shared.light()
+                            if let selectedTab = selectedTab {
+                                selectedTab.wrappedValue = 0
+                            } else {
+                                dismiss()
+                            }
+                        } label: {
                             Image(systemName: "chevron.left")
                                 .font(.system(size: 14, weight: .semibold))
                                 .foregroundColor(Color(hex: "#8B7A6A"))
