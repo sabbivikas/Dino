@@ -12,6 +12,7 @@ import PhotosUI
 struct VoiceJournalView: View {
     @ObservedObject private var themeManager = ThemeManager.shared
 
+    @Environment(\.dismiss) private var dismiss
     @EnvironmentObject var dataManager: SharedDataManager
     @StateObject private var viewModel: JournalViewModel = JournalViewModel(dataManager: SharedDataManager.shared)
     @State private var showAllMemories: Bool = false
@@ -66,6 +67,24 @@ struct VoiceJournalView: View {
                     .padding(.bottom, 40)
                 }
                 .scrollDismissesKeyboard(.interactively)
+
+                VStack {
+                    HStack {
+                        Button { dismiss() } label: {
+                            Image(systemName: "chevron.left")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundColor(Color(hex: "#8B7A6A"))
+                                .frame(width: 34, height: 34)
+                                .background(Circle().fill(Color(hex: "#F5F0E8")))
+                                .shadow(color: .black.opacity(0.10), radius: 4, x: 0, y: 2)
+                        }
+                        .buttonStyle(.plain)
+                        .padding(.leading, 20)
+                        .padding(.top, 16)
+                        Spacer()
+                    }
+                    Spacer()
+                }
             }
             .contentShape(Rectangle())
             .onTapGesture {
