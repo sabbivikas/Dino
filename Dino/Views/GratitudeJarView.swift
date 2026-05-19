@@ -276,7 +276,7 @@ private struct JarStackView: View {
                         )
                         let isNew = note.id == justAddedId
                         let token = JarTokenView(
-                            assetName: tokenAssetFor(index: index),
+                            assetName: tokenAssetFor(note: note),
                             indexInJar: index,
                             totalInJar: min(notes.count, 30),
                             isNewDrop: false
@@ -305,10 +305,13 @@ private struct JarStackView: View {
         .aspectRatio(jarAspect, contentMode: .fit)
     }
 
-    // Cycle dino → heart → leaf by index.
-    private func tokenAssetFor(index: Int) -> String {
-        let types = GratitudeIconType.allCases
-        return types[index % types.count].assetName
+    // Use the token type the user picked when saving the note.
+    private func tokenAssetFor(note: GratitudeNote) -> String {
+        switch note.tokenType {
+        case "dino":  return "jar-dino"
+        case "leaf":  return "jar-leaf"
+        default:      return "jar-heart"
+        }
     }
 
     // Interior bounds inside the jar image (fractions of the drawn image).

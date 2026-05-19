@@ -10,9 +10,9 @@
 
 import SwiftUI
 
-enum JarTokenKind: Int, CaseIterable, Identifiable {
+enum JarTokenKind: String, CaseIterable, Identifiable {
     case dino, heart, leaf
-    var id: Int { rawValue }
+    var id: String { rawValue }
 
     var assetName: String {
         switch self {
@@ -160,7 +160,7 @@ struct AddGratitudeSheet: View {
     private func submit() {
         guard !isEmpty else { return }
         HapticManager.shared.success()
-        viewModel.addNote()
+        viewModel.addNote(tokenType: selectedTokenType.rawValue)
         onSaved?()
     }
 }

@@ -433,8 +433,8 @@ final class SharedDataManager: ObservableObject {
     }
 
     // MARK: - Gratitude
-    func addGratitudeNote(_ text: String) {
-        let note = GratitudeNote(text: text)
+    func addGratitudeNote(_ text: String, tokenType: String = "heart") {
+        let note = GratitudeNote(text: text, tokenType: tokenType)
         gratitudeNotes.insert(note, at: 0)
         addXP(5)
         recordActivity()

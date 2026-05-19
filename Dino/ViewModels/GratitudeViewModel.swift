@@ -30,11 +30,11 @@ class GratitudeViewModel: ObservableObject {
         min(Double(totalCount) / 30.0, 1.0)
     }
 
-    func addNote() {
+    func addNote(tokenType: String = "heart") {
         let text = newNoteText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
-        dataManager.addGratitudeNote(text)
-        AnalyticsManager.shared.trackGratitudeTokenAdded(type: "default")
+        dataManager.addGratitudeNote(text, tokenType: tokenType)
+        AnalyticsManager.shared.trackGratitudeTokenAdded(type: tokenType)
         newNoteText = ""
         showAddSheet = false
     }
