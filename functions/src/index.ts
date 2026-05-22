@@ -137,7 +137,7 @@ export const processEmailQueue = onSchedule(
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             service_id: "service_bmmdob8",
-            template_id: "template_14m442q",
+            template_id: "template_dkc4sqt",
             user_id: "RtQfJvwvxaAyIwlsh",
             template_params: {
               to_email: data.email,
