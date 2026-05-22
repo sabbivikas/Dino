@@ -16,6 +16,7 @@ struct VoiceJournalView: View {
     @EnvironmentObject var dataManager: SharedDataManager
     @StateObject private var viewModel: JournalViewModel = JournalViewModel(dataManager: SharedDataManager.shared)
     @State private var showAllMemories: Bool = false
+    @State private var previewEntry: JournalEntry? = nil
 
     var selectedTab: Binding<Int>? = nil
 
@@ -61,7 +62,8 @@ struct VoiceJournalView: View {
                                 HapticManager.shared.light()
                                 AnalyticsManager.shared.trackSeeAllMemoriesTapped(count: dataManager.journalEntries.count)
                                 showAllMemories = true
-                            }
+                            },
+                            onLongPress: { entry in previewEntry = entry }
                         )
                     }
                     .padding(.horizontal, 20)
@@ -107,6 +109,9 @@ struct VoiceJournalView: View {
             .fullScreenCover(isPresented: $showAllMemories) {
                 JournalAllEntriesView(viewModel: viewModel)
                     .environmentObject(dataManager)
+            }
+            .fullScreenCover(item: $previewEntry) { entry in
+                JournalCardPreviewOverlay(entry: entry, viewModel: viewModel)
             }
         }
     }
@@ -347,6 +352,38 @@ private struct JournalComposerCard: View {
                 .padding(.leading, 56)
                 .padding(.trailing, 16)
 
+                // Photo preview thumbnail
+                if let image = selectedImage {
+                    HStack {
+                        ZStack(alignment: .topTrailing) {
+                            Image(uiImage: image)
+                                .resizable()
+                                .scaledToFill()
+                                .frame(width: 80, height: 80)
+                                .clipShape(RoundedRectangle(cornerRadius: 10))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 10)
+                                        .stroke(Color(hex: "#E8E4D5"), lineWidth: 1)
+                                )
+
+                            Button {
+                                HapticManager.shared.light()
+                                selectedImage = nil
+                            } label: {
+                                Image(systemName: "xmark.circle.fill")
+                                    .font(.system(size: 20))
+                                    .foregroundStyle(.white, Color.black.opacity(0.6))
+                                    .padding(4)
+                            }
+                            .buttonStyle(.plain)
+                            .offset(x: 6, y: -6)
+                        }
+                        Spacer()
+                    }
+                    .padding(.leading, 60)
+                    .padding(.trailing, 16)
+                }
+
                 // Dashed divider
                 DashedDivider()
                     .padding(.leading, 56)
@@ -546,6 +583,7 @@ private struct JournalTimelineStrip: View {
     let entries: [JournalEntry]
     @ObservedObject var viewModel: JournalViewModel
     let onSeeAll: () -> Void
+    var onLongPress: ((JournalEntry) -> Void)? = nil
 
     var body: some View {
         if entries.isEmpty {
@@ -578,7 +616,8 @@ private struct JournalTimelineStrip: View {
                             JournalPolaroidCard(
                                 entry: entry,
                                 index: i,
-                                viewModel: viewModel
+                                viewModel: viewModel,
+                                onLongPress: onLongPress
                             )
                         }
 
@@ -648,6 +687,7 @@ struct JournalPolaroidCard: View {
     let entry: JournalEntry
     let index: Int
     @ObservedObject var viewModel: JournalViewModel
+    var onLongPress: ((JournalEntry) -> Void)? = nil
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -737,6 +777,10 @@ struct JournalPolaroidCard: View {
                     flipped.toggle()
                 }
             }
+        }
+        .onLongPressGesture(minimumDuration: 0.4) {
+            HapticManager.shared.medium()
+            onLongPress?(entry)
         }
         .contextMenu {
             Button {
@@ -835,6 +879,23 @@ struct JournalPolaroidCard: View {
                         endRadius: 95
                     )
                     .allowsHitTesting(false)
+
+                    // Vellum overlay with journal summary
+                    if !snippetText.isEmpty {
+                        VStack {
+                            Spacer()
+                            Text(snippetText)
+                                .font(.custom(DinoTheme.customFontName, size: 11))
+                                .foregroundColor(Color(hex: "#2E2A24"))
+                                .lineLimit(2)
+                                .multilineTextAlignment(.leading)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 6)
+                                .background(Color(hex: "#FEFBF3").opacity(0.88))
+                        }
+                        .allowsHitTesting(false)
+                    }
                 } else {
                     ZStack {
                         moodPhotoGradient(entry.moodTag)
@@ -1388,4 +1449,100 @@ fileprivate func moodVignetteKind(_ tag: String) -> MoodVignette.Kind {
     default:
         return .partly
     }
+}
+
+// MARK: - Card Preview Overlay
+private struct JournalCardPreviewOverlay: View {
+    let entry: JournalEntry
+    @ObservedObject var viewModel: JournalViewModel
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var renderedImage: UIImage? = nil
+    @State private var showShareSheet: Bool = false
+    @State private var toast: String? = nil
+
+    var body: some View {
+        ZStack {
+            Color.black.opacity(0.7).ignoresSafeArea()
+                .onTapGesture { dismiss() }
+
+            VStack(spacing: 24) {
+                Spacer()
+                JournalPolaroidCard(entry: entry, index: 0, viewModel: viewModel)
+                    .frame(width: 320, height: 400)
+                    .allowsHitTesting(false)
+
+                if let toast = toast {
+                    Text(toast)
+                        .font(.system(size: 13))
+                        .padding(.horizontal, 14).padding(.vertical, 8)
+                        .background(Color.black.opacity(0.7), in: Capsule())
+                        .foregroundColor(.white)
+                }
+
+                HStack(spacing: 14) {
+                    Button {
+                        HapticManager.shared.light()
+                        saveToPhotos()
+                    } label: {
+                        Label("save to photos", systemImage: "square.and.arrow.down")
+                            .font(.custom(DinoTheme.customFontName, size: 14))
+                            .foregroundColor(Color(hex: "#2E2A24"))
+                            .padding(.horizontal, 18).padding(.vertical, 12)
+                            .background(Color(hex: "#FEFBF3"), in: Capsule())
+                    }
+                    .buttonStyle(.plain)
+
+                    Button {
+                        HapticManager.shared.light()
+                        shareCard()
+                    } label: {
+                        Label("share", systemImage: "square.and.arrow.up")
+                            .font(.custom(DinoTheme.customFontName, size: 14))
+                            .foregroundColor(Color(hex: "#2E2A24"))
+                            .padding(.horizontal, 18).padding(.vertical, 12)
+                            .background(Color(hex: "#FEFBF3"), in: Capsule())
+                    }
+                    .buttonStyle(.plain)
+                }
+                Spacer().frame(height: 40)
+            }
+        }
+        .sheet(isPresented: $showShareSheet) {
+            if let image = renderedImage {
+                ShareSheet(items: [image, "my dino journal entry \u{1F995}\u{1F33F} #dino #mentalhealth #wellness"])
+            }
+        }
+    }
+
+    @MainActor
+    private func render() -> UIImage? {
+        let card = JournalPolaroidCard(entry: entry, index: 0, viewModel: viewModel)
+            .frame(width: 320, height: 400)
+        let renderer = ImageRenderer(content: card)
+        renderer.scale = UIScreen.main.scale
+        return renderer.uiImage
+    }
+
+    private func saveToPhotos() {
+        guard let image = render() else { return }
+        renderedImage = image
+        UIImageWriteToSavedPhotosAlbum(image, nil, nil, nil)
+        toast = "saved to photos"
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) { toast = nil }
+    }
+
+    private func shareCard() {
+        guard let image = render() else { return }
+        renderedImage = image
+        showShareSheet = true
+    }
+}
+
+private struct ShareSheet: UIViewControllerRepresentable {
+    let items: [Any]
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: items, applicationActivities: nil)
+    }
+    func updateUIViewController(_ vc: UIActivityViewController, context: Context) {}
 }
