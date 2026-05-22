@@ -9,6 +9,7 @@ struct JournalAllEntriesView: View {
     @EnvironmentObject var dataManager: SharedDataManager
     @ObservedObject var viewModel: JournalViewModel
     @Environment(\.dismiss) private var dismiss
+    @State private var previewEntry: JournalEntry? = nil
 
     private var entries: [JournalEntry] {
         dataManager.journalEntries.sorted { $0.date > $1.date }
@@ -30,7 +31,13 @@ struct JournalAllEntriesView: View {
                                 JournalPolaroidCard(
                                     entry: entry,
                                     index: i,
-                                    viewModel: viewModel
+                                    viewModel: viewModel,
+                                    onLongPress: { entry in
+                                        #if DEBUG
+                                        print("[Journal][All] previewEntry set to \(entry.id)")
+                                        #endif
+                                        previewEntry = entry
+                                    }
                                 )
                                 .frame(maxWidth: .infinity)
                             }
@@ -44,6 +51,9 @@ struct JournalAllEntriesView: View {
             }
         }
         .onAppear { AnalyticsManager.shared.trackScreenViewed("all_memories") }
+        .fullScreenCover(item: $previewEntry) { entry in
+            JournalCardPreviewOverlay(entry: entry, viewModel: viewModel)
+        }
     }
 
     private var header: some View {

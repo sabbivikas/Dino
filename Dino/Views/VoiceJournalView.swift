@@ -63,7 +63,12 @@ struct VoiceJournalView: View {
                                 AnalyticsManager.shared.trackSeeAllMemoriesTapped(count: dataManager.journalEntries.count)
                                 showAllMemories = true
                             },
-                            onLongPress: { entry in previewEntry = entry }
+                            onLongPress: { entry in
+                                #if DEBUG
+                                print("[Journal] previewEntry set to \(entry.id)")
+                                #endif
+                                previewEntry = entry
+                            }
                         )
                     }
                     .padding(.horizontal, 20)
@@ -781,6 +786,9 @@ struct JournalPolaroidCard: View {
         }
         .onLongPressGesture(minimumDuration: 0.4) {
             HapticManager.shared.medium()
+            #if DEBUG
+            print("[Journal] long press fired for entry \(entry.id)")
+            #endif
             onLongPress?(entry)
         }
         .contextMenu {
@@ -1453,7 +1461,7 @@ fileprivate func moodVignetteKind(_ tag: String) -> MoodVignette.Kind {
 }
 
 // MARK: - Card Preview Overlay
-private struct JournalCardPreviewOverlay: View {
+struct JournalCardPreviewOverlay: View {
     let entry: JournalEntry
     @ObservedObject var viewModel: JournalViewModel
     @Environment(\.dismiss) private var dismiss
@@ -1483,7 +1491,7 @@ private struct JournalCardPreviewOverlay: View {
                 Spacer()
             }
         }
-        .safeAreaInset(edge: .bottom, spacing: 0) {
+        .overlay(alignment: .bottom) {
             HStack(spacing: 12) {
                 actionPill(label: "save to photos 📸") {
                     saveToPhotos()
@@ -1492,9 +1500,10 @@ private struct JournalCardPreviewOverlay: View {
                     shareCard()
                 }
             }
-            .padding(.horizontal, 24)
-            .padding(.top, 12)
-            .padding(.bottom, 16)
+            .frame(maxWidth: .infinity)
+            .padding(.horizontal, 20)
+            .padding(.top, 16)
+            .padding(.bottom, 36)
         }
         .sheet(isPresented: $showShareSheet) {
             if let image = renderedImage {
@@ -1510,15 +1519,12 @@ private struct JournalCardPreviewOverlay: View {
             action()
         } label: {
             Text(label)
-                .font(.custom(DinoTheme.customFontName, size: 14))
-                .foregroundColor(Color(hex: "#2E2A24"))
-                .padding(.horizontal, 18)
-                .padding(.vertical, 12)
-                .background(Color(hex: "#FEFBF3"), in: Capsule())
-                .overlay(
-                    Capsule()
-                        .stroke(Color(hex: "#A8C5A0").opacity(0.6), lineWidth: 1.2)
-                )
+                .font(.custom(DinoTheme.customFontName, size: 15))
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 16)
+                .background(Color(hex: "#A8C5A0"), in: Capsule())
+                .shadow(color: Color.black.opacity(0.18), radius: 8, x: 0, y: 4)
         }
         .buttonStyle(.plain)
     }
