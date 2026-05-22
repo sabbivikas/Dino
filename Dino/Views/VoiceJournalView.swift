@@ -1462,11 +1462,11 @@ private struct JournalCardPreviewOverlay: View {
     @State private var toast: String? = nil
 
     var body: some View {
-        ZStack {
-            Color.black.opacity(0.7).ignoresSafeArea()
+        ZStack(alignment: .bottom) {
+            Color.black.opacity(0.75).ignoresSafeArea()
                 .onTapGesture { dismiss() }
 
-            VStack(spacing: 24) {
+            VStack(spacing: 16) {
                 Spacer()
                 JournalPolaroidCard(entry: entry, index: 0, viewModel: viewModel)
                     .frame(width: 320, height: 400)
@@ -1479,40 +1479,47 @@ private struct JournalCardPreviewOverlay: View {
                         .background(Color.black.opacity(0.7), in: Capsule())
                         .foregroundColor(.white)
                 }
-
-                HStack(spacing: 14) {
-                    Button {
-                        HapticManager.shared.light()
-                        saveToPhotos()
-                    } label: {
-                        Label("save to photos", systemImage: "square.and.arrow.down")
-                            .font(.custom(DinoTheme.customFontName, size: 14))
-                            .foregroundColor(Color(hex: "#2E2A24"))
-                            .padding(.horizontal, 18).padding(.vertical, 12)
-                            .background(Color(hex: "#FEFBF3"), in: Capsule())
-                    }
-                    .buttonStyle(.plain)
-
-                    Button {
-                        HapticManager.shared.light()
-                        shareCard()
-                    } label: {
-                        Label("share", systemImage: "square.and.arrow.up")
-                            .font(.custom(DinoTheme.customFontName, size: 14))
-                            .foregroundColor(Color(hex: "#2E2A24"))
-                            .padding(.horizontal, 18).padding(.vertical, 12)
-                            .background(Color(hex: "#FEFBF3"), in: Capsule())
-                    }
-                    .buttonStyle(.plain)
-                }
-                Spacer().frame(height: 40)
+                Spacer()
             }
+        }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            HStack(spacing: 12) {
+                actionPill(label: "save to photos 📸") {
+                    saveToPhotos()
+                }
+                actionPill(label: "share 🔗") {
+                    shareCard()
+                }
+            }
+            .padding(.horizontal, 24)
+            .padding(.top, 12)
+            .padding(.bottom, 16)
         }
         .sheet(isPresented: $showShareSheet) {
             if let image = renderedImage {
                 ShareSheet(items: [image, "my dino journal entry \u{1F995}\u{1F33F} #dino #mentalhealth #wellness"])
             }
         }
+    }
+
+    @ViewBuilder
+    private func actionPill(label: String, action: @escaping () -> Void) -> some View {
+        Button {
+            HapticManager.shared.light()
+            action()
+        } label: {
+            Text(label)
+                .font(.custom(DinoTheme.customFontName, size: 14))
+                .foregroundColor(Color(hex: "#2E2A24"))
+                .padding(.horizontal, 18)
+                .padding(.vertical, 12)
+                .background(Color(hex: "#FEFBF3"), in: Capsule())
+                .overlay(
+                    Capsule()
+                        .stroke(Color(hex: "#A8C5A0").opacity(0.6), lineWidth: 1.2)
+                )
+        }
+        .buttonStyle(.plain)
     }
 
     @MainActor
