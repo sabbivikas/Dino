@@ -14,6 +14,7 @@ struct JournalEntry: Codable, Identifiable {
     var moodTag: String
     var isFavorite: Bool
     var durationSeconds: Double
+    var photoFileName: String?
 
     init(
         id: UUID = UUID(),
@@ -23,7 +24,8 @@ struct JournalEntry: Codable, Identifiable {
         summary: String = "voice note recorded",
         moodTag: String = "reflective",
         isFavorite: Bool = false,
-        durationSeconds: Double = 0
+        durationSeconds: Double = 0,
+        photoFileName: String? = nil
     ) {
         self.id = id
         self.date = date
@@ -33,6 +35,24 @@ struct JournalEntry: Codable, Identifiable {
         self.moodTag = moodTag
         self.isFavorite = isFavorite
         self.durationSeconds = durationSeconds
+        self.photoFileName = photoFileName
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, date, audioFileName, title, summary, moodTag, isFavorite, durationSeconds, photoFileName
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try c.decode(UUID.self, forKey: .id)
+        self.date = try c.decode(Date.self, forKey: .date)
+        self.audioFileName = try c.decode(String.self, forKey: .audioFileName)
+        self.title = try c.decode(String.self, forKey: .title)
+        self.summary = try c.decode(String.self, forKey: .summary)
+        self.moodTag = try c.decode(String.self, forKey: .moodTag)
+        self.isFavorite = try c.decode(Bool.self, forKey: .isFavorite)
+        self.durationSeconds = try c.decode(Double.self, forKey: .durationSeconds)
+        self.photoFileName = try c.decodeIfPresent(String.self, forKey: .photoFileName)
     }
 
     var formattedDuration: String {

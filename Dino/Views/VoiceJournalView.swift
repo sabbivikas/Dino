@@ -36,8 +36,8 @@ struct VoiceJournalView: View {
 
                         // Composer card
                         JournalComposerCard(
-                            onDevelop: { text, mood in
-                                saveTextEntry(text: text, mood: mood)
+                            onDevelop: { text, mood, image in
+                                saveTextEntry(text: text, mood: mood, image: image)
                             }
                         )
 
@@ -111,7 +111,7 @@ struct VoiceJournalView: View {
         }
     }
 
-    private func saveTextEntry(text: String, mood: String?) {
+    private func saveTextEntry(text: String, mood: String?, image: UIImage?) {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
 
@@ -120,13 +120,16 @@ struct VoiceJournalView: View {
         let dateStr = dateFormatter.string(from: Date())
         let title = "journal entry \u{2014} \(dateStr)"
 
+        let photoFileName = saveComposerPhoto(image)
+
         let entry = JournalEntry(
             date: Date(),
             audioFileName: "",
             title: title,
             summary: trimmed,
             moodTag: mood ?? "reflective",
-            durationSeconds: 0
+            durationSeconds: 0,
+            photoFileName: photoFileName
         )
         dataManager.addJournalEntry(entry)
         AnalyticsManager.shared.trackJournalEntryCreated(type: "text")
@@ -136,6 +139,29 @@ struct VoiceJournalView: View {
             #selector(UIResponder.resignFirstResponder),
             to: nil, from: nil, for: nil
         )
+    }
+
+    private func saveComposerPhoto(_ image: UIImage?) -> String? {
+        guard let image = image,
+              let data = image.jpegData(compressionQuality: 0.85) else { return nil }
+        let name = "journal_photo_\(UUID().uuidString).jpg"
+        let url = FileManager.default
+            .urls(for: .documentDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent(name)
+        do {
+            try data.write(to: url, options: .atomic)
+        } catch {
+            return nil
+        }
+        try? FileManager.default.setAttributes(
+            [.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication],
+            ofItemAtPath: url.path
+        )
+        var mutableURL = url
+        var resVals = URLResourceValues()
+        resVals.isExcludedFromBackup = true
+        try? mutableURL.setResourceValues(resVals)
+        return name
     }
 }
 
@@ -179,7 +205,7 @@ private struct JournalPaperBackdrop: View {
 
 // MARK: - Journal Composer Card
 private struct JournalComposerCard: View {
-    let onDevelop: (String, String?) -> Void
+    let onDevelop: (String, String?, UIImage?) -> Void
 
     @State private var promptIndex: Int = 0
     @State private var composerText: String = ""
@@ -370,6 +396,7 @@ private struct JournalComposerCard: View {
                         }
                         let textToSave = composerText
                         let moodToSave = selectedMood
+                        let imageToSave = selectedImage
                         let trimmed = textToSave.trimmingCharacters(in: .whitespacesAndNewlines)
                         guard !trimmed.isEmpty else {
                             #if DEBUG
@@ -381,9 +408,10 @@ private struct JournalComposerCard: View {
                         print("[Develop] Saving entry, chars=\(trimmed.count)")
                         #endif
                         HapticManager.shared.success()
-                        onDevelop(textToSave, moodToSave)
+                        onDevelop(textToSave, moodToSave, imageToSave)
                         composerText = ""
                         selectedMood = nil
+                        selectedImage = nil
                     }) {
                         HStack(spacing: 6) {
                             Text("develop")
@@ -625,6 +653,7 @@ struct JournalPolaroidCard: View {
 
     @State private var flipped: Bool = false  // front face shows first
     @State private var visible: Bool = false
+    @State private var loadedPhoto: UIImage? = nil
 
     private var rotation: Double {
         let v = Double((entry.id.hashValue % 80) - 40) / 10.0
@@ -688,6 +717,7 @@ struct JournalPolaroidCard: View {
         .offset(y: visible ? 0 : -30)
         .scaleEffect(visible ? 1 : 0.9)
         .onAppear {
+            loadPhotoIfNeeded()
             if reduceMotion {
                 visible = true
             } else {
@@ -736,40 +766,24 @@ struct JournalPolaroidCard: View {
                     .padding(.top, 6)
 
                 // Photo region
-                ZStack(alignment: .bottom) {
-                    ZStack {
-                        moodPhotoGradient(entry.moodTag)
-                        MoodVignette(kind: moodVignetteKind(entry.moodTag))
-                    }
+                photoArea
                     .frame(width: 140, height: 140)
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
-
-                    // Vellum snippet bar — shows truncated journal text
-                    Rectangle()
-                        .fill(DinoTheme.paper.opacity(0.82))
-                        .frame(width: 140, height: 24)
-                        .overlay(
-                            Text(snippetText)
-                                .font(.system(size: 11))
-                                .foregroundColor(Color(hex: "#3D3A35"))
-                                .lineLimit(1)
-                                .truncationMode(.tail)
-                                .padding(.horizontal, 6),
-                            alignment: .center
-                        )
-                        .clipShape(RoundedRectangle(cornerRadius: 4))
-                        .padding(.bottom, 4)
-                }
-                .frame(width: 140, height: 140)
 
                 // Caption — friendly lowercase title with floral accent
                 Text(friendlyCaption)
                     .font(.custom(DinoTheme.customFontName, size: 14))
                     .foregroundColor(Color(hex: "#3D3A35"))
-                    .lineLimit(2)
+                    .lineLimit(loadedPhoto == nil ? 2 : 1)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 10)
                     .padding(.top, 4)
+
+                if loadedPhoto != nil {
+                    Text(shortDate)
+                        .font(.system(size: 10))
+                        .tracking(0.5)
+                        .foregroundColor(Color(hex: "#A8A29A"))
+                }
 
                 Spacer(minLength: 0)
             }
@@ -801,6 +815,89 @@ struct JournalPolaroidCard: View {
                     Spacer()
                 }
             }
+        }
+    }
+
+    private var photoArea: some View {
+        ZStack(alignment: .bottomLeading) {
+            ZStack {
+                if let photo = loadedPhoto {
+                    Image(uiImage: photo)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: 140, height: 140)
+                        .clipped()
+                    // Soft vignette to match polaroid feel
+                    RadialGradient(
+                        colors: [.clear, Color.black.opacity(0.22)],
+                        center: .center,
+                        startRadius: 40,
+                        endRadius: 95
+                    )
+                    .allowsHitTesting(false)
+                } else {
+                    ZStack {
+                        moodPhotoGradient(entry.moodTag)
+                        MoodVignette(kind: moodVignetteKind(entry.moodTag))
+                    }
+
+                    // Vellum snippet bar — shows truncated journal text (no-photo state)
+                    VStack {
+                        Spacer()
+                        Rectangle()
+                            .fill(DinoTheme.paper.opacity(0.82))
+                            .frame(height: 24)
+                            .overlay(
+                                Text(snippetText)
+                                    .font(.system(size: 11))
+                                    .foregroundColor(Color(hex: "#3D3A35"))
+                                    .lineLimit(1)
+                                    .truncationMode(.tail)
+                                    .padding(.horizontal, 6),
+                                alignment: .center
+                            )
+                            .clipShape(RoundedRectangle(cornerRadius: 4))
+                            .padding(.bottom, 4)
+                            .padding(.horizontal, 0)
+                    }
+                }
+            }
+            .frame(width: 140, height: 140)
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(Color(hex: "#3C2814").opacity(0.08), lineWidth: 1)
+            )
+
+            // Mood emoji badge (only on photo state)
+            if loadedPhoto != nil {
+                Text(moodEmoji(entry.moodTag))
+                    .font(.system(size: 15))
+                    .frame(width: 26, height: 26)
+                    .background(
+                        Circle()
+                            .fill(DinoTheme.paper.opacity(0.92))
+                            .overlay(Circle().stroke(Color(hex: "#3C2814").opacity(0.08), lineWidth: 1))
+                            .shadow(color: Color(hex: "#3C2814").opacity(0.25), radius: 1.5, y: 1)
+                    )
+                    .padding(8)
+            }
+        }
+    }
+
+    private var shortDate: String {
+        let f = DateFormatter()
+        f.dateFormat = "MMM d"
+        return f.string(from: entry.date).lowercased()
+    }
+
+    private func loadPhotoIfNeeded() {
+        guard loadedPhoto == nil, let name = entry.photoFileName else { return }
+        let url = FileManager.default
+            .urls(for: .documentDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent(name)
+        if let img = UIImage(contentsOfFile: url.path) {
+            loadedPhoto = img
         }
     }
 }
@@ -1264,6 +1361,20 @@ private struct MoodSheet: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(DinoTheme.paper)
+    }
+}
+
+@MainActor
+fileprivate func moodEmoji(_ tag: String) -> String {
+    switch tag.lowercased() {
+    case "happy", "joyful", "bright": return "😊"
+    case "calm", "peaceful", "content": return "🌿"
+    case "grateful", "warm": return "🌼"
+    case "reflective", "thoughtful", "dreamy": return "✨"
+    case "anxious", "stressed": return "⚡️"
+    case "okay", "flat": return "😐"
+    case "sad", "low": return "🌧"
+    default: return "🌿"
     }
 }
 
