@@ -688,6 +688,7 @@ struct JournalPolaroidCard: View {
     let index: Int
     @ObservedObject var viewModel: JournalViewModel
     var onLongPress: ((JournalEntry) -> Void)? = nil
+    var preloadedPhoto: UIImage? = nil
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -865,7 +866,7 @@ struct JournalPolaroidCard: View {
     private var photoArea: some View {
         ZStack(alignment: .bottomLeading) {
             ZStack {
-                if let photo = loadedPhoto {
+                if let photo = preloadedPhoto ?? loadedPhoto {
                     Image(uiImage: photo)
                         .resizable()
                         .scaledToFill()
@@ -1524,10 +1525,24 @@ private struct JournalCardPreviewOverlay: View {
 
     @MainActor
     private func render() -> UIImage? {
-        let card = JournalPolaroidCard(entry: entry, index: 0, viewModel: viewModel)
-            .frame(width: 320, height: 400)
+        var photoImage: UIImage? = nil
+        if let fileName = entry.photoFileName {
+            let url = FileManager.default
+                .urls(for: .documentDirectory, in: .userDomainMask)[0]
+                .appendingPathComponent(fileName)
+            photoImage = UIImage(contentsOfFile: url.path)
+        }
+
+        let card = JournalPolaroidCard(
+            entry: entry,
+            index: 0,
+            viewModel: viewModel,
+            preloadedPhoto: photoImage
+        )
+        .frame(width: 320, height: 400)
+
         let renderer = ImageRenderer(content: card)
-        renderer.scale = UIScreen.main.scale
+        renderer.scale = 3.0
         return renderer.uiImage
     }
 
