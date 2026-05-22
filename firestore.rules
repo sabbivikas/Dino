@@ -17,5 +17,9 @@ service cloud.firestore {
       allow read: if request.auth != null && request.auth.uid == uid;
       allow write: if false;
     }
+
+    match /emailQueue/{docId} {
+      allow read, write: if false;
+    }
   }
 }
