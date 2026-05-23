@@ -20,12 +20,13 @@ final class WeeklyCheckInService {
         questionsAndAnswers: [(String, Int)],
         previousScores: [String: Int]? = nil
     ) async -> WeeklyReport {
-        guard let apiKey = readAPIKey(), !apiKey.isEmpty else {
-            #if DEBUG
-            print("\u{1F995} WeeklyCheckInService: no OPENAI_API_KEY in Info.plist \u{2014} returning mock")
-            #endif
+        let resolvedKey = readAPIKey() ?? ""
+        print("🦕 API KEY FOUND: \(!resolvedKey.isEmpty)")
+        guard !resolvedKey.isEmpty else {
+            print("🦕 USING MOCK - reason: OPENAI_API_KEY missing from Info.plist (Secrets.xcconfig not wired)")
             return mockReport()
         }
+        let apiKey = resolvedKey
 
         guard let url = URL(string: "https://api.openai.com/v1/chat/completions") else {
             return mockReport()
@@ -57,6 +58,7 @@ final class WeeklyCheckInService {
         }
         request.httpBody = httpBody
 
+        print("🦕 USING REAL API")
         do {
             let (data, response) = try await URLSession.shared.data(for: request)
             guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
@@ -68,9 +70,7 @@ final class WeeklyCheckInService {
             }
             return decodeReport(from: data) ?? mockReport()
         } catch {
-            #if DEBUG
-            print("\u{1F995} WeeklyCheckInService: network error \(error.localizedDescription) \u{2014} falling back to mock")
-            #endif
+            print("🦕 USING MOCK - reason: \(error)")
             return mockReport()
         }
     }
