@@ -9,7 +9,10 @@
 import SwiftUI
 
 struct AssessmentView: View {
+    @EnvironmentObject var dataManager: SharedDataManager
+
     var body: some View {
         WeeklyCheckInView()
+            .environmentObject(dataManager)
     }
 }
