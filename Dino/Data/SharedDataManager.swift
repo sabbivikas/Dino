@@ -84,6 +84,9 @@ final class SharedDataManager: ObservableObject {
     @Published var assessmentResults: [AssessmentResult] {
         didSet { save(assessmentResults, forKey: userKey("assessmentResults")) }
     }
+    @Published var weeklyCheckIns: [WeeklyCheckInResult] {
+        didSet { save(weeklyCheckIns, forKey: userKey("weeklyCheckIns")) }
+    }
     @Published var streakData: StreakData {
         didSet { save(streakData, forKey: userKey("streakData")) }
     }
@@ -158,6 +161,7 @@ final class SharedDataManager: ObservableObject {
         self.focusSessions = Self.load([FocusSession].self, from: ud, key: Self.staticUserKey(uid, "focusSessions")) ?? []
         self.meditationSessions = Self.load([MeditationSession].self, from: ud, key: Self.staticUserKey(uid, "meditationSessions")) ?? []
         self.assessmentResults = Self.load([AssessmentResult].self, from: ud, key: Self.staticUserKey(uid, "assessmentResults")) ?? []
+        self.weeklyCheckIns = Self.load([WeeklyCheckInResult].self, from: ud, key: Self.staticUserKey(uid, "weeklyCheckIns")) ?? []
         self.streakData = Self.load(StreakData.self, from: ud, key: Self.staticUserKey(uid, "streakData")) ?? StreakData()
         self.growthStats = Self.load(GrowthStats.self, from: ud, key: Self.staticUserKey(uid, "growthStats")) ?? GrowthStats()
 
@@ -282,6 +286,7 @@ final class SharedDataManager: ObservableObject {
         focusSessions = Self.load([FocusSession].self, from: ud, key: userKey("focusSessions")) ?? []
         meditationSessions = Self.load([MeditationSession].self, from: ud, key: userKey("meditationSessions")) ?? []
         assessmentResults = Self.load([AssessmentResult].self, from: ud, key: userKey("assessmentResults")) ?? []
+        weeklyCheckIns = Self.load([WeeklyCheckInResult].self, from: ud, key: userKey("weeklyCheckIns")) ?? []
         streakData = Self.load(StreakData.self, from: ud, key: userKey("streakData")) ?? StreakData()
         growthStats = Self.load(GrowthStats.self, from: ud, key: userKey("growthStats")) ?? GrowthStats()
 
@@ -304,6 +309,7 @@ final class SharedDataManager: ObservableObject {
         focusSessions = []
         meditationSessions = []
         assessmentResults = []
+        weeklyCheckIns = []
         streakData = StreakData()
         growthStats = GrowthStats()
         dinoSkin = "default"
@@ -493,6 +499,19 @@ final class SharedDataManager: ObservableObject {
     func saveAssessmentResult(_ result: AssessmentResult) {
         assessmentResults.insert(result, at: 0)
         recordActivity()
+    }
+
+    // MARK: - Weekly Check-In
+    func addWeeklyCheckIn(_ result: WeeklyCheckInResult) {
+        // Replace any previous entry for the same week/year, then sort newest first.
+        weeklyCheckIns.removeAll { $0.weekNumber == result.weekNumber && $0.year == result.year }
+        weeklyCheckIns.insert(result, at: 0)
+        weeklyCheckIns.sort { $0.completedAt > $1.completedAt }
+        recordActivity()
+    }
+
+    func latestCheckIn() -> WeeklyCheckInResult? {
+        weeklyCheckIns.first
     }
 
     // MARK: - Self-care

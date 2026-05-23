@@ -181,6 +181,10 @@ final class AnalyticsManager {
         capture("assessment_completed", properties: ["score": score])
     }
 
+    func trackScreenViewed(_ screen: String) {
+        capture("screen_viewed", properties: ["screen": screen])
+    }
+
     // MARK: - Focus
 
     func trackFocusSessionStarted(duration: Int) {
@@ -259,12 +263,6 @@ final class AnalyticsManager {
             "condition": condition,
             "temp": temp
         ])
-    }
-
-    // MARK: - Screens & Sessions
-
-    func trackScreenViewed(_ screen: String) {
-        capture("screen_viewed", properties: ["screen": screen])
     }
 
     func trackAppOpened() {
