@@ -25,9 +25,9 @@ enum CheckInAIError: LocalizedError {
 final class CheckInAIService {
     static let shared = CheckInAIService()
 
-    // TODO: paste your OpenAI key here locally after pulling — do not commit.
-    // For production, wire OPENAI_API_KEY via Secrets.xcconfig and read from Bundle.main.
-    private let apiKey = ""
+    // Key is read from LocalSecrets.openAIKey — that file is intended to be
+    // edited locally and ignored via `git update-index --skip-worktree`.
+    private let apiKey = LocalSecrets.openAIKey
 
     private let endpoint = URL(string: "https://api.openai.com/v1/chat/completions")!
     private let model = "gpt-4o"
