@@ -171,3 +171,121 @@ export const processEmailQueue = onSchedule(
     functions.logger.info(`processEmailQueue: sent=${sent} failed=${failed} batch=${snap.docs.length}`);
   }
 );
+
+
+interface ReportRequest {
+  questions: string[];
+  answers: number[];
+  weekNumber: number;
+  year?: number;
+  dateRange?: string;
+  previousScores?: Record<string, number>;
+}
+
+const WEEKLY_REPORT_SYSTEM_PROMPT = `You are Dino, a warm and empathetic mental wellness companion. You analyze weekly mental health check-in responses and generate caring, insightful wellness reports. Your tone is warm, personal, and encouraging — never clinical or alarming. Always remind users this is a reflection tool not a diagnosis.`;
+
+export const generateWeeklyReport = onCall(
+  { secrets: [OPENAI_API_KEY], timeoutSeconds: 60, memory: "512MiB" },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "sign in required");
+    }
+    const uid = request.auth.uid;
+    const data = request.data as ReportRequest | undefined;
+    if (
+      !data ||
+      !Array.isArray(data.questions) ||
+      !Array.isArray(data.answers) ||
+      data.questions.length === 0 ||
+      data.questions.length !== data.answers.length ||
+      data.questions.length > 20
+    ) {
+      throw new HttpsError("invalid-argument", "invalid questions/answers");
+    }
+    const weekNumber = Number(data.weekNumber);
+    const year = Number(data.year ?? new Date().getUTCFullYear());
+    if (!Number.isInteger(weekNumber) || weekNumber < 1 || weekNumber > 53) {
+      throw new HttpsError("invalid-argument", "invalid weekNumber");
+    }
+    const dateRange = String(data.dateRange ?? "");
+
+    const db = admin.firestore();
+    const reportRef = db
+      .collection("weekly_reports")
+      .doc(uid)
+      .collection("weeks")
+      .doc(`${year}-w${weekNumber}`);
+
+    const existing = await reportRef.get();
+    if (existing.exists) {
+      throw new HttpsError("already-exists", "report for this week already exists");
+    }
+
+    const lines: string[] = [];
+    lines.push(`A user completed their weekly mental health check-in (Week ${weekNumber}, ${dateRange}). Here are their responses:`);
+    lines.push("");
+    const labels = ["not at all", "several days", "more than half the days", "nearly every day"];
+    data.questions.forEach((q, i) => {
+      const ans = Math.max(0, Math.min(3, Number(data.answers[i] ?? 0)));
+      lines.push(`Q${i + 1}: ${q}`);
+      lines.push(`A: ${labels[ans]} (${ans}/3)`);
+    });
+    lines.push("");
+    if (data.previousScores && Object.keys(data.previousScores).length > 0) {
+      lines.push(`Previous week scores: ${JSON.stringify(data.previousScores)}`);
+    } else {
+      lines.push(`Previous week scores: none (first check-in)`);
+    }
+    lines.push("");
+    lines.push(`Generate a JSON response with this exact structure:`);
+    lines.push(`{
+  "overallScore": number 0-100,
+  "overallLabel": string,
+  "overallEmoji": string,
+  "moodEnergyScore": number 0-100,
+  "moodEnergyInsight": string,
+  "anxietyStressScore": number 0-100,
+  "anxietyStressInsight": string,
+  "wellbeingScore": number 0-100,
+  "wellbeingInsight": string,
+  "weeklyReflection": string,
+  "trend": "improved" | "stable" | "needs attention",
+  "trendNote": string
+}`);
+    const userPrompt = lines.join("\n");
+
+    try {
+      const openai = new OpenAI({ apiKey: OPENAI_API_KEY.value() });
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o",
+        response_format: { type: "json_object" },
+        messages: [
+          { role: "system", content: WEEKLY_REPORT_SYSTEM_PROMPT },
+          { role: "user", content: userPrompt },
+        ],
+      });
+      const content = completion.choices[0]?.message?.content;
+      if (!content) {
+        throw new HttpsError("internal", "OpenAI returned no content");
+      }
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(content);
+      } catch {
+        throw new HttpsError("internal", "OpenAI response was not valid JSON");
+      }
+      await reportRef.set({
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        weekNumber,
+        year,
+        dateRange,
+      });
+      return parsed;
+    } catch (err) {
+      if (err instanceof HttpsError) throw err;
+      const message = err instanceof Error ? err.message : "OpenAI request failed";
+      throw new HttpsError("internal", message);
+    }
+  }
+);
+

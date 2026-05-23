@@ -108,14 +108,26 @@ struct WeeklyCheckInView: View {
         withAnimation { phase = .generating }
         let answered = answers.map { $0 ?? 0 }
         let prev = dataManager.weeklyCheckIns.first
+        let previousScores: [String: Int]?
+        if let p = prev {
+            previousScores = [
+                "overallScore": p.report.overallScore,
+                "moodEnergyScore": p.report.moodEnergyScore,
+                "anxietyStressScore": p.report.anxietyStressScore,
+                "wellbeingScore": p.report.wellbeingScore,
+            ]
+        } else {
+            previousScores = nil
+        }
         Task {
             do {
                 let report = try await CheckInAIService.shared.generateReport(
                     weekNumber: weekNumber,
+                    year: year,
                     dateRange: dateRange,
                     questions: questions,
                     answers: answered,
-                    previous: prev
+                    previousScores: previousScores
                 )
                 let result = WeeklyCheckInResult(
                     weekNumber: weekNumber,

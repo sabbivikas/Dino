@@ -29,3 +29,6 @@ firebase-rules-tests/node_modules/
 
 # Secrets — do not commit (contains real API keys)
 Secrets.xcconfig
+
+# Safety net: local-only secrets file should never be tracked
+Dino/LocalSecrets.swift
