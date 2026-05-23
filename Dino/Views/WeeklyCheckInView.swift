@@ -33,6 +33,8 @@ struct WeeklyCheckInView: View {
     @State private var answers: [Int?] = []
     @State private var currentIndex: Int = 0
     @State private var errorText: String?
+    @State private var showErrorAlert: Bool = false
+    @State private var errorMessage: String = ""
 
     // Week metadata, computed once.
     private let weekNumber: Int
@@ -93,6 +95,11 @@ struct WeeklyCheckInView: View {
             .transition(.opacity)
         }
         .onAppear { AnalyticsManager.shared.trackAssessmentStarted() }
+        .alert("something went wrong", isPresented: $showErrorAlert) {
+            Button("ok") { }
+        } message: {
+            Text(errorMessage)
+        }
     }
 
     // MARK: - Flow
@@ -104,7 +111,10 @@ struct WeeklyCheckInView: View {
     }
 
     private func finishAndGenerate() {
+        print("🦕 CHECK-IN: starting generation")
         errorText = nil
+        showErrorAlert = false
+        errorMessage = ""
         withAnimation { phase = .generating }
         let answered = answers.map { $0 ?? 0 }
         let prev = dataManager.weeklyCheckIns.first
@@ -149,12 +159,15 @@ struct WeeklyCheckInView: View {
                     withAnimation { phase = .report(result) }
                 }
             } catch {
+                let msg = error.localizedDescription.isEmpty ? "report generation failed (no error message)" : error.localizedDescription
                 #if DEBUG
-                print("[CheckIn] FAILED: \(error)")
-                print("[CheckIn]   localizedDescription: \(error.localizedDescription)")
+                print("🦕 CHECK-IN: FAILED — \(error)")
+                print("🦕 CHECK-IN:   localizedDescription: \(msg)")
                 #endif
                 await MainActor.run {
-                    errorText = error.localizedDescription.isEmpty ? "report generation failed (no error message)" : error.localizedDescription
+                    errorText = msg
+                    errorMessage = msg
+                    showErrorAlert = true
                 }
             }
         }
