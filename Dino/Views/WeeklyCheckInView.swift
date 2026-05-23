@@ -498,29 +498,33 @@ private struct GeneratingView: View {
                     }
                 }
                 .padding(.top, 24)
-                .onAppear { animateDots() }
+                .task { await animateDots() }
             }
 
             Spacer()
         }
-        .onAppear { startStages() }
+        .task { await runStages() }
     }
 
-    private func startStages() {
-        Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { timer in
-            withAnimation {
-                stageIndex = (stageIndex + 1) % stages.count
-            }
-            if errorText != nil { timer.invalidate() }
+    @MainActor
+    private func runStages() async {
+        var index = stageIndex
+        while !Task.isCancelled {
+            try? await Task.sleep(nanoseconds: 2_000_000_000)
+            guard !Task.isCancelled, errorText == nil else { return }
+            index = (index + 1) % stages.count
+            withAnimation { stageIndex = index }
         }
     }
 
-    private func animateDots() {
-        Timer.scheduledTimer(withTimeInterval: 0.4, repeats: true) { timer in
+    @MainActor
+    private func animateDots() async {
+        while !Task.isCancelled {
+            try? await Task.sleep(nanoseconds: 400_000_000)
+            guard !Task.isCancelled, errorText == nil else { return }
             withAnimation(.easeInOut(duration: 0.4)) {
                 dotPhase = CGFloat((Int(dotPhase) + 1) % 3)
             }
-            if errorText != nil { timer.invalidate() }
         }
     }
 }
