@@ -137,8 +137,6 @@ class NotificationManager: ObservableObject {
         if dailyCheckInEnabled { scheduleDailyCheckIn() }
         if streakReminderEnabled { scheduleStreakReminder() }
         if windDownEnabled { scheduleWindDown() }
-        // Weekly check-in reminder rides on the master daily check-in toggle.
-        if dailyCheckInEnabled { scheduleWeeklyCheckInReminder() }
     }
 
     // MARK: - Wind-down (configurable — routines + custom time)
@@ -259,29 +257,6 @@ class NotificationManager: ObservableObject {
         ("you've been showing up", "keep the momentum going today"),
         ("just one moment today", "your future self will thank you"),
     ]
-
-    func scheduleWeeklyCheckInReminder() {
-        guard notificationsEnabled, hasPermission, dailyCheckInEnabled else { return }
-        let content = UNMutableNotificationContent()
-        content.title = "weekly check-in"
-        content.body = "take a few minutes to reflect on your week 🌿"
-        content.sound = .default
-
-        var dc = DateComponents()
-        dc.weekday = 1 // Sunday
-        dc.hour = 19
-        dc.minute = 0
-
-        let trigger = UNCalendarNotificationTrigger(dateMatching: dc, repeats: true)
-        let request = UNNotificationRequest(identifier: "weekly_checkin_reminder", content: content, trigger: trigger)
-        UNUserNotificationCenter.current().add(request) { error in
-            if let error = error {
-                #if DEBUG
-                print("[Notifications] weekly check-in schedule error: \(error.localizedDescription)")
-                #endif
-            }
-        }
-    }
 
     private func scheduleStreakReminder() {
         let dayOfYear = Calendar.current.ordinality(of: .day, in: .year, for: Date()) ?? 0

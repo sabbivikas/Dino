@@ -12,6 +12,7 @@
 		1D2444BE2F9BF8DA00A7CD7E /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = FB000020GOOGLESIGNIN0001 /* GoogleSignIn */; };
 		1D2444BF2F9BF8DA00A7CD7E /* GoogleSignInSwift in Frameworks */ = {isa = PBXBuildFile; productRef = FB000021GOOGLESIGNINUI01 /* GoogleSignInSwift */; };
 		1D2444C02F9BF8DA00A7CD7E /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = FB000012FIRESTOREPROD01 /* FirebaseFirestore */; };
+		1D2D2E692FC161B1002BF79B /* FirebaseFunctions in Frameworks */ = {isa = PBXBuildFile; productRef = 1D2D2E682FC161B1002BF79B /* FirebaseFunctions */; };
 		1DE98E532FB82FF80005AC59 /* PostHog in Frameworks */ = {isa = PBXBuildFile; productRef = 1DE98E522FB82FF80005AC59 /* PostHog */; };
 		AA000021AAAA000000000001 /* DinoLiveActivityExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = AA000011AAAA000000000001 /* DinoLiveActivityExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
@@ -115,6 +116,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				1D2444C02F9BF8DA00A7CD7E /* FirebaseFirestore in Frameworks */,
+				1D2D2E692FC161B1002BF79B /* FirebaseFunctions in Frameworks */,
 				1D2444BF2F9BF8DA00A7CD7E /* GoogleSignInSwift in Frameworks */,
 				1D2444BE2F9BF8DA00A7CD7E /* GoogleSignIn in Frameworks */,
 				1DE98E532FB82FF80005AC59 /* PostHog in Frameworks */,
@@ -223,6 +225,7 @@
 				FB000021GOOGLESIGNINUI01 /* GoogleSignInSwift */,
 				FB000012FIRESTOREPROD01 /* FirebaseFirestore */,
 				1DE98E522FB82FF80005AC59 /* PostHog */,
+				1D2D2E682FC161B1002BF79B /* FirebaseFunctions */,
 			);
 			productName = Dino;
 			productReference = E1CF602D2F73C55B008D5746 /* Dino.app */;
@@ -799,6 +802,11 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		1D2D2E682FC161B1002BF79B /* FirebaseFunctions */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = FB000001FIREBASE000000001 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseFunctions;
+		};
 		1DE98E522FB82FF80005AC59 /* PostHog */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 1DE98E502FB823480005AC59 /* XCRemoteSwiftPackageReference "posthog-ios" */;
