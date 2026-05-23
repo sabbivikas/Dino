@@ -121,6 +121,9 @@ struct WeeklyCheckInView: View {
         }
         Task {
             do {
+                #if DEBUG
+                print("[CheckIn] finishAndGenerate Task started")
+                #endif
                 let report = try await CheckInAIService.shared.generateReport(
                     weekNumber: weekNumber,
                     year: year,
@@ -129,6 +132,9 @@ struct WeeklyCheckInView: View {
                     answers: answered,
                     previousScores: previousScores
                 )
+                #if DEBUG
+                print("[CheckIn] got report back — transitioning to .report phase")
+                #endif
                 let result = WeeklyCheckInResult(
                     weekNumber: weekNumber,
                     year: year,
@@ -143,8 +149,12 @@ struct WeeklyCheckInView: View {
                     withAnimation { phase = .report(result) }
                 }
             } catch {
+                #if DEBUG
+                print("[CheckIn] FAILED: \(error)")
+                print("[CheckIn]   localizedDescription: \(error.localizedDescription)")
+                #endif
                 await MainActor.run {
-                    errorText = error.localizedDescription
+                    errorText = error.localizedDescription.isEmpty ? "report generation failed (no error message)" : error.localizedDescription
                 }
             }
         }

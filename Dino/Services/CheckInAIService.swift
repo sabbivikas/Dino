@@ -41,7 +41,13 @@ final class CheckInAIService {
         answers: [Int],
         previousScores: [String: Int]?
     ) async throws -> WeeklyReport {
+        #if DEBUG
+        print("[CheckIn] generateReport called week=\(weekNumber) y=\(year) q=\(questions.count) a=\(answers.count)")
+        #endif
         #if canImport(FirebaseFunctions)
+        #if DEBUG
+        print("[CheckIn] FirebaseFunctions available — calling cloud function")
+        #endif
         let functions = Functions.functions(region: "us-central1")
         let callable = functions.httpsCallable("generateWeeklyReport")
 
@@ -74,12 +80,25 @@ final class CheckInAIService {
             throw CheckInAIError.network(error.localizedDescription)
         }
 
+        #if DEBUG
+        print("[CheckIn] cloud function returned. data type: \(type(of: result.data))")
+        #endif
         guard let dict = result.data as? [String: Any] else {
+            #if DEBUG
+            print("[CheckIn] result.data is NOT [String: Any] — raw value: \(String(describing: result.data))")
+            #endif
             throw CheckInAIError.invalidResponse
         }
+        #if DEBUG
+        print("[CheckIn] dict keys: \(Array(dict.keys).sorted())")
+        #endif
         do {
             let data = try JSONSerialization.data(withJSONObject: dict)
-            return try JSONDecoder().decode(WeeklyReport.self, from: data)
+            let report = try JSONDecoder().decode(WeeklyReport.self, from: data)
+            #if DEBUG
+            print("[CheckIn] decoded report — overall=\(report.overallScore) label=\(report.overallLabel)")
+            #endif
+            return report
         } catch {
             #if DEBUG
             print("[CheckIn] decode failed: \(error)")
@@ -87,6 +106,9 @@ final class CheckInAIService {
             throw CheckInAIError.decodeFailed
         }
         #else
+        #if DEBUG
+        print("[CheckIn] FirebaseFunctions NOT linked — throwing notConfigured")
+        #endif
         throw CheckInAIError.notConfigured
         #endif
     }
