@@ -56,6 +56,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		FFFF0001FFFF0001FFFF0001 /* Secrets.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Secrets.xcconfig; sourceTree = "<group>"; };
 		AA000011AAAA000000000001 /* DinoLiveActivityExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = DinoLiveActivityExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		E1CF602D2F73C55B008D5746 /* Dino.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Dino.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		E1CF603C2F73C55D008D5746 /* DinoTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DinoTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -152,6 +153,7 @@
 		E1CF60242F73C55B008D5746 = {
 			isa = PBXGroup;
 			children = (
+				FFFF0001FFFF0001FFFF0001 /* Secrets.xcconfig */,
 				E1CF602F2F73C55B008D5746 /* Dino */,
 				E1CF60602F73C55D008D5746 /* Shared */,
 				AA000030AAAA000000000001 /* DinoLiveActivity */,
@@ -582,6 +584,7 @@
 		};
 		E1CF60512F73C55D008D5746 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = FFFF0001FFFF0001FFFF0001 /* Secrets.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -617,6 +620,7 @@
 		};
 		E1CF60522F73C55D008D5746 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = FFFF0001FFFF0001FFFF0001 /* Secrets.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
