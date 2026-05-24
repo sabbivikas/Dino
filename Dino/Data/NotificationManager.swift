@@ -173,16 +173,8 @@ class NotificationManager: ObservableObject {
         if journal { routines.append("journal") }
         if gratitude { routines.append("gratitude") }
 
-        let messages = [
-            "time to wind down gently",
-            "the day is softening, so can you",
-            "a quiet moment is waiting for you",
-            "close the day kindly",
-            "rest is a practice too",
-        ]
-
         let content = UNMutableNotificationContent()
-        content.title = messages[Calendar.current.component(.dayOfYear, from: Date()) % messages.count]
+        content.title = NudgeLibrary.random(from: NudgeLibrary.windDown)
         if !routines.isEmpty {
             content.body = "tonight: " + routines.joined(separator: " · ")
         }
@@ -212,25 +204,14 @@ class NotificationManager: ObservableObject {
 
     // MARK: - Daily Check-in
 
-    private let checkInMessages = [
-        ("how are you feeling today?", "take a moment to check in with yourself"),
-        ("pause for a second", "your feelings matter. let's check in."),
-        ("hey, how's your day going?", "a quick reflection can make all the difference"),
-        ("a gentle reminder", "you deserve a moment of stillness today"),
-        ("checking in on you", "how's your emotional weather right now?"),
-    ]
-
     private func scheduleDailyCheckIn() {
-        let dayOfYear = Calendar.current.ordinality(of: .day, in: .year, for: Date()) ?? 0
-        let message = checkInMessages[dayOfYear % checkInMessages.count]
-
         var dateComponents = DateComponents()
         dateComponents.hour = checkInHour
         dateComponents.minute = checkInMinute
 
         let content = UNMutableNotificationContent()
-        content.title = message.0
-        content.body = message.1
+        content.title = "dino"
+        content.body = NudgeLibrary.random(from: NudgeLibrary.dailyCheckIn)
         content.sound = .default
         content.categoryIdentifier = "DAILY_CHECKIN"
         content.userInfo = ["action": "mood"]
@@ -251,25 +232,15 @@ class NotificationManager: ObservableObject {
 
     // MARK: - Streak Reminder
 
-    private let streakMessages = [
-        ("keep your streak alive", "one small check-in is all it takes"),
-        ("don't break the chain", "your streak is worth protecting"),
-        ("you've been showing up", "keep the momentum going today"),
-        ("just one moment today", "your future self will thank you"),
-    ]
-
     private func scheduleStreakReminder() {
-        let dayOfYear = Calendar.current.ordinality(of: .day, in: .year, for: Date()) ?? 0
-        let message = streakMessages[dayOfYear % streakMessages.count]
-
         // Schedule for 2 hours after check-in time as a fallback
         var dateComponents = DateComponents()
         dateComponents.hour = min(23, checkInHour + 2)
         dateComponents.minute = checkInMinute
 
         let content = UNMutableNotificationContent()
-        content.title = message.0
-        content.body = message.1
+        content.title = "dino"
+        content.body = NudgeLibrary.random(from: NudgeLibrary.streakReminder)
         content.sound = .default
         content.categoryIdentifier = "STREAK_REMINDER"
         content.userInfo = ["action": "mood"]
@@ -290,24 +261,14 @@ class NotificationManager: ObservableObject {
 
     // MARK: - Wind-down
 
-    private let windDownMessages = [
-        ("time to slow down", "how was your day? let's reflect."),
-        ("the day is winding down", "take a breath before sleep"),
-        ("evening check-in", "what's one thing you're grateful for today?"),
-        ("settling in for the night", "a moment of calm before rest"),
-    ]
-
     private func scheduleWindDown() {
-        let dayOfYear = Calendar.current.ordinality(of: .day, in: .year, for: Date()) ?? 0
-        let message = windDownMessages[dayOfYear % windDownMessages.count]
-
         var dateComponents = DateComponents()
         dateComponents.hour = 21 // 9pm
         dateComponents.minute = 30
 
         let content = UNMutableNotificationContent()
-        content.title = message.0
-        content.body = message.1
+        content.title = "dino"
+        content.body = NudgeLibrary.random(from: NudgeLibrary.windDown)
         content.sound = .default
         content.categoryIdentifier = "WIND_DOWN"
         content.userInfo = ["action": "journal"]
@@ -334,6 +295,17 @@ class NotificationManager: ObservableObject {
         print("[Notifications] streak reminder removed — user already logged mood today")
     }
 
+    /// Any activity (journal, gratitude, breathing, meditation, etc.) cancels the
+    /// evening streak nudge. Lightweight call site for SharedDataManager.
+    func userDidLogActivity() {
+        UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: ["streak_reminder"])
+    }
+
+    /// Called when the app opens — today's daily check-in is no longer needed.
+    func cancelTodaysCheckInIfApplicable() {
+        UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: ["daily_checkin"])
+    }
+
     /// Call this when user opens the app. Re-checks permission and reschedules if needed.
     func userDidOpenApp() {
         UNUserNotificationCenter.current().getNotificationSettings { settings in
@@ -343,10 +315,100 @@ class NotificationManager: ObservableObject {
                 if self.hasPermission && self.notificationsEnabled {
                     self.rescheduleAll()
                     self.scheduleReEngagementIfNeeded()
+                    self.cancelTodaysCheckInIfApplicable()
                 }
                 self.debugPrintPending()
             }
         }
+    }
+
+    // MARK: - Plant Nudges (driven by growth events)
+
+    private static let plantNudgesKey = "dino.plantNudgesEnabled"
+    private static let lastSeenBloomKey = "dino.lastSeenBloomCount"
+    private static let previousStreakKey = "dino.previousStreak"
+
+    var plantNudgesEnabled: Bool {
+        get { UserDefaults.standard.object(forKey: Self.plantNudgesKey) as? Bool ?? true }
+        set { UserDefaults.standard.set(newValue, forKey: Self.plantNudgesKey) }
+    }
+
+    func schedulePlantDyingNudge() {
+        schedulePlantNudge(
+            identifier: "plant_dying_nudge",
+            body: NudgeLibrary.random(from: NudgeLibrary.plantDying),
+            delaySeconds: 3 * 60 * 60
+        )
+    }
+
+    func schedulePlantProgressNudge() {
+        schedulePlantNudge(
+            identifier: "plant_progress_nudge",
+            body: NudgeLibrary.random(from: NudgeLibrary.plantProgressing),
+            delaySeconds: 60
+        )
+    }
+
+    func schedulePlantBloomingNudge() {
+        schedulePlantNudge(
+            identifier: "plant_blooming_nudge",
+            body: NudgeLibrary.random(from: NudgeLibrary.plantBlooming),
+            delaySeconds: 60
+        )
+    }
+
+    private func schedulePlantNudge(identifier: String, body: String, delaySeconds: TimeInterval) {
+        guard notificationsEnabled, plantNudgesEnabled else { return }
+        UNUserNotificationCenter.current().getNotificationSettings { [weak self] settings in
+            guard self != nil else { return }
+            DispatchQueue.main.async {
+                guard Self.isPermissionGranted(settings.authorizationStatus) else { return }
+                let content = UNMutableNotificationContent()
+                content.title = "dino"
+                content.body = body
+                content.sound = .default
+                let trigger = UNTimeIntervalNotificationTrigger(timeInterval: delaySeconds, repeats: false)
+                let request = UNNotificationRequest(identifier: identifier, content: content, trigger: trigger)
+                let center = UNUserNotificationCenter.current()
+                center.removePendingNotificationRequests(withIdentifiers: [identifier])
+                center.add(request) { error in
+                    #if DEBUG
+                    if let error = error {
+                        print("[Nudge] plant schedule failed for \(identifier): \(error)")
+                    } else {
+                        print("[Nudge] plant scheduled \(identifier) in \(Int(delaySeconds))s")
+                    }
+                    #endif
+                }
+            }
+        }
+    }
+
+    /// Inspect growth state and fire the right plant nudge (if any).
+    /// Priority: bloom celebration > progress milestone > dying.
+    /// Bloom proxy = GrowthStats.level (we have no separate bloomCount field).
+    func checkAndSchedulePlantNudge(streakData: StreakData, growthStats: GrowthStats) {
+        let ud = UserDefaults.standard
+        let currentBloom = growthStats.level
+        let lastSeenBloom = ud.integer(forKey: Self.lastSeenBloomKey)
+        if currentBloom > lastSeenBloom {
+            schedulePlantBloomingNudge()
+            ud.set(currentBloom, forKey: Self.lastSeenBloomKey)
+            ud.set(streakData.currentStreak, forKey: Self.previousStreakKey)
+            return
+        }
+        if [7, 14, 21].contains(streakData.currentStreak) {
+            let previous = ud.integer(forKey: Self.previousStreakKey)
+            if previous != streakData.currentStreak {
+                schedulePlantProgressNudge()
+            }
+            ud.set(streakData.currentStreak, forKey: Self.previousStreakKey)
+            return
+        }
+        if streakData.currentStreak == 0 && ud.integer(forKey: Self.previousStreakKey) > 0 {
+            schedulePlantDyingNudge()
+        }
+        ud.set(streakData.currentStreak, forKey: Self.previousStreakKey)
     }
 
     // MARK: - Test Notification

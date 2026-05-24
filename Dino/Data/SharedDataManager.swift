@@ -88,10 +88,16 @@ final class SharedDataManager: ObservableObject {
         didSet { save(weeklyCheckIns, forKey: userKey("weeklyCheckIns")) }
     }
     @Published var streakData: StreakData {
-        didSet { save(streakData, forKey: userKey("streakData")) }
+        didSet {
+            save(streakData, forKey: userKey("streakData"))
+            NotificationManager.shared.checkAndSchedulePlantNudge(streakData: streakData, growthStats: growthStats)
+        }
     }
     @Published var growthStats: GrowthStats {
-        didSet { save(growthStats, forKey: userKey("growthStats")) }
+        didSet {
+            save(growthStats, forKey: userKey("growthStats"))
+            NotificationManager.shared.checkAndSchedulePlantNudge(streakData: streakData, growthStats: growthStats)
+        }
     }
     @Published var dinoSkin: String {
         didSet { defaults.set(dinoSkin, forKey: userKey("dinoSkin")) }
@@ -413,6 +419,7 @@ final class SharedDataManager: ObservableObject {
         journalEntries.insert(entry, at: 0)
         addXP(15)
         recordActivity()
+        NotificationManager.shared.userDidLogActivity()
         scheduleWidgetReload()
     }
 
@@ -444,6 +451,7 @@ final class SharedDataManager: ObservableObject {
         gratitudeNotes.insert(note, at: 0)
         addXP(5)
         recordActivity()
+        NotificationManager.shared.userDidLogActivity()
     }
 
     func deleteGratitudeNote(_ note: GratitudeNote) {
@@ -478,6 +486,7 @@ final class SharedDataManager: ObservableObject {
         breathingSessions.insert(session, at: 0)
         addXP(20)
         recordActivity()
+        NotificationManager.shared.userDidLogActivity()
         scheduleWidgetReload()
     }
 
@@ -493,6 +502,7 @@ final class SharedDataManager: ObservableObject {
         meditationSessions.insert(session, at: 0)
         if session.completed { addXP(20) }
         recordActivity()
+        NotificationManager.shared.userDidLogActivity()
     }
 
     // MARK: - Assessment
