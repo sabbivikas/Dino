@@ -43,6 +43,7 @@ struct GratitudeJarView: View {
 
     // Jar wobble animation state
     @State private var jarWobbleAnimating = false
+    @State private var showSlipsView = false
 
     var body: some View {
         NavigationStack {
@@ -91,6 +92,11 @@ struct GratitudeJarView: View {
                         .rotationEffect(.degrees(jarWobbleAnimating ? 0.6 : -0.6))
                         .offset(y: jarWobbleAnimating ? -2 : 0)
                         .shadow(color: Color(hex: "#2A1A0C").opacity(0.32), radius: 20, x: 0, y: 8)
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            HapticManager.shared.light()
+                            showSlipsView = true
+                        }
                         .onAppear {
                             guard !reduceMotion else { return }
                             withAnimation(
@@ -147,6 +153,10 @@ struct GratitudeJarView: View {
                     .padding(.horizontal, 20)
                     .padding(.bottom, 20)
                 }
+            }
+            .fullScreenCover(isPresented: $showSlipsView) {
+                GratitudeSlipsView()
+                    .environmentObject(dataManager)
             }
             .sheet(isPresented: $viewModel.showAddSheet) {
                 AddGratitudeSheet(viewModel: viewModel, onSaved: {
