@@ -52,6 +52,40 @@ struct SelfCareRemindersView: View {
                 ForEach(selfCareReminders) { r in
                     SelfCareReminderRow(reminder: r)
                 }
+
+                #if DEBUG
+                Button {
+                    print("🦕 TEST BUTTON TAPPED")
+                    let content = UNMutableNotificationContent()
+                    content.title = "dino test"
+                    content.body = "if you see this in 5 seconds, notifications work"
+                    content.sound = .default
+                    let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 5, repeats: false)
+                    let request = UNNotificationRequest(identifier: "dino.test.button", content: content, trigger: trigger)
+                    UNUserNotificationCenter.current().add(request) { error in
+                        if let error = error {
+                            print("🦕 TEST FAILED: \(error)")
+                        } else {
+                            print("🦕 TEST SCHEDULED for 5s")
+                        }
+                    }
+                    NotificationManager.shared.debugNotificationStatus()
+                } label: {
+                    HStack {
+                        Image(systemName: "bell.badge")
+                        Text("test notifications")
+                            .font(.custom(DinoTheme.customFontName, size: 14))
+                    }
+                    .foregroundColor(DinoTheme.textPrimary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .background(
+                        RoundedRectangle(cornerRadius: 12)
+                            .strokeBorder(DinoTheme.cardBorder, lineWidth: 1)
+                    )
+                }
+                .padding(.top, 8)
+                #endif
             }
             .padding(20)
         }
@@ -164,12 +198,14 @@ private struct SelfCareReminderRow: View {
     }
 
     private func schedule() {
+        print("🦕 SCHEDULING: \(reminder.id) at \(hour):\(String(format: "%02d", minute))")
         NotificationManager.shared.setSelfCareReminder(
             id: reminder.id,
             body: reminder.body,
             hour: hour,
             minute: minute
         ) { success in
+            print("🦕 SCHEDULE RESULT for \(reminder.id): success=\(success)")
             if !success {
                 enabled = false
                 showPermissionAlert = true

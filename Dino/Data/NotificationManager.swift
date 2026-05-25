@@ -450,6 +450,22 @@ class NotificationManager: ObservableObject {
         }
     }
 
+    /// Always-on debug — prints permission state and all pending requests.
+    /// Intentionally not gated by #if DEBUG so it shows on TestFlight too.
+    func debugNotificationStatus() {
+        UNUserNotificationCenter.current().getNotificationSettings { settings in
+            print("🦕 NOTIF PERMISSION: \(settings.authorizationStatus.rawValue)")
+            print("🦕 ALERT: \(settings.alertSetting.rawValue)")
+            print("🦕 SOUND: \(settings.soundSetting.rawValue)")
+        }
+        UNUserNotificationCenter.current().getPendingNotificationRequests { requests in
+            print("🦕 PENDING COUNT: \(requests.count)")
+            requests.forEach { r in
+                print("🦕 PENDING: \(r.identifier) | \(r.content.body) | trigger: \(String(describing: r.trigger))")
+            }
+        }
+    }
+
     /// Debug: print all pending notifications
     func debugPrintPending() {
         UNUserNotificationCenter.current().getPendingNotificationRequests { requests in

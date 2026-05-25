@@ -159,6 +159,18 @@ struct DinoApp: App {
                 }
                 .task {
                     notificationManager.userDidOpenApp()
+
+                    // Request permission if not yet decided
+                    let settings = await UNUserNotificationCenter.current().notificationSettings()
+                    if settings.authorizationStatus == .notDetermined {
+                        _ = await notificationManager.requestPermissionDetailed()
+                    } else if settings.authorizationStatus == .authorized
+                              || settings.authorizationStatus == .provisional {
+                        notificationManager.rescheduleAll()
+                    }
+
+                    notificationManager.debugNotificationStatus()
+
                     AnalyticsManager.shared.trackAppOpened()
                     ImageCache.shared.preload(["DinoMascot", "dino-meditation", "DinoFlower-cut", "cut-DinoChecklist", "dino-only"])
                 }
