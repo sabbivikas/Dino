@@ -7,6 +7,17 @@ import Foundation
 import UserNotifications
 import Combine
 
+extension Notification.Name {
+    static let dinoOpenURL = Notification.Name("dinoOpenURL")
+}
+
+/// Holds a deep-link URL set by AppDelegate when a notification is tapped
+/// before ContentView is subscribed. ContentView clears it after handling.
+/// Touched only on the main thread (delegate callback + view lifecycle).
+enum DinoPendingDeepLink {
+    static var url: URL?
+}
+
 @MainActor
 class NotificationManager: ObservableObject {
     static let shared = NotificationManager()
@@ -20,9 +31,6 @@ class NotificationManager: ObservableObject {
     }
     @Published var streakReminderEnabled: Bool {
         didSet { UserDefaults.standard.set(streakReminderEnabled, forKey: "notif_streakReminder"); rescheduleAll() }
-    }
-    @Published var windDownEnabled: Bool {
-        didSet { UserDefaults.standard.set(windDownEnabled, forKey: "notif_windDown"); rescheduleAll() }
     }
     @Published var checkInHour: Int {
         didSet { UserDefaults.standard.set(checkInHour, forKey: "notif_checkInHour"); rescheduleAll() }
@@ -50,7 +58,6 @@ class NotificationManager: ObservableObject {
         self.notificationsEnabled = ud.object(forKey: "notif_enabled") as? Bool ?? true
         self.dailyCheckInEnabled = ud.object(forKey: "notif_dailyCheckIn") as? Bool ?? true
         self.streakReminderEnabled = ud.object(forKey: "notif_streakReminder") as? Bool ?? true
-        self.windDownEnabled = ud.object(forKey: "notif_windDown") as? Bool ?? true
         self.checkInHour = ud.object(forKey: "notif_checkInHour") as? Int ?? 19 // 7pm default
         self.checkInMinute = ud.object(forKey: "notif_checkInMinute") as? Int ?? 0
         self.isInitializing = false
@@ -126,19 +133,20 @@ class NotificationManager: ObservableObject {
         guard !isInitializing else { return }
 
         guard notificationsEnabled && hasPermission else {
-            UNUserNotificationCenter.current().removeAllPendingNotificationRequests()
-            print("[Notifications] disabled or no permission — cleared all pending")
+            // When master OFF or no permission, remove ONLY what this function manages
+            // (NOT winddown.daily, NOT self-care, NOT plant nudges, NOT re_engagement)
+            UNUserNotificationCenter.current().removePendingNotificationRequests(
+                withIdentifiers: ["daily_checkin", "streak_reminder", "selfcare-water", "selfcare-eat"]
+            )
             return
         }
 
-        // Only remove what we manage in this method — preserves self-care, plant nudges, re_engagement, winddown.daily, test_notification
         UNUserNotificationCenter.current().removePendingNotificationRequests(
-            withIdentifiers: ["daily_checkin", "streak_reminder", "wind_down"]
+            withIdentifiers: ["daily_checkin", "streak_reminder"]
         )
 
         if dailyCheckInEnabled { scheduleDailyCheckIn() }
         if streakReminderEnabled { scheduleStreakReminder() }
-        if windDownEnabled { scheduleWindDown() }
 
         #if DEBUG
         printPendingNotifications()
@@ -160,11 +168,6 @@ class NotificationManager: ObservableObject {
             content.body = NudgeLibrary.random(from: NudgeLibrary.streakReminder)
             content.categoryIdentifier = "STREAK_REMINDER"
             content.userInfo = ["action": "mood"]
-        case "wind_down":
-            content.title = "dino 🦕"
-            content.body = NudgeLibrary.random(from: NudgeLibrary.windDown)
-            content.categoryIdentifier = "WIND_DOWN"
-            content.userInfo = ["action": "journal"]
         default:
             return
         }
@@ -305,16 +308,6 @@ class NotificationManager: ObservableObject {
             let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: true)
             scheduleNotification(id: "streak_reminder", trigger: trigger)
         }
-    }
-
-    // MARK: - Wind-down
-
-    private func scheduleWindDown() {
-        var components = DateComponents()
-        components.hour = 21
-        components.minute = 30
-        let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: true)
-        scheduleNotification(id: "wind_down", trigger: trigger)
     }
 
     // MARK: - Smart Skip Logic

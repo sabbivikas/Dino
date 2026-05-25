@@ -73,12 +73,25 @@ struct SettingsView: View {
                             isOn: $notifManager.streakReminderEnabled
                         )
 
-                        SettingsToggle(
-                            icon: "moon.fill",
-                            label: "wind-down",
-                            color: DinoTheme.lavender,
-                            isOn: $notifManager.windDownEnabled
-                        )
+                        NavigationLink {
+                            WindDownView()
+                        } label: {
+                            HStack(spacing: 14) {
+                                Image(systemName: "moon.fill")
+                                    .font(DinoTheme.dinoFont(size: 16))
+                                    .foregroundColor(DinoTheme.lavender)
+                                    .frame(width: 32, height: 32)
+                                    .background(DinoTheme.lavender.opacity(0.12))
+                                    .cornerRadius(8)
+                                Text("wind-down")
+                                    .font(DinoTheme.bodyFont())
+                                    .foregroundColor(DinoTheme.textPrimary)
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundColor(DinoTheme.textSecondary.opacity(0.6))
+                            }
+                        }
                     }
                 } header: {
                     Text("notifications")
@@ -104,7 +117,7 @@ struct SettingsView: View {
                                 Text("self-care reminders")
                                     .font(DinoTheme.bodyFont())
                                     .foregroundColor(DinoTheme.textPrimary)
-                                Text("water, food, rest, check-in")
+                                Text("water, food")
                                     .font(DinoTheme.captionFont())
                                     .foregroundColor(DinoTheme.textSecondary)
                             }

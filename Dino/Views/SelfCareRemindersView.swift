@@ -2,10 +2,10 @@
 //  SelfCareRemindersView.swift
 //  Dino
 //
-//  Four daily self-care nudges (water, eat, wind down, check-in). Toggling
-//  a reminder schedules a repeating UNCalendarNotificationTrigger via
-//  NotificationManager; toggling off cancels it. Permission-denied surfaces
-//  a Settings-deep-link alert and reverts the toggle.
+//  Two daily self-care nudges (water, eat). Toggling a reminder schedules a
+//  repeating UNCalendarNotificationTrigger via NotificationManager; toggling
+//  off cancels it. Permission-denied surfaces a Settings-deep-link alert and
+//  reverts the toggle.
 //
 
 import SwiftUI
@@ -35,20 +35,6 @@ private let selfCareReminders: [SelfCareReminder] = [
         name: "eat something",
         body: "dino noticed it might be lunchtime 🍽 have you eaten something today?",
         defaultHour: 12, defaultMinute: 30
-    ),
-    SelfCareReminder(
-        id: "selfcare-rest",
-        icon: "😴",
-        name: "wind down",
-        body: "time to slow down 🌙 dino is winding down too",
-        defaultHour: 21, defaultMinute: 30
-    ),
-    SelfCareReminder(
-        id: "selfcare-checkin",
-        icon: "🌿",
-        name: "check in with yourself",
-        body: "how are you really doing today? 🌿 take a moment for yourself",
-        defaultHour: 19, defaultMinute: 0
     )
 ]
 
@@ -72,9 +58,6 @@ struct SelfCareRemindersView: View {
         .background(DinoTheme.background.ignoresSafeArea())
         .navigationTitle("self-care reminders")
         .navigationBarTitleDisplayMode(.inline)
-        .task {
-            _ = await NotificationManager.shared.requestPermissionDetailed()
-        }
     }
 }
 
@@ -136,15 +119,6 @@ private struct SelfCareReminderRow: View {
                         enabled = newValue
                         AnalyticsManager.shared.trackSelfCareReminderToggled(type: reminder.id, enabled: newValue)
                         if newValue {
-                            #if DEBUG
-                            let content = UNMutableNotificationContent()
-                            content.title = "dino self-care test 🦕"
-                            content.body = "if you see this, notifications work — your scheduled reminder is queued"
-                            content.sound = .default
-                            let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 10, repeats: false)
-                            let request = UNNotificationRequest(identifier: "dino.selfcare.test", content: content, trigger: trigger)
-                            UNUserNotificationCenter.current().add(request)
-                            #endif
                             schedule()
                         } else {
                             cancel()

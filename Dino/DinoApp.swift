@@ -16,7 +16,51 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
         FirebaseApp.configure()
         print("[App] Firebase configured")
         UNUserNotificationCenter.current().delegate = self
+        registerNotificationCategories()
         return true
+    }
+
+    private func registerNotificationCategories() {
+        let logMoodAction = UNNotificationAction(
+            identifier: "LOG_MOOD",
+            title: "log mood 🌿",
+            options: [.foreground]
+        )
+        let openJournalAction = UNNotificationAction(
+            identifier: "OPEN_JOURNAL",
+            title: "open journal ✍️",
+            options: [.foreground]
+        )
+        let logActivityAction = UNNotificationAction(
+            identifier: "LOG_ACTIVITY",
+            title: "log something 🌱",
+            options: [.foreground]
+        )
+        let startBreathingAction = UNNotificationAction(
+            identifier: "START_BREATHING",
+            title: "breathe with dino 🌬️",
+            options: [.foreground]
+        )
+
+        let checkInCategory = UNNotificationCategory(
+            identifier: "DAILY_CHECKIN",
+            actions: [logMoodAction, openJournalAction],
+            intentIdentifiers: []
+        )
+        let streakCategory = UNNotificationCategory(
+            identifier: "STREAK_REMINDER",
+            actions: [logActivityAction],
+            intentIdentifiers: []
+        )
+        let windDownCategory = UNNotificationCategory(
+            identifier: "WIND_DOWN",
+            actions: [startBreathingAction],
+            intentIdentifiers: []
+        )
+
+        UNUserNotificationCenter.current().setNotificationCategories(
+            [checkInCategory, streakCategory, windDownCategory]
+        )
     }
 
     func application(_ app: UIApplication,
@@ -25,17 +69,45 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
         return GIDSignIn.sharedInstance.handle(url)
     }
 
-    // Handle notification taps
+    // Handle notification taps and action buttons
     func userNotificationCenter(_ center: UNUserNotificationCenter,
                                  didReceive response: UNNotificationResponse,
                                  withCompletionHandler completionHandler: @escaping () -> Void) {
-        let action = response.notification.request.content.userInfo["action"] as? String ?? "home"
-        Task { @MainActor in
-            switch action {
-            case "mood":       SharedDataManager.shared.deepLinkTab = 2
-            case "journal":    SharedDataManager.shared.deepLinkTab = 1
-            case "gratitude":  SharedDataManager.shared.deepLinkTab = 3
-            default:           SharedDataManager.shared.deepLinkTab = 0
+        let identifier = response.actionIdentifier
+        let category = response.notification.request.content.categoryIdentifier
+
+        let path: String?
+        switch identifier {
+        case "LOG_MOOD":
+            path = "dino://mood"
+        case "OPEN_JOURNAL":
+            path = "dino://journal"
+        case "LOG_ACTIVITY":
+            path = "dino://mood"
+        case "START_BREATHING":
+            path = "dino://breathe"
+        case UNNotificationDefaultActionIdentifier:
+            switch category {
+            case "DAILY_CHECKIN":   path = "dino://mood"
+            case "STREAK_REMINDER": path = "dino://mood"
+            case "WIND_DOWN":       path = "dino://breathe"
+            default:
+                let action = response.notification.request.content.userInfo["action"] as? String ?? "home"
+                switch action {
+                case "mood":      path = "dino://mood"
+                case "journal":   path = "dino://journal"
+                case "gratitude": path = "dino://gratitude"
+                default:          path = nil
+                }
+            }
+        default:
+            path = nil
+        }
+
+        if let path = path, let url = URL(string: path) {
+            DinoPendingDeepLink.url = url
+            DispatchQueue.main.async {
+                NotificationCenter.default.post(name: .dinoOpenURL, object: url)
             }
         }
         completionHandler()

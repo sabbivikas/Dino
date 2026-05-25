@@ -40,6 +40,18 @@ struct ContentView: View {
         .onOpenURL { url in
             handleDeepLink(url)
         }
+        .onReceive(NotificationCenter.default.publisher(for: .dinoOpenURL)) { note in
+            if let url = note.object as? URL {
+                handleDeepLink(url)
+                DinoPendingDeepLink.url = nil
+            }
+        }
+        .onAppear {
+            if let url = DinoPendingDeepLink.url {
+                handleDeepLink(url)
+                DinoPendingDeepLink.url = nil
+            }
+        }
         .fullScreenCover(isPresented: $showMonthlyPaintingGenerator) {
             MoodPaintingGeneratorView(
                 month: Date(),
