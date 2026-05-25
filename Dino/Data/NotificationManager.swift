@@ -131,12 +131,63 @@ class NotificationManager: ObservableObject {
             return
         }
 
-        UNUserNotificationCenter.current().removeAllPendingNotificationRequests()
-        print("[Notifications] cleared all pending, rescheduling...")
+        // Only remove what we manage in this method — preserves self-care, plant nudges, re_engagement, winddown.daily, test_notification
+        UNUserNotificationCenter.current().removePendingNotificationRequests(
+            withIdentifiers: ["daily_checkin", "streak_reminder", "wind_down"]
+        )
 
         if dailyCheckInEnabled { scheduleDailyCheckIn() }
         if streakReminderEnabled { scheduleStreakReminder() }
         if windDownEnabled { scheduleWindDown() }
+
+        #if DEBUG
+        printPendingNotifications()
+        #endif
+    }
+
+    private func scheduleNotification(id: String, trigger: UNNotificationTrigger) {
+        let content = UNMutableNotificationContent()
+        content.sound = .default
+
+        switch id {
+        case "daily_checkin":
+            content.title = "dino 🦕"
+            content.body = NudgeLibrary.random(from: NudgeLibrary.dailyCheckIn)
+            content.categoryIdentifier = "DAILY_CHECKIN"
+            content.userInfo = ["action": "mood"]
+        case "streak_reminder":
+            content.title = "dino 🦕"
+            content.body = NudgeLibrary.random(from: NudgeLibrary.streakReminder)
+            content.categoryIdentifier = "STREAK_REMINDER"
+            content.userInfo = ["action": "mood"]
+        case "wind_down":
+            content.title = "dino 🦕"
+            content.body = NudgeLibrary.random(from: NudgeLibrary.windDown)
+            content.categoryIdentifier = "WIND_DOWN"
+            content.userInfo = ["action": "journal"]
+        default:
+            return
+        }
+
+        let request = UNNotificationRequest(identifier: id, content: content, trigger: trigger)
+        UNUserNotificationCenter.current().add(request) { error in
+            #if DEBUG
+            if let error = error {
+                print("[Notifications] \(id) schedule ERROR: \(error)")
+            } else {
+                print("[Notifications] \(id) scheduled with trigger: \(String(describing: trigger))")
+            }
+            #endif
+        }
+    }
+
+    func printPendingNotifications() {
+        UNUserNotificationCenter.current().getPendingNotificationRequests { requests in
+            #if DEBUG
+            print("🦕 PENDING NOTIFICATIONS (\(requests.count)):")
+            requests.forEach { print("  - \($0.identifier): \($0.trigger.map { String(describing: $0) } ?? "no trigger")") }
+            #endif
+        }
     }
 
     // MARK: - Wind-down (configurable — routines + custom time)
@@ -205,109 +256,82 @@ class NotificationManager: ObservableObject {
     // MARK: - Daily Check-in
 
     private func scheduleDailyCheckIn() {
-        var dateComponents = DateComponents()
-        dateComponents.hour = checkInHour
-        dateComponents.minute = checkInMinute
+        var components = DateComponents()
+        components.hour = checkInHour
+        components.minute = checkInMinute
 
-        let content = UNMutableNotificationContent()
-        content.title = "dino"
-        content.body = NudgeLibrary.random(from: NudgeLibrary.dailyCheckIn)
-        content.sound = .default
-        content.categoryIdentifier = "DAILY_CHECKIN"
-        content.userInfo = ["action": "mood"]
+        let alreadyOpenedToday: Bool
+        if let lastOpen = UserDefaults.standard.object(forKey: "dino.lastAppOpenDate") as? Date {
+            alreadyOpenedToday = Calendar.current.isDateInToday(lastOpen)
+        } else {
+            alreadyOpenedToday = false
+        }
 
-        let trigger = UNCalendarNotificationTrigger(dateMatching: dateComponents, repeats: true)
-        let request = UNNotificationRequest(identifier: "daily_checkin", content: content, trigger: trigger)
-
-        UNUserNotificationCenter.current().add(request) { error in
-            #if DEBUG
-            if let error = error {
-                print("[Notifications] daily check-in schedule ERROR: \(error)")
-            } else {
-                print("[Notifications] daily check-in scheduled at \(dateComponents.hour ?? 0):\(String(format: "%02d", dateComponents.minute ?? 0))")
-            }
-            #endif
+        if alreadyOpenedToday, let tomorrow = Calendar.current.date(byAdding: .day, value: 1, to: Date()) {
+            let cal = Calendar.current
+            components.year = cal.component(.year, from: tomorrow)
+            components.month = cal.component(.month, from: tomorrow)
+            components.day = cal.component(.day, from: tomorrow)
+            let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
+            scheduleNotification(id: "daily_checkin", trigger: trigger)
+        } else {
+            let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: true)
+            scheduleNotification(id: "daily_checkin", trigger: trigger)
         }
     }
 
     // MARK: - Streak Reminder
 
     private func scheduleStreakReminder() {
-        // Schedule for 2 hours after check-in time as a fallback
-        var dateComponents = DateComponents()
-        dateComponents.hour = min(23, checkInHour + 2)
-        dateComponents.minute = checkInMinute
+        var components = DateComponents()
+        components.hour = min(23, checkInHour + 2)
+        components.minute = checkInMinute
 
-        let content = UNMutableNotificationContent()
-        content.title = "dino"
-        content.body = NudgeLibrary.random(from: NudgeLibrary.streakReminder)
-        content.sound = .default
-        content.categoryIdentifier = "STREAK_REMINDER"
-        content.userInfo = ["action": "mood"]
+        let activityToday: Bool
+        if let lastActivity = UserDefaults.standard.object(forKey: "dino.lastActivityDate") as? Date {
+            activityToday = Calendar.current.isDateInToday(lastActivity)
+        } else {
+            activityToday = false
+        }
 
-        let trigger = UNCalendarNotificationTrigger(dateMatching: dateComponents, repeats: true)
-        let request = UNNotificationRequest(identifier: "streak_reminder", content: content, trigger: trigger)
-
-        UNUserNotificationCenter.current().add(request) { error in
-            #if DEBUG
-            if let error = error {
-                print("[Notifications] streak reminder schedule ERROR: \(error)")
-            } else {
-                print("[Notifications] streak reminder scheduled at \(dateComponents.hour ?? 0):\(String(format: "%02d", dateComponents.minute ?? 0))")
-            }
-            #endif
+        if activityToday, let tomorrow = Calendar.current.date(byAdding: .day, value: 1, to: Date()) {
+            let cal = Calendar.current
+            components.year = cal.component(.year, from: tomorrow)
+            components.month = cal.component(.month, from: tomorrow)
+            components.day = cal.component(.day, from: tomorrow)
+            let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
+            scheduleNotification(id: "streak_reminder", trigger: trigger)
+        } else {
+            let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: true)
+            scheduleNotification(id: "streak_reminder", trigger: trigger)
         }
     }
 
     // MARK: - Wind-down
 
     private func scheduleWindDown() {
-        var dateComponents = DateComponents()
-        dateComponents.hour = 21 // 9pm
-        dateComponents.minute = 30
-
-        let content = UNMutableNotificationContent()
-        content.title = "dino"
-        content.body = NudgeLibrary.random(from: NudgeLibrary.windDown)
-        content.sound = .default
-        content.categoryIdentifier = "WIND_DOWN"
-        content.userInfo = ["action": "journal"]
-
-        let trigger = UNCalendarNotificationTrigger(dateMatching: dateComponents, repeats: true)
-        let request = UNNotificationRequest(identifier: "wind_down", content: content, trigger: trigger)
-
-        UNUserNotificationCenter.current().add(request) { error in
-            #if DEBUG
-            if let error = error {
-                print("[Notifications] wind-down schedule ERROR: \(error)")
-            } else {
-                print("[Notifications] wind-down scheduled at 21:30")
-            }
-            #endif
-        }
+        var components = DateComponents()
+        components.hour = 21
+        components.minute = 30
+        let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: true)
+        scheduleNotification(id: "wind_down", trigger: trigger)
     }
 
     // MARK: - Smart Skip Logic
 
-    /// Call this when user logs a mood. Removes today's pending streak reminder.
     func userDidLogMood() {
-        UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: ["streak_reminder"])
-        print("[Notifications] streak reminder removed — user already logged mood today")
+        UserDefaults.standard.set(Date(), forKey: "dino.lastActivityDate")
+        print("[Notifications] activity stamped (mood)")
     }
 
-    /// Any activity (journal, gratitude, breathing, meditation, etc.) cancels the
-    /// evening streak nudge. Lightweight call site for SharedDataManager.
     func userDidLogActivity() {
-        UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: ["streak_reminder"])
-    }
-
-    /// Called when the app opens — today's daily check-in is no longer needed.
-    func cancelTodaysCheckInIfApplicable() {
-        UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: ["daily_checkin"])
+        UserDefaults.standard.set(Date(), forKey: "dino.lastActivityDate")
+        print("[Notifications] activity stamped")
     }
 
     /// Call this when user opens the app. Re-checks permission and reschedules if needed.
     func userDidOpenApp() {
+        UserDefaults.standard.set(Date(), forKey: "dino.lastAppOpenDate")
         UNUserNotificationCenter.current().getNotificationSettings { settings in
             Task { @MainActor in
                 self.hasPermission = Self.isPermissionGranted(settings.authorizationStatus)
@@ -315,7 +339,6 @@ class NotificationManager: ObservableObject {
                 if self.hasPermission && self.notificationsEnabled {
                     self.rescheduleAll()
                     self.scheduleReEngagementIfNeeded()
-                    self.cancelTodaysCheckInIfApplicable()
                 }
                 self.debugPrintPending()
             }
