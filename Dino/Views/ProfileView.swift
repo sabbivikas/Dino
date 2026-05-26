@@ -138,6 +138,10 @@ struct ProfileView: View {
 
     @State private var activeSheet: ProfileSheet?
     @State private var showRateAlert: Bool = false
+    @AppStorage("dino.showStreak") private var showStreak: Bool = true
+    @AppStorage("dino.streakHintSeen") private var streakHintSeen: Bool = false
+    @State private var streakBurst: Bool = false
+    @State private var navigateToStreak: Bool = false
     @State private var showSignOutConfirm = false
     @State private var showClearDataConfirm = false
     @State private var showDeleteAccountConfirm = false
@@ -493,17 +497,42 @@ struct ProfileView: View {
 
     private var statsStickersRow: some View {
         HStack(spacing: 14) {
-            NavigationLink {
-                StreakCalendarView().environmentObject(dataManager)
-            } label: {
-                StickerCircle(
-                    number: "\(unionStreak)",
-                    label: "day streak",
-                    innerRing: SB.peach,
-                    tilt: 3
-                )
+            VStack(spacing: 2) {
+                ZStack {
+                    StickerCircle(
+                        number: "\(unionStreak)",
+                        label: "day streak",
+                        innerRing: SB.peach,
+                        tilt: 3,
+                        paused: !showStreak
+                    )
+                    if streakBurst {
+                        Text("\u{1F525}")
+                            .font(.system(size: 32))
+                            .scaleEffect(1.4)
+                            .opacity(0)
+                            .animation(.spring(response: 0.6, dampingFraction: 0.5), value: streakBurst)
+                    }
+                }
+                .contentShape(Rectangle())
+                .navigationDestination(isPresented: $navigateToStreak) {
+                    StreakCalendarView().environmentObject(dataManager)
+                }
+                .onTapGesture {
+                    toggleStreakDisplay()
+                }
+                .onLongPressGesture(minimumDuration: 0.4) {
+                    HapticManager.shared.light()
+                    navigateToStreak = true
+                }
+                if !streakHintSeen {
+                    Text("tap to pause")
+                        .font(.system(size: 10))
+                        .italic()
+                        .foregroundColor(Color(hex: "#A8A29A"))
+                        .transition(.opacity)
+                }
             }
-            .buttonStyle(.plain)
 
             Button {
                 activeSheet = .gratitudeJar
@@ -600,6 +629,26 @@ struct ProfileView: View {
             .padding(.bottom, 20)
         }
         .rotationEffect(.degrees(-1.5))
+    }
+
+    // MARK: - Streak toggle
+
+    private func toggleStreakDisplay() {
+        HapticManager.shared.medium()
+        withAnimation(.spring(response: 0.45, dampingFraction: 0.65)) {
+            showStreak.toggle()
+        }
+        if showStreak {
+            streakBurst = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+                streakBurst = false
+            }
+        }
+        if !streakHintSeen {
+            withAnimation(.easeOut(duration: 0.3)) {
+                streakHintSeen = true
+            }
+        }
     }
 
     // MARK: - Sections
@@ -984,30 +1033,46 @@ private struct StickerCircle: View {
     let label: String
     let innerRing: Color
     let tilt: Double
+    var paused: Bool = false
+
+    private var mutedGrey: Color { Color(hex: "#E5DECC") }
+    private var mutedRing: Color { Color(hex: "#BFB6A6") }
 
     var body: some View {
         ZStack {
             Circle()
-                .fill(SB.paperWhite)
+                .fill(paused ? mutedGrey : SB.paperWhite)
             Circle()
                 .strokeBorder(
-                    SB.sage,
+                    paused ? mutedRing : SB.sage,
                     style: StrokeStyle(lineWidth: 2, dash: [4, 3])
                 )
             Circle()
-                .strokeBorder(innerRing, lineWidth: 3)
+                .strokeBorder(paused ? mutedRing.opacity(0.5) : innerRing, lineWidth: 3)
                 .padding(6)
 
-            VStack(spacing: 0) {
-                Text(number)
-                    .font(DinoTheme.numericFont(size: 22))
-                    .foregroundColor(SB.nearBlack)
-                Text(label)
-                    .font(DinoTheme.dinoFont(size: 11))
-                    .foregroundColor(SB.sage)
-                    .multilineTextAlignment(.center)
+            if paused {
+                VStack(spacing: 2) {
+                    Text("\u{1F33F}")
+                        .font(.system(size: 22))
+                    Text("streak paused")
+                        .font(DinoTheme.dinoFont(size: 9))
+                        .foregroundColor(Color(hex: "#8B8478"))
+                        .multilineTextAlignment(.center)
+                }
+                .padding(.horizontal, 6)
+            } else {
+                VStack(spacing: 0) {
+                    Text(number)
+                        .font(DinoTheme.numericFont(size: 22))
+                        .foregroundColor(SB.nearBlack)
+                    Text(label)
+                        .font(DinoTheme.dinoFont(size: 11))
+                        .foregroundColor(SB.sage)
+                        .multilineTextAlignment(.center)
+                }
+                .padding(.horizontal, 6)
             }
-            .padding(.horizontal, 6)
         }
         .frame(width: 84, height: 84)
         .rotationEffect(.degrees(tilt))

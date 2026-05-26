@@ -13,6 +13,10 @@ struct HomeView: View {
     @StateObject private var notificationStore = NotificationStore.shared
     @StateObject private var paintingService = MoodPaintingService.shared
     @State private var showNotificationCenter = false
+    @AppStorage("dino.showStreak") private var showStreak: Bool = true
+    @AppStorage("dino.streakHintSeen") private var streakHintSeen: Bool = false
+    @State private var streakBurst: Bool = false
+    @State private var navigateToStreak: Bool = false
 
     var body: some View {
         NavigationStack {
@@ -94,6 +98,24 @@ struct HomeView: View {
         }
     }
 
+    private func toggleStreakDisplay() {
+        HapticManager.shared.medium()
+        withAnimation(.spring(response: 0.45, dampingFraction: 0.65)) {
+            showStreak.toggle()
+        }
+        if showStreak {
+            streakBurst = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+                streakBurst = false
+            }
+        }
+        if !streakHintSeen {
+            withAnimation(.easeOut(duration: 0.3)) {
+                streakHintSeen = true
+            }
+        }
+    }
+
     private func refreshNotifications() {
         let today = Date()
         let hasPainting = paintingService.hasPainting(for: today)
@@ -128,19 +150,49 @@ struct HomeView: View {
 
     private var headerTrailing: some View {
         HStack(spacing: 14) {
-            // Streak egg
-            NavigationLink {
-                StreakCalendarView().environmentObject(dataManager)
-            } label: {
+            // Streak egg — tap to pause/resume, long-press to open calendar
+            VStack(spacing: 1) {
                 ZStack {
-                    Image(systemName: "oval.fill")
-                        .font(DinoTheme.dinoFont(size: 22))
-                        .foregroundColor(DinoTheme.peach.opacity(0.5))
-                    Text("\(dataManager.streakData.currentStreak)")
-                        .font(DinoTheme.numericFont(size: 10))
-                        .foregroundColor(DinoTheme.textPrimary)
-                        .offset(y: 1)
+                    if showStreak {
+                        Image(systemName: "oval.fill")
+                            .font(DinoTheme.dinoFont(size: 22))
+                            .foregroundColor(DinoTheme.peach.opacity(0.5))
+                        Text("\(dataManager.streakData.currentStreak)")
+                            .font(DinoTheme.numericFont(size: 10))
+                            .foregroundColor(DinoTheme.textPrimary)
+                            .offset(y: 1)
+                        if streakBurst {
+                            Text("\u{1F525}")
+                                .font(.system(size: 18))
+                                .scaleEffect(1.4)
+                                .opacity(0)
+                                .animation(.spring(response: 0.6, dampingFraction: 0.5), value: streakBurst)
+                        }
+                    } else {
+                        Circle()
+                            .fill(Color(hex: "#E5DECC"))
+                            .frame(width: 24, height: 24)
+                        Text("\u{1F33F}")
+                            .font(.system(size: 12))
+                    }
                 }
+                .frame(width: 28, height: 28)
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    toggleStreakDisplay()
+                }
+                .onLongPressGesture(minimumDuration: 0.4) {
+                    HapticManager.shared.light()
+                    navigateToStreak = true
+                }
+                if !showStreak {
+                    Text("paused")
+                        .font(.system(size: 8))
+                        .foregroundColor(Color(hex: "#8B8478"))
+                }
+            }
+            .navigationDestination(isPresented: $navigateToStreak) {
+                StreakCalendarView().environmentObject(dataManager)
             }
 
             Button {
