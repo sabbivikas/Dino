@@ -36,21 +36,46 @@ final class FeedbackService {
         let templateID = Self.config("EMAILJS_TEMPLATE_ID", fallback: "template_dkc4sqt")
         let publicKey = Self.config("EMAILJS_PUBLIC_KEY", fallback: "RtQfJvwvxaAyIwlsh")
 
+        let userName = user.displayName ?? "Dino User"
+        let userEmail = user.email ?? "unknown"
+
+        // Build a self-contained feedback body that includes everything.
+        // If the EmailJS template body just renders {{message}}, the feedback
+        // arrives fully formatted. We also pass individual template params for
+        // any template that wires them up separately.
+        let fullBody = """
+        NEW FEEDBACK FROM DINO APP
+
+        From:     \(userName) (\(userEmail))
+        Category: \(category)
+        UID:      \(user.uid)
+
+        Message:
+        \(message)
+
+        ---
+        App version: \(appVersion)
+        Device:      \(device)
+        iOS:         \(iosVersion)
+        """
+
         let params: [String: Any] = [
             "service_id": serviceID,
             "template_id": templateID,
             "user_id": publicKey,
             "template_params": [
-                "user_name": user.displayName ?? "Dino User",
-                "user_email": user.email ?? "unknown",
+                "to_email": "sabbi.vikas@gmail.com",
+                "user_name": userName,
+                "user_email": userEmail,
                 "category": category,
-                "message": message,
+                "message": fullBody,
                 "app_version": appVersion,
                 "device": device,
                 "ios_version": iosVersion,
                 "user_id": user.uid,
-                "reply_to": user.email ?? "unknown",
-                "from_name": user.displayName ?? "Dino User"
+                "reply_to": userEmail,
+                "from_name": "\(userName) (dino feedback)",
+                "subject": "dino feedback: \(category)"
             ]
         ]
 
@@ -65,12 +90,11 @@ final class FeedbackService {
 
         do {
             let (data, response) = try await URLSession.shared.data(for: request)
-            guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
-                let code = (response as? HTTPURLResponse)?.statusCode ?? -1
-                let body = String(data: data, encoding: .utf8) ?? "<no body>"
-                #if DEBUG
-                print("[Feedback] EmailJS submit failed status=\(code) body=\(body)")
-                #endif
+            let code = (response as? HTTPURLResponse)?.statusCode ?? -1
+            let body = String(data: data, encoding: .utf8) ?? "<no body>"
+            // Always log (release too) so we can diagnose on real devices.
+            print("🦕 FEEDBACK status=\(code) body=\(body)")
+            guard code == 200 else {
                 throw FeedbackError.submissionFailed
             }
             await MainActor.run {
@@ -79,11 +103,8 @@ final class FeedbackService {
         } catch let error as FeedbackError {
             throw error
         } catch {
-            #if DEBUG
-            print("[Feedback] EmailJS submit error: \(error)")
-            print("[Feedback]   domain: \((error as NSError).domain)")
-            print("[Feedback]   code: \((error as NSError).code)")
-            #endif
+            print("🦕 FEEDBACK NETWORK ERROR: \(error)")
+            print("🦕 FEEDBACK   domain: \((error as NSError).domain) code: \((error as NSError).code)")
             throw FeedbackError.submissionFailed
         }
     }
