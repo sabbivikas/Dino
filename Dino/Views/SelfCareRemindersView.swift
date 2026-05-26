@@ -35,6 +35,27 @@ private let selfCareReminders: [SelfCareReminder] = [
         name: "eat something",
         body: "dino noticed it might be lunchtime 🍽 have you eaten something today?",
         defaultHour: 12, defaultMinute: 30
+    ),
+    SelfCareReminder(
+        id: "breathing_reminder",
+        icon: "🌬️",
+        name: "breathing",
+        body: "hey take a breath with dino 🌬️",
+        defaultHour: 8, defaultMinute: 0
+    ),
+    SelfCareReminder(
+        id: "journal_reminder",
+        icon: "✍️",
+        name: "journal",
+        body: "your journal is waiting 📝",
+        defaultHour: 19, defaultMinute: 0
+    ),
+    SelfCareReminder(
+        id: "gratitude_reminder",
+        icon: "🫙",
+        name: "gratitude",
+        body: "drop one small good thing in the jar today 🫙",
+        defaultHour: 20, defaultMinute: 0
     )
 ]
 
@@ -199,25 +220,50 @@ private struct SelfCareReminderRow: View {
 
     private func schedule() {
         print("🦕 SCHEDULING: \(reminder.id) at \(hour):\(String(format: "%02d", minute))")
-        NotificationManager.shared.setSelfCareReminder(
-            id: reminder.id,
-            body: reminder.body,
-            hour: hour,
-            minute: minute
-        ) { success in
-            print("🦕 SCHEDULE RESULT for \(reminder.id): success=\(success)")
-            if !success {
-                enabled = false
-                showPermissionAlert = true
-            } else {
-                #if DEBUG
-                NotificationManager.shared.debugPendingNotifications()
-                #endif
+        switch reminder.id {
+        case "breathing_reminder":
+            NotificationManager.shared.scheduleBreathingReminder(hour: hour, minute: minute)
+            completePermissionCheck()
+        case "journal_reminder":
+            NotificationManager.shared.scheduleJournalReminder(hour: hour, minute: minute)
+            completePermissionCheck()
+        case "gratitude_reminder":
+            NotificationManager.shared.scheduleGratitudeReminder(hour: hour, minute: minute)
+            completePermissionCheck()
+        default:
+            NotificationManager.shared.setSelfCareReminder(
+                id: reminder.id,
+                body: reminder.body,
+                hour: hour,
+                minute: minute
+            ) { success in
+                print("🦕 SCHEDULE RESULT for \(reminder.id): success=\(success)")
+                if !success {
+                    enabled = false
+                    showPermissionAlert = true
+                } else {
+                    #if DEBUG
+                    NotificationManager.shared.debugPendingNotifications()
+                    #endif
+                }
+            }
+        }
+    }
+
+    private func completePermissionCheck() {
+        UNUserNotificationCenter.current().getNotificationSettings { settings in
+            DispatchQueue.main.async {
+                let status = settings.authorizationStatus
+                let ok = status == .authorized || status == .provisional || status == .ephemeral
+                if !ok {
+                    self.enabled = false
+                    self.showPermissionAlert = true
+                }
             }
         }
     }
 
     private func cancel() {
-        NotificationManager.shared.cancelSelfCareReminder(id: reminder.id)
+        UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: [reminder.id])
     }
 }

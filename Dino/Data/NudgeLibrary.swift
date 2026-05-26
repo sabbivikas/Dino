@@ -100,6 +100,33 @@ struct NudgeLibrary {
         "small leaf, big deal. progress looks like this"
     ]
 
+    // MARK: - Routine: breathing reminder
+    static let breathingReminder = [
+        "hey take a breath with dino 🌬️ even one minute helps",
+        "your nervous system wants a reset 🌬️ breathe with dino",
+        "one breathing session today. you got this 🌬️",
+        "dino is waiting to breathe with you 🦕🌬️",
+        "two minutes of breathing can change everything 🌬️"
+    ]
+
+    // MARK: - Routine: journal reminder
+    static let journalReminder = [
+        "hey what's been on your mind lately? 🌿 write it down",
+        "your journal is waiting 📝 even one line counts",
+        "something happened today worth remembering 🌿 write it down",
+        "dino wants to know how your day went ✍️",
+        "two minutes. one thought. open your journal 🌿"
+    ]
+
+    // MARK: - Routine: gratitude reminder
+    static let gratitudeReminder = [
+        "drop one small good thing in the jar today 🫙 even tiny counts",
+        "your jar is waiting for something good 🫙",
+        "what was one okay thing today? drop it in 🫙",
+        "dino wants you to find one good thing 🦕🫙",
+        "gratitude jar time 🫙 one small thing. go."
+    ]
+
     // MARK: - Helper
 
     static func random(from array: [String]) -> String {

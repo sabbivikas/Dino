@@ -148,9 +148,75 @@ class NotificationManager: ObservableObject {
         if dailyCheckInEnabled { scheduleDailyCheckIn() }
         if streakReminderEnabled { scheduleStreakReminder() }
 
+        scheduleDefaultRemindersIfNeeded()
+
         #if DEBUG
         printPendingNotifications()
         #endif
+    }
+
+    /// First-launch only — pre-populate routine + self-care reminders with sensible defaults
+    /// and flip the matching @AppStorage toggles so SelfCareRemindersView reflects the state.
+    private func scheduleDefaultRemindersIfNeeded() {
+        let ud = UserDefaults.standard
+        let key = "dino.defaultRemindersScheduled"
+        guard !ud.bool(forKey: key) else { return }
+
+        print("[Notifications] first launch — scheduling default routine + self-care reminders")
+        scheduleBreathingReminder(hour: 8, minute: 0)
+        scheduleJournalReminder(hour: 19, minute: 0)
+        scheduleGratitudeReminder(hour: 20, minute: 0)
+        setSelfCareReminder(id: "selfcare-water", body: "hey, when did you last have water? 💧", hour: 10, minute: 0) { _ in }
+        setSelfCareReminder(id: "selfcare-eat",   body: "dino noticed it might be lunchtime 🍽", hour: 12, minute: 30) { _ in }
+
+        ud.set(true, forKey: "selfcare-water.enabled")
+        ud.set(10, forKey: "selfcare-water.hour"); ud.set(0, forKey: "selfcare-water.minute")
+        ud.set(true, forKey: "selfcare-eat.enabled")
+        ud.set(12, forKey: "selfcare-eat.hour"); ud.set(30, forKey: "selfcare-eat.minute")
+        ud.set(true, forKey: "breathing_reminder.enabled")
+        ud.set(8, forKey: "breathing_reminder.hour"); ud.set(0, forKey: "breathing_reminder.minute")
+        ud.set(true, forKey: "journal_reminder.enabled")
+        ud.set(19, forKey: "journal_reminder.hour"); ud.set(0, forKey: "journal_reminder.minute")
+        ud.set(true, forKey: "gratitude_reminder.enabled")
+        ud.set(20, forKey: "gratitude_reminder.hour"); ud.set(0, forKey: "gratitude_reminder.minute")
+
+        ud.set(true, forKey: key)
+    }
+
+    // MARK: - Routine Reminders (breathing / journal / gratitude)
+
+    func scheduleBreathingReminder(hour: Int, minute: Int) {
+        var components = DateComponents()
+        components.timeZone = .current
+        components.hour = hour
+        components.minute = minute
+        let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: true)
+        let body = NudgeLibrary.random(from: NudgeLibrary.breathingReminder)
+        scheduleNotification(id: "breathing_reminder", body: body, trigger: trigger)
+    }
+
+    func scheduleJournalReminder(hour: Int, minute: Int) {
+        var components = DateComponents()
+        components.timeZone = .current
+        components.hour = hour
+        components.minute = minute
+        let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: true)
+        let body = NudgeLibrary.random(from: NudgeLibrary.journalReminder)
+        scheduleNotification(id: "journal_reminder", body: body, trigger: trigger)
+    }
+
+    func scheduleGratitudeReminder(hour: Int, minute: Int) {
+        var components = DateComponents()
+        components.timeZone = .current
+        components.hour = hour
+        components.minute = minute
+        let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: true)
+        let body = NudgeLibrary.random(from: NudgeLibrary.gratitudeReminder)
+        scheduleNotification(id: "gratitude_reminder", body: body, trigger: trigger)
+    }
+
+    func cancelRoutineReminder(id: String) {
+        UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: [id])
     }
 
     private func scheduleNotification(id: String, body: String, trigger: UNNotificationTrigger) {
@@ -166,6 +232,14 @@ class NotificationManager: ObservableObject {
         case "streak_reminder":
             content.categoryIdentifier = "STREAK_REMINDER"
             content.userInfo = ["action": "mood"]
+        case "breathing_reminder":
+            content.categoryIdentifier = "WIND_DOWN"
+            content.userInfo = ["action": "breathe"]
+        case "journal_reminder":
+            content.categoryIdentifier = "DAILY_CHECKIN"
+            content.userInfo = ["action": "journal"]
+        case "gratitude_reminder":
+            content.userInfo = ["action": "gratitude"]
         default:
             break
         }
