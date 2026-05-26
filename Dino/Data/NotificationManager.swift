@@ -153,23 +153,21 @@ class NotificationManager: ObservableObject {
         #endif
     }
 
-    private func scheduleNotification(id: String, trigger: UNNotificationTrigger) {
+    private func scheduleNotification(id: String, body: String, trigger: UNNotificationTrigger) {
         let content = UNMutableNotificationContent()
         content.sound = .default
+        content.title = "dino 🦕"
+        content.body = body
 
         switch id {
         case "daily_checkin":
-            content.title = "dino 🦕"
-            content.body = NudgeLibrary.random(from: NudgeLibrary.dailyCheckIn)
             content.categoryIdentifier = "DAILY_CHECKIN"
             content.userInfo = ["action": "mood"]
         case "streak_reminder":
-            content.title = "dino 🦕"
-            content.body = NudgeLibrary.random(from: NudgeLibrary.streakReminder)
             content.categoryIdentifier = "STREAK_REMINDER"
             content.userInfo = ["action": "mood"]
         default:
-            return
+            break
         }
 
         let request = UNNotificationRequest(identifier: id, content: content, trigger: trigger)
@@ -227,32 +225,35 @@ class NotificationManager: ObservableObject {
         if journal { routines.append("journal") }
         if gratitude { routines.append("gratitude") }
 
-        let content = UNMutableNotificationContent()
-        content.title = NudgeLibrary.random(from: NudgeLibrary.windDown)
-        if !routines.isEmpty {
-            content.body = "tonight: " + routines.joined(separator: " · ")
-        }
-        content.sound = .default
-        content.categoryIdentifier = "WIND_DOWN"
-        content.userInfo = ["action": "journal"]
-
         var dc = DateComponents()
         dc.hour = hour
         dc.minute = minute
-
         let trigger = UNCalendarNotificationTrigger(dateMatching: dc, repeats: true)
-        let request = UNNotificationRequest(identifier: "winddown.daily",
-                                            content: content,
-                                            trigger: trigger)
 
-        UNUserNotificationCenter.current().add(request) { error in
-            #if DEBUG
-            if let error = error {
-                print("[Notifications] wind-down (configurable) schedule ERROR: \(error)")
-            } else {
-                print("[Notifications] wind-down (configurable) scheduled at \(hour):\(String(format: "%02d", minute))")
+        Task { @MainActor in
+            let title = await NudgeGeneratorService.shared.getNudge(for: "windDown")
+            let content = UNMutableNotificationContent()
+            content.title = title
+            if !routines.isEmpty {
+                content.body = "tonight: " + routines.joined(separator: " · ")
             }
-            #endif
+            content.sound = .default
+            content.categoryIdentifier = "WIND_DOWN"
+            content.userInfo = ["action": "journal"]
+
+            let request = UNNotificationRequest(identifier: "winddown.daily",
+                                                content: content,
+                                                trigger: trigger)
+
+            UNUserNotificationCenter.current().add(request) { error in
+                #if DEBUG
+                if let error = error {
+                    print("[Notifications] wind-down (configurable) schedule ERROR: \(error)")
+                } else {
+                    print("[Notifications] wind-down (configurable) scheduled at \(hour):\(String(format: "%02d", minute))")
+                }
+                #endif
+            }
         }
     }
 
@@ -270,16 +271,20 @@ class NotificationManager: ObservableObject {
             alreadyOpenedToday = false
         }
 
+        let trigger: UNCalendarNotificationTrigger
         if alreadyOpenedToday, let tomorrow = Calendar.current.date(byAdding: .day, value: 1, to: Date()) {
             let cal = Calendar.current
             components.year = cal.component(.year, from: tomorrow)
             components.month = cal.component(.month, from: tomorrow)
             components.day = cal.component(.day, from: tomorrow)
-            let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
-            scheduleNotification(id: "daily_checkin", trigger: trigger)
+            trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
         } else {
-            let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: true)
-            scheduleNotification(id: "daily_checkin", trigger: trigger)
+            trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: true)
+        }
+
+        Task { @MainActor in
+            let body = await NudgeGeneratorService.shared.getNudge(for: "dailyCheckIn")
+            self.scheduleNotification(id: "daily_checkin", body: body, trigger: trigger)
         }
     }
 
@@ -297,16 +302,20 @@ class NotificationManager: ObservableObject {
             activityToday = false
         }
 
+        let trigger: UNCalendarNotificationTrigger
         if activityToday, let tomorrow = Calendar.current.date(byAdding: .day, value: 1, to: Date()) {
             let cal = Calendar.current
             components.year = cal.component(.year, from: tomorrow)
             components.month = cal.component(.month, from: tomorrow)
             components.day = cal.component(.day, from: tomorrow)
-            let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
-            scheduleNotification(id: "streak_reminder", trigger: trigger)
+            trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
         } else {
-            let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: true)
-            scheduleNotification(id: "streak_reminder", trigger: trigger)
+            trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: true)
+        }
+
+        Task { @MainActor in
+            let body = await NudgeGeneratorService.shared.getNudge(for: "streakReminder")
+            self.scheduleNotification(id: "streak_reminder", body: body, trigger: trigger)
         }
     }
 
@@ -350,27 +359,36 @@ class NotificationManager: ObservableObject {
     }
 
     func schedulePlantDyingNudge() {
-        schedulePlantNudge(
-            identifier: "plant_dying_nudge",
-            body: NudgeLibrary.random(from: NudgeLibrary.plantDying),
-            delaySeconds: 3 * 60 * 60
-        )
+        Task { @MainActor in
+            let body = await NudgeGeneratorService.shared.getNudge(for: "plantDying")
+            self.schedulePlantNudge(
+                identifier: "plant_dying_nudge",
+                body: body,
+                delaySeconds: 3 * 60 * 60
+            )
+        }
     }
 
     func schedulePlantProgressNudge() {
-        schedulePlantNudge(
-            identifier: "plant_progress_nudge",
-            body: NudgeLibrary.random(from: NudgeLibrary.plantProgressing),
-            delaySeconds: 60
-        )
+        Task { @MainActor in
+            let body = await NudgeGeneratorService.shared.getNudge(for: "plantProgressing")
+            self.schedulePlantNudge(
+                identifier: "plant_progress_nudge",
+                body: body,
+                delaySeconds: 60
+            )
+        }
     }
 
     func schedulePlantBloomingNudge() {
-        schedulePlantNudge(
-            identifier: "plant_blooming_nudge",
-            body: NudgeLibrary.random(from: NudgeLibrary.plantBlooming),
-            delaySeconds: 60
-        )
+        Task { @MainActor in
+            let body = await NudgeGeneratorService.shared.getNudge(for: "plantBlooming")
+            self.schedulePlantNudge(
+                identifier: "plant_blooming_nudge",
+                body: body,
+                delaySeconds: 60
+            )
+        }
     }
 
     private func schedulePlantNudge(identifier: String, body: String, delaySeconds: TimeInterval) {
