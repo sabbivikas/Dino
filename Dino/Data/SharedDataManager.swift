@@ -90,12 +90,14 @@ final class SharedDataManager: ObservableObject {
     @Published var streakData: StreakData {
         didSet {
             save(streakData, forKey: userKey("streakData"))
+            print("🌱 PLANT NUDGE CHECK: streak=\(streakData.currentStreak) level=\(growthStats.level)")
             NotificationManager.shared.checkAndSchedulePlantNudge(streakData: streakData, growthStats: growthStats)
         }
     }
     @Published var growthStats: GrowthStats {
         didSet {
             save(growthStats, forKey: userKey("growthStats"))
+            print("🌱 PLANT NUDGE CHECK: streak=\(streakData.currentStreak) level=\(growthStats.level)")
             NotificationManager.shared.checkAndSchedulePlantNudge(streakData: streakData, growthStats: growthStats)
         }
     }

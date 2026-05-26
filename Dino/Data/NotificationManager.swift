@@ -427,14 +427,21 @@ class NotificationManager: ObservableObject {
     }
 
     func schedulePlantDyingNudge() {
+        #if DEBUG
+        let dyingDelay: TimeInterval = 10
+        #else
+        let dyingDelay: TimeInterval = 3 * 60 * 60
+        #endif
+        print("🌱 SCHEDULING PLANT DYING NUDGE — fires in \(Int(dyingDelay))s")
         schedulePlantNudge(
             identifier: "plant_dying_nudge",
             body: NudgeLibrary.random(from: NudgeLibrary.plantDying),
-            delaySeconds: 3 * 60 * 60
+            delaySeconds: dyingDelay
         )
     }
 
     func schedulePlantProgressNudge() {
+        print("🌱 SCHEDULING PLANT PROGRESS NUDGE")
         schedulePlantNudge(
             identifier: "plant_progress_nudge",
             body: NudgeLibrary.random(from: NudgeLibrary.plantProgressing),
@@ -443,6 +450,7 @@ class NotificationManager: ObservableObject {
     }
 
     func schedulePlantBloomingNudge() {
+        print("🌱 SCHEDULING PLANT BLOOMING NUDGE — level up!")
         schedulePlantNudge(
             identifier: "plant_blooming_nudge",
             body: NudgeLibrary.random(from: NudgeLibrary.plantBlooming),
@@ -485,6 +493,7 @@ class NotificationManager: ObservableObject {
         let currentBloom = growthStats.level
         let lastSeenBloom = ud.integer(forKey: Self.lastSeenBloomKey)
         if currentBloom > lastSeenBloom {
+            print("🌱 BLOOM TRIGGERED: bloom \(lastSeenBloom) → \(currentBloom)")
             schedulePlantBloomingNudge()
             ud.set(currentBloom, forKey: Self.lastSeenBloomKey)
             ud.set(streakData.currentStreak, forKey: Self.previousStreakKey)
@@ -493,13 +502,20 @@ class NotificationManager: ObservableObject {
         if [7, 14, 21].contains(streakData.currentStreak) {
             let previous = ud.integer(forKey: Self.previousStreakKey)
             if previous != streakData.currentStreak {
+                print("🌱 PROGRESS TRIGGERED: streak hit \(streakData.currentStreak)")
                 schedulePlantProgressNudge()
+            } else {
+                print("🌱 PLANT CHECK no action")
             }
             ud.set(streakData.currentStreak, forKey: Self.previousStreakKey)
             return
         }
-        if streakData.currentStreak == 0 && ud.integer(forKey: Self.previousStreakKey) > 0 {
+        let previous = ud.integer(forKey: Self.previousStreakKey)
+        if streakData.currentStreak == 0 && previous > 0 {
+            print("🌱 DYING TRIGGERED: streak dropped from \(previous) → 0")
             schedulePlantDyingNudge()
+        } else {
+            print("🌱 PLANT CHECK no action")
         }
         ud.set(streakData.currentStreak, forKey: Self.previousStreakKey)
     }
