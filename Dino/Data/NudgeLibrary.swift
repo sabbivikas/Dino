@@ -105,22 +105,4 @@ struct NudgeLibrary {
     static func random(from array: [String]) -> String {
         array.randomElement() ?? array.first ?? ""
     }
-
-    /// Maps a string category name to the fallback array. Used by
-    /// NudgeGeneratorService when OpenAI is unavailable or returns nothing.
-    static func fallbacks(for category: String) -> [String] {
-        switch category {
-        case "dailyCheckIn":         return dailyCheckIn
-        case "streakReminder":       return streakReminder
-        case "windDown":             return windDown
-        case "drinkWater":           return drinkWater
-        case "eatSomething":         return eatSomething
-        case "rest":                 return rest
-        case "checkInWithYourself":  return checkInWithYourself
-        case "plantDying":           return plantDying
-        case "plantBlooming":        return plantBlooming
-        case "plantProgressing":     return plantProgressing
-        default:                     return dailyCheckIn
-        }
-    }
 }

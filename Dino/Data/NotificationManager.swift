@@ -230,30 +230,28 @@ class NotificationManager: ObservableObject {
         dc.minute = minute
         let trigger = UNCalendarNotificationTrigger(dateMatching: dc, repeats: true)
 
-        Task { @MainActor in
-            let title = await NudgeGeneratorService.shared.getNudge(for: "windDown")
-            let content = UNMutableNotificationContent()
-            content.title = title
-            if !routines.isEmpty {
-                content.body = "tonight: " + routines.joined(separator: " · ")
-            }
-            content.sound = .default
-            content.categoryIdentifier = "WIND_DOWN"
-            content.userInfo = ["action": "journal"]
+        let title = NudgeLibrary.random(from: NudgeLibrary.windDown)
+        let content = UNMutableNotificationContent()
+        content.title = title
+        if !routines.isEmpty {
+            content.body = "tonight: " + routines.joined(separator: " · ")
+        }
+        content.sound = .default
+        content.categoryIdentifier = "WIND_DOWN"
+        content.userInfo = ["action": "journal"]
 
-            let request = UNNotificationRequest(identifier: "winddown.daily",
-                                                content: content,
-                                                trigger: trigger)
+        let request = UNNotificationRequest(identifier: "winddown.daily",
+                                            content: content,
+                                            trigger: trigger)
 
-            UNUserNotificationCenter.current().add(request) { error in
-                #if DEBUG
-                if let error = error {
-                    print("[Notifications] wind-down (configurable) schedule ERROR: \(error)")
-                } else {
-                    print("[Notifications] wind-down (configurable) scheduled at \(hour):\(String(format: "%02d", minute))")
-                }
-                #endif
+        UNUserNotificationCenter.current().add(request) { error in
+            #if DEBUG
+            if let error = error {
+                print("[Notifications] wind-down (configurable) schedule ERROR: \(error)")
+            } else {
+                print("[Notifications] wind-down (configurable) scheduled at \(hour):\(String(format: "%02d", minute))")
             }
+            #endif
         }
     }
 
@@ -282,10 +280,8 @@ class NotificationManager: ObservableObject {
             trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: true)
         }
 
-        Task { @MainActor in
-            let body = await NudgeGeneratorService.shared.getNudge(for: "dailyCheckIn")
-            self.scheduleNotification(id: "daily_checkin", body: body, trigger: trigger)
-        }
+        let body = NudgeLibrary.random(from: NudgeLibrary.dailyCheckIn)
+        scheduleNotification(id: "daily_checkin", body: body, trigger: trigger)
     }
 
     // MARK: - Streak Reminder
@@ -313,10 +309,8 @@ class NotificationManager: ObservableObject {
             trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: true)
         }
 
-        Task { @MainActor in
-            let body = await NudgeGeneratorService.shared.getNudge(for: "streakReminder")
-            self.scheduleNotification(id: "streak_reminder", body: body, trigger: trigger)
-        }
+        let body = NudgeLibrary.random(from: NudgeLibrary.streakReminder)
+        scheduleNotification(id: "streak_reminder", body: body, trigger: trigger)
     }
 
     // MARK: - Smart Skip Logic
@@ -359,36 +353,27 @@ class NotificationManager: ObservableObject {
     }
 
     func schedulePlantDyingNudge() {
-        Task { @MainActor in
-            let body = await NudgeGeneratorService.shared.getNudge(for: "plantDying")
-            self.schedulePlantNudge(
-                identifier: "plant_dying_nudge",
-                body: body,
-                delaySeconds: 3 * 60 * 60
-            )
-        }
+        schedulePlantNudge(
+            identifier: "plant_dying_nudge",
+            body: NudgeLibrary.random(from: NudgeLibrary.plantDying),
+            delaySeconds: 3 * 60 * 60
+        )
     }
 
     func schedulePlantProgressNudge() {
-        Task { @MainActor in
-            let body = await NudgeGeneratorService.shared.getNudge(for: "plantProgressing")
-            self.schedulePlantNudge(
-                identifier: "plant_progress_nudge",
-                body: body,
-                delaySeconds: 60
-            )
-        }
+        schedulePlantNudge(
+            identifier: "plant_progress_nudge",
+            body: NudgeLibrary.random(from: NudgeLibrary.plantProgressing),
+            delaySeconds: 60
+        )
     }
 
     func schedulePlantBloomingNudge() {
-        Task { @MainActor in
-            let body = await NudgeGeneratorService.shared.getNudge(for: "plantBlooming")
-            self.schedulePlantNudge(
-                identifier: "plant_blooming_nudge",
-                body: body,
-                delaySeconds: 60
-            )
-        }
+        schedulePlantNudge(
+            identifier: "plant_blooming_nudge",
+            body: NudgeLibrary.random(from: NudgeLibrary.plantBlooming),
+            delaySeconds: 60
+        )
     }
 
     private func schedulePlantNudge(identifier: String, body: String, delaySeconds: TimeInterval) {
