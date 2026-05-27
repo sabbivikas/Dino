@@ -6,6 +6,7 @@
 import Foundation
 import Combine
 import UIKit
+import FirebaseFunctions
 
 enum MoodPaintingError: Error, LocalizedError {
     case invalidResponse(Int)
@@ -117,67 +118,22 @@ final class MoodPaintingService: ObservableObject {
     }
 
     private func callDALLE(prompt: String) async throws -> UIImage {
-        let apiKey = Self.config("OPENAI_API_KEY", fallback: "")
-        guard !apiKey.isEmpty else {
-            #if DEBUG
-            print("[Painting] OPENAI_API_KEY missing — set in Secrets.xcconfig or Xcode scheme environment variables")
-            #endif
-            throw MoodPaintingError.network("missing OPENAI_API_KEY")
-        }
+        let functions = Functions.functions(region: "us-central1")
+        let callable = functions.httpsCallable("generateMoodPainting")
 
-        guard let url = URL(string: "https://api.openai.com/v1/images/generations") else {
-            throw MoodPaintingError.invalidResponse(-1)
-        }
-
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.timeoutInterval = 60
-        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-
-        let body: [String: Any] = [
-            "model": "dall-e-3",
-            "prompt": prompt,
-            "n": 1,
-            "size": "1024x1024",
-            "quality": "standard",
-            "style": "vivid"
-        ]
-        request.httpBody = try JSONSerialization.data(withJSONObject: body)
-
-        let (data, response): (Data, URLResponse)
+        let result: HTTPSCallableResult
         do {
-            (data, response) = try await URLSession.shared.data(for: request)
-        } catch {
+            result = try await callable.call(["prompt": prompt])
+        } catch let error as NSError {
+            #if DEBUG
+            print("[Painting] Cloud Function failed: code=\(error.code) domain=\(error.domain) msg=\(error.localizedDescription)")
+            #endif
             throw MoodPaintingError.network(error.localizedDescription)
         }
 
-        guard let http = response as? HTTPURLResponse else {
-            throw MoodPaintingError.invalidResponse(-1)
-        }
-        guard http.statusCode == 200 else {
-            #if DEBUG
-            let bodyString = String(data: data, encoding: .utf8) ?? "<no body>"
-            print("[Painting] DALL-E request failed status=\(http.statusCode) body=\(bodyString)")
-            #endif
-            throw MoodPaintingError.invalidResponse(http.statusCode)
-        }
-
-        struct OAIResp: Decodable {
-            struct Item: Decodable { let url: String }
-            let data: [Item]
-        }
-        let decoded: OAIResp
-        do {
-            decoded = try JSONDecoder().decode(OAIResp.self, from: data)
-        } catch {
-            #if DEBUG
-            print("[Painting] DALL-E response decode failed: \(error)")
-            #endif
-            throw MoodPaintingError.decodeFailed
-        }
-        guard let imageURLString = decoded.data.first?.url,
-              let imageURL = URL(string: imageURLString) else {
+        guard let dict = result.data as? [String: Any],
+              let urlString = dict["url"] as? String,
+              let imageURL = URL(string: urlString) else {
             throw MoodPaintingError.decodeFailed
         }
 
@@ -194,14 +150,6 @@ final class MoodPaintingService: ObservableObject {
             throw MoodPaintingError.decodeFailed
         }
         return image
-    }
-
-    private static func config(_ key: String, fallback: String) -> String {
-        guard let value = Bundle.main.object(forInfoDictionaryKey: key) as? String,
-              !value.isEmpty, !value.hasPrefix("$(") else {
-            return fallback
-        }
-        return value
     }
 
     // MARK: - Persistence

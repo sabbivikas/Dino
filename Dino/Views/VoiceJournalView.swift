@@ -17,6 +17,8 @@ struct VoiceJournalView: View {
     @StateObject private var viewModel: JournalViewModel = JournalViewModel(dataManager: SharedDataManager.shared)
     @State private var showAllMemories: Bool = false
     @State private var previewEntry: JournalEntry? = nil
+    @State private var entryDate: Date = Date()
+    @State private var showDatePicker: Bool = false
 
     var selectedTab: Binding<Int>? = nil
 
@@ -34,6 +36,15 @@ struct VoiceJournalView: View {
                             .foregroundColor(DinoTheme.ink)
                             .frame(maxWidth: .infinity, alignment: .center)
                             .padding(.top, 4)
+
+                        // Date header — tappable to backdate
+                        Button {
+                            HapticManager.shared.light()
+                            showDatePicker = true
+                        } label: {
+                            entryDateHeader
+                        }
+                        .buttonStyle(.plain)
 
                         // Composer card
                         JournalComposerCard(
@@ -118,6 +129,38 @@ struct VoiceJournalView: View {
             .fullScreenCover(item: $previewEntry) { entry in
                 JournalCardPreviewOverlay(entry: entry, viewModel: viewModel)
             }
+            .sheet(isPresented: $showDatePicker) {
+                DatePickerSheet(date: $entryDate)
+            }
+        }
+    }
+
+    private var entryDateHeader: some View {
+        let cal = Calendar.current
+        let isToday = cal.isDateInToday(entryDate)
+        let f = DateFormatter()
+        f.dateFormat = "MMMM d"
+        let label = f.string(from: entryDate).lowercased()
+        return HStack(spacing: 6) {
+            if isToday {
+                Text("today")
+                    .font(.system(size: 13))
+                    .italic()
+                    .foregroundColor(Color(hex: "#A8A29A"))
+            } else {
+                Text(label)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(Color(hex: "#7A7266"))
+                Text("\u{21A9}\u{FE0E} backdated")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 2)
+                    .background(Color(hex: "#A8C5A0"), in: Capsule())
+            }
+            Image(systemName: "calendar")
+                .font(.system(size: 11))
+                .foregroundColor(Color(hex: "#A8A29A"))
         }
     }
 
@@ -133,7 +176,7 @@ struct VoiceJournalView: View {
         let photoFileName = saveComposerPhoto(image)
 
         let entry = JournalEntry(
-            date: Date(),
+            date: entryDate,
             audioFileName: "",
             title: title,
             summary: trimmed,
@@ -144,11 +187,41 @@ struct VoiceJournalView: View {
         dataManager.addJournalEntry(entry)
         AnalyticsManager.shared.trackJournalEntryCreated(type: "text")
 
+        // Reset entry date to today so the next entry defaults to today again
+        entryDate = Date()
+
         // Dismiss keyboard
         UIApplication.shared.sendAction(
             #selector(UIResponder.resignFirstResponder),
             to: nil, from: nil, for: nil
         )
+    }
+
+    private struct DatePickerSheet: View {
+        @Binding var date: Date
+        @Environment(\.dismiss) private var dismiss
+        var body: some View {
+            NavigationStack {
+                VStack {
+                    DatePicker(
+                        "entry date",
+                        selection: $date,
+                        in: ...Date(),
+                        displayedComponents: .date
+                    )
+                    .datePickerStyle(.graphical)
+                    .padding()
+                    Spacer()
+                }
+                .navigationTitle("backdate")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("done") { dismiss() }
+                    }
+                }
+            }
+        }
     }
 
     private func saveComposerPhoto(_ image: UIImage?) -> String? {

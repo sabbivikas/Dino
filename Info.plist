@@ -2,8 +2,6 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>OPENAI_API_KEY</key>
-	<string>$(OPENAI_API_KEY)</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Allow location to match Dino's theme to the weather around you and show local support resources.</string>
 	<key>NSMotionUsageDescription</key>
