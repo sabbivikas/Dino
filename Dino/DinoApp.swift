@@ -134,6 +134,16 @@ struct DinoApp: App {
         )
         config.captureApplicationLifecycleEvents = true
         PostHogSDK.shared.setup(config)
+
+        // One-time migration: gestures swapped (tap now opens calendar, long-press pauses).
+        // Re-show the hint so existing users discover the new behavior.
+        let ud = UserDefaults.standard
+        let hintVersionKey = "dino.streakHintVersion"
+        let currentHintVersion = 2
+        if ud.integer(forKey: hintVersionKey) < currentHintVersion {
+            ud.set(false, forKey: "dino.streakHintSeen")
+            ud.set(currentHintVersion, forKey: hintVersionKey)
+        }
     }
     @StateObject private var dataManager = SharedDataManager.shared
     @StateObject private var themeManager = ThemeManager.shared

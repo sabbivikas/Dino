@@ -162,7 +162,7 @@ struct HomeView: View {
 
     private var headerTrailing: some View {
         HStack(spacing: 14) {
-            // Streak egg — tap to pause/resume, long-press to open calendar
+            // Streak egg — tap to open calendar, long-press to pause/resume
             VStack(spacing: 1) {
                 ZStack {
                     if showStreak {
@@ -199,11 +199,16 @@ struct HomeView: View {
                 .scaleEffect(showStreak ? (resumeBurst ? 1.2 : 1.0) : pulseScale)
                 .contentShape(Rectangle())
                 .onTapGesture {
-                    toggleStreakDisplay()
-                }
-                .onLongPressGesture(minimumDuration: 0.4) {
                     HapticManager.shared.light()
                     navigateToStreak = true
+                    if !streakHintSeen {
+                        withAnimation(.easeOut(duration: 0.3)) {
+                            streakHintSeen = true
+                        }
+                    }
+                }
+                .onLongPressGesture(minimumDuration: 0.4) {
+                    toggleStreakDisplay()
                 }
                 .onAppear {
                     withAnimation(.easeInOut(duration: 2).repeatForever(autoreverses: true)) {

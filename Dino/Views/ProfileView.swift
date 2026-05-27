@@ -521,11 +521,16 @@ struct ProfileView: View {
                     StreakCalendarView().environmentObject(dataManager)
                 }
                 .onTapGesture {
-                    toggleStreakDisplay()
-                }
-                .onLongPressGesture(minimumDuration: 0.4) {
                     HapticManager.shared.light()
                     navigateToStreak = true
+                    if !streakHintSeen {
+                        withAnimation(.easeOut(duration: 0.3)) {
+                            streakHintSeen = true
+                        }
+                    }
+                }
+                .onLongPressGesture(minimumDuration: 0.4) {
+                    toggleStreakDisplay()
                 }
                 if !showStreak {
                     Text("paused")
@@ -534,7 +539,7 @@ struct ProfileView: View {
                         .foregroundColor(Color(hex: "#A8A29A"))
                         .transition(.opacity)
                 } else if !streakHintSeen {
-                    Text("tap to pause")
+                    Text("hold to pause 🌿")
                         .font(.system(size: 10))
                         .italic()
                         .foregroundColor(Color(hex: "#A8A29A"))
