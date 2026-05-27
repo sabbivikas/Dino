@@ -15,6 +15,8 @@ struct HomeView: View {
     @State private var showNotificationCenter = false
     @AppStorage("dino.showStreak") private var showStreak: Bool = true
     @AppStorage("dino.streakHintSeen") private var streakHintSeen: Bool = false
+    @AppStorage("dino.lastSeenWhatsNewVersion") private var lastSeenWhatsNewVersion: String = ""
+    @State private var showWhatsNew: Bool = false
     @State private var streakBurst: Bool = false
     @State private var resumeBurst: Bool = false
     @State private var pulseScale: CGFloat = 1.0
@@ -87,9 +89,15 @@ struct HomeView: View {
             .sheet(isPresented: $showNotificationCenter) {
                 NotificationCenterView()
             }
+            .sheet(isPresented: $showWhatsNew, onDismiss: {
+                lastSeenWhatsNewVersion = currentAppVersion()
+            }) {
+                WhatsNewView()
+            }
             .onAppear {
                 refreshNotifications()
                 AnalyticsManager.shared.trackHomeOpened()
+                maybeShowWhatsNew()
             }
             .onChange(of: dataManager.streakData.currentStreak) { _, _ in refreshNotifications() }
             .onChange(of: dataManager.journalEntries.count) { _, _ in refreshNotifications() }
@@ -125,6 +133,18 @@ struct HomeView: View {
             withAnimation(.easeOut(duration: 0.3)) {
                 streakHintSeen = true
             }
+        }
+    }
+
+    private func currentAppVersion() -> String {
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? ""
+    }
+
+    private func maybeShowWhatsNew() {
+        let current = currentAppVersion()
+        guard !current.isEmpty, current != lastSeenWhatsNewVersion else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+            showWhatsNew = true
         }
     }
 

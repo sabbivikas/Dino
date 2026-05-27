@@ -8,6 +8,7 @@ import SwiftUI
 struct MainTabView: View {
     @EnvironmentObject var dataManager: SharedDataManager
     @ObservedObject private var themeManager = ThemeManager.shared
+    @StateObject private var updateService = AppUpdateService.shared
     @State private var selectedTab: Int = 0
 
     var body: some View {
@@ -46,6 +47,12 @@ struct MainTabView: View {
             }
             selectedTab = tab
             dataManager.deepLinkTab = nil
+        }
+        .overlay(alignment: .bottom) {
+            UpdateBannerView()
+        }
+        .task {
+            await updateService.checkForUpdate()
         }
     }
 }
