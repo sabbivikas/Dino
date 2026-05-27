@@ -141,6 +141,7 @@ struct ProfileView: View {
     @AppStorage("dino.showStreak") private var showStreak: Bool = true
     @AppStorage("dino.streakHintSeen") private var streakHintSeen: Bool = false
     @State private var streakBurst: Bool = false
+    @State private var resumeBurst: Bool = false
     @State private var navigateToStreak: Bool = false
     @State private var showSignOutConfirm = false
     @State private var showClearDataConfirm = false
@@ -504,7 +505,8 @@ struct ProfileView: View {
                         label: "day streak",
                         innerRing: SB.peach,
                         tilt: 3,
-                        paused: !showStreak
+                        paused: !showStreak,
+                        resumeBurst: resumeBurst
                     )
                     if streakBurst {
                         Text("\u{1F525}")
@@ -525,7 +527,13 @@ struct ProfileView: View {
                     HapticManager.shared.light()
                     navigateToStreak = true
                 }
-                if !streakHintSeen {
+                if !showStreak {
+                    Text("paused")
+                        .font(.system(size: 11))
+                        .italic()
+                        .foregroundColor(Color(hex: "#A8A29A"))
+                        .transition(.opacity)
+                } else if !streakHintSeen {
                     Text("tap to pause")
                         .font(.system(size: 10))
                         .italic()
@@ -635,10 +643,20 @@ struct ProfileView: View {
 
     private func toggleStreakDisplay() {
         HapticManager.shared.medium()
-        withAnimation(.spring(response: 0.45, dampingFraction: 0.65)) {
-            showStreak.toggle()
-        }
         if showStreak {
+            withAnimation(.easeOut(duration: 0.4)) {
+                showStreak = false
+            }
+        } else {
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.6)) {
+                showStreak = true
+            }
+            resumeBurst = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+                withAnimation(.spring(response: 0.4, dampingFraction: 0.6)) {
+                    resumeBurst = false
+                }
+            }
             streakBurst = true
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
                 streakBurst = false
@@ -1034,34 +1052,37 @@ private struct StickerCircle: View {
     let innerRing: Color
     let tilt: Double
     var paused: Bool = false
+    var resumeBurst: Bool = false
 
-    private var mutedGrey: Color { Color(hex: "#E5DECC") }
-    private var mutedRing: Color { Color(hex: "#BFB6A6") }
+    @State private var pulseScale: CGFloat = 1.0
+
+    private var mutedGrey: Color { Color(hex: "#E8E4D5") }
+    private var sageLeaf: Color { Color(hex: "#A8C5A0") }
 
     var body: some View {
         ZStack {
-            Circle()
-                .fill(paused ? mutedGrey : SB.paperWhite)
-            Circle()
-                .strokeBorder(
-                    paused ? mutedRing : SB.sage,
-                    style: StrokeStyle(lineWidth: 2, dash: [4, 3])
-                )
-            Circle()
-                .strokeBorder(paused ? mutedRing.opacity(0.5) : innerRing, lineWidth: 3)
-                .padding(6)
-
             if paused {
-                VStack(spacing: 2) {
-                    Text("\u{1F33F}")
-                        .font(.system(size: 22))
-                    Text("streak paused")
-                        .font(DinoTheme.dinoFont(size: 9))
-                        .foregroundColor(Color(hex: "#8B8478"))
-                        .multilineTextAlignment(.center)
-                }
-                .padding(.horizontal, 6)
+                Circle()
+                    .fill(mutedGrey)
+                Circle()
+                    .strokeBorder(
+                        sageLeaf.opacity(0.5),
+                        style: StrokeStyle(lineWidth: 1.5, dash: [4, 3])
+                    )
+                Image(systemName: "leaf.fill")
+                    .font(.system(size: 26, weight: .medium))
+                    .foregroundColor(sageLeaf)
             } else {
+                Circle()
+                    .fill(SB.paperWhite)
+                Circle()
+                    .strokeBorder(
+                        SB.sage,
+                        style: StrokeStyle(lineWidth: 2, dash: [4, 3])
+                    )
+                Circle()
+                    .strokeBorder(innerRing, lineWidth: 3)
+                    .padding(6)
                 VStack(spacing: 0) {
                     Text(number)
                         .font(DinoTheme.numericFont(size: 22))
@@ -1075,7 +1096,13 @@ private struct StickerCircle: View {
             }
         }
         .frame(width: 84, height: 84)
+        .scaleEffect(paused ? pulseScale : (resumeBurst ? 1.2 : 1.0))
         .rotationEffect(.degrees(tilt))
+        .onAppear {
+            withAnimation(.easeInOut(duration: 2).repeatForever(autoreverses: true)) {
+                pulseScale = 1.05
+            }
+        }
     }
 }
 

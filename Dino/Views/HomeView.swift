@@ -16,6 +16,8 @@ struct HomeView: View {
     @AppStorage("dino.showStreak") private var showStreak: Bool = true
     @AppStorage("dino.streakHintSeen") private var streakHintSeen: Bool = false
     @State private var streakBurst: Bool = false
+    @State private var resumeBurst: Bool = false
+    @State private var pulseScale: CGFloat = 1.0
     @State private var navigateToStreak: Bool = false
 
     var body: some View {
@@ -100,10 +102,20 @@ struct HomeView: View {
 
     private func toggleStreakDisplay() {
         HapticManager.shared.medium()
-        withAnimation(.spring(response: 0.45, dampingFraction: 0.65)) {
-            showStreak.toggle()
-        }
         if showStreak {
+            withAnimation(.easeOut(duration: 0.4)) {
+                showStreak = false
+            }
+        } else {
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.6)) {
+                showStreak = true
+            }
+            resumeBurst = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+                withAnimation(.spring(response: 0.4, dampingFraction: 0.6)) {
+                    resumeBurst = false
+                }
+            }
             streakBurst = true
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
                 streakBurst = false
@@ -170,13 +182,21 @@ struct HomeView: View {
                         }
                     } else {
                         Circle()
-                            .fill(Color(hex: "#E5DECC"))
+                            .fill(Color(hex: "#E8E4D5"))
                             .frame(width: 24, height: 24)
-                        Text("\u{1F33F}")
-                            .font(.system(size: 12))
+                        Circle()
+                            .strokeBorder(
+                                Color(hex: "#A8C5A0").opacity(0.5),
+                                style: StrokeStyle(lineWidth: 1.5, dash: [4, 3])
+                            )
+                            .frame(width: 24, height: 24)
+                        Image(systemName: "leaf.fill")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(Color(hex: "#A8C5A0"))
                     }
                 }
                 .frame(width: 28, height: 28)
+                .scaleEffect(showStreak ? (resumeBurst ? 1.2 : 1.0) : pulseScale)
                 .contentShape(Rectangle())
                 .onTapGesture {
                     toggleStreakDisplay()
@@ -185,10 +205,10 @@ struct HomeView: View {
                     HapticManager.shared.light()
                     navigateToStreak = true
                 }
-                if !showStreak {
-                    Text("paused")
-                        .font(.system(size: 8))
-                        .foregroundColor(Color(hex: "#8B8478"))
+                .onAppear {
+                    withAnimation(.easeInOut(duration: 2).repeatForever(autoreverses: true)) {
+                        pulseScale = 1.05
+                    }
                 }
             }
             .navigationDestination(isPresented: $navigateToStreak) {
