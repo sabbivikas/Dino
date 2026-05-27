@@ -37,17 +37,13 @@ struct VoiceJournalView: View {
                             .frame(maxWidth: .infinity, alignment: .center)
                             .padding(.top, 4)
 
-                        // Date header — tappable to backdate
-                        Button {
-                            HapticManager.shared.light()
-                            showDatePicker = true
-                        } label: {
-                            entryDateHeader
-                        }
-                        .buttonStyle(.plain)
-
                         // Composer card
                         JournalComposerCard(
+                            entryDate: entryDate,
+                            onHeaderTap: {
+                                HapticManager.shared.light()
+                                showDatePicker = true
+                            },
                             onDevelop: { text, mood, image in
                                 saveTextEntry(text: text, mood: mood, image: image)
                             }
@@ -135,35 +131,6 @@ struct VoiceJournalView: View {
         }
     }
 
-    private var entryDateHeader: some View {
-        let cal = Calendar.current
-        let isToday = cal.isDateInToday(entryDate)
-        let f = DateFormatter()
-        f.dateFormat = "MMMM d"
-        let label = f.string(from: entryDate).lowercased()
-        return HStack(spacing: 6) {
-            if isToday {
-                Text("today")
-                    .font(.system(size: 13))
-                    .italic()
-                    .foregroundColor(Color(hex: "#A8A29A"))
-            } else {
-                Text(label)
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(Color(hex: "#7A7266"))
-                Text("\u{21A9}\u{FE0E} backdated")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 7)
-                    .padding(.vertical, 2)
-                    .background(Color(hex: "#A8C5A0"), in: Capsule())
-            }
-            Image(systemName: "calendar")
-                .font(.system(size: 11))
-                .foregroundColor(Color(hex: "#A8A29A"))
-        }
-    }
-
     private func saveTextEntry(text: String, mood: String?, image: UIImage?) {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
@@ -200,27 +167,51 @@ struct VoiceJournalView: View {
     private struct DatePickerSheet: View {
         @Binding var date: Date
         @Environment(\.dismiss) private var dismiss
+
         var body: some View {
-            NavigationStack {
-                VStack {
+            ZStack {
+                Color(hex: "#FAF6EC").ignoresSafeArea()
+                VStack(spacing: 16) {
+                    Text("backdate entry")
+                        .font(.custom(DinoTheme.customFontName, size: 22))
+                        .foregroundColor(DinoTheme.ink)
+                        .padding(.top, 24)
+
+                    Text("pick the day you want this memory to belong to")
+                        .font(.system(size: 12))
+                        .italic()
+                        .foregroundColor(Color(hex: "#7A7266"))
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 32)
+
                     DatePicker(
-                        "entry date",
+                        "",
                         selection: $date,
                         in: ...Date(),
                         displayedComponents: .date
                     )
                     .datePickerStyle(.graphical)
-                    .padding()
-                    Spacer()
-                }
-                .navigationTitle("backdate")
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .confirmationAction) {
-                        Button("done") { dismiss() }
+                    .labelsHidden()
+                    .padding(.horizontal, 16)
+                    .tint(Color(hex: "#A8C5A0"))
+
+                    Button {
+                        HapticManager.shared.light()
+                        dismiss()
+                    } label: {
+                        Text("done")
+                            .font(.custom(DinoTheme.customFontName, size: 16))
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 14)
+                            .background(Color(hex: "#A8C5A0"), in: Capsule())
                     }
+                    .buttonStyle(.plain)
+                    .padding(.horizontal, 24)
+                    .padding(.bottom, 24)
                 }
             }
+            .presentationDetents([.medium, .large])
         }
     }
 
@@ -288,6 +279,8 @@ private struct JournalPaperBackdrop: View {
 
 // MARK: - Journal Composer Card
 private struct JournalComposerCard: View {
+    let entryDate: Date
+    let onHeaderTap: () -> Void
     let onDevelop: (String, String?, UIImage?) -> Void
 
     @State private var promptIndex: Int = 0
@@ -314,7 +307,11 @@ private struct JournalComposerCard: View {
     private var metaText: String {
         let formatter = DateFormatter()
         formatter.dateFormat = "EEEE, MMM d"
-        return formatter.string(from: Date()).uppercased() + " · DEAR DIARY"
+        return formatter.string(from: entryDate).uppercased() + " · DEAR DIARY"
+    }
+
+    private var isBackdated: Bool {
+        !Calendar.current.isDateInToday(entryDate)
     }
 
     var body: some View {
@@ -376,13 +373,31 @@ private struct JournalComposerCard: View {
 
             // Content
             VStack(alignment: .leading, spacing: 14) {
-                // Meta row
-                Text(metaText)
-                    .font(.system(size: 11, weight: .semibold))
-                    .tracking(0.6)
-                    .foregroundColor(Color(hex: "#A67074"))
-                    .padding(.leading, 60)
-                    .padding(.top, 4)
+                // Meta row — tappable to backdate
+                Button {
+                    onHeaderTap()
+                } label: {
+                    HStack(spacing: 6) {
+                        Text(metaText)
+                            .font(.system(size: 11, weight: .semibold))
+                            .tracking(0.6)
+                            .foregroundColor(Color(hex: "#A67074"))
+                        Image(systemName: "calendar")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundColor(Color(hex: "#A67074").opacity(0.7))
+                        if isBackdated {
+                            Text("\u{21A9}\u{FE0E}")
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 5)
+                                .padding(.vertical, 1)
+                                .background(Color(hex: "#A8C5A0"), in: Capsule())
+                        }
+                    }
+                }
+                .buttonStyle(.plain)
+                .padding(.leading, 60)
+                .padding(.top, 4)
 
                 // Rotating prompt
                 HStack {
