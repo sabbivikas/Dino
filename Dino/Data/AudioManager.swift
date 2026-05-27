@@ -20,7 +20,7 @@ final class AudioManager: ObservableObject {
     // MARK: - Published State
     @Published var isPlaying: Bool = false
     @Published var currentTrack: String?
-    @Published var volume: Float = 0.5
+    @Published var volume: Float = 0.7
 
     // MARK: - Private
     private var player: AVAudioPlayer?

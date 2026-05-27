@@ -117,7 +117,7 @@ struct OnboardingView: View {
             }
         }
         .onAppear {
-            AudioManager.shared.play(track: "onboarding_ambient")
+            AudioManager.shared.play(track: "onboarding_ambient", playback: false)
             AudioManager.shared.fadeIn(duration: 2.0)
         }
         .onDisappear {
