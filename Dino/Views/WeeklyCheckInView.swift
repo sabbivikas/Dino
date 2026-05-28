@@ -539,6 +539,15 @@ private struct ReportView: View {
                         .font(.system(size: 13))
                         .foregroundColor(mutedInk)
 
+                    if report.isMock {
+                        Text("offline summary — reconnect for your ai report")
+                            .font(DinoTheme.captionFont())
+                            .foregroundColor(DinoTheme.sageGreen)
+                            .multilineTextAlignment(.center)
+                            .frame(maxWidth: .infinity)
+                            .padding(.horizontal, 20)
+                    }
+
                     // Overall gauge
                     OverallGauge(
                         score: report.overallScore,

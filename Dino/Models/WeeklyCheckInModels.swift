@@ -18,6 +18,7 @@ struct WeeklyReport: Codable, Equatable {
     let weeklyReflection: String
     let trend: String
     let trendNote: String
+    var isMock: Bool = false
 }
 
 struct WeeklyCheckInResult: Codable, Identifiable, Equatable {

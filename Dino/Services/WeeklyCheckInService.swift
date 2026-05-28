@@ -156,7 +156,8 @@ final class WeeklyCheckInService {
             wellbeingInsight: "you showed up for yourself in small ways. that counts.",
             weeklyReflection: "hey you \u{2014} this week felt a little lighter than last, and that's worth sitting with. you noticed when things got heavy and reached for tools that work for you. that's not nothing.",
             trend: "improved",
-            trendNote: "\u{2191} improved from last week"
+            trendNote: "\u{2191} improved from last week",
+            isMock: true
         )
     }
 }
