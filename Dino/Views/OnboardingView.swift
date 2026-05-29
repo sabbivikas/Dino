@@ -993,65 +993,94 @@ private struct StepAnxietyUseCasePage: View {
 }
 
 // MARK: - Step 9: Rough day use case
+private struct GratitudeSlipSpec {
+    let label: String
+    let color: Color
+    let rotation: Double
+}
+
+private let gratitudeSlips: [GratitudeSlipSpec] = [
+    GratitudeSlipSpec(label: "quiet morning", color: Color(hex: "#FDDCB5"), rotation: -10),
+    GratitudeSlipSpec(label: "good tea",      color: Color(hex: "#E8E0F5"), rotation: 6),
+    GratitudeSlipSpec(label: "kind words",    color: Color(hex: "#C8E6F5"), rotation: -4),
+    GratitudeSlipSpec(label: "sunshine",      color: Color(hex: "#C8E0C4"), rotation: 8),
+    GratitudeSlipSpec(label: "deep breath",   color: Color(hex: "#F5D0D0"), rotation: -7)
+]
+
 private struct StepRoughDayUseCasePage: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var appeared: Bool = false
-
-    private let tokenColors: [Color] = [
-        Color(hex: "#F5C6AA"),
-        Color(hex: "#A8D4E6"),
-        Color(hex: "#C4B8D4"),
-        Color(hex: "#E8B4B8"),
-        Color(hex: "#A8C5A0")
-    ]
+    @State private var cycle: Int = 0
+    @State private var cycleTimer: Timer? = nil
 
     var body: some View {
-        ZStack {
-            LinearGradient(
-                colors: [Color(hex: "#FAF6EC"), Color(hex: "#F5C6AA").opacity(0.45)],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .ignoresSafeArea()
+        VStack(spacing: 24) {
+            Spacer(minLength: 12)
 
-            VStack(spacing: 24) {
-                Spacer(minLength: 12)
+            jarStage
+                .padding(.horizontal, 24)
 
-                jarVisual
-                    .frame(width: 180, height: 220)
+            Text("one small good thing")
+                .font(.custom(DinoTheme.customFontName, size: 28))
+                .foregroundColor(OnboardingColors.textPrimary)
+                .multilineTextAlignment(.center)
 
-                Text("one small good thing")
-                    .font(.custom(DinoTheme.customFontName, size: 28))
-                    .foregroundColor(OnboardingColors.textPrimary)
-                    .multilineTextAlignment(.center)
+            Text("on hard days, dropping one moment into your jar shifts something. it doesn't have to be big.")
+                .font(DinoTheme.dinoFont(size: 17))
+                .foregroundColor(OnboardingColors.textSecondary)
+                .multilineTextAlignment(.center)
+                .lineSpacing(4)
+                .padding(.horizontal, 32)
 
-                Text("on hard days, dropping one moment into your jar shifts something. it doesn't have to be big.")
-                    .font(DinoTheme.dinoFont(size: 17))
-                    .foregroundColor(OnboardingColors.textSecondary)
-                    .multilineTextAlignment(.center)
-                    .lineSpacing(4)
-                    .padding(.horizontal, 32)
+            Text("people who do this 3x a week report feeling more grounded")
+                .font(DinoTheme.dinoFont(size: 11))
+                .foregroundColor(OnboardingColors.textSecondary.opacity(0.65))
+                .multilineTextAlignment(.center)
+                .lineSpacing(3)
+                .padding(.horizontal, 36)
 
-                Text("people who do this 3x a week report feeling more grounded")
-                    .font(DinoTheme.dinoFont(size: 11))
-                    .foregroundColor(OnboardingColors.textSecondary.opacity(0.65))
-                    .multilineTextAlignment(.center)
-                    .lineSpacing(3)
-                    .padding(.horizontal, 36)
-
-                Spacer()
+            Spacer()
+        }
+        .onAppear {
+            cycleTimer = Timer.scheduledTimer(withTimeInterval: 4.5, repeats: true) { _ in
+                cycle += 1
             }
         }
-        .onAppear { appeared = true }
+        .onDisappear {
+            cycleTimer?.invalidate()
+            cycleTimer = nil
+        }
+    }
+
+    private var jarStage: some View {
+        jarVisual
+            .frame(width: 180, height: 220)
+            .padding(20)
+            .frame(maxWidth: .infinity)
+            .background(
+                RoundedRectangle(cornerRadius: 20)
+                    .fill(
+                        LinearGradient(
+                            colors: [Color(hex: "#FEFBF3"), Color(hex: "#F4F0E4")],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 20)
+                            .stroke(Color(hex: "#D1D5DB"), lineWidth: 1)
+                    )
+                    .shadow(color: Color.black.opacity(0.05), radius: 6, x: 0, y: 3)
+            )
     }
 
     private var jarVisual: some View {
         ZStack(alignment: .bottom) {
-            ForEach(0..<tokenColors.count, id: \.self) { i in
-                FallingToken(
-                    color: tokenColors[i],
+            // Falling gratitude slips drop into the jar
+            ForEach(gratitudeSlips.indices, id: \.self) { i in
+                GratitudeSlip(
+                    spec: gratitudeSlips[i],
                     index: i,
-                    appeared: appeared,
+                    cycle: cycle,
                     reduceMotion: reduceMotion
                 )
             }
@@ -1070,62 +1099,75 @@ private struct StepRoughDayUseCasePage: View {
                             .stroke(OnboardingColors.sage.opacity(0.35), lineWidth: 1)
                     )
 
-                ZStack(alignment: .bottom) {
-                    RoundedRectangle(cornerRadius: 22)
-                        .fill(Color(hex: "#FEFBF3").opacity(0.75))
-                        .frame(width: 130, height: 140)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 22)
-                                .stroke(OnboardingColors.sage.opacity(0.45), lineWidth: 1.4)
-                        )
-                        .shadow(color: OnboardingColors.textPrimary.opacity(0.10), radius: 8, x: 0, y: 4)
-
-                    HStack(spacing: 6) {
-                        ForEach(0..<3, id: \.self) { i in
-                            Circle()
-                                .fill(tokenColors[i].opacity(0.8))
-                                .frame(width: 14, height: 14)
-                        }
-                    }
-                    .padding(.bottom, 14)
-                }
+                RoundedRectangle(cornerRadius: 22)
+                    .fill(Color(hex: "#FEFBF3").opacity(0.75))
+                    .frame(width: 130, height: 140)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 22)
+                            .stroke(OnboardingColors.sage.opacity(0.45), lineWidth: 1.4)
+                    )
+                    .shadow(color: OnboardingColors.textPrimary.opacity(0.10), radius: 8, x: 0, y: 4)
             }
         }
     }
 }
 
-private struct FallingToken: View {
-    @State private var dropped: Bool = false
-    let color: Color
+private struct GratitudeSlip: View {
+    let spec: GratitudeSlipSpec
     let index: Int
-    let appeared: Bool
+    let cycle: Int
     let reduceMotion: Bool
 
-    var body: some View {
-        let xOffsets: [CGFloat] = [-30, -10, 10, 30, 0]
-        let startX = xOffsets[index % xOffsets.count]
-        let delay = Double(index) * 0.6
+    @State private var landed: Bool = false
+    @State private var squished: Bool = false
 
-        Circle()
-            .fill(color)
-            .frame(width: 12, height: 12)
-            .shadow(color: color.opacity(0.5), radius: 3, x: 0, y: 1)
-            .offset(x: startX, y: dropped ? 90 : -120)
-            .opacity(dropped ? 0 : (appeared ? 1 : 0))
-            .rotationEffect(.degrees(dropped ? 180 : 0))
+    var body: some View {
+        let delay = 0.2 + Double(index) * 0.5
+
+        RoundedRectangle(cornerRadius: 6)
+            .fill(spec.color)
+            .frame(width: 80, height: 28)
+            .overlay(
+                Text(spec.label)
+                    .font(DinoTheme.dinoFont(size: 9))
+                    .foregroundColor(Color.black.opacity(0.5))
+            )
+            .shadow(color: Color.black.opacity(0.06), radius: 3, x: 0, y: 2)
+            .rotationEffect(.degrees(spec.rotation))
+            .scaleEffect(x: 1.0, y: squished ? 0.85 : 1.0)
+            .opacity(landed ? 0.85 : 0)
+            .offset(y: reduceMotion ? 0 : (landed ? 0 : -180))
+            .padding(.bottom, 16)
             .onAppear {
-                guard appeared else { return }
-                if reduceMotion {
-                    dropped = false
-                    return
+                scheduleFall(delay: delay)
+            }
+            .onChange(of: cycle) { _, _ in
+                landed = false
+                squished = false
+                scheduleFall(delay: delay)
+            }
+    }
+
+    private func scheduleFall(delay: Double) {
+        if reduceMotion {
+            // Fade-in only — no movement, no squish
+            withAnimation(.easeIn(duration: 0.6).delay(delay)) {
+                landed = true
+            }
+        } else {
+            withAnimation(.easeIn(duration: 0.6).delay(delay)) {
+                landed = true
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay + 0.6) {
+                withAnimation(.spring(response: 0.25, dampingFraction: 0.5)) {
+                    squished = true
                 }
-                withAnimation(
-                    .easeIn(duration: 1.4)
-                        .delay(delay)
-                        .repeatForever(autoreverses: false)
-                ) {
-                    dropped = true
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
+                    withAnimation(.spring(response: 0.25, dampingFraction: 0.6)) {
+                        squished = false
+                    }
                 }
             }
+        }
     }
 }
