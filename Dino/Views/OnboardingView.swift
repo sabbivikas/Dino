@@ -167,17 +167,15 @@ struct OnboardingView: View {
 
             Spacer()
 
-            HStack(spacing: 7) {
-                ForEach(0..<totalSteps, id: \.self) { i in
-                    Circle()
-                        .fill(progressDotColor(for: i))
-                        .frame(
-                            width: i == currentStep ? 9 : 6,
-                            height: i == currentStep ? 9 : 6
-                        )
-                        .animation(.easeInOut(duration: 0.2), value: currentStep)
-                }
-            }
+            Text("step \(currentStep + 1) of \(totalSteps)")
+                .font(DinoTheme.dinoFont(size: 12))
+                .foregroundColor(
+                    currentStep == 4
+                        ? Color.white.opacity(0.6)
+                        : Color(hex: "#2D3142").opacity(0.6)
+                )
+                .contentTransition(.numericText())
+                .animation(.easeInOut(duration: 0.3), value: currentStep)
 
             Spacer()
 
@@ -569,10 +567,15 @@ private struct StepEncouragementPage: View {
                     .frame(width: 220, height: 180)
                     .shadow(color: Color(hex: "#4A3520").opacity(0.18), radius: 12, x: 0, y: 6)
 
-                // Rising hearts
+                // Rising hearts — custom circle accents with wobble
                 ForEach(0..<3, id: \.self) { i in
-                    RisingHeart(appeared: appeared, delay: Double(i) * 0.3)
-                        .offset(x: CGFloat([-40, 0, 40][i]))
+                    RisingHeart(
+                        appeared: appeared,
+                        delay: Double(i) * 0.3,
+                        size: [14, 20, 16][i],
+                        wobble: [-5, 8, -8][i]
+                    )
+                    .offset(x: CGFloat([-40, 0, 40][i]))
                 }
             }
 
@@ -597,19 +600,22 @@ private struct RisingHeart: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let appeared: Bool
     let delay: Double
+    let size: CGFloat
+    let wobble: Double
 
     var body: some View {
         let dur: Double = 1.2
-        Image(systemName: "heart.fill")
-            .font(.system(size: 22))
-            .foregroundColor(Color(hex: "#E8B4B8"))
+        Circle()
+            .fill(Color(hex: "#E8B4B8"))
+            .frame(width: size, height: size)
             .opacity(appeared && !reduceMotion ? 0 : (reduceMotion && appeared ? 0.8 : 0))
-            .scaleEffect(appeared ? 1 : 0.6)
+            .scaleEffect(reduceMotion ? 1.0 : (appeared ? 1 : 0.6))
+            .rotationEffect(.degrees(appeared && !reduceMotion ? wobble : 0))
             .offset(y: appeared && !reduceMotion ? -80 : 0)
             .animation(
                 reduceMotion
                     ? .easeOut(duration: 0.4).delay(delay)
-                    : .easeOut(duration: dur).delay(delay),
+                    : .easeInOut(duration: dur).delay(delay),
                 value: appeared
             )
     }
@@ -708,9 +714,13 @@ private struct RadioRow: View {
                 Spacer()
             }
             .padding(16)
-            .background(OnboardingColors.cardWhite)
+            .background(Color(hex: "#F9FAFB"))
             .cornerRadius(16)
-            .shadow(color: OnboardingColors.textPrimary.opacity(0.06), radius: 4, x: 0, y: 1)
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(Color(hex: "#D1D5DB"), lineWidth: 1)
+            )
+            .shadow(color: Color.black.opacity(0.04), radius: 4, x: 0, y: 2)
         }
         .buttonStyle(ScaleButtonStyle())
     }
@@ -726,15 +736,29 @@ private struct StepNotificationsPage: View {
 
             MascotView(imageName: "cut-DinoChecklist", size: 200)
 
-            Text("gentle reminders?")
-                .font(.custom(DinoTheme.customFontName, size: 24))
-                .foregroundColor(OnboardingColors.textPrimary)
+            VStack(spacing: 8) {
+                Text("gentle reminders?")
+                    .font(.custom(DinoTheme.customFontName, size: 24))
+                    .foregroundColor(OnboardingColors.textPrimary)
+                    .multilineTextAlignment(.center)
 
-            Text("dino will help you stay on top of your tasks.")
-                .font(DinoTheme.dinoFont(size: 15))
-                .foregroundColor(OnboardingColors.textSecondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 24)
+                Text("dino will help you stay on top of your tasks.")
+                    .font(DinoTheme.dinoFont(size: 15))
+                    .foregroundColor(OnboardingColors.textSecondary)
+                    .multilineTextAlignment(.center)
+            }
+            .padding(20)
+            .frame(maxWidth: .infinity)
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(Color(hex: "#F9FAFB"))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(Color(hex: "#D1D5DB"), lineWidth: 1)
+            )
+            .shadow(color: Color.black.opacity(0.04), radius: 4, x: 0, y: 2)
+            .padding(.horizontal, 24)
 
             if !permissionRequested {
                 Button(action: requestNotifications) {
@@ -847,12 +871,17 @@ private struct StepNamePage: View {
                     .onAppear { focused = true }
             }
             .frame(height: 56)
-            .background(OnboardingColors.cardWhite)
-            .cornerRadius(18)
+            .background(Color(hex: "#F9FAFB"))
+            .cornerRadius(16)
             .overlay(
-                RoundedRectangle(cornerRadius: 18)
-                    .stroke(OnboardingColors.sage, lineWidth: 1.4)
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(
+                        focused ? Color(hex: "#A8C5A0") : Color(hex: "#D1D5DB"),
+                        lineWidth: focused ? 2 : 1.5
+                    )
             )
+            .shadow(color: Color.black.opacity(0.04), radius: 4, x: 0, y: 2)
+            .animation(.easeInOut(duration: 0.2), value: focused)
             .padding(.horizontal, 24)
 
             Spacer()
@@ -862,15 +891,27 @@ private struct StepNamePage: View {
 
 // MARK: - Step 8: Disclaimer + Confetti
 private struct StepDisclaimerPage: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var appeared: Bool = false
+
     var body: some View {
         VStack(spacing: 24) {
             Spacer(minLength: 20)
 
-            Image("cut-DinoPink")
-                .resizable()
-                .scaledToFit()
-                .frame(width: 180, height: 180)
-                .shadow(color: Color(hex: "#4A3520").opacity(0.18), radius: 12, x: 0, y: 6)
+            MascotView(imageName: "cut-DinoPink", size: 180)
+                .scaleEffect(reduceMotion ? 1.0 : (appeared ? 1.0 : 0.8))
+                .opacity(appeared ? 1.0 : 0)
+                .onAppear {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                        withAnimation(
+                            reduceMotion
+                                ? .easeOut(duration: 0.4)
+                                : .spring(response: 0.6, dampingFraction: 0.55)
+                        ) {
+                            appeared = true
+                        }
+                    }
+                }
 
             Text("thank you for being honest/brave. i know it isn't easy to talk about your struggles. let's get started!")
                 .font(DinoTheme.dinoFont(size: 17))
