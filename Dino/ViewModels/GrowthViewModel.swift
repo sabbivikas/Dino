@@ -266,23 +266,27 @@ final class GrowthViewModel: ObservableObject {
     // MARK: - Recency
 
     var daysSinceJournal: Int {
-        guard let d = dataManager.journalEntries.first?.date else { return .max }
-        return daysSince(d)
+        let dates = dataManager.journalEntries.map { $0.date }
+        guard let latest = dates.max() else { return .max }
+        return daysSince(latest)
     }
 
     var daysSinceMood: Int {
-        guard let d = dataManager.moodEntries.first?.date else { return .max }
-        return daysSince(d)
+        let dates = dataManager.moodEntries.map { $0.date }
+        guard let latest = dates.max() else { return .max }
+        return daysSince(latest)
     }
 
     var daysSinceGratitude: Int {
-        guard let d = dataManager.gratitudeNotes.first?.createdAt else { return .max }
-        return daysSince(d)
+        let dates = dataManager.gratitudeNotes.map { $0.createdAt }
+        guard let latest = dates.max() else { return .max }
+        return daysSince(latest)
     }
 
     var daysSinceBreathing: Int {
-        guard let d = dataManager.breathingSessions.first?.date else { return .max }
-        return daysSince(d)
+        let dates = dataManager.breathingSessions.map { $0.date }
+        guard let latest = dates.max() else { return .max }
+        return daysSince(latest)
     }
 
     var daysSinceAny: Int {
