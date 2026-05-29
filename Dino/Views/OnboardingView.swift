@@ -154,7 +154,7 @@ struct OnboardingView: View {
             if currentStep > 0 {
                 Button(action: goBack) {
                     Text("back")
-                        .font(.system(size: 15, design: .rounded))
+                        .font(DinoTheme.dinoFont(size: 15))
                         .foregroundColor(currentStep == 4
                                          ? Color.white.opacity(0.65)
                                          : OnboardingColors.textSecondary)
@@ -237,7 +237,7 @@ struct OnboardingView: View {
                 primarySageButton(label: "next") { advance() }
                 Button(action: advance) {
                     Text("skip")
-                        .font(.system(size: 15, design: .rounded))
+                        .font(DinoTheme.dinoFont(size: 15))
                         .foregroundColor(OnboardingColors.textSecondary)
                 }
                 .buttonStyle(ScaleButtonStyle())
@@ -253,7 +253,7 @@ struct OnboardingView: View {
     private func primarySageButton(label: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Text(label)
-                .font(.system(size: 17, weight: .semibold, design: .rounded))
+                .font(DinoTheme.dinoFont(size: 17))
                 .foregroundColor(.white)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 18)
@@ -270,7 +270,7 @@ struct OnboardingView: View {
     private func outlinedButton(label: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Text(label)
-                .font(.system(size: 17, weight: .semibold, design: .rounded))
+                .font(DinoTheme.dinoFont(size: 17))
                 .foregroundColor(OnboardingColors.moonlight)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 16)
@@ -466,8 +466,7 @@ private struct StepDoingGreatPage: View {
             MascotView(imageName: "cut-DinoBalloon", size: 200)
 
             Text("good to hear that! Dino will help you keep things up.")
-                .font(.custom(DinoTheme.customFontName, size: 22))
-                .italic()
+                .font(DinoTheme.dinoFont(size: 22))
                 .foregroundColor(OnboardingColors.textPrimary)
                 .multilineTextAlignment(.center)
                 .lineSpacing(4)
@@ -490,8 +489,7 @@ private struct StepChallengePickerPage: View {
             MascotView(imageName: "cut-DinoMascot", size: 140)
 
             Text("sorry to hear what's going on. what's been weighing on you most?")
-                .font(.custom(DinoTheme.customFontName, size: 18))
-                .italic()
+                .font(DinoTheme.dinoFont(size: 22))
                 .foregroundColor(OnboardingColors.textPrimary)
                 .multilineTextAlignment(.center)
                 .lineSpacing(4)
@@ -583,7 +581,7 @@ private struct StepEncouragementPage: View {
                 .foregroundColor(OnboardingColors.textPrimary)
 
             Text("while receiving professional care is important, small habits and lifestyle changes can make a stark difference.")
-                .font(.system(size: 17, design: .rounded))
+                .font(DinoTheme.dinoFont(size: 17))
                 .foregroundColor(OnboardingColors.textPrimary.opacity(0.8))
                 .multilineTextAlignment(.center)
                 .lineSpacing(4)
@@ -634,8 +632,7 @@ private struct StepNavyQuotePage: View {
                     .frame(width: 320, height: 180)
 
                 Text(navyQuote)
-                    .font(.custom(DinoTheme.customFontName, size: 20))
-                    .italic()
+                    .font(DinoTheme.dinoFont(size: 20))
                     .foregroundColor(OnboardingColors.moonlight)
                     .multilineTextAlignment(.center)
                     .lineSpacing(4)
@@ -706,7 +703,7 @@ private struct RadioRow: View {
                     }
                 }
                 Text(label)
-                    .font(.system(size: 17, design: .rounded))
+                    .font(DinoTheme.dinoFont(size: 17))
                     .foregroundColor(OnboardingColors.textPrimary)
                 Spacer()
             }
@@ -734,7 +731,7 @@ private struct StepNotificationsPage: View {
                 .foregroundColor(OnboardingColors.textPrimary)
 
             Text("dino will help you stay on top of your tasks.")
-                .font(.system(size: 15, design: .rounded))
+                .font(DinoTheme.dinoFont(size: 15))
                 .foregroundColor(OnboardingColors.textSecondary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 24)
@@ -755,10 +752,10 @@ private struct StepNotificationsPage: View {
             } else {
                 HStack(spacing: 10) {
                     Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 18, weight: .medium, design: .rounded))
+                        .font(.system(size: 18, weight: .medium))
                         .foregroundColor(OnboardingColors.sage)
                     Text("reminders enabled!")
-                        .font(.system(size: 17, weight: .semibold, design: .rounded))
+                        .font(DinoTheme.dinoFont(size: 17))
                         .foregroundColor(OnboardingColors.sage)
                 }
             }
@@ -767,7 +764,7 @@ private struct StepNotificationsPage: View {
                 OnboardingMaybeLaterNotifier.fire()
             }) {
                 Text("maybe later")
-                    .font(.system(size: 15, design: .rounded))
+                    .font(DinoTheme.dinoFont(size: 15))
                     .foregroundColor(OnboardingColors.textSecondary)
             }
             .buttonStyle(ScaleButtonStyle())
@@ -838,12 +835,12 @@ private struct StepNamePage: View {
             ZStack(alignment: .leading) {
                 if userName.isEmpty {
                     Text("your name")
-                        .font(.system(size: 17, design: .rounded))
+                        .font(DinoTheme.dinoFont(size: 17))
                         .foregroundColor(OnboardingColors.placeholder)
                         .padding(.horizontal, 16)
                 }
                 TextField("", text: $userName)
-                    .font(.system(size: 17, design: .rounded))
+                    .font(DinoTheme.dinoFont(size: 17))
                     .foregroundColor(OnboardingColors.textPrimary)
                     .padding(.horizontal, 16)
                     .focused($focused)
@@ -876,7 +873,7 @@ private struct StepDisclaimerPage: View {
                 .shadow(color: Color(hex: "#4A3520").opacity(0.18), radius: 12, x: 0, y: 6)
 
             Text("thank you for being honest/brave. i know it isn't easy to talk about your struggles. let's get started!")
-                .font(.system(size: 15, design: .rounded))
+                .font(DinoTheme.dinoFont(size: 17))
                 .foregroundColor(OnboardingColors.textSecondary)
                 .multilineTextAlignment(.center)
                 .lineSpacing(5)
@@ -932,15 +929,14 @@ private struct StepAnxietyUseCasePage: View {
                     .multilineTextAlignment(.center)
 
                 Text("4 minutes of breathing activates your body's calm response. dino will guide you through it.")
-                    .font(.system(size: 14, design: .rounded))
-                    .italic()
+                    .font(DinoTheme.dinoFont(size: 16))
                     .foregroundColor(OnboardingColors.textSecondary)
                     .multilineTextAlignment(.center)
                     .lineSpacing(4)
                     .padding(.horizontal, 32)
 
                 Text("used by people before meetings, after hard news, during panic moments")
-                    .font(.system(size: 11, design: .rounded))
+                    .font(DinoTheme.dinoFont(size: 11))
                     .foregroundColor(OnboardingColors.textSecondary.opacity(0.65))
                     .multilineTextAlignment(.center)
                     .lineSpacing(3)
@@ -989,15 +985,14 @@ private struct StepRoughDayUseCasePage: View {
                     .multilineTextAlignment(.center)
 
                 Text("on hard days, dropping one moment into your jar shifts something. it doesn't have to be big.")
-                    .font(.system(size: 14, design: .rounded))
-                    .italic()
+                    .font(DinoTheme.dinoFont(size: 17))
                     .foregroundColor(OnboardingColors.textSecondary)
                     .multilineTextAlignment(.center)
                     .lineSpacing(4)
                     .padding(.horizontal, 32)
 
                 Text("people who do this 3x a week report feeling more grounded")
-                    .font(.system(size: 11, design: .rounded))
+                    .font(DinoTheme.dinoFont(size: 11))
                     .foregroundColor(OnboardingColors.textSecondary.opacity(0.65))
                     .multilineTextAlignment(.center)
                     .lineSpacing(3)
