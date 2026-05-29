@@ -23,6 +23,34 @@ private struct OnboardingColors {
     static let moonlight     = Color(hex: "#F5E9C4")
     static let placeholder   = Color(hex: "#A0958A")
     static let navy          = Color(hex: "#1A1A33")
+    static let surface1      = Color(hex: "#F9FAFB")
+    static let cardBorder    = Color(hex: "#D1D5DB")
+    static let sageDeep      = Color(hex: "#7BA872")
+}
+
+// MARK: - Shared onboarding surfaces
+
+private struct OnboardingCardSurface: ViewModifier {
+    var cornerRadius: CGFloat = 16
+    var padding: CGFloat = 0
+
+    func body(content: Content) -> some View {
+        content
+            .padding(padding)
+            .background(OnboardingColors.surface1)
+            .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
+            .overlay(
+                RoundedRectangle(cornerRadius: cornerRadius)
+                    .stroke(OnboardingColors.cardBorder, lineWidth: 1)
+            )
+            .shadow(color: Color.black.opacity(0.04), radius: 4, x: 0, y: 2)
+    }
+}
+
+private extension View {
+    func onboardingCardSurface(cornerRadius: CGFloat = 16, padding: CGFloat = 0) -> some View {
+        modifier(OnboardingCardSurface(cornerRadius: cornerRadius, padding: padding))
+    }
 }
 
 // MARK: - Swappable quote constants
@@ -88,6 +116,16 @@ struct OnboardingView: View {
                     .transition(.opacity)
             }
 
+            if currentStep == 1 {
+                OnboardingFeelingColorWash(selectedFeeling: selectedFeeling)
+                    .transition(.opacity)
+            }
+
+            if currentStep == 3 {
+                OnboardingEncouragementHeartsAmbient()
+                    .transition(.opacity)
+            }
+
             VStack(spacing: 0) {
                 topBar
                     .padding(.horizontal, 20)
@@ -110,10 +148,9 @@ struct OnboardingView: View {
                     .padding(.bottom, 40)
             }
 
-            // Step 8 confetti sits above the content
             if currentStep == 10 {
-                Confetti()
-                    .allowsHitTesting(false)
+                OnboardingCelebrationAmbient()
+                    .transition(.opacity)
             }
         }
         .onAppear {
@@ -167,17 +204,15 @@ struct OnboardingView: View {
 
             Spacer()
 
-            HStack(spacing: 7) {
-                ForEach(0..<totalSteps, id: \.self) { i in
-                    Circle()
-                        .fill(progressDotColor(for: i))
-                        .frame(
-                            width: i == currentStep ? 9 : 6,
-                            height: i == currentStep ? 9 : 6
-                        )
-                        .animation(.easeInOut(duration: 0.2), value: currentStep)
-                }
-            }
+            Text("step \(currentStep + 1) of \(totalSteps)")
+                .font(DinoTheme.dinoFont(size: 12))
+                .foregroundColor(
+                    currentStep == 4
+                        ? OnboardingColors.moonlight.opacity(0.85)
+                        : DinoTheme.textSecondary.opacity(0.7)
+                )
+                .id(currentStep)
+                .transition(.opacity.animation(.easeInOut(duration: 0.3)))
 
             Spacer()
 
@@ -319,12 +354,6 @@ struct OnboardingView: View {
         AnalyticsManager.shared.trackOnboardingComplete()
     }
 
-    private func progressDotColor(for index: Int) -> Color {
-        if currentStep == 4 {
-            return index == currentStep ? OnboardingColors.sage : Color.white.opacity(0.3)
-        }
-        return index == currentStep ? OnboardingColors.sage : Color(hex: "#E5E7EB")
-    }
 }
 
 // MARK: - Step 0: Welcome
@@ -389,23 +418,29 @@ private struct StepFeelingPage: View {
                 .padding(.horizontal, 24)
 
             VStack(spacing: 12) {
-                pill(
+                FeelingPillButton(
                     label: "doing great",
-                    bg: OnboardingColors.peach,
                     option: "doing great!",
-                    index: 0
+                    isSelected: selectedFeeling == "doing great!",
+                    index: 0,
+                    appeared: appeared,
+                    onSelect: { selectedFeeling = $0 }
                 )
-                pill(
+                FeelingPillButton(
                     label: "it's a challenge",
-                    bg: OnboardingColors.sky,
                     option: "ongoing mental health challenges",
-                    index: 1
+                    isSelected: selectedFeeling == "ongoing mental health challenges",
+                    index: 1,
+                    appeared: appeared,
+                    onSelect: { selectedFeeling = $0 }
                 )
-                pill(
+                FeelingPillButton(
                     label: "somewhere in between",
-                    bg: OnboardingColors.lavender,
                     option: "having a hard time getting over something",
-                    index: 2
+                    isSelected: selectedFeeling == "having a hard time getting over something",
+                    index: 2,
+                    appeared: appeared,
+                    onSelect: { selectedFeeling = $0 }
                 )
             }
             .padding(.horizontal, 20)
@@ -414,39 +449,57 @@ private struct StepFeelingPage: View {
         }
         .onAppear { appeared = true }
     }
+}
 
-    @ViewBuilder
-    private func pill(label: String, bg: Color, option: String, index: Int) -> some View {
-        Button(action: {
-            withAnimation(.spring(response: 0.3)) { selectedFeeling = option }
-        }) {
+private struct FeelingPillButton: View {
+    let label: String
+    let option: String
+    let isSelected: Bool
+    let index: Int
+    let appeared: Bool
+    let onSelect: (String) -> Void
+
+    @State private var bounceScale: CGFloat = 1
+
+    var body: some View {
+        Button(action: select) {
             Text(label)
-                .font(.system(size: 17, weight: .medium, design: .rounded))
-                .foregroundColor(OnboardingColors.textPrimary)
+                .font(DinoTheme.dinoFont(size: 17))
+                .foregroundColor(isSelected ? .white : OnboardingColors.textPrimary)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 14)
                 .padding(.horizontal, 28)
-                .background(bg)
-                .cornerRadius(24)
-                .shadow(color: OnboardingColors.textPrimary.opacity(0.10), radius: 6, x: 0, y: 2)
+                .background(isSelected ? OnboardingColors.sage : OnboardingColors.surface1)
+                .clipShape(RoundedRectangle(cornerRadius: 16))
                 .overlay(
-                    RoundedRectangle(cornerRadius: 24)
+                    RoundedRectangle(cornerRadius: 16)
                         .stroke(
-                            selectedFeeling == option
-                                ? OnboardingColors.sage
-                                : Color.clear,
-                            lineWidth: 2
+                            isSelected ? OnboardingColors.sageDeep : OnboardingColors.cardBorder,
+                            lineWidth: isSelected ? 2 : 1.5
                         )
                 )
+                .shadow(color: Color.black.opacity(0.04), radius: 4, x: 0, y: 2)
         }
         .buttonStyle(ScaleButtonStyle())
-        .scaleEffect(appeared ? 1 : 0.92)
+        .scaleEffect((appeared ? 1 : 0.92) * bounceScale)
         .opacity(appeared ? 1 : 0)
         .animation(
             .timingCurve(0.22, 1, 0.36, 1, duration: 0.48)
                 .delay(Double(index) * 0.12),
             value: appeared
         )
+    }
+
+    private func select() {
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+            onSelect(option)
+            bounceScale = 1.04
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                bounceScale = 1
+            }
+        }
     }
 }
 
@@ -483,8 +536,7 @@ private struct StepChallengePickerPage: View {
             MascotView(imageName: "cut-DinoMascot", size: 140)
 
             Text("sorry to hear what's going on. what's been weighing on you most?")
-                .font(.custom(DinoTheme.customFontName, size: 18))
-                .italic()
+                .font(DinoTheme.dinoFont(size: 22))
                 .foregroundColor(OnboardingColors.textPrimary)
                 .multilineTextAlignment(.center)
                 .lineSpacing(4)
@@ -500,6 +552,7 @@ private struct StepChallengePickerPage: View {
                         )
                     }
                 }
+                .onboardingCardSurface(cornerRadius: 20, padding: 20)
                 .padding(.horizontal, 20)
                 .padding(.bottom, 8)
             }
@@ -512,30 +565,41 @@ private struct ChallengePillButton: View {
     let isSelected: Bool
     let onTap: () -> Void
 
+    @State private var bounceScale: CGFloat = 1
+
     var body: some View {
-        Button(action: {
-            withAnimation(.spring(response: 0.3)) { onTap() }
-        }) {
+        Button(action: select) {
             Text(label)
-                .font(.system(size: 15, weight: .medium, design: .rounded))
+                .font(DinoTheme.dinoFont(size: 16))
                 .foregroundColor(isSelected ? .white : OnboardingColors.textPrimary)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 14)
                 .padding(.horizontal, 16)
-                .background(isSelected ? OnboardingColors.sage : OnboardingColors.cardWhite)
-                .cornerRadius(16)
-                .shadow(color: OnboardingColors.textPrimary.opacity(0.06), radius: 4, x: 0, y: 1)
+                .background(isSelected ? OnboardingColors.sage : OnboardingColors.surface1)
+                .clipShape(RoundedRectangle(cornerRadius: 16))
                 .overlay(
                     RoundedRectangle(cornerRadius: 16)
                         .stroke(
-                            isSelected
-                                ? OnboardingColors.sage
-                                : OnboardingColors.sage.opacity(0.15),
-                            lineWidth: 1.2
+                            isSelected ? OnboardingColors.sageDeep : OnboardingColors.cardBorder,
+                            lineWidth: isSelected ? 2 : 1.5
                         )
                 )
+                .shadow(color: Color.black.opacity(0.04), radius: 4, x: 0, y: 2)
         }
         .buttonStyle(ScaleButtonStyle())
+        .scaleEffect(bounceScale)
+    }
+
+    private func select() {
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+            onTap()
+            bounceScale = 1.04
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                bounceScale = 1
+            }
+        }
     }
 }
 
@@ -578,7 +642,7 @@ private struct StepEncouragementPage: View {
                 .foregroundColor(OnboardingColors.textPrimary)
 
             Text("while receiving professional care is important, small habits and lifestyle changes can make a stark difference.")
-                .font(.system(size: 17, design: .rounded))
+                .font(DinoTheme.dinoFont(size: 17))
                 .foregroundColor(OnboardingColors.textPrimary.opacity(0.8))
                 .multilineTextAlignment(.center)
                 .lineSpacing(4)
@@ -590,18 +654,42 @@ private struct StepEncouragementPage: View {
     }
 }
 
+private struct RoseHeartShape: View {
+    var size: CGFloat = 20
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .fill(OnboardingColors.rose)
+                .frame(width: size * 0.52, height: size * 0.52)
+                .offset(x: -size * 0.18, y: size * 0.04)
+            Circle()
+                .fill(OnboardingColors.rose)
+                .frame(width: size * 0.52, height: size * 0.52)
+                .offset(x: size * 0.18, y: size * 0.04)
+            Ellipse()
+                .fill(OnboardingColors.rose)
+                .frame(width: size * 0.55, height: size * 0.42)
+                .offset(y: size * 0.14)
+        }
+        .frame(width: size, height: size)
+        .shadow(color: Color(hex: "#4A3520").opacity(0.12), radius: 4, x: 0, y: 2)
+    }
+}
+
 private struct RisingHeart: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let appeared: Bool
     let delay: Double
 
+    @State private var wobble: Double = -8
+
     var body: some View {
         let dur: Double = 1.2
-        Image(systemName: "heart.fill")
-            .font(.system(size: 22))
-            .foregroundColor(Color(hex: "#E8B4B8"))
+        RoseHeartShape(size: 20)
             .opacity(appeared && !reduceMotion ? 0 : (reduceMotion && appeared ? 0.8 : 0))
             .scaleEffect(appeared ? 1 : 0.6)
+            .rotationEffect(.degrees(reduceMotion ? 0 : wobble))
             .offset(y: appeared && !reduceMotion ? -80 : 0)
             .animation(
                 reduceMotion
@@ -609,6 +697,13 @@ private struct RisingHeart: View {
                     : .easeOut(duration: dur).delay(delay),
                 value: appeared
             )
+            .onChange(of: appeared) { _, isUp in
+                guard isUp, !reduceMotion else { return }
+                wobble = -8
+                withAnimation(.easeInOut(duration: dur).delay(delay)) {
+                    wobble = 8
+                }
+            }
     }
 }
 
@@ -701,14 +796,11 @@ private struct RadioRow: View {
                     }
                 }
                 Text(label)
-                    .font(.system(size: 17, design: .rounded))
+                    .font(DinoTheme.dinoFont(size: 17))
                     .foregroundColor(OnboardingColors.textPrimary)
                 Spacer()
             }
-            .padding(16)
-            .background(OnboardingColors.cardWhite)
-            .cornerRadius(16)
-            .shadow(color: OnboardingColors.textPrimary.opacity(0.06), radius: 4, x: 0, y: 1)
+            .onboardingCardSurface(cornerRadius: 16, padding: 16)
         }
         .buttonStyle(ScaleButtonStyle())
     }
@@ -724,15 +816,18 @@ private struct StepNotificationsPage: View {
 
             MascotView(imageName: "cut-DinoChecklist", size: 200)
 
-            Text("gentle reminders?")
-                .font(.custom(DinoTheme.customFontName, size: 24))
-                .foregroundColor(OnboardingColors.textPrimary)
+            VStack(spacing: 10) {
+                Text("gentle reminders?")
+                    .font(.custom(DinoTheme.customFontName, size: 24))
+                    .foregroundColor(OnboardingColors.textPrimary)
 
-            Text("dino will help you stay on top of your tasks.")
-                .font(.system(size: 15, design: .rounded))
-                .foregroundColor(OnboardingColors.textSecondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 24)
+                Text("dino will help you stay on top of your tasks.")
+                    .font(DinoTheme.dinoFont(size: 15))
+                    .foregroundColor(OnboardingColors.textSecondary)
+                    .multilineTextAlignment(.center)
+            }
+            .onboardingCardSurface(cornerRadius: 16, padding: 20)
+            .padding(.horizontal, 24)
 
             if !permissionRequested {
                 Button(action: requestNotifications) {
@@ -833,24 +928,28 @@ private struct StepNamePage: View {
             ZStack(alignment: .leading) {
                 if userName.isEmpty {
                     Text("your name")
-                        .font(.system(size: 17, design: .rounded))
+                        .font(DinoTheme.dinoFont(size: 17))
                         .foregroundColor(OnboardingColors.placeholder)
                         .padding(.horizontal, 16)
                 }
                 TextField("", text: $userName)
-                    .font(.system(size: 17, design: .rounded))
+                    .font(DinoTheme.dinoFont(size: 17))
                     .foregroundColor(OnboardingColors.textPrimary)
                     .padding(.horizontal, 16)
                     .focused($focused)
                     .onAppear { focused = true }
             }
             .frame(height: 56)
-            .background(OnboardingColors.cardWhite)
-            .cornerRadius(18)
+            .background(OnboardingColors.surface1)
+            .clipShape(RoundedRectangle(cornerRadius: 16))
             .overlay(
-                RoundedRectangle(cornerRadius: 18)
-                    .stroke(OnboardingColors.sage, lineWidth: 1.4)
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(
+                        focused ? OnboardingColors.sage : OnboardingColors.cardBorder,
+                        lineWidth: focused ? 2 : 1
+                    )
             )
+            .shadow(color: Color.black.opacity(0.04), radius: 4, x: 0, y: 2)
             .padding(.horizontal, 24)
 
             Spacer()
@@ -858,20 +957,21 @@ private struct StepNamePage: View {
     }
 }
 
-// MARK: - Step 8: Disclaimer + Confetti
+// MARK: - Step 10: Thank you + celebration
 private struct StepDisclaimerPage: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var mascotScale: CGFloat = 0.8
+
     var body: some View {
         VStack(spacing: 24) {
             Spacer(minLength: 20)
 
-            Image("cut-DinoPink")
-                .resizable()
-                .scaledToFit()
-                .frame(width: 180, height: 180)
+            MascotView(imageName: "cut-DinoPink", size: 180)
+                .scaleEffect(mascotScale)
                 .shadow(color: Color(hex: "#4A3520").opacity(0.18), radius: 12, x: 0, y: 6)
 
             Text("thank you for being honest/brave. i know it isn't easy to talk about your struggles. let's get started!")
-                .font(.system(size: 15, design: .rounded))
+                .font(DinoTheme.dinoFont(size: 17))
                 .foregroundColor(OnboardingColors.textSecondary)
                 .multilineTextAlignment(.center)
                 .lineSpacing(5)
@@ -879,63 +979,52 @@ private struct StepDisclaimerPage: View {
 
             Spacer()
         }
+        .onAppear {
+            if reduceMotion {
+                mascotScale = 1
+            } else {
+                withAnimation(.spring(response: 0.6, dampingFraction: 0.55)) {
+                    mascotScale = 1.1
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                    withAnimation(.spring(response: 0.6, dampingFraction: 0.55)) {
+                        mascotScale = 1
+                    }
+                }
+            }
+        }
     }
 }
 
 
-// MARK: - Step 8: Anxiety use case
+// MARK: - Step 8: Anxiety use case (breathing preview)
 private struct StepAnxietyUseCasePage: View {
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var pulsing: Bool = false
-
     var body: some View {
         ZStack {
-            LinearGradient(
-                colors: [Color(hex: "#E8F0E2"), Color(hex: "#D6E5CC")],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .ignoresSafeArea()
-            .opacity(0.85)
+            OnboardingBreathingAmbient()
 
             VStack(spacing: 24) {
                 Spacer(minLength: 12)
 
-                ZStack {
-                    Circle()
-                        .fill(OnboardingColors.sage.opacity(0.18))
-                        .frame(width: 200, height: 200)
-                        .blur(radius: 18)
-
-                    Circle()
-                        .fill(OnboardingColors.sage.opacity(0.6))
-                        .frame(width: 140, height: 140)
-                        .scaleEffect(pulsing && !reduceMotion ? 1.18 : 1.0)
-                        .shadow(color: OnboardingColors.sage.opacity(0.45), radius: 20, x: 0, y: 6)
-                        .animation(
-                            reduceMotion
-                                ? .default
-                                : .easeInOut(duration: 3).repeatForever(autoreverses: true),
-                            value: pulsing
-                        )
-                }
-                .frame(height: 220)
+                BreathingCircleComposition()
+                    .frame(height: 240)
 
                 Text("when anxiety hits")
                     .font(.custom(DinoTheme.customFontName, size: 28))
                     .foregroundColor(OnboardingColors.textPrimary)
                     .multilineTextAlignment(.center)
 
-                Text("4 minutes of breathing activates your body's calm response. dino will guide you through it.")
-                    .font(.system(size: 14, design: .rounded))
-                    .italic()
+                (Text("")
+                    + Text("4").font(DinoTheme.numericFont(size: 16))
+                    + Text(" minutes of breathing activates your body's calm response. dino will guide you through it.")
+                        .font(DinoTheme.dinoFont(size: 16)))
                     .foregroundColor(OnboardingColors.textSecondary)
                     .multilineTextAlignment(.center)
                     .lineSpacing(4)
                     .padding(.horizontal, 32)
 
                 Text("used by people before meetings, after hard news, during panic moments")
-                    .font(.system(size: 11, design: .rounded))
+                    .font(DinoTheme.dinoFont(size: 11))
                     .foregroundColor(OnboardingColors.textSecondary.opacity(0.65))
                     .multilineTextAlignment(.center)
                     .lineSpacing(3)
@@ -944,39 +1033,112 @@ private struct StepAnxietyUseCasePage: View {
                 Spacer()
             }
         }
-        .onAppear {
-            if !reduceMotion { pulsing = true }
-        }
     }
 }
 
-// MARK: - Step 9: Rough day use case
-private struct StepRoughDayUseCasePage: View {
+private struct BreathingCircleComposition: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var appeared: Bool = false
 
-    private let tokenColors: [Color] = [
-        Color(hex: "#F5C6AA"),
-        Color(hex: "#A8D4E6"),
-        Color(hex: "#C4B8D4"),
-        Color(hex: "#E8B4B8"),
-        Color(hex: "#A8C5A0")
-    ]
+    private let sage = Color(hex: "#A8C5A0")
+    private let sky = Color(hex: "#C8E6F5")
+    private let period: Double = 10.0
 
     var body: some View {
+        TimelineView(.animation) { context in
+            let t = context.date.timeIntervalSinceReferenceDate
+            let norm = (t.truncatingRemainder(dividingBy: period)) / period
+            let inhale = norm < 0.5
+
+            VStack(spacing: 14) {
+                ZStack {
+                    breathingLayer(
+                        norm: norm,
+                        delay: 0,
+                        maxScale: 1.12,
+                        style: .outerGlow
+                    )
+                    breathingLayer(
+                        norm: norm,
+                        delay: 0.05,
+                        maxScale: 1.08,
+                        style: .midRing
+                    )
+                    breathingLayer(
+                        norm: norm,
+                        delay: 0.1,
+                        maxScale: 1.05,
+                        style: .innerCore
+                    )
+                }
+                .frame(width: 200, height: 200)
+
+                Text(inhale ? "breathe in" : "breathe out")
+                    .font(DinoTheme.dinoFont(size: 14))
+                    .foregroundColor(OnboardingColors.sage)
+                    .id(inhale)
+                    .transition(.opacity)
+                    .animation(.easeInOut(duration: 0.4), value: inhale)
+            }
+        }
+    }
+
+    private enum LayerStyle { case outerGlow, midRing, innerCore }
+
+    @ViewBuilder
+    private func breathingLayer(
+        norm: Double,
+        delay: Double,
+        maxScale: CGFloat,
+        style: LayerStyle
+    ) -> some View {
+        let shifted = norm - delay
+        let pulse = 0.5 - 0.5 * cos(shifted * 2 * .pi)
+        let wave = reduceMotion
+            ? 1.0
+            : 1.0 + (maxScale - 1.0) * CGFloat(pulse)
+        let opacityPulse = reduceMotion
+            ? (0.55 + 0.15 * sin(norm * 2 * .pi))
+            : 1.0
+
+        Group {
+            switch style {
+            case .outerGlow:
+                Circle()
+                    .fill(sage.opacity(0.25 * opacityPulse))
+                    .frame(width: 200, height: 200)
+                    .blur(radius: 6)
+            case .midRing:
+                Circle()
+                    .stroke(sage.opacity(0.45 * opacityPulse), lineWidth: 2)
+                    .frame(width: 168, height: 168)
+            case .innerCore:
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [sage, sky],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 140, height: 140)
+                    .shadow(color: sage.opacity(0.45), radius: 20, x: 0, y: 6)
+            }
+        }
+        .scaleEffect(wave)
+    }
+}
+
+// MARK: - Step 9: Rough day use case (gratitude jar)
+private struct StepRoughDayUseCasePage: View {
+    var body: some View {
         ZStack {
-            LinearGradient(
-                colors: [Color(hex: "#FAF6EC"), Color(hex: "#F5C6AA").opacity(0.45)],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .ignoresSafeArea()
+            OnboardingGratitudeJarAmbient()
 
             VStack(spacing: 24) {
                 Spacer(minLength: 12)
 
-                jarVisual
-                    .frame(width: 180, height: 220)
+                GratitudeJarStage()
+                    .frame(maxWidth: 280)
 
                 Text("one small good thing")
                     .font(.custom(DinoTheme.customFontName, size: 28))
@@ -984,15 +1146,16 @@ private struct StepRoughDayUseCasePage: View {
                     .multilineTextAlignment(.center)
 
                 Text("on hard days, dropping one moment into your jar shifts something. it doesn't have to be big.")
-                    .font(.system(size: 14, design: .rounded))
-                    .italic()
+                    .font(DinoTheme.dinoFont(size: 17))
                     .foregroundColor(OnboardingColors.textSecondary)
                     .multilineTextAlignment(.center)
                     .lineSpacing(4)
                     .padding(.horizontal, 32)
 
-                Text("people who do this 3x a week report feeling more grounded")
-                    .font(.system(size: 11, design: .rounded))
+                (Text("people who do this ")
+                    + Text("3").font(DinoTheme.numericFont(size: 11))
+                    + Text("x a week report feeling more grounded")
+                        .font(DinoTheme.dinoFont(size: 11)))
                     .foregroundColor(OnboardingColors.textSecondary.opacity(0.65))
                     .multilineTextAlignment(.center)
                     .lineSpacing(3)
@@ -1001,90 +1164,155 @@ private struct StepRoughDayUseCasePage: View {
                 Spacer()
             }
         }
-        .onAppear { appeared = true }
     }
+}
 
-    private var jarVisual: some View {
+private struct GratitudeSlipSpec {
+    let text: String
+    let color: Color
+    let rotation: Double
+    let xOffset: CGFloat
+}
+
+private struct GratitudeJarStage: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var cycle: Int = 0
+
+    private static let slips: [GratitudeSlipSpec] = [
+        GratitudeSlipSpec(text: "quiet morning", color: OnboardingColors.peach, rotation: -10, xOffset: -28),
+        GratitudeSlipSpec(text: "good tea", color: OnboardingColors.lavender, rotation: 8, xOffset: 22),
+        GratitudeSlipSpec(text: "kind words", color: OnboardingColors.sky, rotation: -6, xOffset: -8),
+        GratitudeSlipSpec(text: "sunshine", color: OnboardingColors.sage, rotation: 12, xOffset: 30),
+        GratitudeSlipSpec(text: "deep breath", color: OnboardingColors.rose, rotation: -12, xOffset: 0)
+    ]
+
+    var body: some View {
         ZStack(alignment: .bottom) {
-            ForEach(0..<tokenColors.count, id: \.self) { i in
-                FallingToken(
-                    color: tokenColors[i],
+            ForEach(0..<Self.slips.count, id: \.self) { i in
+                GratitudeSlipView(
+                    spec: Self.slips[i],
                     index: i,
-                    appeared: appeared,
+                    cycle: cycle,
                     reduceMotion: reduceMotion
                 )
             }
+            gratitudeJar
+        }
+        .frame(width: 220, height: 260)
+        .padding(20)
+        .background(
+            LinearGradient(
+                colors: [Color(hex: "#FEFBF3"), Color(hex: "#F4F0E4")],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 20))
+        .shadow(color: Color.black.opacity(0.08), radius: 12, x: 0, y: 6)
+        .onAppear {
+            guard !reduceMotion else { return }
+            scheduleNextCycle()
+        }
+    }
 
-            VStack(spacing: 0) {
-                Capsule()
-                    .fill(OnboardingColors.sage.opacity(0.85))
-                    .frame(width: 90, height: 16)
-                    .shadow(color: OnboardingColors.textPrimary.opacity(0.10), radius: 2, x: 0, y: 1)
+    private var gratitudeJar: some View {
+        VStack(spacing: 0) {
+            Capsule()
+                .fill(OnboardingColors.sage.opacity(0.85))
+                .frame(width: 90, height: 16)
+                .shadow(color: OnboardingColors.textPrimary.opacity(0.10), radius: 2, x: 0, y: 1)
 
-                Rectangle()
-                    .fill(Color(hex: "#FEFBF3").opacity(0.9))
-                    .frame(width: 70, height: 10)
+            Rectangle()
+                .fill(Color(hex: "#FEFBF3").opacity(0.9))
+                .frame(width: 70, height: 10)
+                .overlay(
+                    Rectangle()
+                        .stroke(OnboardingColors.sage.opacity(0.35), lineWidth: 1)
+                )
+
+            ZStack(alignment: .bottom) {
+                RoundedRectangle(cornerRadius: 22)
+                    .fill(Color(hex: "#FEFBF3").opacity(0.75))
+                    .frame(width: 130, height: 140)
                     .overlay(
-                        Rectangle()
-                            .stroke(OnboardingColors.sage.opacity(0.35), lineWidth: 1)
+                        RoundedRectangle(cornerRadius: 22)
+                            .stroke(OnboardingColors.sage.opacity(0.45), lineWidth: 1.4)
                     )
-
-                ZStack(alignment: .bottom) {
-                    RoundedRectangle(cornerRadius: 22)
-                        .fill(Color(hex: "#FEFBF3").opacity(0.75))
-                        .frame(width: 130, height: 140)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 22)
-                                .stroke(OnboardingColors.sage.opacity(0.45), lineWidth: 1.4)
-                        )
-                        .shadow(color: OnboardingColors.textPrimary.opacity(0.10), radius: 8, x: 0, y: 4)
-
-                    HStack(spacing: 6) {
-                        ForEach(0..<3, id: \.self) { i in
-                            Circle()
-                                .fill(tokenColors[i].opacity(0.8))
-                                .frame(width: 14, height: 14)
-                        }
-                    }
-                    .padding(.bottom, 14)
-                }
+                    .shadow(color: OnboardingColors.textPrimary.opacity(0.10), radius: 8, x: 0, y: 4)
             }
+        }
+    }
+
+    private func scheduleNextCycle() {
+        let lastDelay = Double(Self.slips.count - 1) * 0.45 + 1.1
+        let repeatAfter = lastDelay + 1.5
+        DispatchQueue.main.asyncAfter(deadline: .now() + repeatAfter) {
+            cycle += 1
+            scheduleNextCycle()
         }
     }
 }
 
-private struct FallingToken: View {
-    @State private var dropped: Bool = false
-    let color: Color
+private struct GratitudeSlipView: View {
+    let spec: GratitudeSlipSpec
     let index: Int
-    let appeared: Bool
+    let cycle: Int
     let reduceMotion: Bool
 
-    var body: some View {
-        let xOffsets: [CGFloat] = [-30, -10, 10, 30, 0]
-        let startX = xOffsets[index % xOffsets.count]
-        let delay = Double(index) * 0.6
+    @State private var dropY: CGFloat = -130
+    @State private var landed: Bool = false
+    @State private var squishY: CGFloat = 1
 
-        Circle()
-            .fill(color)
-            .frame(width: 12, height: 12)
-            .shadow(color: color.opacity(0.5), radius: 3, x: 0, y: 1)
-            .offset(x: startX, y: dropped ? 90 : -120)
-            .opacity(dropped ? 0 : (appeared ? 1 : 0))
-            .rotationEffect(.degrees(dropped ? 180 : 0))
-            .onAppear {
-                guard appeared else { return }
-                if reduceMotion {
-                    dropped = false
-                    return
-                }
-                withAnimation(
-                    .easeIn(duration: 1.4)
-                        .delay(delay)
-                        .repeatForever(autoreverses: false)
-                ) {
-                    dropped = true
+    private let landY: CGFloat = 72
+
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 6)
+                .fill(spec.color.opacity(0.6))
+                .frame(width: 80, height: 28)
+            Text(spec.text)
+                .font(DinoTheme.dinoFont(size: 9))
+                .foregroundColor(OnboardingColors.textPrimary.opacity(0.85))
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+        }
+        .rotationEffect(.degrees(spec.rotation))
+        .offset(x: spec.xOffset, y: dropY)
+        .scaleEffect(x: 1, y: squishY, anchor: .bottom)
+        .opacity(reduceMotion && landed ? 0.9 : 1)
+        .onAppear { runDrop() }
+        .onChange(of: cycle) { _, _ in resetAndDrop() }
+    }
+
+    private func runDrop() {
+        resetAndDrop()
+    }
+
+    private func resetAndDrop() {
+        dropY = -130
+        landed = false
+        squishY = 1
+        let delay = Double(index) * 0.45
+
+        if reduceMotion {
+            dropY = landY
+            landed = true
+            return
+        }
+
+        withAnimation(.easeIn(duration: 1.0).delay(delay)) {
+            dropY = landY
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay + 1.0) {
+            landed = true
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.65)) {
+                squishY = 0.85
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.65)) {
+                    squishY = 1
                 }
             }
+        }
     }
 }
