@@ -377,6 +377,8 @@ private enum OnboardingBeginNotifier {
 private struct StepFeelingPage: View {
     @Binding var selectedFeeling: String
     @State private var appeared: Bool = false
+    @State private var tappedIndex: Int? = nil
+    @State private var tapPulse: CGFloat = 1.0
 
     var body: some View {
         VStack(spacing: 28) {
@@ -391,19 +393,16 @@ private struct StepFeelingPage: View {
             VStack(spacing: 12) {
                 pill(
                     label: "doing great",
-                    bg: OnboardingColors.peach,
                     option: "doing great!",
                     index: 0
                 )
                 pill(
                     label: "it's a challenge",
-                    bg: OnboardingColors.sky,
                     option: "ongoing mental health challenges",
                     index: 1
                 )
                 pill(
                     label: "somewhere in between",
-                    bg: OnboardingColors.lavender,
                     option: "having a hard time getting over something",
                     index: 2
                 )
@@ -416,31 +415,39 @@ private struct StepFeelingPage: View {
     }
 
     @ViewBuilder
-    private func pill(label: String, bg: Color, option: String, index: Int) -> some View {
+    private func pill(label: String, option: String, index: Int) -> some View {
+        let isSelected = selectedFeeling == option
         Button(action: {
             withAnimation(.spring(response: 0.3)) { selectedFeeling = option }
+            tappedIndex = index
+            withAnimation(.spring(response: 0.15, dampingFraction: 0.5)) {
+                tapPulse = 1.04
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                    tapPulse = 1.0
+                }
+            }
         }) {
             Text(label)
-                .font(.system(size: 17, weight: .medium, design: .rounded))
-                .foregroundColor(OnboardingColors.textPrimary)
+                .font(DinoTheme.dinoFont(size: 17))
+                .foregroundColor(isSelected ? .white : OnboardingColors.textPrimary)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 14)
                 .padding(.horizontal, 28)
-                .background(bg)
-                .cornerRadius(24)
-                .shadow(color: OnboardingColors.textPrimary.opacity(0.10), radius: 6, x: 0, y: 2)
+                .background(isSelected ? Color(hex: "#A8C5A0") : Color(hex: "#F9FAFB"))
+                .cornerRadius(16)
+                .shadow(color: .black.opacity(0.04), radius: 4, x: 0, y: 2)
                 .overlay(
-                    RoundedRectangle(cornerRadius: 24)
+                    RoundedRectangle(cornerRadius: 16)
                         .stroke(
-                            selectedFeeling == option
-                                ? OnboardingColors.sage
-                                : Color.clear,
-                            lineWidth: 2
+                            isSelected ? Color(hex: "#7BA872") : Color(hex: "#D1D5DB"),
+                            lineWidth: isSelected ? 2 : 1.5
                         )
                 )
         }
         .buttonStyle(ScaleButtonStyle())
-        .scaleEffect(appeared ? 1 : 0.92)
+        .scaleEffect((tappedIndex == index ? tapPulse : 1.0) * (appeared ? 1 : 0.92))
         .opacity(appeared ? 1 : 0)
         .animation(
             .timingCurve(0.22, 1, 0.36, 1, duration: 0.48)
@@ -517,21 +524,19 @@ private struct ChallengePillButton: View {
             withAnimation(.spring(response: 0.3)) { onTap() }
         }) {
             Text(label)
-                .font(.system(size: 15, weight: .medium, design: .rounded))
+                .font(DinoTheme.dinoFont(size: 16))
                 .foregroundColor(isSelected ? .white : OnboardingColors.textPrimary)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 14)
                 .padding(.horizontal, 16)
-                .background(isSelected ? OnboardingColors.sage : OnboardingColors.cardWhite)
+                .background(isSelected ? Color(hex: "#A8C5A0") : Color(hex: "#F9FAFB"))
                 .cornerRadius(16)
-                .shadow(color: OnboardingColors.textPrimary.opacity(0.06), radius: 4, x: 0, y: 1)
+                .shadow(color: .black.opacity(0.04), radius: 4, x: 0, y: 2)
                 .overlay(
                     RoundedRectangle(cornerRadius: 16)
                         .stroke(
-                            isSelected
-                                ? OnboardingColors.sage
-                                : OnboardingColors.sage.opacity(0.15),
-                            lineWidth: 1.2
+                            isSelected ? Color(hex: "#7BA872") : Color(hex: "#D1D5DB"),
+                            lineWidth: isSelected ? 2 : 1.5
                         )
                 )
         }
