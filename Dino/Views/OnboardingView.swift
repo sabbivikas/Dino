@@ -430,10 +430,10 @@ private struct StepFeelingPage: View {
             }
         }) {
             Text(label)
-                .font(DinoTheme.dinoFont(size: 17))
+                .font(DinoTheme.dinoFont(size: 19))
                 .foregroundColor(isSelected ? .white : OnboardingColors.textPrimary)
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 14)
+                .padding(.vertical, 18)
                 .padding(.horizontal, 28)
                 .background(isSelected ? Color(hex: "#A8C5A0") : Color(hex: "#F9FAFB"))
                 .cornerRadius(16)
@@ -524,10 +524,10 @@ private struct ChallengePillButton: View {
             withAnimation(.spring(response: 0.3)) { onTap() }
         }) {
             Text(label)
-                .font(DinoTheme.dinoFont(size: 16))
+                .font(DinoTheme.dinoFont(size: 18))
                 .foregroundColor(isSelected ? .white : OnboardingColors.textPrimary)
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 14)
+                .padding(.vertical, 18)
                 .padding(.horizontal, 16)
                 .background(isSelected ? Color(hex: "#A8C5A0") : Color(hex: "#F9FAFB"))
                 .cornerRadius(16)
