@@ -888,65 +888,106 @@ private struct StepDisclaimerPage: View {
 // MARK: - Step 8: Anxiety use case
 private struct StepAnxietyUseCasePage: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var pulsing: Bool = false
+    @State private var outerScale: CGFloat = 1.0
+    @State private var midScale: CGFloat = 1.0
+    @State private var innerScale: CGFloat = 1.0
+    @State private var dimmed: Bool = false
+    @State private var breathPhase: String = "breathe in"
+    @State private var phaseTimer: Timer? = nil
 
     var body: some View {
-        ZStack {
-            LinearGradient(
-                colors: [Color(hex: "#E8F0E2"), Color(hex: "#D6E5CC")],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .ignoresSafeArea()
-            .opacity(0.85)
+        VStack(spacing: 24) {
+            Spacer(minLength: 12)
 
-            VStack(spacing: 24) {
-                Spacer(minLength: 12)
+            ZStack {
+                // Layer 1 — outer glow ring
+                Circle()
+                    .fill(Color(hex: "#A8C5A0").opacity(0.25))
+                    .frame(width: 200, height: 200)
+                    .blur(radius: 6)
+                    .scaleEffect(reduceMotion ? 1.0 : outerScale)
+                    .opacity(reduceMotion && dimmed ? 0.7 : 1.0)
 
-                ZStack {
-                    Circle()
-                        .fill(OnboardingColors.sage.opacity(0.18))
-                        .frame(width: 200, height: 200)
-                        .blur(radius: 18)
+                // Layer 2 — mid ring
+                Circle()
+                    .stroke(Color(hex: "#A8C5A0").opacity(0.45), lineWidth: 2)
+                    .frame(width: 160, height: 160)
+                    .scaleEffect(reduceMotion ? 1.0 : midScale)
+                    .opacity(reduceMotion && dimmed ? 0.7 : 1.0)
 
-                    Circle()
-                        .fill(OnboardingColors.sage.opacity(0.6))
-                        .frame(width: 140, height: 140)
-                        .scaleEffect(pulsing && !reduceMotion ? 1.18 : 1.0)
-                        .shadow(color: OnboardingColors.sage.opacity(0.45), radius: 20, x: 0, y: 6)
-                        .animation(
-                            reduceMotion
-                                ? .default
-                                : .easeInOut(duration: 3).repeatForever(autoreverses: true),
-                            value: pulsing
+                // Layer 3 — inner core
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [Color(hex: "#A8C5A0"), Color(hex: "#C8E6F5")],
+                            startPoint: .top,
+                            endPoint: .bottom
                         )
-                }
-                .frame(height: 220)
-
-                Text("when anxiety hits")
-                    .font(.custom(DinoTheme.customFontName, size: 28))
-                    .foregroundColor(OnboardingColors.textPrimary)
-                    .multilineTextAlignment(.center)
-
-                Text("4 minutes of breathing activates your body's calm response. dino will guide you through it.")
-                    .font(DinoTheme.dinoFont(size: 16))
-                    .foregroundColor(OnboardingColors.textSecondary)
-                    .multilineTextAlignment(.center)
-                    .lineSpacing(4)
-                    .padding(.horizontal, 32)
-
-                Text("used by people before meetings, after hard news, during panic moments")
-                    .font(DinoTheme.dinoFont(size: 11))
-                    .foregroundColor(OnboardingColors.textSecondary.opacity(0.65))
-                    .multilineTextAlignment(.center)
-                    .lineSpacing(3)
-                    .padding(.horizontal, 36)
-
-                Spacer()
+                    )
+                    .frame(width: 120, height: 120)
+                    .scaleEffect(reduceMotion ? 1.0 : innerScale)
+                    .opacity(reduceMotion && dimmed ? 0.7 : 1.0)
             }
+            .frame(height: 220)
+
+            Text(breathPhase)
+                .font(DinoTheme.dinoFont(size: 14))
+                .foregroundColor(Color(hex: "#A8C5A0"))
+                .id(breathPhase)
+                .transition(.opacity.animation(.easeInOut(duration: 0.4)))
+
+            Text("when anxiety hits")
+                .font(.custom(DinoTheme.customFontName, size: 28))
+                .foregroundColor(OnboardingColors.textPrimary)
+                .multilineTextAlignment(.center)
+
+            Text("4 minutes of breathing activates your body's calm response. dino will guide you through it.")
+                .font(DinoTheme.dinoFont(size: 16))
+                .foregroundColor(OnboardingColors.textSecondary)
+                .multilineTextAlignment(.center)
+                .lineSpacing(4)
+                .padding(.horizontal, 32)
+
+            Text("used by people before meetings, after hard news, during panic moments")
+                .font(DinoTheme.dinoFont(size: 11))
+                .foregroundColor(OnboardingColors.textSecondary.opacity(0.65))
+                .multilineTextAlignment(.center)
+                .lineSpacing(3)
+                .padding(.horizontal, 36)
+
+            Spacer()
         }
         .onAppear {
-            if !reduceMotion { pulsing = true }
+            if reduceMotion {
+                // Opacity-only pulse — no scale changes
+                withAnimation(.easeInOut(duration: 10).repeatForever(autoreverses: true)) {
+                    dimmed = true
+                }
+            } else {
+                withAnimation(.easeInOut(duration: 10).repeatForever(autoreverses: true)) {
+                    outerScale = 1.12
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    withAnimation(.easeInOut(duration: 10).repeatForever(autoreverses: true)) {
+                        midScale = 1.08
+                    }
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                    withAnimation(.easeInOut(duration: 10).repeatForever(autoreverses: true)) {
+                        innerScale = 1.05
+                    }
+                }
+            }
+
+            phaseTimer = Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { _ in
+                withAnimation(.easeInOut(duration: 0.4)) {
+                    breathPhase = (breathPhase == "breathe in") ? "breathe out" : "breathe in"
+                }
+            }
+        }
+        .onDisappear {
+            phaseTimer?.invalidate()
+            phaseTimer = nil
         }
     }
 }
