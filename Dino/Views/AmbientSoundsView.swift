@@ -1195,183 +1195,157 @@ private struct WaveBars: View {
     }
 }
 
-// MARK: - ForestLetterView (intro before the waterfall scene)
+// MARK: - Reusable scene wrappers
 
-/// Cream letter card shown before AmbientSoundsView. Reveals the letter
-/// word-by-word, then offers a sage CTA to enter the waterfall.
+/// The full waterfall scene at a given palette — used both as the live ambient
+/// view and as the blurred backdrop behind the forest letter intro.
+struct WaterfallScene: View {
+    let palette: AmbientPalette
+    let isNight: Bool
+    let reduceMotion: Bool
+
+    var body: some View {
+        GeometryReader { geo in
+            let scale = max(geo.size.width / 402.0, geo.size.height / 874.0)
+            ZStack {
+                SkyLayer(palette: palette, isNight: isNight)
+                if isNight {
+                    MoonAndStars(reduceMotion: reduceMotion)
+                }
+                DriftingClouds(palette: palette, reduceMotion: reduceMotion)
+                GodRays(palette: palette, reduceMotion: reduceMotion)
+                SideTreeMasses(palette: palette)
+                FoliageLayer(positions: SceneLayout.foliageBack, fill: palette.treeB)
+                FoliageLayer(positions: SceneLayout.foliageMid,  fill: palette.treeM)
+                FoliageLayer(positions: SceneLayout.foliageCanopy, fill: palette.canopy1, opacity: 0.96)
+                RockCliff(palette: palette)
+                FernsLayer(palette: palette)
+                FoliageLayer(positions: SceneLayout.foliageFront, fill: palette.treeF)
+                FoliageLayer(positions: SceneLayout.foliageHL, fill: palette.treeHL, opacity: 0.6)
+                WaterfallSystem(palette: palette, reduceMotion: reduceMotion)
+                PoolLayer(palette: palette, reduceMotion: reduceMotion)
+                PoolForeground(palette: palette, reduceMotion: reduceMotion)
+                FishLayer(palette: palette, reduceMotion: reduceMotion)
+                if isNight {
+                    FirefliesLayer(reduceMotion: reduceMotion)
+                }
+                VignetteOverlay(isNight: isNight)
+            }
+            .frame(width: 402, height: 874)
+            .scaleEffect(scale)
+            .frame(width: geo.size.width, height: geo.size.height)
+            .clipped()
+        }
+    }
+}
+
+/// Thin wrapper that always renders the daytime palette — used by
+/// `ForestLetterView` as a hauntingly dim background.
+struct WaterfallDayScene: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    var body: some View {
+        WaterfallScene(palette: .day, isNight: false, reduceMotion: reduceMotion)
+    }
+}
+
+// MARK: - ForestLetterView (aged-parchment airmail letter)
+
+/// Full-screen letter shown before AmbientSoundsView. The waterfall scene
+/// sits behind, dimmed and blurred. The letter itself is a parchment page
+/// with airmail border, postage stamp, postmark, and a hand-drawn signature.
 struct ForestLetterView: View {
     let onEnter: () -> Void
     let onDismiss: () -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var sealAppeared: Bool = false
-    @State private var cardAppeared: Bool = false
-    @State private var ctaAppeared: Bool = false
+    @State private var landed: Bool = false
     @State private var fadingOut: Bool = false
-
-    private let letterCopy = """
-dear friend,
-
-find a quiet spot and close your eyes.
-
-you're standing at the edge of a still forest. somewhere nearby, a waterfall breathes.
-
-there's nothing to do here.
-no goals. no rush.
-
-just let the sounds carry you in.
-breathe slowly. stay as long as you like.
-
-the forest is always here,
-whenever you need it.
-"""
-
-    private var revealDuration: Double {
-        // ~0.06s per word + a buffer for the final word to finish appearing.
-        let wordCount = letterCopy.split(whereSeparator: { $0.isWhitespace }).count
-        return min(3.5, Double(wordCount) * 0.06 + 0.4)
-    }
 
     var body: some View {
         ZStack {
-            NatureBackdrop()
-                .ignoresSafeArea()
+            // Hauntingly dim, blurred waterfall in the background.
+            // Audio is NOT started until "enter the forest" is tapped.
+            ZStack {
+                WaterfallDayScene()
+                Color.black.opacity(0.35)
+            }
+            .blur(radius: 3)
+            .ignoresSafeArea()
 
-            letterCard
-                .offset(y: (cardAppeared || reduceMotion) ? 0 : 30)
-                .opacity(cardAppeared ? (fadingOut ? 0 : 1) : 0)
-                .padding(.horizontal, 28)
+            // Letter + CTAs centered vertically.
+            VStack(spacing: 0) {
+                Spacer(minLength: 24)
+
+                LetterPaper()
+                    .padding(.horizontal, 20)
+                    .rotationEffect(.degrees(restRotation), anchor: .center)
+                    .offset(y: yOffset)
+                    .scaleEffect(scaleAmount)
+                    .opacity(landed ? (fadingOut ? 0 : 1) : 0)
+
+                Spacer(minLength: 12)
+
+                // CTAs sit outside the letter, glowing softly against the dark scene.
+                Button(action: enterForest) {
+                    Text("enter the forest →")
+                        .font(DinoTheme.dinoFont(size: 17))
+                        .foregroundColor(Color(hex: "#FEFBF3"))
+                        .shadow(color: Color(hex: "#A8C5A0").opacity(0.6), radius: 8)
+                        .padding(.vertical, 6)
+                }
+                .buttonStyle(.plain)
+                .padding(.top, 20)
+                .opacity(fadingOut ? 0 : 1)
+
+                Button(action: onDismiss) {
+                    Text("maybe later")
+                        .font(DinoTheme.dinoFont(size: 14))
+                        .foregroundColor(Color.white.opacity(0.5))
+                        .padding(.vertical, 4)
+                }
+                .buttonStyle(.plain)
+                .padding(.top, 12)
+                .padding(.bottom, 36)
+                .opacity(fadingOut ? 0 : 1)
+            }
         }
         .ignoresSafeArea()
         .onAppear { startEntrance() }
     }
 
-    private var letterCard: some View {
-        VStack(spacing: 0) {
-            // Wax / leaf seal at top
-            ZStack {
-                Circle()
-                    .fill(Color(hex: "#A8C5A0").opacity(0.2))
-                    .frame(width: 64, height: 64)
-                    .blur(radius: 12)
-                Circle()
-                    .fill(Color(hex: "#A8C5A0"))
-                    .frame(width: 48, height: 48)
-                ForestLeafShape()
-                    .fill(Color.white.opacity(0.8))
-                    .frame(width: 22, height: 28)
-            }
-            .scaleEffect(reduceMotion ? 1.0 : (sealAppeared ? 1.0 : 0.0))
-            .opacity(sealAppeared ? 1 : 0)
+    // MARK: Entrance / exit
 
-            Text("a note from the forest")
-                .font(DinoTheme.dinoFont(size: 12))
-                .tracking(1.5)
-                .foregroundColor(Color(hex: "#9E8E7E").opacity(0.8))
-                .padding(.top, 14)
-
-            // Letter body — word reveal
-            WordRevealText(
-                letterCopy,
-                font: DinoTheme.dinoFont(size: 16),
-                color: Color(hex: "#4A3520")
-            )
-            .multilineTextAlignment(.center)
-            .lineSpacing(6)
-            .padding(.top, 16)
-
-            // Three-dot decorative divider
-            HStack(spacing: 8) {
-                ForEach(0..<3, id: \.self) { _ in
-                    Circle()
-                        .fill(Color(hex: "#A8C5A0").opacity(0.6))
-                        .frame(width: 4, height: 4)
-                }
-            }
-            .padding(.top, 20)
-
-            // Primary CTA (appears after the letter finishes revealing)
-            Button(action: enterForest) {
-                Text("enter the forest")
-                    .font(DinoTheme.dinoFont(size: 17))
-                    .foregroundColor(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 18)
-                    .background(Color(hex: "#A8C5A0"))
-                    .cornerRadius(16)
-                    .shadow(color: Color(hex: "#A8C5A0").opacity(0.4), radius: 12, x: 0, y: 4)
-            }
-            .buttonStyle(ScaleButtonStyle())
-            .opacity(ctaAppeared ? 1 : 0)
-            .padding(.top, 24)
-
-            // Ghost dismiss
-            Button(action: {
-                onDismiss()
-            }) {
-                Text("maybe later")
-                    .font(DinoTheme.dinoFont(size: 15))
-                    .foregroundColor(Color(hex: "#A8C5A0"))
-                    .padding(.vertical, 8)
-            }
-            .buttonStyle(.plain)
-            .padding(.top, 12)
-        }
-        .padding(32)
-        .background(
-            RoundedRectangle(cornerRadius: 24)
-                .fill(Color(hex: "#FEFBF3"))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 24)
-                .stroke(Color(hex: "#E8DDD0"), lineWidth: 1)
-        )
-        .shadow(color: Color(hex: "#C4A882").opacity(0.15), radius: 16, x: 0, y: 6)
+    private var restRotation: Double {
+        if reduceMotion { return -1 }
+        return landed ? -1 : -8
+    }
+    private var yOffset: Double {
+        if reduceMotion { return 0 }
+        return landed ? 0 : -60
+    }
+    private var scaleAmount: Double {
+        if reduceMotion { return 1.0 }
+        return landed ? 1.0 : 0.94
     }
 
-    // MARK: Animation orchestration
-
     private func startEntrance() {
-        // Seal pops in first
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-            withAnimation(
-                reduceMotion
-                    ? .easeOut(duration: 0.35)
-                    : .spring(response: 0.6, dampingFraction: 0.55)
-            ) {
-                sealAppeared = true
-            }
-        }
-
-        // Card slides up
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
             withAnimation(
                 reduceMotion
                     ? .easeOut(duration: 0.4)
-                    : .spring(response: 0.5, dampingFraction: 0.75)
+                    : .spring(response: 0.65, dampingFraction: 0.72)
             ) {
-                cardAppeared = true
-            }
-        }
-
-        // CTA fades in after the word reveal completes
-        let ctaDelay = (reduceMotion ? 0.6 : (revealDuration + 0.4))
-        DispatchQueue.main.asyncAfter(deadline: .now() + ctaDelay) {
-            withAnimation(.easeOut(duration: 0.4)) {
-                ctaAppeared = true
+                landed = true
             }
         }
     }
 
     private func enterForest() {
-        // Start audio during the transition so the user hears the waterfall
-        // before the visual change completes.
         let audio = AudioManager.shared
         audio.setVolume(0.7)
         audio.play(track: "rain", playback: false)
         audio.fadeIn(duration: 2.0)
 
-        // Card fades out, then hand off to the parent.
         withAnimation(.easeOut(duration: 0.4)) { fadingOut = true }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
             onEnter()
@@ -1379,7 +1353,256 @@ whenever you need it.
     }
 }
 
-/// Simple two-arc leaf used inside the forest letter seal.
+// MARK: - Letter paper (parchment + airmail border + stamp + postmark + content)
+
+private struct LetterPaper: View {
+    private let letterBody: String = """
+find a quiet spot.
+close your eyes.
+
+you're standing at the edge of a still forest.
+somewhere nearby, a waterfall breathes.
+
+there is nothing to do here.
+no goals. no rush. no noise.
+
+just let the sounds find you.
+breathe slowly.
+stay as long as you like.
+
+the forest will be here,
+whenever you need it.
+"""
+
+    var body: some View {
+        ZStack(alignment: .topTrailing) {
+            // Parchment background + subtle grain lines
+            ZStack {
+                LinearGradient(
+                    colors: [
+                        Color(hex: "#FBF4E4"),
+                        Color(hex: "#F5EDD8"),
+                        Color(hex: "#EFE4CA")
+                    ],
+                    startPoint: .top, endPoint: .bottom
+                )
+                Canvas { ctx, size in
+                    for i in 0..<4 {
+                        var p = Path()
+                        let y = Double(i + 1) * size.height / 5.0
+                        p.move(to: CGPoint(x: 0, y: y))
+                        p.addLine(to: CGPoint(x: size.width, y: y + 24))
+                        ctx.stroke(p, with: .color(Color(hex: "#8B7355").opacity(0.03)), lineWidth: 0.5)
+                    }
+                }
+            }
+
+            // Letter content (header + body + footer + fold line)
+            VStack(alignment: .leading, spacing: 0) {
+                Text("dear friend,")
+                    .font(DinoTheme.dinoFont(size: 15))
+                    .italic()
+                    .foregroundColor(Color(hex: "#6B5B3E"))
+                    .padding(.top, 20)
+                    .padding(.leading, 20)
+
+                Text(letterBody)
+                    .font(DinoTheme.dinoFont(size: 15))
+                    .foregroundColor(Color(hex: "#4A3520"))
+                    .lineSpacing(7)
+                    .multilineTextAlignment(.leading)
+                    .padding(.horizontal, 20)
+                    .padding(.top, 14)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("with love,")
+                        .font(DinoTheme.dinoFont(size: 15))
+                        .italic()
+                        .foregroundColor(Color(hex: "#6B5B3E"))
+                    Text("the forest")
+                        .font(DinoTheme.dinoFont(size: 18))
+                        .foregroundColor(Color(hex: "#3D6B3A"))
+                    ForestLeafShape()
+                        .fill(Color(hex: "#A8C5A0"))
+                        .frame(width: 12, height: 14)
+                        .padding(.top, 2)
+                }
+                .padding(.leading, 20)
+                .padding(.top, 18)
+
+                Rectangle()
+                    .fill(Color(hex: "#D4C4A0").opacity(0.6))
+                    .frame(height: 0.5)
+                    .padding(.top, 16)
+
+                Color.clear.frame(height: 14)
+            }
+            .padding(.bottom, 4)
+
+            // Airmail border sits over the parchment but BELOW the stamp.
+            AirmailStripes(thickness: 8)
+                .padding(6)
+                .allowsHitTesting(false)
+
+            // Postage stamp + postmark in top-right — drawn on top of the border.
+            ZStack(alignment: .topTrailing) {
+                PostageStamp()
+                    .padding(.top, 12)
+                    .padding(.trailing, 12)
+                PostmarkCircle()
+                    .offset(x: -8, y: 30)
+            }
+        }
+        .background(Color(hex: "#FBF4E4"))
+        .cornerRadius(4)
+        .shadow(color: Color.black.opacity(0.20), radius: 20, x: 0, y: 8)
+    }
+}
+
+// MARK: - Airmail stripes
+
+/// 45° alternating red/blue stripes filling a ring around the parent rect.
+/// Uses Canvas + `.destinationOut` to punch the inner area transparent.
+private struct AirmailStripes: View {
+    let thickness: Double
+
+    var body: some View {
+        Canvas { ctx, size in
+            let red  = Color(hex: "#E85444")
+            let blue = Color(hex: "#4A7FC1")
+            let stripeW: Double = 8
+            let cycle: Double = 16   // red(8) + blue(8)
+            let span = size.width + size.height
+
+            var x: Double = -span
+            while x < span {
+                var r = Path()
+                r.move(to: CGPoint(x: x, y: 0))
+                r.addLine(to: CGPoint(x: x + size.height, y: size.height))
+                ctx.stroke(r, with: .color(red), lineWidth: stripeW)
+                var b = Path()
+                b.move(to: CGPoint(x: x + 8, y: 0))
+                b.addLine(to: CGPoint(x: x + 8 + size.height, y: size.height))
+                ctx.stroke(b, with: .color(blue), lineWidth: stripeW)
+                x += cycle
+            }
+
+            // Punch out the inner area so only the border ring remains visible.
+            ctx.blendMode = .destinationOut
+            let inner = CGRect(
+                x: thickness,
+                y: thickness,
+                width: max(0, size.width  - 2 * thickness),
+                height: max(0, size.height - 2 * thickness)
+            )
+            ctx.fill(Path(inner), with: .color(.black))
+        }
+    }
+}
+
+// MARK: - Postage stamp
+
+private struct PostageStamp: View {
+    var body: some View {
+        ZStack {
+            // Cream outer frame
+            Rectangle()
+                .fill(Color(hex: "#FEFBF3"))
+                .frame(width: 56, height: 68)
+            // Sage interior
+            Rectangle()
+                .fill(Color(hex: "#A8C5A0"))
+                .frame(width: 52, height: 64)
+            // Inner sage-deep hairline for the classic stamp look
+            Rectangle()
+                .stroke(Color(hex: "#7BA872"), lineWidth: 0.6)
+                .frame(width: 46, height: 58)
+            // Leaf + label
+            VStack(spacing: 2) {
+                ForestLeafShape()
+                    .fill(Color.white)
+                    .frame(width: 18, height: 22)
+                Text("dino")
+                    .font(DinoTheme.dinoFont(size: 8))
+                    .foregroundColor(.white)
+                    .tracking(0.6)
+            }
+            .offset(y: -2)
+        }
+        // Faint scalloped "perforation" suggestion via repeated white dots
+        .overlay(PerforationDots(width: 56, height: 68))
+        .rotationEffect(.degrees(4))
+        .shadow(color: Color.black.opacity(0.12), radius: 2, x: 0, y: 1)
+    }
+}
+
+/// Small white circles arrayed around the edge to suggest postage perforations.
+private struct PerforationDots: View {
+    let width: Double
+    let height: Double
+    var body: some View {
+        Canvas { ctx, size in
+            let r: Double = 1.4
+            let step: Double = 5.0
+            func dot(_ x: Double, _ y: Double) {
+                ctx.fill(
+                    Path(ellipseIn: CGRect(x: x - r, y: y - r, width: r * 2, height: r * 2)),
+                    with: .color(Color(hex: "#FEFBF3"))
+                )
+            }
+            // Top + bottom edges
+            var x = step
+            while x < size.width {
+                dot(x, 0)
+                dot(x, size.height)
+                x += step
+            }
+            // Left + right edges
+            var y = step
+            while y < size.height {
+                dot(0, y)
+                dot(size.width, y)
+                y += step
+            }
+        }
+        .frame(width: width, height: height)
+    }
+}
+
+// MARK: - Postmark
+
+private struct PostmarkCircle: View {
+    var body: some View {
+        ZStack {
+            // Outer dashed circle
+            Circle()
+                .stroke(
+                    Color(hex: "#8B7355").opacity(0.5),
+                    style: StrokeStyle(lineWidth: 1.5, dash: [3, 3])
+                )
+                .frame(width: 44, height: 44)
+
+            // Two horizontal lines around the center text
+            VStack(spacing: 1.5) {
+                Rectangle()
+                    .fill(Color(hex: "#8B7355").opacity(0.5))
+                    .frame(width: 22, height: 0.5)
+                Text("forest post")
+                    .font(DinoTheme.dinoFont(size: 7))
+                    .foregroundColor(Color(hex: "#8B7355").opacity(0.7))
+                    .tracking(0.4)
+                Rectangle()
+                    .fill(Color(hex: "#8B7355").opacity(0.5))
+                    .frame(width: 22, height: 0.5)
+            }
+        }
+        .rotationEffect(.degrees(-12))
+    }
+}
+
+// MARK: - Forest leaf shape (used by seal, footer signature, and stamp)
+
 private struct ForestLeafShape: Shape {
     func path(in r: CGRect) -> Path {
         var p = Path()
@@ -1389,7 +1612,6 @@ private struct ForestLeafShape: Shape {
         p.addQuadCurve(to: bottom, control: CGPoint(x: r.maxX, y: r.midY))
         p.addQuadCurve(to: top,    control: CGPoint(x: r.minX, y: r.midY))
         p.closeSubpath()
-        // Center vein
         p.move(to: top)
         p.addLine(to: bottom)
         return p
@@ -1411,46 +1633,16 @@ struct AmbientSoundsView: View {
     private var palette: AmbientPalette { isNight ? .night : .day }
 
     var body: some View {
-        GeometryReader { geo in
-            let scale = max(geo.size.width / 402.0, geo.size.height / 874.0)
-            ZStack {
-                Color.black.ignoresSafeArea()
-
-                ZStack {
-                    SkyLayer(palette: palette, isNight: isNight)
-                    if isNight {
-                        MoonAndStars(reduceMotion: reduceMotion)
-                    }
-                    DriftingClouds(palette: palette, reduceMotion: reduceMotion)
-                    GodRays(palette: palette, reduceMotion: reduceMotion)
-                    SideTreeMasses(palette: palette)
-                    FoliageLayer(positions: SceneLayout.foliageBack, fill: palette.treeB)
-                    FoliageLayer(positions: SceneLayout.foliageMid,  fill: palette.treeM)
-                    FoliageLayer(positions: SceneLayout.foliageCanopy, fill: palette.canopy1, opacity: 0.96)
-                    RockCliff(palette: palette)
-                    FernsLayer(palette: palette)
-                    FoliageLayer(positions: SceneLayout.foliageFront, fill: palette.treeF)
-                    FoliageLayer(positions: SceneLayout.foliageHL, fill: palette.treeHL, opacity: 0.6)
-                    WaterfallSystem(palette: palette, reduceMotion: reduceMotion)
-                    PoolLayer(palette: palette, reduceMotion: reduceMotion)
-                    PoolForeground(palette: palette, reduceMotion: reduceMotion)
-                    FishLayer(palette: palette, reduceMotion: reduceMotion)
-                    if isNight {
-                        FirefliesLayer(reduceMotion: reduceMotion)
-                    }
-                    VignetteOverlay(isNight: isNight)
-                }
-                .frame(width: 402, height: 874)
-                .scaleEffect(scale)
-                .clipped()
-
-                AmbientUIOverlay(
-                    palette: palette,
-                    isPlaying: audio.isPlaying,
-                    onClose: close
-                )
+        ZStack {
+            Color.black.ignoresSafeArea()
+            WaterfallScene(palette: palette, isNight: isNight, reduceMotion: reduceMotion)
                 .ignoresSafeArea()
-            }
+            AmbientUIOverlay(
+                palette: palette,
+                isPlaying: audio.isPlaying,
+                onClose: close
+            )
+            .ignoresSafeArea()
         }
         .ignoresSafeArea()
         .preferredColorScheme(isNight ? .dark : .light)
