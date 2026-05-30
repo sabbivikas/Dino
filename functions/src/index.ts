@@ -74,6 +74,47 @@ export const generateMoodPainting = onCall(
   }
 );
 
+// Daily "forest letter" — short, poetic, single-paragraph note read aloud
+// from the ambient sounds screen. Authenticated to avoid anonymous abuse;
+// the iOS client caches per local-day so this is called ~once per user per day.
+export const generateForestLetter = onCall(
+  { secrets: [OPENAI_API_KEY], timeoutSeconds: 30, memory: "256MiB" },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "sign in required");
+    }
+
+    const weekday = (request.data?.weekday ?? "") as string;
+    const monthName = (request.data?.monthName ?? "") as string;
+
+    const systemPrompt =
+      "You are the forest. Write one short daily letter to someone who visits a quiet waterfall to find peace. Connect nature with mental health in a warm poetic way. Write in lowercase. Never use dashes. Keep under 150 words. No greeting or sign off. Just the letter body. Make each day feel completely different.";
+    const userPrompt = `Write today's forest letter. Today is ${weekday}, ${monthName}.`;
+
+    try {
+      const openai = new OpenAI({ apiKey: OPENAI_API_KEY.value() });
+      const resp = await openai.chat.completions.create({
+        model: "gpt-4o",
+        max_tokens: 200,
+        temperature: 0.9,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+      });
+      const content = resp.choices?.[0]?.message?.content ?? "";
+      if (!content) {
+        throw new HttpsError("internal", "OpenAI returned empty content");
+      }
+      return { content: content.trim() };
+    } catch (err) {
+      if (err instanceof HttpsError) throw err;
+      const message = err instanceof Error ? err.message : "OpenAI request failed";
+      throw new HttpsError("internal", message);
+    }
+  }
+);
+
 export const sendWelcomeEmailAfterTwoDays = functions.auth.user().onCreate(async (user) => {
   const email = (user.email || "").trim();
   const uid = user.uid;

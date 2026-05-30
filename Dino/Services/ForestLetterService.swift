@@ -8,6 +8,7 @@
 //
 
 import Foundation
+import FirebaseFunctions
 
 struct ForestDailyLetter: Codable {
     let date: String           // yyyy-MM-dd, the local-day the letter belongs to
@@ -21,8 +22,9 @@ actor ForestLetterService {
 
     private let cacheKey = "dino.forestDailyLetter"
 
-    private static let fallbackContent =
-        "the water has been here longer than your worries. it does not rush. it does not stop. it simply finds its way. so will you."
+    private static let fallbackLetter = """
+        the water has been here longer than your worries. it does not rush. it does not stop. it simply finds its way. so will you.
+        """
 
     // MARK: - Public API
 
@@ -39,47 +41,38 @@ actor ForestLetterService {
         return letter
     }
 
-    /// Calls OpenAI's Chat Completions API. On any error, returns the
-    /// fallback line so the UI always has something to render.
+    /// Calls the `generateForestLetter` Firebase Cloud Function, which proxies
+    /// the OpenAI Chat Completions request so the API key never ships in the
+    /// app binary. On any failure, returns the fallback line so the UI is
+    /// never empty.
     func generateLetter() async -> String {
-        guard let apiKey = Bundle.main.object(forInfoDictionaryKey: "OPENAI_API_KEY") as? String,
-              !apiKey.isEmpty,
-              let url = URL(string: "https://api.openai.com/v1/chat/completions") else {
-            return Self.fallbackContent
-        }
-
-        let (weekday, monthName) = Self.weekdayAndMonth()
-        let systemPrompt = "You are the forest. Write one short daily letter to someone who visits a quiet waterfall to find peace. Connect nature with mental health in a warm poetic way. Write in lowercase. Never use dashes. Keep under 150 words. No greeting or sign off. Just the letter body. Make each day feel completely different."
-        let userPrompt = "Write today's forest letter. Today is \(weekday), \(monthName)."
-
-        let body: [String: Any] = [
-            "model": "gpt-4o",
-            "max_tokens": 200,
-            "temperature": 0.9,
-            "messages": [
-                ["role": "system", "content": systemPrompt],
-                ["role": "user",   "content": userPrompt]
-            ]
-        ]
-
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-        request.timeoutInterval = 25
-
         do {
-            request.httpBody = try JSONSerialization.data(withJSONObject: body)
-            let (data, _) = try await URLSession.shared.data(for: request)
-            guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-                  let choices = json["choices"] as? [[String: Any]],
-                  let message = choices.first?["message"] as? [String: Any],
-                  let content = message["content"] as? String else {
-                return Self.fallbackContent
+            let weekdayFormatter = DateFormatter()
+            weekdayFormatter.dateFormat = "EEEE"
+            let weekday = weekdayFormatter.string(from: Date())
+
+            let monthFormatter = DateFormatter()
+            monthFormatter.dateFormat = "MMMM"
+            let monthName = monthFormatter.string(from: Date())
+
+            let functions = Functions.functions(region: "us-central1")
+            let callable = functions.httpsCallable("generateForestLetter")
+            let result = try await callable.call([
+                "weekday": weekday,
+                "monthName": monthName
+            ])
+
+            if let data = result.data as? [String: Any],
+               let content = data["content"] as? String,
+               !content.isEmpty {
+                return content
             }
-            return content.trimmingCharacters(in: .whitespacesAndNewlines)
+            return Self.fallbackLetter
         } catch {
-            return Self.fallbackContent
+            #if DEBUG
+            print("\u{1F33F} Forest letter error: \(error)")
+            #endif
+            return Self.fallbackLetter
         }
     }
 
@@ -123,12 +116,4 @@ actor ForestLetterService {
         return df.string(from: Date())
     }
 
-    nonisolated private static func weekdayAndMonth() -> (String, String) {
-        let wd = DateFormatter()
-        wd.dateFormat = "EEEE"
-        let mo = DateFormatter()
-        mo.dateFormat = "MMMM"
-        let now = Date()
-        return (wd.string(from: now), mo.string(from: now))
-    }
 }
