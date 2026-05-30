@@ -106,6 +106,7 @@ private enum ProfileSheet: Identifiable {
     case paintingGallery
     case paintingGenerator
     case feedback
+    case ambientSounds
     case stub(ComingSoonContent)
 
     var id: String {
@@ -123,6 +124,7 @@ private enum ProfileSheet: Identifiable {
         case .paintingGallery: return "paintingGallery"
         case .paintingGenerator: return "paintingGenerator"
         case .feedback: return "feedback"
+        case .ambientSounds: return "ambientSounds"
         case .stub(let c):   return "stub-\(c.id)"
         }
     }
@@ -137,6 +139,7 @@ struct ProfileView: View {
     @Environment(\.requestReview) private var requestReview
 
     @State private var activeSheet: ProfileSheet?
+    @State private var showAmbientSounds: Bool = false
     @State private var showRateAlert: Bool = false
     @AppStorage("dino.showStreak") private var showStreak: Bool = true
     @AppStorage("dino.streakHintSeen") private var streakHintSeen: Bool = false
@@ -293,8 +296,12 @@ struct ProfileView: View {
                     moods: moodsForCurrentMonth()
                 )
             case .feedback: FeedbackView()
+            case .ambientSounds: EmptyView() // presented via fullScreenCover instead
             case .stub(let content): ComingSoonView(content: content)
             }
+        }
+        .fullScreenCover(isPresented: $showAmbientSounds) {
+            AmbientSoundsView()
         }
         .alert("enjoying dino?", isPresented: $showRateAlert) {
             Button("rate now") { requestReview() }
@@ -749,7 +756,9 @@ struct ProfileView: View {
             ) {
                 activeSheet = .gentleReminders
             }
-            AmbientSoundsRow()
+            AmbientSoundsRow {
+                showAmbientSounds = true
+            }
             SBRow(
                 icon: "moon.stars.fill",
                 iconColor: SB.lavender,
@@ -1187,41 +1196,42 @@ private struct PaperSection<Content: View>: View {
     }
 }
 
-// MARK: - Ambient Sounds Row (coming soon, non-tappable)
+// MARK: - Ambient Sounds Row
 
 private struct AmbientSoundsRow: View {
+    let onTap: () -> Void
+
     var body: some View {
-        HStack(spacing: 12) {
-            ZStack {
-                Circle()
-                    .fill(SB.peach)
-                    .frame(width: 36, height: 36)
-                Image(systemName: "music.note")
-                    .font(.system(size: 15, weight: .medium))
-                    .foregroundColor(.white)
+        Button(action: onTap) {
+            HStack(spacing: 12) {
+                ZStack {
+                    Circle()
+                        .fill(SB.peach)
+                        .frame(width: 36, height: 36)
+                    Image(systemName: "music.note")
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundColor(.white)
+                }
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("ambient sounds")
+                        .font(DinoTheme.dinoFont(size: 16))
+                        .foregroundColor(SB.nearBlack)
+                    Text("rain, forest, soft piano")
+                        .font(DinoTheme.dinoFont(size: 12))
+                        .foregroundColor(SB.sage)
+                }
+
+                Spacer(minLength: 0)
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(SB.sage.opacity(0.55))
             }
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text("ambient sounds")
-                    .font(DinoTheme.dinoFont(size: 16))
-                    .foregroundColor(SB.nearBlack)
-                Text("rain, forest, soft piano")
-                    .font(DinoTheme.dinoFont(size: 12))
-                    .foregroundColor(SB.sage)
-            }
-
-            Spacer(minLength: 0)
-
-            Text("coming soon")
-                .font(DinoTheme.dinoFont(size: 10))
-                .foregroundColor(SB.sage)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 3)
-                .background(
-                    Capsule().fill(SB.sage.opacity(0.12))
-                )
+            .contentShape(Rectangle())
+            .padding(.vertical, 6)
         }
-        .padding(.vertical, 6)
+        .buttonStyle(.plain)
     }
 }
 
