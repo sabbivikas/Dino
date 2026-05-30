@@ -1199,7 +1199,7 @@ private struct WaveBars: View {
 
 /// The full waterfall scene at a given palette — used both as the live ambient
 /// view and as the blurred backdrop behind the forest letter intro.
-struct WaterfallScene: View {
+fileprivate struct WaterfallScene: View {
     let palette: AmbientPalette
     let isNight: Bool
     let reduceMotion: Bool
