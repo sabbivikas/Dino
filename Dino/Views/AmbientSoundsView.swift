@@ -419,7 +419,7 @@ private struct MoonAndStars: View {
             .position(x: 120 + 170, y: -46 + 170)
 
             // Moon body
-            TimelineView(.animation) { tl in
+            TimelineView(.animation(minimumInterval: 1/60)) { tl in
                 let t = tl.date.timeIntervalSinceReferenceDate
                 let pulse = reduceMotion ? 1.0 : (1.0 + 0.04 * sin(t * .pi * 2 / 6))
                 ZStack {
@@ -450,7 +450,7 @@ private struct MoonAndStars: View {
             }
 
             // Stars (twinkle)
-            TimelineView(.animation) { tl in
+            TimelineView(.animation(minimumInterval: 1/60)) { tl in
                 let t = tl.date.timeIntervalSinceReferenceDate
                 ForEach(0..<SceneLayout.stars.count, id: \.self) { i in
                     let s = SceneLayout.stars[i]
@@ -485,7 +485,7 @@ private struct DriftingClouds: View {
     }
 
     private func cloud(scale: Double, top: Double, period: Double, delay: Double) -> some View {
-        TimelineView(.animation) { tl in
+        TimelineView(.animation(minimumInterval: 1/60)) { tl in
             let t = tl.date.timeIntervalSinceReferenceDate + delay
             // drift: from left=-130 to left=430 over `period` seconds, linear
             let phase = reduceMotion ? 0.3 : ((t.truncatingRemainder(dividingBy: period)) / period)
@@ -524,7 +524,7 @@ private struct GodRays: View {
     ]
 
     var body: some View {
-        TimelineView(.animation) { tl in
+        TimelineView(.animation(minimumInterval: 1/60)) { tl in
             let t = tl.date.timeIntervalSinceReferenceDate
             ZStack(alignment: .topLeading) {
                 ForEach(0..<specs.count, id: \.self) { i in
@@ -584,7 +584,7 @@ private struct WaterfallSystem: View {
                 .frame(width: 88, height: 384)
 
                 // Streaks (animated falling lines)
-                TimelineView(.animation) { tl in
+                TimelineView(.animation(minimumInterval: 1/60)) { tl in
                     let t = tl.date.timeIntervalSinceReferenceDate
                     ZStack(alignment: .topLeading) {
                         ForEach(0..<SceneLayout.streaks.count, id: \.self) { i in
@@ -612,7 +612,7 @@ private struct WaterfallSystem: View {
             .position(x: 201, y: 236 + 192)
 
             // Mist (rising blobs)
-            TimelineView(.animation) { tl in
+            TimelineView(.animation(minimumInterval: 1/60)) { tl in
                 let t = tl.date.timeIntervalSinceReferenceDate
                 ZStack(alignment: .bottomLeading) {
                     mistBlob(t: t, size: 64, x: -32, delay: 0)
@@ -626,7 +626,7 @@ private struct WaterfallSystem: View {
             }
 
             // Foam (pulsing blobs at the base)
-            TimelineView(.animation) { tl in
+            TimelineView(.animation(minimumInterval: 1/60)) { tl in
                 let t = tl.date.timeIntervalSinceReferenceDate
                 ZStack(alignment: .topLeading) {
                     foamBlob(t: t, w: 46, h: 26, x: 8,  y: 18, delay: 0)
@@ -715,7 +715,7 @@ private struct PoolLayer: View {
             .position(x: 201, y: 874 - 156)
 
             // Shimmer column
-            TimelineView(.animation) { tl in
+            TimelineView(.animation(minimumInterval: 1/60)) { tl in
                 let t = tl.date.timeIntervalSinceReferenceDate
                 let dur = 4.5
                 let phase = reduceMotion ? 0.5 : ((t.truncatingRemainder(dividingBy: dur)) / dur)
@@ -735,7 +735,7 @@ private struct PoolLayer: View {
             }
 
             // Ripples
-            TimelineView(.animation) { tl in
+            TimelineView(.animation(minimumInterval: 1/60)) { tl in
                 let t = tl.date.timeIntervalSinceReferenceDate
                 ZStack(alignment: .topLeading) {
                     ForEach(0..<ripples.count, id: \.self) { i in
@@ -820,7 +820,7 @@ private struct PoolForeground: View {
     }
 
     private func lilyPad(cx: Double, cy: Double, rx: Double, ry: Double, delay: Double, flower: Color? = nil) -> some View {
-        TimelineView(.animation) { tl in
+        TimelineView(.animation(minimumInterval: 1/60)) { tl in
             let t = tl.date.timeIntervalSinceReferenceDate
             let dur = 6.0
             let phase = reduceMotion ? 0.0 : (((t + delay).truncatingRemainder(dividingBy: dur)) / dur)
@@ -911,7 +911,7 @@ private struct FernShape: Shape {
 private struct FirefliesLayer: View {
     let reduceMotion: Bool
     var body: some View {
-        TimelineView(.animation) { tl in
+        TimelineView(.animation(minimumInterval: 1/60)) { tl in
             let t = tl.date.timeIntervalSinceReferenceDate
             ZStack(alignment: .topLeading) {
                 ForEach(0..<SceneLayout.fireflies.count, id: \.self) { i in
@@ -974,7 +974,7 @@ private struct FishLayer: View {
     private enum SplashDir { case up, down }
 
     private func jumper(homeX: Double, homeY: Double, duration: Double, delay: Double, flip: Bool) -> some View {
-        TimelineView(.animation) { tl in
+        TimelineView(.animation(minimumInterval: 1/60)) { tl in
             let t = tl.date.timeIntervalSinceReferenceDate
             let phase = reduceMotion ? 1.0 :
                 (((t + delay).truncatingRemainder(dividingBy: duration)) / duration)
@@ -1018,7 +1018,7 @@ private struct FishLayer: View {
     }
 
     private func splash(at pt: CGPoint, duration: Double, delay: Double, direction: SplashDir) -> some View {
-        TimelineView(.animation) { tl in
+        TimelineView(.animation(minimumInterval: 1/60)) { tl in
             let t = tl.date.timeIntervalSinceReferenceDate
             let phase = reduceMotion ? 1.0 :
                 (((t + delay).truncatingRemainder(dividingBy: duration)) / duration)
@@ -1176,7 +1176,7 @@ private struct WaveBars: View {
         (12, -0.9), (26, -0.3), (16, -0.6), (22, -0.45), (14, -0.75)
     ]
     var body: some View {
-        TimelineView(.animation) { tl in
+        TimelineView(.animation(minimumInterval: 1/60)) { tl in
             let t = tl.date.timeIntervalSinceReferenceDate
             HStack(alignment: .center, spacing: 7) {
                 ForEach(0..<bars.count, id: \.self) { i in
@@ -1647,15 +1647,21 @@ struct AmbientSoundsView: View {
         .ignoresSafeArea()
         .preferredColorScheme(isNight ? .dark : .light)
         .onAppear {
-            // If the user came in via ForestLetterView, audio is already playing
-            // and fading in — don't restart it. Otherwise kick it off fresh.
-            let audio = AudioManager.shared
-            if audio.currentTrack != "rain" || !audio.isPlaying {
-                audio.setVolume(0.7)
-                audio.play(track: "rain", playback: false)
-                audio.fadeIn(duration: 1.5)
+            // Keep the screen lit so the ambient scene runs uninterrupted.
+            UIApplication.shared.isIdleTimerDisabled = true
+
+            // Only start the track if it isn't already playing — e.g. when
+            // the user came in via ForestLetterView, audio is already fading in.
+            if !AudioManager.shared.isPlaying {
+                AudioManager.shared.play(track: "rain", playback: false)
+                AudioManager.shared.setVolume(0.7)
+                AudioManager.shared.fadeIn(duration: 1.5)
             }
+
             AnalyticsManager.shared.trackScreenViewed("ambient_sounds")
+        }
+        .onDisappear {
+            UIApplication.shared.isIdleTimerDisabled = false
         }
     }
 
