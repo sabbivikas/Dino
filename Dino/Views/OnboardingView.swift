@@ -9,6 +9,7 @@
 import SwiftUI
 import UserNotifications
 import PostHog
+import StoreKit
 
 // MARK: - v6 Onboarding Colors (fixed, never themed)
 private struct OnboardingColors {
@@ -75,7 +76,7 @@ struct OnboardingView: View {
     @State private var dinoNameInput: String = ""
     @State private var showSettingsAlert: Bool = false
 
-    private var totalSteps: Int { 11 }
+    private var totalSteps: Int { 12 }
 
     var body: some View {
         ZStack {
@@ -198,6 +199,7 @@ struct OnboardingView: View {
         case 8: StepAnxietyUseCasePage()
         case 9: StepRoughDayUseCasePage()
         case 10: StepDisclaimerPage()
+        case 11: StepRatingPage(onFinish: finish)
         default: EmptyView()
         }
     }
@@ -241,7 +243,10 @@ struct OnboardingView: View {
                 .buttonStyle(ScaleButtonStyle())
             }
         } else if currentStep == 10 {
-            primarySageButton(label: "let's begin") { finish() }
+            primarySageButton(label: "let's begin") { advance() }
+        } else if currentStep == 11 {
+            // Step 11 has its own inline buttons inside the rating card
+            EmptyView()
         } else {
             primarySageButton(label: "next") { advance() }
         }
@@ -1210,5 +1215,250 @@ private struct GratitudeSlip: View {
                 }
             }
         }
+    }
+}
+
+// MARK: - Step 11: Rating
+
+private struct TestimonialData {
+    let quote: String
+    let name: String
+    let tag: String
+}
+
+private let ratingTestimonials: [TestimonialData] = [
+    TestimonialData(
+        quote: "your little dino has saved my day many times.",
+        name: "patricia b.",
+        tag: "rn, icu nurse \u{00B7} finland"
+    ),
+    TestimonialData(
+        quote: "it feels so friendly and natural, not like i'm being pressured to keep up with my good habits.",
+        name: "mikhale m.",
+        tag: "dino user"
+    ),
+    TestimonialData(
+        quote: "the app helps me remember the good parts of life.",
+        name: "luan",
+        tag: "dino community"
+    )
+]
+
+private struct StepRatingPage: View {
+    let onFinish: () -> Void
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var mascotAppeared: Bool = false
+    @State private var cardAppeared: [Bool] = [false, false, false]
+    @State private var starAppeared: [Bool] = [false, false, false, false, false]
+    @State private var starBounce: [CGFloat] = [1, 1, 1, 1, 1]
+    @State private var selectedStars: Int = 0
+
+    var body: some View {
+        ScrollView(showsIndicators: false) {
+            VStack(spacing: 28) {
+                // SECTION 1 — mascot + headlines
+                VStack(spacing: 12) {
+                    MascotView(imageName: "cut-DinoMascot", size: 100)
+                        .scaleEffect(reduceMotion ? 1.0 : (mascotAppeared ? 1.0 : 0.8))
+                        .opacity(mascotAppeared ? 1 : 0)
+
+                    Text("enjoying dino?")
+                        .font(DinoTheme.dinoFont(size: 30))
+                        .foregroundColor(Color(hex: "#2D3142"))
+                        .padding(.top, 12)
+
+                    Text("you're already part of something beautiful \u{1F331}")
+                        .font(DinoTheme.dinoFont(size: 15))
+                        .foregroundColor(Color(hex: "#2D3142").opacity(0.6))
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 32)
+                }
+
+                // SECTION 2 — testimonial cards
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 14) {
+                        ForEach(0..<ratingTestimonials.count, id: \.self) { i in
+                            TestimonialCard(data: ratingTestimonials[i])
+                                .opacity(cardAppeared[i] ? 1 : 0)
+                                .offset(y: reduceMotion ? 0 : (cardAppeared[i] ? 0 : 20))
+                        }
+                    }
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 4)
+                }
+
+                // SECTION 3 — rating stars
+                VStack(spacing: 8) {
+                    Text("tap to rate dino \u{2728}")
+                        .font(DinoTheme.dinoFont(size: 13))
+                        .foregroundColor(Color(hex: "#2D3142").opacity(0.55))
+                        .padding(.bottom, 8)
+
+                    HStack(spacing: 14) {
+                        ForEach(0..<5, id: \.self) { i in
+                            Button(action: { tapStar(i) }) {
+                                Image(systemName: i < selectedStars ? "star.fill" : "star")
+                                    .font(.system(size: 40))
+                                    .foregroundColor(
+                                        i < selectedStars
+                                            ? Color(hex: "#F9C784")
+                                            : Color(hex: "#D1D5DB")
+                                    )
+                            }
+                            .buttonStyle(.plain)
+                            .scaleEffect(reduceMotion ? 1.0 : (starAppeared[i] ? starBounce[i] : 0))
+                            .opacity(starAppeared[i] ? 1 : 0)
+                        }
+                    }
+                }
+
+                // SECTION 4 — CTAs
+                VStack(spacing: 10) {
+                    if selectedStars > 0 {
+                        Button(action: rateAction) {
+                            Text("rate on the app store")
+                                .font(DinoTheme.dinoFont(size: 17))
+                                .foregroundColor(.white)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 16)
+                                .background(Color(hex: "#A8C5A0"))
+                                .cornerRadius(16)
+                                .shadow(color: Color(hex: "#A8C5A0").opacity(0.4), radius: 12, x: 0, y: 4)
+                        }
+                        .buttonStyle(ScaleButtonStyle())
+                        .transition(.opacity)
+                    }
+
+                    Button(action: onFinish) {
+                        Text("maybe later")
+                            .font(DinoTheme.dinoFont(size: 14))
+                            .foregroundColor(Color(hex: "#2D3142").opacity(0.55))
+                            .padding(.vertical, 10)
+                    }
+                    .buttonStyle(ScaleButtonStyle())
+                }
+                .padding(.horizontal, 20)
+            }
+            .padding(.top, 28)
+            .padding(.bottom, 24)
+            .background(
+                RoundedRectangle(cornerRadius: 28)
+                    .fill(Color(hex: "#FEFBF3").opacity(0.95))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 28)
+                    .stroke(Color(hex: "#E8DDD0"), lineWidth: 1)
+            )
+            .shadow(color: Color(hex: "#C4A882").opacity(0.12), radius: 14, x: 0, y: 6)
+            .padding(.horizontal, 20)
+            .padding(.vertical, 8)
+        }
+        .scrollIndicators(.hidden)
+        .animation(.easeInOut(duration: 0.35), value: selectedStars > 0)
+        .onAppear { startEntranceAnimations() }
+    }
+
+    private func startEntranceAnimations() {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+            withAnimation(
+                reduceMotion
+                    ? .easeOut(duration: 0.4)
+                    : .spring(response: 0.6, dampingFraction: 0.55)
+            ) {
+                mascotAppeared = true
+            }
+        }
+        for i in 0..<ratingTestimonials.count {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3 + Double(i) * 0.12) {
+                withAnimation(
+                    reduceMotion
+                        ? .easeOut(duration: 0.35)
+                        : .spring(response: 0.5, dampingFraction: 0.75)
+                ) {
+                    cardAppeared[i] = true
+                }
+            }
+        }
+        for i in 0..<5 {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.7 + Double(i) * 0.06) {
+                withAnimation(
+                    reduceMotion
+                        ? .easeOut(duration: 0.25)
+                        : .spring(response: 0.4, dampingFraction: 0.7)
+                ) {
+                    starAppeared[i] = true
+                }
+            }
+        }
+    }
+
+    private func tapStar(_ index: Int) {
+        let stars = index + 1
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        withAnimation(.spring(response: 0.3)) {
+            selectedStars = stars
+        }
+        guard !reduceMotion else { return }
+        withAnimation(.spring(response: 0.25, dampingFraction: 0.5)) {
+            starBounce[index] = 1.35
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
+            withAnimation(.spring(response: 0.25, dampingFraction: 0.6)) {
+                starBounce[index] = 1.0
+            }
+        }
+    }
+
+    private func rateAction() {
+        if let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene {
+            SKStoreReviewController.requestReview(in: scene)
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+            onFinish()
+        }
+    }
+}
+
+private struct TestimonialCard: View {
+    let data: TestimonialData
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 3) {
+                ForEach(0..<5, id: \.self) { _ in
+                    Image(systemName: "star.fill")
+                        .font(.system(size: 13))
+                        .foregroundColor(Color(hex: "#F9C784"))
+                }
+            }
+            .padding(.bottom, 10)
+
+            Text(data.quote)
+                .font(DinoTheme.dinoFont(size: 14))
+                .foregroundColor(Color(hex: "#4A3520"))
+                .lineSpacing(4)
+                .multilineTextAlignment(.leading)
+                .fixedSize(horizontal: false, vertical: true)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(data.name)
+                    .font(DinoTheme.dinoFont(size: 12))
+                    .foregroundColor(Color(hex: "#A8C5A0"))
+                Text(data.tag)
+                    .font(DinoTheme.dinoFont(size: 11))
+                    .foregroundColor(Color(hex: "#9E8E7E").opacity(0.8))
+            }
+            .padding(.top, 10)
+        }
+        .padding(20)
+        .frame(width: 260, alignment: .leading)
+        .background(Color(hex: "#FEFBF3"))
+        .cornerRadius(20)
+        .overlay(
+            RoundedRectangle(cornerRadius: 20)
+                .stroke(Color(hex: "#E8DDD0"), lineWidth: 1)
+        )
+        .shadow(color: Color(hex: "#C4A882").opacity(0.15), radius: 10, x: 0, y: 4)
     }
 }
