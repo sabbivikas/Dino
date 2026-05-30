@@ -2,218 +2,82 @@
 //  WhatsNewView.swift
 //  Dino
 //
+//  Modal shown once per app version. Cards walk the user through what
+//  changed; the first card supports a deep link into the ambient flow.
+//
 
 import SwiftUI
 
-// MARK: - Custom Icon Views
+// MARK: - Feature model
 
-private struct CameraIconView: View {
-    var body: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 3)
-                .stroke(Color(hex: "#2A7A6C"), lineWidth: 1.5)
-                .frame(width: 18, height: 13)
-            Rectangle()
-                .stroke(Color(hex: "#2A7A6C"), lineWidth: 1.5)
-                .frame(width: 6, height: 3)
-                .offset(y: -7)
-            Circle()
-                .stroke(Color(hex: "#2A7A6C"), lineWidth: 1.5)
-                .frame(width: 6, height: 6)
-        }
-        .frame(width: 22, height: 22)
-    }
-}
-
-private struct JarIconView: View {
-    var body: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 2)
-                .stroke(Color(hex: "#2A7A6C"), lineWidth: 1.5)
-                .frame(width: 10, height: 3)
-                .offset(y: -7)
-            RoundedRectangle(cornerRadius: 4)
-                .stroke(Color(hex: "#2A7A6C"), lineWidth: 1.5)
-                .frame(width: 14, height: 14)
-                .offset(y: 1)
-        }
-        .frame(width: 22, height: 22)
-    }
-}
-
-private struct CalendarIconView: View {
-    var body: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 2)
-                .stroke(Color(hex: "#2A7A6C"), lineWidth: 1.5)
-                .frame(width: 16, height: 14)
-                .offset(y: 1)
-            Rectangle()
-                .stroke(Color(hex: "#2A7A6C"), lineWidth: 1.5)
-                .frame(width: 2, height: 4)
-                .offset(x: -4, y: -6)
-            Rectangle()
-                .stroke(Color(hex: "#2A7A6C"), lineWidth: 1.5)
-                .frame(width: 2, height: 4)
-                .offset(x: 4, y: -6)
-            Rectangle()
-                .fill(Color(hex: "#2A7A6C"))
-                .frame(width: 16, height: 1)
-                .offset(y: -1)
-        }
-        .frame(width: 22, height: 22)
-    }
-}
-
-private struct FlameIconView: View {
-    var body: some View {
-        Path { path in
-            path.move(to: CGPoint(x: 11, y: 2))
-            path.addQuadCurve(to: CGPoint(x: 5, y: 12), control: CGPoint(x: 4, y: 6))
-            path.addQuadCurve(to: CGPoint(x: 11, y: 20), control: CGPoint(x: 4, y: 18))
-            path.addQuadCurve(to: CGPoint(x: 17, y: 12), control: CGPoint(x: 18, y: 18))
-            path.addQuadCurve(to: CGPoint(x: 11, y: 2), control: CGPoint(x: 18, y: 6))
-        }
-        .stroke(Color(hex: "#2A7A6C"), lineWidth: 1.5)
-        .frame(width: 22, height: 22)
-    }
-}
-
-private struct LeafIconView: View {
-    var body: some View {
-        Path { path in
-            path.move(to: CGPoint(x: 4, y: 18))
-            path.addQuadCurve(to: CGPoint(x: 18, y: 4), control: CGPoint(x: 4, y: 4))
-            path.addQuadCurve(to: CGPoint(x: 4, y: 18), control: CGPoint(x: 18, y: 18))
-            path.move(to: CGPoint(x: 4, y: 18))
-            path.addLine(to: CGPoint(x: 18, y: 4))
-        }
-        .stroke(Color(hex: "#2A7A6C"), lineWidth: 1.5)
-        .frame(width: 22, height: 22)
-    }
-}
-
-private struct ChartIconView: View {
-    var body: some View {
-        ZStack {
-            Path { path in
-                path.move(to: CGPoint(x: 3, y: 19))
-                path.addLine(to: CGPoint(x: 19, y: 19))
-                path.move(to: CGPoint(x: 3, y: 19))
-                path.addLine(to: CGPoint(x: 3, y: 3))
-            }
-            .stroke(Color(hex: "#2A7A6C"), lineWidth: 1.5)
-            Path { path in
-                path.move(to: CGPoint(x: 5, y: 14))
-                path.addLine(to: CGPoint(x: 9, y: 10))
-                path.addLine(to: CGPoint(x: 13, y: 12))
-                path.addLine(to: CGPoint(x: 18, y: 6))
-            }
-            .stroke(Color(hex: "#2A7A6C"), lineWidth: 1.5)
-        }
-        .frame(width: 22, height: 22)
-    }
-}
-
-private struct BellIconView: View {
-    var body: some View {
-        ZStack {
-            Path { path in
-                path.move(to: CGPoint(x: 4, y: 16))
-                path.addLine(to: CGPoint(x: 18, y: 16))
-                path.addQuadCurve(to: CGPoint(x: 15, y: 6), control: CGPoint(x: 17, y: 12))
-                path.addQuadCurve(to: CGPoint(x: 7, y: 6), control: CGPoint(x: 11, y: 3))
-                path.addQuadCurve(to: CGPoint(x: 4, y: 16), control: CGPoint(x: 5, y: 12))
-            }
-            .stroke(Color(hex: "#2A7A6C"), lineWidth: 1.5)
-            Circle()
-                .stroke(Color(hex: "#2A7A6C"), lineWidth: 1.5)
-                .frame(width: 3, height: 3)
-                .offset(y: 8)
-        }
-        .frame(width: 22, height: 22)
-    }
-}
-
-// MARK: - Confetti
-
-private struct ConfettiView: View {
-    let count: Int = 16
-    @State private var animate: Bool = false
-    private let colors: [Color] = [
-        Color(hex: "#A8C5A0"),
-        Color(hex: "#F5C6AA"),
-        Color(hex: "#D7C8E8")
-    ]
-
-    var body: some View {
-        ZStack {
-            ForEach(0..<count, id: \.self) { i in
-                Circle()
-                    .fill(colors[i % colors.count])
-                    .frame(width: CGFloat([4, 6, 8].randomElement() ?? 6),
-                           height: CGFloat([4, 6, 8].randomElement() ?? 6))
-                    .offset(
-                        x: CGFloat.random(in: -140...140),
-                        y: animate ? -120 : 60
-                    )
-                    .opacity(animate ? 0 : 0.85)
-                    .animation(
-                        .easeOut(duration: Double.random(in: 2.0...3.5))
-                            .delay(Double(i) * 0.08)
-                            .repeatForever(autoreverses: false),
-                        value: animate
-                    )
-            }
-        }
-        .frame(height: 80)
-        .onAppear { animate = true }
-    }
-}
-
-// MARK: - Feature Model
-
-private struct Feature: Identifiable {
+private struct WhatsNewFeature: Identifiable {
     let id = UUID()
-    let icon: AnyView
+    let icon: String
+    let iconBackground: Color
     let title: String
     let description: String
-    let tint: Color
+    let deepLink: String?
+    let buttonLabel: String?
 }
 
-// MARK: - Feature Card Row
+// MARK: - Feature card row
 
 private struct FeatureCardRow: View {
-    let feature: Feature
+    let feature: WhatsNewFeature
+    let onDeepLink: (String) -> Void
+    let appeared: Bool
+    let reduceMotion: Bool
+
     var body: some View {
-        HStack(spacing: 14) {
-            ZStack {
-                Circle()
-                    .fill(feature.tint.opacity(0.3))
-                    .frame(width: 36, height: 36)
-                feature.icon
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .top, spacing: 14) {
+                ZStack {
+                    Circle()
+                        .fill(feature.iconBackground)
+                        .frame(width: 44, height: 44)
+                    Text(feature.icon)
+                        .font(.system(size: 20))
+                }
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(feature.title)
+                        .font(DinoTheme.dinoFont(size: 16))
+                        .foregroundColor(Color(hex: "#2D3142"))
+                    Text(feature.description)
+                        .font(DinoTheme.dinoFont(size: 14))
+                        .foregroundColor(Color(hex: "#2D3142").opacity(0.65))
+                        .lineSpacing(3)
+                        .multilineTextAlignment(.leading)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Spacer(minLength: 0)
             }
-            VStack(alignment: .leading, spacing: 2) {
-                Text(feature.title)
-                    .font(.custom(DinoTheme.customFontName, size: 15))
-                    .foregroundColor(Color(hex: "#2E2A24"))
-                Text(feature.description)
-                    .font(.system(size: 12))
-                    .italic()
-                    .foregroundColor(Color(hex: "#7A7266"))
-                    .lineLimit(2)
+
+            if let deepLink = feature.deepLink, let label = feature.buttonLabel {
+                Button(action: { onDeepLink(deepLink) }) {
+                    Text(label)
+                        .font(DinoTheme.dinoFont(size: 13))
+                        .foregroundColor(Color(hex: "#A8C5A0"))
+                        .padding(.vertical, 4)
+                }
+                .buttonStyle(.plain)
+                .padding(.leading, 58)
+                .padding(.top, 2)
             }
-            Spacer()
         }
-        .padding(14)
+        .padding(16)
         .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color.white)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(Color(hex: "#E8E4D5"), lineWidth: 1)
-                )
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color(hex: "#FEFBF3"))
         )
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(Color(hex: "#E8DDD0"), lineWidth: 1)
+        )
+        .shadow(color: Color.black.opacity(0.04), radius: 6, x: 0, y: 2)
+        .opacity(appeared ? 1 : 0)
+        .offset(y: (appeared || reduceMotion) ? 0 : 20)
     }
 }
 
@@ -221,73 +85,184 @@ private struct FeatureCardRow: View {
 
 struct WhatsNewView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    fileprivate static let features: [Feature] = [
-        Feature(icon: AnyView(CameraIconView()),   title: "photo journals",      description: "attach photos to entries, save as polaroid cards",      tint: Color(hex: "#A8C5A0")),
-        Feature(icon: AnyView(JarIconView()),      title: "gratitude slips",     description: "open the jar and see all your little joys scattered out", tint: Color(hex: "#D7C8E8")),
-        Feature(icon: AnyView(CalendarIconView()), title: "backdated entries",   description: "write journal entries for any past day",                tint: Color(hex: "#F5C6AA")),
-        Feature(icon: AnyView(FlameIconView()),    title: "pause your streak",   description: "hold the streak to pause it anytime. no guilt.",        tint: Color(hex: "#A8C5A0")),
-        Feature(icon: AnyView(LeafIconView()),     title: "breathing reminders", description: "gentle nudges to breathe throughout your day",          tint: Color(hex: "#D7C8E8")),
-        Feature(icon: AnyView(ChartIconView()),    title: "weekly check-in",     description: "research-backed questions with an AI wellness report",  tint: Color(hex: "#F5C6AA")),
-        Feature(icon: AnyView(BellIconView()),     title: "smarter nudges",      description: "notifications that feel like a friend checking on you", tint: Color(hex: "#A8C5A0"))
+    @State private var mascotAppeared: Bool = false
+    @State private var cardsAppeared: [Bool] = Array(repeating: false, count: 5)
+
+    private var appVersion: String {
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.5"
+    }
+
+    private let features: [WhatsNewFeature] = [
+        WhatsNewFeature(
+            icon: "\u{1F30A}",
+            iconBackground: Color(hex: "#A8C5A0"),
+            title: "ambient sounds",
+            description: "step into a living forest waterfall. close your eyes and let the sounds carry you in. day and night cycles, fireflies, and jumping fish.",
+            deepLink: "dino://ambient",
+            buttonLabel: "enter the forest \u{2192}"
+        ),
+        WhatsNewFeature(
+            icon: "\u{2728}",
+            iconBackground: Color(hex: "#FDDCB5"),
+            title: "onboarding redesign",
+            description: "a completely new first experience \u{2014} premium animations, breathing circle, gratitude slips, and a forest letter welcoming you in.",
+            deepLink: nil,
+            buttonLabel: nil
+        ),
+        WhatsNewFeature(
+            icon: "\u{1F331}",
+            iconBackground: Color(hex: "#C8E0C4"),
+            title: "sunflower fixed",
+            description: "your garden now correctly reads your most recent practice. one check-in a day keeps it healthy.",
+            deepLink: nil,
+            buttonLabel: nil
+        ),
+        WhatsNewFeature(
+            icon: "\u{2B50}",
+            iconBackground: Color(hex: "#F9C784").opacity(0.3),
+            title: "share the love",
+            description: "enjoying dino? a new rating screen helps you share dino with others who might need it.",
+            deepLink: nil,
+            buttonLabel: nil
+        ),
+        WhatsNewFeature(
+            icon: "\u{1F3A8}",
+            iconBackground: Color(hex: "#E8E0F5"),
+            title: "design polish",
+            description: "typography, pill states, card borders, breathing animations \u{2014} everything feels a little more refined.",
+            deepLink: nil,
+            buttonLabel: nil
+        )
     ]
 
     var body: some View {
         ZStack {
             Color(hex: "#FAF6EC").ignoresSafeArea()
+
             VStack(spacing: 0) {
-                ConfettiView()
-                    .padding(.top, 16)
+                header
+                    .padding(.top, 24)
 
-                VStack(spacing: 8) {
-                    Text("what's new in dino")
-                        .font(.custom(DinoTheme.customFontName, size: 26))
-                        .foregroundColor(Color(hex: "#2E2A24"))
-
-                    Text("v1.4")
-                        .font(.custom(DinoTheme.customFontName, size: 12))
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 4)
-                        .background(Color(hex: "#A8C5A0"), in: Capsule())
-                }
-
-                ScrollView {
+                ScrollView(showsIndicators: false) {
                     LazyVStack(spacing: 12) {
-                        ForEach(Self.features) { f in
-                            FeatureCardRow(feature: f)
+                        ForEach(Array(features.enumerated()), id: \.element.id) { index, feature in
+                            FeatureCardRow(
+                                feature: feature,
+                                onDeepLink: { link in handleDeepLink(link) },
+                                appeared: reduceMotion ? true : cardsAppeared[safe: index] ?? true,
+                                reduceMotion: reduceMotion
+                            )
                         }
                     }
                     .padding(.horizontal, 20)
                     .padding(.vertical, 24)
                 }
 
-                VStack(spacing: 12) {
-                    Button {
-                        HapticManager.shared.light()
-                        dismiss()
-                    } label: {
-                        Text("let's explore")
-                            .font(.custom(DinoTheme.customFontName, size: 16))
-                            .foregroundColor(.white)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 14)
-                            .background(Color(hex: "#A8C5A0"), in: Capsule())
-                    }
-                    .buttonStyle(.plain)
-
-                    Button {
-                        dismiss()
-                    } label: {
-                        Text("skip")
-                            .font(.system(size: 12))
-                            .foregroundColor(Color(hex: "#A8A29A"))
-                    }
-                    .buttonStyle(.plain)
-                }
-                .padding(.horizontal, 24)
-                .padding(.bottom, 24)
+                bottomCTA
+                    .padding(.horizontal, 24)
+                    .padding(.bottom, 24)
             }
         }
+        .onAppear { startEntrance() }
+    }
+
+    private var header: some View {
+        VStack(spacing: 0) {
+            Image("cut-DinoMascot")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 64, height: 64)
+                .scaleEffect(reduceMotion ? 1.0 : (mascotAppeared ? 1.0 : 0))
+                .opacity(mascotAppeared ? 1 : 0)
+
+            Text("what's new in dino")
+                .font(DinoTheme.dinoFont(size: 28))
+                .foregroundColor(Color(hex: "#2D3142"))
+                .multilineTextAlignment(.center)
+                .padding(.top, 12)
+
+            Text("v\(appVersion)")
+                .font(DinoTheme.dinoFont(size: 12))
+                .foregroundColor(Color(hex: "#A8C5A0"))
+                .padding(.horizontal, 12)
+                .padding(.vertical, 4)
+                .background(Color(hex: "#A8C5A0").opacity(0.12))
+                .clipShape(Capsule())
+                .padding(.top, 8)
+        }
+    }
+
+    private var bottomCTA: some View {
+        VStack(spacing: 8) {
+            Button {
+                HapticManager.shared.light()
+                dismiss()
+            } label: {
+                Text("let's explore")
+                    .font(DinoTheme.dinoFont(size: 17))
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 18)
+                    .background(Color(hex: "#A8C5A0"))
+                    .cornerRadius(16)
+                    .shadow(color: Color(hex: "#A8C5A0").opacity(0.4), radius: 12, x: 0, y: 4)
+            }
+            .buttonStyle(.plain)
+
+            Text("released May 2026")
+                .font(DinoTheme.dinoFont(size: 11))
+                .foregroundColor(Color(hex: "#2D3142").opacity(0.35))
+        }
+    }
+
+    // MARK: Animation
+
+    private func startEntrance() {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+            withAnimation(
+                reduceMotion
+                    ? .easeOut(duration: 0.35)
+                    : .spring(response: 0.5, dampingFraction: 0.6)
+            ) {
+                mascotAppeared = true
+            }
+        }
+
+        for i in 0..<features.count {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35 + Double(i) * 0.08) {
+                withAnimation(
+                    reduceMotion
+                        ? .easeOut(duration: 0.3)
+                        : .spring(response: 0.5, dampingFraction: 0.75)
+                ) {
+                    if i < cardsAppeared.count {
+                        cardsAppeared[i] = true
+                    }
+                }
+            }
+        }
+    }
+
+    // MARK: Deep link
+
+    private func handleDeepLink(_ link: String) {
+        guard let url = URL(string: link) else { return }
+        HapticManager.shared.light()
+        dismiss()
+        // Wait for the sheet dismiss animation, then ask the app to handle
+        // the URL through the existing deep-link pipeline.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+            NotificationCenter.default.post(name: .dinoOpenURL, object: url)
+        }
+    }
+}
+
+// MARK: - Safe-index helper
+
+private extension Array {
+    subscript(safe index: Int) -> Element? {
+        indices.contains(index) ? self[index] : nil
     }
 }

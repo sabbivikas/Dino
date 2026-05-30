@@ -121,6 +121,7 @@ final class SharedDataManager: ObservableObject {
     @Published var deepLinkTab: Int?
     @Published var showBreathingFromDeepLink: Bool = false
     @Published var showFocusFromDeepLink: Bool = false
+    @Published var showAmbientFromDeepLink: Bool = false
     @Published var presentAddGratitude: Bool = false
 
     // MARK: - Member Since

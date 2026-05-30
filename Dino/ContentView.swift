@@ -58,6 +58,12 @@ struct ContentView: View {
                 moods: moodsForCurrentMonth()
             )
         }
+        .fullScreenCover(isPresented: Binding(
+            get: { dataManager.showAmbientFromDeepLink },
+            set: { dataManager.showAmbientFromDeepLink = $0 }
+        )) {
+            AmbientSoundsView()
+        }
     }
 
     private func checkMonthlyPaintingTrigger() {
@@ -100,6 +106,10 @@ struct ContentView: View {
         case "focus":
             dataManager.deepLinkTab = 0
             dataManager.showFocusFromDeepLink = true
+        case "ambient":
+            // Ambient sounds present as a full-screen cover on top of
+            // whatever tab is active — no tab change required.
+            dataManager.showAmbientFromDeepLink = true
         default:
             break
         }
