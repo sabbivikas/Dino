@@ -1250,23 +1250,22 @@ private struct StepRatingPage: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var mascotAppeared: Bool = false
     @State private var cardAppeared: [Bool] = [false, false, false]
-    @State private var starAppeared: [Bool] = [false, false, false, false, false]
     @State private var starBounce: [CGFloat] = [1, 1, 1, 1, 1]
     @State private var selectedStars: Int = 0
 
     var body: some View {
         ScrollView(showsIndicators: false) {
-            VStack(spacing: 28) {
-                // SECTION 1 — mascot + headlines
-                VStack(spacing: 12) {
-                    MascotView(imageName: "cut-DinoMascot", size: 100)
+            VStack(spacing: 20) {
+                // TOP SECTION — mascot + headlines
+                VStack(spacing: 8) {
+                    MascotView(imageName: "cut-DinoMascot", size: 90)
                         .scaleEffect(reduceMotion ? 1.0 : (mascotAppeared ? 1.0 : 0.8))
                         .opacity(mascotAppeared ? 1 : 0)
 
                     Text("enjoying dino?")
-                        .font(DinoTheme.dinoFont(size: 30))
+                        .font(DinoTheme.dinoFont(size: 28))
                         .foregroundColor(Color(hex: "#2D3142"))
-                        .padding(.top, 12)
+                        .padding(.top, 8)
 
                     Text("you're already part of something beautiful \u{1F331}")
                         .font(DinoTheme.dinoFont(size: 15))
@@ -1275,31 +1274,32 @@ private struct StepRatingPage: View {
                         .padding(.horizontal, 32)
                 }
 
-                // SECTION 2 — testimonial cards
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 14) {
-                        ForEach(0..<ratingTestimonials.count, id: \.self) { i in
-                            TestimonialCard(data: ratingTestimonials[i])
-                                .opacity(cardAppeared[i] ? 1 : 0)
-                                .offset(y: reduceMotion ? 0 : (cardAppeared[i] ? 0 : 20))
-                        }
+                // TESTIMONIAL SECTION — label + 3 vertical cards
+                VStack(spacing: 12) {
+                    Text("what others are saying")
+                        .font(DinoTheme.dinoFont(size: 12))
+                        .foregroundColor(Color(hex: "#2D3142").opacity(0.45))
+                        .padding(.top, 4)
+                        .frame(maxWidth: .infinity, alignment: .center)
+
+                    ForEach(0..<ratingTestimonials.count, id: \.self) { i in
+                        TestimonialCard(data: ratingTestimonials[i])
+                            .opacity(cardAppeared[i] ? 1 : 0)
+                            .offset(y: reduceMotion ? 0 : (cardAppeared[i] ? 0 : 16))
                     }
-                    .padding(.horizontal, 24)
-                    .padding(.vertical, 4)
                 }
 
-                // SECTION 3 — rating stars
-                VStack(spacing: 8) {
-                    Text("tap to rate dino \u{2728}")
+                // RATING SECTION — label + stars
+                VStack(spacing: 12) {
+                    Text("tap to rate")
                         .font(DinoTheme.dinoFont(size: 13))
-                        .foregroundColor(Color(hex: "#2D3142").opacity(0.55))
-                        .padding(.bottom, 8)
+                        .foregroundColor(Color(hex: "#2D3142").opacity(0.5))
 
-                    HStack(spacing: 14) {
+                    HStack(spacing: 16) {
                         ForEach(0..<5, id: \.self) { i in
                             Button(action: { tapStar(i) }) {
                                 Image(systemName: i < selectedStars ? "star.fill" : "star")
-                                    .font(.system(size: 40))
+                                    .font(.system(size: 34))
                                     .foregroundColor(
                                         i < selectedStars
                                             ? Color(hex: "#F9C784")
@@ -1307,14 +1307,14 @@ private struct StepRatingPage: View {
                                     )
                             }
                             .buttonStyle(.plain)
-                            .scaleEffect(reduceMotion ? 1.0 : (starAppeared[i] ? starBounce[i] : 0))
-                            .opacity(starAppeared[i] ? 1 : 0)
+                            .scaleEffect(reduceMotion ? 1.0 : starBounce[i])
                         }
                     }
                 }
+                .padding(.top, 4)
 
-                // SECTION 4 — CTAs
-                VStack(spacing: 10) {
+                // BUTTONS
+                VStack(spacing: 8) {
                     if selectedStars > 0 {
                         Button(action: rateAction) {
                             Text("rate on the app store")
@@ -1338,24 +1338,13 @@ private struct StepRatingPage: View {
                     }
                     .buttonStyle(ScaleButtonStyle())
                 }
-                .padding(.horizontal, 20)
+                .padding(.top, 4)
             }
-            .padding(.top, 28)
-            .padding(.bottom, 24)
-            .background(
-                RoundedRectangle(cornerRadius: 28)
-                    .fill(Color(hex: "#FEFBF3").opacity(0.95))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 28)
-                    .stroke(Color(hex: "#E8DDD0"), lineWidth: 1)
-            )
-            .shadow(color: Color(hex: "#C4A882").opacity(0.12), radius: 14, x: 0, y: 6)
-            .padding(.horizontal, 20)
-            .padding(.vertical, 8)
+            .padding(.horizontal, 24)
+            .padding(.bottom, 32)
         }
         .scrollIndicators(.hidden)
-        .animation(.easeInOut(duration: 0.35), value: selectedStars > 0)
+        .animation(.easeInOut(duration: 0.3), value: selectedStars > 0)
         .onAppear { startEntranceAnimations() }
     }
 
@@ -1370,24 +1359,13 @@ private struct StepRatingPage: View {
             }
         }
         for i in 0..<ratingTestimonials.count {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3 + Double(i) * 0.12) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3 + Double(i) * 0.1) {
                 withAnimation(
                     reduceMotion
                         ? .easeOut(duration: 0.35)
                         : .spring(response: 0.5, dampingFraction: 0.75)
                 ) {
                     cardAppeared[i] = true
-                }
-            }
-        }
-        for i in 0..<5 {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.7 + Double(i) * 0.06) {
-                withAnimation(
-                    reduceMotion
-                        ? .easeOut(duration: 0.25)
-                        : .spring(response: 0.4, dampingFraction: 0.7)
-                ) {
-                    starAppeared[i] = true
                 }
             }
         }
@@ -1401,7 +1379,7 @@ private struct StepRatingPage: View {
         }
         guard !reduceMotion else { return }
         withAnimation(.spring(response: 0.25, dampingFraction: 0.5)) {
-            starBounce[index] = 1.35
+            starBounce[index] = 1.3
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
             withAnimation(.spring(response: 0.25, dampingFraction: 0.6)) {
@@ -1424,41 +1402,42 @@ private struct TestimonialCard: View {
     let data: TestimonialData
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 3) {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 2) {
                 ForEach(0..<5, id: \.self) { _ in
                     Image(systemName: "star.fill")
-                        .font(.system(size: 13))
+                        .font(.system(size: 11))
                         .foregroundColor(Color(hex: "#F9C784"))
                 }
             }
-            .padding(.bottom, 10)
 
             Text(data.quote)
                 .font(DinoTheme.dinoFont(size: 14))
                 .foregroundColor(Color(hex: "#4A3520"))
-                .lineSpacing(4)
+                .lineSpacing(3)
                 .multilineTextAlignment(.leading)
                 .fixedSize(horizontal: false, vertical: true)
 
-            VStack(alignment: .leading, spacing: 2) {
+            HStack(spacing: 6) {
                 Text(data.name)
                     .font(DinoTheme.dinoFont(size: 12))
                     .foregroundColor(Color(hex: "#A8C5A0"))
+                Text("\u{00B7}")
+                    .font(DinoTheme.dinoFont(size: 12))
+                    .foregroundColor(Color(hex: "#9E8E7E").opacity(0.5))
                 Text(data.tag)
                     .font(DinoTheme.dinoFont(size: 11))
                     .foregroundColor(Color(hex: "#9E8E7E").opacity(0.8))
             }
-            .padding(.top, 10)
         }
-        .padding(20)
-        .frame(width: 260, alignment: .leading)
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color(hex: "#FEFBF3"))
-        .cornerRadius(20)
+        .cornerRadius(16)
         .overlay(
-            RoundedRectangle(cornerRadius: 20)
+            RoundedRectangle(cornerRadius: 16)
                 .stroke(Color(hex: "#E8DDD0"), lineWidth: 1)
         )
-        .shadow(color: Color(hex: "#C4A882").opacity(0.15), radius: 10, x: 0, y: 4)
+        .shadow(color: Color(hex: "#C4A882").opacity(0.12), radius: 8, x: 0, y: 3)
     }
 }
