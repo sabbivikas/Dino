@@ -774,7 +774,7 @@ struct ProfileView: View {
                 activeSheet = .gentleReminders
             }
             AmbientSoundsRow {
-                showForestLetter = true
+                showAmbientSounds = true
             }
             SBRow(
                 icon: "moon.stars.fill",

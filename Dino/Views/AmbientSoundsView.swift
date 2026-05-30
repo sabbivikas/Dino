@@ -1203,6 +1203,8 @@ fileprivate struct WaterfallScene: View {
     let palette: AmbientPalette
     let isNight: Bool
     let reduceMotion: Bool
+    var lilyPadGlow: Bool = false
+    var onLilyPadTap: (() -> Void)? = nil
 
     var body: some View {
         GeometryReader { geo in
@@ -1229,7 +1231,21 @@ fileprivate struct WaterfallScene: View {
                 if isNight {
                     FirefliesLayer(reduceMotion: reduceMotion)
                 }
+                // Day-only morning effects (butterflies, birds, mist, dragonfly).
+                if !isNight {
+                    DayEffectsLayer(palette: palette, reduceMotion: reduceMotion)
+                }
                 VignetteOverlay(isNight: isNight)
+
+                // Tappable lily pad with optional pulsing glow hint.
+                if let onLilyPadTap {
+                    LilyPadTapZone(
+                        glow: lilyPadGlow,
+                        reduceMotion: reduceMotion,
+                        onTap: onLilyPadTap
+                    )
+                    .position(x: 300, y: 776)
+                }
             }
             .frame(width: 402, height: 874)
             .scaleEffect(scale)
@@ -1625,6 +1641,11 @@ struct AmbientSoundsView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @ObservedObject private var audio = AudioManager.shared
     @State private var isClosing: Bool = false
+    @State private var letterOpen: Bool = false
+    @State private var dailyLetter: ForestDailyLetter?
+    @State private var letterLoading: Bool = false
+    @State private var savedToJar: Bool = false
+    @State private var lilyPadGlow: Bool = false
 
     private let isNight: Bool = {
         let h = Calendar.current.component(.hour, from: Date())
@@ -1635,14 +1656,36 @@ struct AmbientSoundsView: View {
     var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
-            WaterfallScene(palette: palette, isNight: isNight, reduceMotion: reduceMotion)
-                .ignoresSafeArea()
+            WaterfallScene(
+                palette: palette,
+                isNight: isNight,
+                reduceMotion: reduceMotion,
+                lilyPadGlow: lilyPadGlow && !letterOpen,
+                onLilyPadTap: { openLetter() }
+            )
+            .ignoresSafeArea()
+
             AmbientUIOverlay(
                 palette: palette,
                 isPlaying: audio.isPlaying,
                 onClose: close
             )
             .ignoresSafeArea()
+            .opacity(letterOpen ? 0 : 1)
+            .animation(.easeInOut(duration: 0.2), value: letterOpen)
+
+            // Daily forest-letter overlay rendered on top of everything.
+            if letterOpen {
+                ForestLetterOverlay(
+                    letter: dailyLetter,
+                    loading: letterLoading,
+                    savedToJar: savedToJar,
+                    reduceMotion: reduceMotion,
+                    onSave: handleSaveToJar,
+                    onClose: { closeLetter() }
+                )
+                .transition(.opacity)
+            }
         }
         .ignoresSafeArea()
         .preferredColorScheme(isNight ? .dark : .light)
@@ -1659,10 +1702,52 @@ struct AmbientSoundsView: View {
             }
 
             AnalyticsManager.shared.trackScreenViewed("ambient_sounds")
+
+            // Begin the lily-pad pulse after a 3s pause so the scene has
+            // time to land before pointing at the tap target.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+                withAnimation { lilyPadGlow = true }
+            }
+
+            // Preload today's letter so the overlay reads instantly.
+            Task { await loadLetter() }
         }
         .onDisappear {
             UIApplication.shared.isIdleTimerDisabled = false
         }
+    }
+
+    // MARK: - Letter loading + tap handlers
+
+    private func openLetter() {
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        withAnimation(.spring(response: 0.65, dampingFraction: 0.72)) {
+            letterOpen = true
+        }
+        // Refresh in case it wasn't loaded yet on appear.
+        if dailyLetter == nil { Task { await loadLetter() } }
+    }
+
+    private func closeLetter() {
+        withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+            letterOpen = false
+        }
+    }
+
+    private func handleSaveToJar() {
+        guard let letter = dailyLetter, !savedToJar else { return }
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        savedToJar = true
+        Task { await ForestLetterService.shared.saveToGratitudeJar(letter) }
+    }
+
+    @MainActor
+    private func loadLetter() async {
+        letterLoading = true
+        let letter = await ForestLetterService.shared.getTodaysLetter()
+        dailyLetter = letter
+        savedToJar = letter.savedToJar
+        letterLoading = false
     }
 
     private func close() {
@@ -1673,5 +1758,392 @@ struct AmbientSoundsView: View {
             AudioManager.shared.stop()
             dismiss()
         }
+    }
+}
+
+// MARK: - Day-only morning effects (butterflies, birds, mist, dragonfly)
+
+private struct DayEffectsLayer: View {
+    let palette: AmbientPalette
+    let reduceMotion: Bool
+
+    var body: some View {
+        ZStack(alignment: .topLeading) {
+            Butterfly(y: 430, wing: Color(hex: "#FDDCB5"),
+                      fromX: -30, toX: 430, duration: 22, delay: 0,
+                      reduceMotion: reduceMotion)
+            Butterfly(y: 520, wing: Color(hex: "#E8B4B8"),
+                      fromX: 430, toX: -30, duration: 25, delay: -8,
+                      reduceMotion: reduceMotion)
+            Butterfly(y: 360, wing: Color(hex: "#A8C5A0"),
+                      fromX: -30, toX: 430, duration: 19, delay: -16,
+                      reduceMotion: reduceMotion)
+
+            Bird(y: 118, duration: 60, delay: 0,   reduceMotion: reduceMotion)
+            Bird(y: 172, duration: 80, delay: -20, reduceMotion: reduceMotion)
+
+            MorningMist(baseX: 30,  y: 648, w: 170, h: 38, amplitude: 20, inverse: false, duration: 8,  delay: 0,  reduceMotion: reduceMotion)
+            MorningMist(baseX: 180, y: 690, w: 150, h: 34, amplitude: 20, inverse: true,  duration: 10, delay: -2, reduceMotion: reduceMotion)
+            MorningMist(baseX: 90,  y: 736, w: 180, h: 40, amplitude: 20, inverse: false, duration: 9,  delay: -4, reduceMotion: reduceMotion)
+
+            Dragonfly(x: 150, y: 712, reduceMotion: reduceMotion)
+        }
+        .frame(width: 402, height: 874, alignment: .topLeading)
+        .allowsHitTesting(false)
+    }
+}
+
+private struct Butterfly: View {
+    let y: Double
+    let wing: Color
+    let fromX: Double
+    let toX: Double
+    let duration: Double
+    let delay: Double
+    let reduceMotion: Bool
+
+    var body: some View {
+        TimelineView(.animation(minimumInterval: 1/60)) { tl in
+            let t = tl.date.timeIntervalSinceReferenceDate + delay
+            let phase = reduceMotion ? 0.5 : ((t.truncatingRemainder(dividingBy: duration)) / duration)
+            let x = fromX + (toX - fromX) * phase
+            let bobPhase = reduceMotion ? 0.5 : ((t.truncatingRemainder(dividingBy: 4.0)) / 4.0)
+            let bobY = -15.0 + 30.0 * (0.5 - 0.5 * cos(bobPhase * 2 * .pi))
+            let flapPhase = reduceMotion ? 0.5 : ((t.truncatingRemainder(dividingBy: 0.4)) / 0.4)
+            let scaleY = reduceMotion ? 1.0 : (0.3 + 0.7 * (0.5 - 0.5 * cos(flapPhase * 2 * .pi)))
+            let opacity: Double = {
+                if phase < 0.10 { return phase / 0.10 }
+                if phase > 0.90 { return max(0, 1.0 - (phase - 0.90) / 0.10) }
+                return 1.0
+            }()
+            HStack(spacing: 1) {
+                Ellipse().fill(wing).frame(width: 10, height: 7)
+                Ellipse().fill(wing).frame(width: 10, height: 7)
+            }
+            .scaleEffect(x: 1.0, y: scaleY)
+            .opacity(opacity)
+            .position(x: x, y: y + (reduceMotion ? 0 : bobY))
+        }
+    }
+}
+
+private struct Bird: View {
+    let y: Double
+    let duration: Double
+    let delay: Double
+    let reduceMotion: Bool
+
+    var body: some View {
+        TimelineView(.animation(minimumInterval: 1/30)) { tl in
+            let t = tl.date.timeIntervalSinceReferenceDate + delay
+            let phase = reduceMotion ? 0.5 : ((t.truncatingRemainder(dividingBy: duration)) / duration)
+            let x = -30.0 + (430.0 - (-30.0)) * phase
+            let flapPhase = reduceMotion ? 0.5 : ((t.truncatingRemainder(dividingBy: 0.8)) / 0.8)
+            let scaleY = reduceMotion ? 1.0 : (0.6 + 0.4 * (0.5 - 0.5 * cos(flapPhase * 2 * .pi)))
+            BirdShape()
+                .stroke(
+                    Color(hex: "#2D3142").opacity(0.4),
+                    style: StrokeStyle(lineWidth: 1.4, lineCap: .round)
+                )
+                .frame(width: 14, height: 10)
+                .scaleEffect(x: 1.0, y: scaleY)
+                .position(x: x, y: y)
+        }
+    }
+}
+
+private struct BirdShape: Shape {
+    func path(in r: CGRect) -> Path {
+        var p = Path()
+        // Translate the SVG path "M1 6 Q7 -1 7 4 Q7 -1 13 6" into the rect.
+        // Source viewbox: x 0–14, y -1–6 (i.e. 14×7 with a -1pt overhang).
+        let sx = r.width / 14.0
+        let sy = r.height / 8.0
+        let originY = r.minY + 1 * sy  // shift so y=-1 lands at the top of the rect
+        func pt(_ x: Double, _ y: Double) -> CGPoint {
+            CGPoint(x: r.minX + x * sx, y: originY + y * sy)
+        }
+        p.move(to: pt(1, 6))
+        p.addQuadCurve(to: pt(7, 4), control: pt(7, -1))
+        p.addQuadCurve(to: pt(13, 6), control: pt(7, -1))
+        return p
+    }
+}
+
+private struct MorningMist: View {
+    let baseX: Double
+    let y: Double
+    let w: Double
+    let h: Double
+    let amplitude: Double
+    let inverse: Bool
+    let duration: Double
+    let delay: Double
+    let reduceMotion: Bool
+
+    var body: some View {
+        TimelineView(.animation(minimumInterval: 1/30)) { tl in
+            let t = tl.date.timeIntervalSinceReferenceDate + delay
+            let phase = ((t.truncatingRemainder(dividingBy: duration)) / duration)
+            let baseSign: Double = inverse ? 1 : -1
+            let dx = reduceMotion ? 0 : baseSign * amplitude * cos(phase * 2 * .pi)
+            Ellipse()
+                .fill(Color.white)
+                .opacity(0.30)
+                .frame(width: w, height: h)
+                .blur(radius: 12)
+                .position(x: baseX + w / 2 + dx, y: y + h / 2)
+        }
+    }
+}
+
+private struct Dragonfly: View {
+    let x: Double
+    let y: Double
+    let reduceMotion: Bool
+
+    var body: some View {
+        TimelineView(.animation(minimumInterval: 1/60)) { tl in
+            let t = tl.date.timeIntervalSinceReferenceDate
+            let hoverY = reduceMotion ? 0 : -4.0 * (0.5 - 0.5 * cos((t / 1.2) * 2 * .pi))
+            let hoverX = reduceMotion ? 0 : 3.0 * (0.5 - 0.5 * cos((t / 1.8) * 2 * .pi))
+            let wingOp = reduceMotion ? 0.7 : 0.5 + 0.4 * (0.5 - 0.5 * cos((t / 0.3) * 2 * .pi))
+            ZStack {
+                RoundedRectangle(cornerRadius: 1.5)
+                    .fill(Color(hex: "#A8C5A0").opacity(wingOp))
+                    .frame(width: 16, height: 3)
+                    .offset(y: -2)
+                RoundedRectangle(cornerRadius: 1.5)
+                    .fill(Color(hex: "#A8C5A0").opacity(wingOp))
+                    .frame(width: 16, height: 3)
+                    .offset(y: 2)
+                Capsule()
+                    .fill(Color(hex: "#A8C5A0").opacity(0.8))
+                    .frame(width: 3, height: 10)
+            }
+            .position(x: x + hoverX, y: y + hoverY)
+        }
+    }
+}
+
+// MARK: - Lily pad tap zone
+
+private struct LilyPadTapZone: View {
+    let glow: Bool
+    let reduceMotion: Bool
+    let onTap: () -> Void
+
+    var body: some View {
+        ZStack {
+            if glow {
+                if reduceMotion {
+                    Circle()
+                        .fill(Color(hex: "#A8C5A0").opacity(0.3))
+                        .frame(width: 80, height: 80)
+                        .blur(radius: 6)
+                } else {
+                    TimelineView(.animation(minimumInterval: 1/30)) { tl in
+                        let t = tl.date.timeIntervalSinceReferenceDate
+                        let phase = (t.truncatingRemainder(dividingBy: 2.0)) / 2.0
+                        let f = 0.5 - 0.5 * cos(phase * 2 * .pi)
+                        let scale = 1.0 + 0.08 * f
+                        let op = 0.2 + 0.2 * f
+                        Circle()
+                            .fill(Color(hex: "#A8C5A0").opacity(op))
+                            .frame(width: 80, height: 80)
+                            .scaleEffect(scale)
+                            .blur(radius: 6)
+                    }
+                }
+            }
+            Color.clear
+                .frame(width: 80, height: 40)
+                .contentShape(Rectangle())
+                .onTapGesture { onTap() }
+        }
+    }
+}
+
+// MARK: - Forest letter overlay (the leaf)
+
+private struct ForestLetterOverlay: View {
+    let letter: ForestDailyLetter?
+    let loading: Bool
+    let savedToJar: Bool
+    let reduceMotion: Bool
+    let onSave: () -> Void
+    let onClose: () -> Void
+
+    @State private var animateLoading: Bool = false
+    @State private var saveAppeared: Bool = false
+
+    var body: some View {
+        GeometryReader { geo in
+            let leafW = max(0, geo.size.width - 48)
+            let leafH = leafW * 1.5
+            ZStack {
+                Color.black.opacity(0.45)
+                    .ignoresSafeArea()
+                    .contentShape(Rectangle())
+                    .onTapGesture { onClose() }
+
+                ZStack {
+                    LeafLetterShape()
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    Color(hex: "#E8F0E2"),
+                                    Color(hex: "#D4E8CC"),
+                                    Color(hex: "#C4DEB8")
+                                ],
+                                startPoint: .top, endPoint: .bottom
+                            )
+                        )
+                    LeafVeins()
+                        .stroke(
+                            Color(hex: "#A8C5A0").opacity(0.25),
+                            lineWidth: 0.8
+                        )
+
+                    VStack(spacing: 0) {
+                        ForestLeafShape()
+                            .fill(Color(hex: "#3D6B3A").opacity(0.5))
+                            .frame(width: 18, height: 24)
+                            .padding(.top, 56)
+
+                        Text("a note from the forest")
+                            .font(DinoTheme.dinoFont(size: 11))
+                            .foregroundColor(Color(hex: "#3D6B3A").opacity(0.65))
+                            .tracking(1.5)
+                            .padding(.top, 14)
+
+                        Rectangle()
+                            .fill(Color(hex: "#A8C5A0").opacity(0.30))
+                            .frame(width: 36, height: 0.5)
+                            .padding(.vertical, 14)
+
+                        if loading {
+                            Text("the forest is writing\u{2026}")
+                                .font(DinoTheme.dinoFont(size: 14))
+                                .foregroundColor(Color(hex: "#3D6B3A").opacity(0.45))
+                                .opacity(reduceMotion ? 0.7 : (animateLoading ? 1.0 : 0.3))
+                        } else {
+                            Text(letter?.content ?? "")
+                                .font(DinoTheme.dinoFont(size: 15))
+                                .foregroundColor(Color(hex: "#2D4A20"))
+                                .lineSpacing(7)
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal, 36)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+
+                        Rectangle()
+                            .fill(Color(hex: "#A8C5A0").opacity(0.30))
+                            .frame(width: 36, height: 0.5)
+                            .padding(.vertical, 18)
+
+                        if !savedToJar && letter != nil && !loading {
+                            Button(action: onSave) {
+                                Text("save to jar \u{1FAD9}")
+                                    .font(DinoTheme.dinoFont(size: 14))
+                                    .foregroundColor(Color(hex: "#3D6B3A"))
+                                    .padding(.horizontal, 20)
+                                    .padding(.vertical, 10)
+                                    .background(Color.white.opacity(0.25))
+                                    .clipShape(Capsule())
+                            }
+                            .buttonStyle(.plain)
+                        }
+
+                        if savedToJar {
+                            HStack(spacing: 6) {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .font(.system(size: 14))
+                                    .foregroundColor(Color(hex: "#3D6B3A"))
+                                Text("saved to your jar")
+                                    .font(DinoTheme.dinoFont(size: 13))
+                                    .foregroundColor(Color(hex: "#3D6B3A"))
+                            }
+                            .opacity(saveAppeared ? 1 : 0)
+                            .scaleEffect(saveAppeared ? 1 : 0.85)
+                            .onAppear {
+                                withAnimation(.spring(response: 0.4, dampingFraction: 0.65)) {
+                                    saveAppeared = true
+                                }
+                            }
+                        }
+
+                        Button(action: onClose) {
+                            Text("close")
+                                .font(DinoTheme.dinoFont(size: 12))
+                                .foregroundColor(Color(hex: "#3D6B3A").opacity(0.4))
+                                .padding(.top, 12)
+                        }
+                        .buttonStyle(.plain)
+
+                        Spacer(minLength: 32)
+                    }
+                    .frame(width: leafW, height: leafH)
+                }
+                .frame(width: leafW, height: leafH)
+                .shadow(color: Color.black.opacity(0.18), radius: 24, x: 0, y: 10)
+                .position(x: geo.size.width / 2, y: geo.size.height / 2)
+            }
+        }
+        .onAppear {
+            if !reduceMotion {
+                withAnimation(.easeInOut(duration: 1.0).repeatForever(autoreverses: true)) {
+                    animateLoading = true
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Leaf shapes for the daily-letter overlay
+
+private struct LeafLetterShape: Shape {
+    func path(in r: CGRect) -> Path {
+        var p = Path()
+        let top = CGPoint(x: r.midX, y: r.minY)
+        let bottom = CGPoint(x: r.midX, y: r.maxY)
+        p.move(to: top)
+        p.addCurve(
+            to: bottom,
+            control1: CGPoint(x: r.maxX, y: r.minY + r.height * 0.30),
+            control2: CGPoint(x: r.maxX, y: r.minY + r.height * 0.70)
+        )
+        p.addCurve(
+            to: top,
+            control1: CGPoint(x: r.minX, y: r.minY + r.height * 0.70),
+            control2: CGPoint(x: r.minX, y: r.minY + r.height * 0.30)
+        )
+        p.closeSubpath()
+        return p
+    }
+}
+
+private struct LeafVeins: Shape {
+    func path(in r: CGRect) -> Path {
+        var p = Path()
+        // Central spine (slightly inset from tip + base)
+        let top = CGPoint(x: r.midX, y: r.minY + r.height * 0.08)
+        let bottom = CGPoint(x: r.midX, y: r.maxY - r.height * 0.08)
+        p.move(to: top)
+        p.addLine(to: bottom)
+
+        // 6 side veins (3 pairs) angled 40° from vertical, growing toward the tip.
+        let angle = 40.0 * .pi / 180.0
+        let length = r.width * 0.32
+        for f in [0.32, 0.50, 0.68] {
+            let y = r.minY + r.height * f
+            let dx = sin(angle) * length
+            let dy = -cos(angle) * length
+            p.move(to: CGPoint(x: r.midX, y: y))
+            p.addLine(to: CGPoint(x: r.midX - dx, y: y + dy))
+            p.move(to: CGPoint(x: r.midX, y: y))
+            p.addLine(to: CGPoint(x: r.midX + dx, y: y + dy))
+        }
+        return p
     }
 }
