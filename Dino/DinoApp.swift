@@ -135,6 +135,12 @@ struct DinoApp: App {
         config.captureApplicationLifecycleEvents = true
         PostHogSDK.shared.setup(config)
 
+        PostHogSDK.shared.register([
+            "app_version": Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "unknown",
+            "build_number": Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "unknown",
+            "platform": "iOS"
+        ])
+
         // One-time migration: gestures swapped (tap now opens calendar, long-press pauses).
         // Re-show the hint so existing users discover the new behavior.
         let ud = UserDefaults.standard
@@ -188,10 +194,12 @@ struct DinoApp: App {
                     switch newPhase {
                     case .active:
                         sessionStartTime = Date()
+                        AnalyticsManager.shared.trackSessionStarted()
                     case .inactive, .background:
                         let duration = Date().timeIntervalSince(sessionStartTime)
                         if duration > 0 {
                             AnalyticsManager.shared.trackAppBackgrounded(sessionDuration: duration)
+                            AnalyticsManager.shared.trackSessionEnded(durationSeconds: Int(duration))
                         }
                     @unknown default:
                         break

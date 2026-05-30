@@ -1330,7 +1330,10 @@ private struct StepRatingPage: View {
                         .transition(.opacity)
                     }
 
-                    Button(action: onFinish) {
+                    Button(action: {
+                        AnalyticsManager.shared.trackRatingSkipped()
+                        onFinish()
+                    }) {
                         Text("maybe later")
                             .font(DinoTheme.dinoFont(size: 14))
                             .foregroundColor(Color(hex: "#2D3142").opacity(0.55))
@@ -1345,7 +1348,10 @@ private struct StepRatingPage: View {
         }
         .scrollIndicators(.hidden)
         .animation(.easeInOut(duration: 0.3), value: selectedStars > 0)
-        .onAppear { startEntranceAnimations() }
+        .onAppear {
+            AnalyticsManager.shared.trackRatingScreenShown()
+            startEntranceAnimations()
+        }
     }
 
     private func startEntranceAnimations() {
@@ -1373,6 +1379,7 @@ private struct StepRatingPage: View {
 
     private func tapStar(_ index: Int) {
         let stars = index + 1
+        AnalyticsManager.shared.trackRatingStarTapped(stars: stars)
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
         withAnimation(.spring(response: 0.3)) {
             selectedStars = stars
@@ -1389,6 +1396,7 @@ private struct StepRatingPage: View {
     }
 
     private func rateAction() {
+        AnalyticsManager.shared.trackRatingSubmitted(stars: selectedStars)
         if let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene {
             SKStoreReviewController.requestReview(in: scene)
         }

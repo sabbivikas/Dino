@@ -51,6 +51,10 @@ final class AnalyticsManager {
         capture("onboarding_step_viewed", properties: ["step": step, "total": total])
     }
 
+    func trackOnboardingStepViewed(step: Int) {
+        capture("onboarding_step_viewed", properties: ["step_number": step])
+    }
+
     func trackOnboardingComplete() {
         capture("onboarding_completed")
     }
@@ -271,6 +275,44 @@ final class AnalyticsManager {
 
     func trackAppBackgrounded(sessionDuration: Double) {
         capture("app_backgrounded", properties: ["session_duration_seconds": sessionDuration])
+    }
+
+    // MARK: - Rating
+
+    func trackRatingScreenShown() {
+        capture("rating_screen_shown", properties: [:])
+    }
+
+    func trackRatingStarTapped(stars: Int) {
+        capture("rating_star_tapped", properties: ["stars": stars])
+    }
+
+    func trackRatingSubmitted(stars: Int) {
+        capture("rating_submitted", properties: ["stars": stars])
+    }
+
+    func trackRatingSkipped() {
+        capture("rating_skipped", properties: [:])
+    }
+
+    // MARK: - Session
+
+    func trackSessionStarted() {
+        capture("session_started", properties: [
+            "time_of_day": Calendar.current.component(.hour, from: Date())
+        ])
+    }
+
+    func trackSessionEnded(durationSeconds: Int) {
+        capture("session_ended", properties: [
+            "duration_seconds": durationSeconds
+        ])
+    }
+
+    // MARK: - Deep Links
+
+    func trackDeepLinkOpened(screen: String) {
+        capture("deep_link_opened", properties: ["screen": screen])
     }
 
     // MARK: - Identity
