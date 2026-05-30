@@ -140,6 +140,7 @@ struct ProfileView: View {
 
     @State private var activeSheet: ProfileSheet?
     @State private var showAmbientSounds: Bool = false
+    @State private var showForestLetter: Bool = false
     @State private var showRateAlert: Bool = false
     @AppStorage("dino.showStreak") private var showStreak: Bool = true
     @AppStorage("dino.streakHintSeen") private var streakHintSeen: Bool = false
@@ -299,6 +300,22 @@ struct ProfileView: View {
             case .ambientSounds: EmptyView() // presented via fullScreenCover instead
             case .stub(let content): ComingSoonView(content: content)
             }
+        }
+        .fullScreenCover(isPresented: $showForestLetter) {
+            ForestLetterView(
+                onEnter: {
+                    // Dismiss the letter, then present the waterfall once SwiftUI
+                    // finishes the dismiss animation. The audio is already fading
+                    // in from inside ForestLetterView.enterForest().
+                    showForestLetter = false
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                        showAmbientSounds = true
+                    }
+                },
+                onDismiss: {
+                    showForestLetter = false
+                }
+            )
         }
         .fullScreenCover(isPresented: $showAmbientSounds) {
             AmbientSoundsView()
@@ -757,7 +774,7 @@ struct ProfileView: View {
                 activeSheet = .gentleReminders
             }
             AmbientSoundsRow {
-                showAmbientSounds = true
+                showForestLetter = true
             }
             SBRow(
                 icon: "moon.stars.fill",

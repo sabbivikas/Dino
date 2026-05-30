@@ -1195,6 +1195,207 @@ private struct WaveBars: View {
     }
 }
 
+// MARK: - ForestLetterView (intro before the waterfall scene)
+
+/// Cream letter card shown before AmbientSoundsView. Reveals the letter
+/// word-by-word, then offers a sage CTA to enter the waterfall.
+struct ForestLetterView: View {
+    let onEnter: () -> Void
+    let onDismiss: () -> Void
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var sealAppeared: Bool = false
+    @State private var cardAppeared: Bool = false
+    @State private var ctaAppeared: Bool = false
+    @State private var fadingOut: Bool = false
+
+    private let letterCopy = """
+dear friend,
+
+find a quiet spot and close your eyes.
+
+you're standing at the edge of a still forest. somewhere nearby, a waterfall breathes.
+
+there's nothing to do here.
+no goals. no rush.
+
+just let the sounds carry you in.
+breathe slowly. stay as long as you like.
+
+the forest is always here,
+whenever you need it.
+"""
+
+    private var revealDuration: Double {
+        // ~0.06s per word + a buffer for the final word to finish appearing.
+        let wordCount = letterCopy.split(whereSeparator: { $0.isWhitespace }).count
+        return min(3.5, Double(wordCount) * 0.06 + 0.4)
+    }
+
+    var body: some View {
+        ZStack {
+            NatureBackdrop()
+                .ignoresSafeArea()
+
+            letterCard
+                .offset(y: (cardAppeared || reduceMotion) ? 0 : 30)
+                .opacity(cardAppeared ? (fadingOut ? 0 : 1) : 0)
+                .padding(.horizontal, 28)
+        }
+        .ignoresSafeArea()
+        .onAppear { startEntrance() }
+    }
+
+    private var letterCard: some View {
+        VStack(spacing: 0) {
+            // Wax / leaf seal at top
+            ZStack {
+                Circle()
+                    .fill(Color(hex: "#A8C5A0").opacity(0.2))
+                    .frame(width: 64, height: 64)
+                    .blur(radius: 12)
+                Circle()
+                    .fill(Color(hex: "#A8C5A0"))
+                    .frame(width: 48, height: 48)
+                ForestLeafShape()
+                    .fill(Color.white.opacity(0.8))
+                    .frame(width: 22, height: 28)
+            }
+            .scaleEffect(reduceMotion ? 1.0 : (sealAppeared ? 1.0 : 0.0))
+            .opacity(sealAppeared ? 1 : 0)
+
+            Text("a note from the forest")
+                .font(DinoTheme.dinoFont(size: 12))
+                .tracking(1.5)
+                .foregroundColor(Color(hex: "#9E8E7E").opacity(0.8))
+                .padding(.top, 14)
+
+            // Letter body — word reveal
+            WordRevealText(
+                letterCopy,
+                font: DinoTheme.dinoFont(size: 16),
+                color: Color(hex: "#4A3520")
+            )
+            .multilineTextAlignment(.center)
+            .lineSpacing(6)
+            .padding(.top, 16)
+
+            // Three-dot decorative divider
+            HStack(spacing: 8) {
+                ForEach(0..<3, id: \.self) { _ in
+                    Circle()
+                        .fill(Color(hex: "#A8C5A0").opacity(0.6))
+                        .frame(width: 4, height: 4)
+                }
+            }
+            .padding(.top, 20)
+
+            // Primary CTA (appears after the letter finishes revealing)
+            Button(action: enterForest) {
+                Text("enter the forest")
+                    .font(DinoTheme.dinoFont(size: 17))
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 18)
+                    .background(Color(hex: "#A8C5A0"))
+                    .cornerRadius(16)
+                    .shadow(color: Color(hex: "#A8C5A0").opacity(0.4), radius: 12, x: 0, y: 4)
+            }
+            .buttonStyle(ScaleButtonStyle())
+            .opacity(ctaAppeared ? 1 : 0)
+            .padding(.top, 24)
+
+            // Ghost dismiss
+            Button(action: {
+                onDismiss()
+            }) {
+                Text("maybe later")
+                    .font(DinoTheme.dinoFont(size: 15))
+                    .foregroundColor(Color(hex: "#A8C5A0"))
+                    .padding(.vertical, 8)
+            }
+            .buttonStyle(.plain)
+            .padding(.top, 12)
+        }
+        .padding(32)
+        .background(
+            RoundedRectangle(cornerRadius: 24)
+                .fill(Color(hex: "#FEFBF3"))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 24)
+                .stroke(Color(hex: "#E8DDD0"), lineWidth: 1)
+        )
+        .shadow(color: Color(hex: "#C4A882").opacity(0.15), radius: 16, x: 0, y: 6)
+    }
+
+    // MARK: Animation orchestration
+
+    private func startEntrance() {
+        // Seal pops in first
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            withAnimation(
+                reduceMotion
+                    ? .easeOut(duration: 0.35)
+                    : .spring(response: 0.6, dampingFraction: 0.55)
+            ) {
+                sealAppeared = true
+            }
+        }
+
+        // Card slides up
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+            withAnimation(
+                reduceMotion
+                    ? .easeOut(duration: 0.4)
+                    : .spring(response: 0.5, dampingFraction: 0.75)
+            ) {
+                cardAppeared = true
+            }
+        }
+
+        // CTA fades in after the word reveal completes
+        let ctaDelay = (reduceMotion ? 0.6 : (revealDuration + 0.4))
+        DispatchQueue.main.asyncAfter(deadline: .now() + ctaDelay) {
+            withAnimation(.easeOut(duration: 0.4)) {
+                ctaAppeared = true
+            }
+        }
+    }
+
+    private func enterForest() {
+        // Start audio during the transition so the user hears the waterfall
+        // before the visual change completes.
+        let audio = AudioManager.shared
+        audio.setVolume(0.7)
+        audio.play(track: "rain", playback: false)
+        audio.fadeIn(duration: 2.0)
+
+        // Card fades out, then hand off to the parent.
+        withAnimation(.easeOut(duration: 0.4)) { fadingOut = true }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+            onEnter()
+        }
+    }
+}
+
+/// Simple two-arc leaf used inside the forest letter seal.
+private struct ForestLeafShape: Shape {
+    func path(in r: CGRect) -> Path {
+        var p = Path()
+        let top = CGPoint(x: r.midX, y: r.minY)
+        let bottom = CGPoint(x: r.midX, y: r.maxY)
+        p.move(to: top)
+        p.addQuadCurve(to: bottom, control: CGPoint(x: r.maxX, y: r.midY))
+        p.addQuadCurve(to: top,    control: CGPoint(x: r.minX, y: r.midY))
+        p.closeSubpath()
+        // Center vein
+        p.move(to: top)
+        p.addLine(to: bottom)
+        return p
+    }
+}
+
 // MARK: - AmbientSoundsView (composition root)
 
 struct AmbientSoundsView: View {
@@ -1254,9 +1455,14 @@ struct AmbientSoundsView: View {
         .ignoresSafeArea()
         .preferredColorScheme(isNight ? .dark : .light)
         .onAppear {
-            AudioManager.shared.setVolume(0.7)
-            AudioManager.shared.play(track: "rain", playback: false)
-            AudioManager.shared.fadeIn(duration: 1.5)
+            // If the user came in via ForestLetterView, audio is already playing
+            // and fading in — don't restart it. Otherwise kick it off fresh.
+            let audio = AudioManager.shared
+            if audio.currentTrack != "rain" || !audio.isPlaying {
+                audio.setVolume(0.7)
+                audio.play(track: "rain", playback: false)
+                audio.fadeIn(duration: 1.5)
+            }
             AnalyticsManager.shared.trackScreenViewed("ambient_sounds")
         }
     }
