@@ -1359,7 +1359,7 @@ struct ForestLetterView: View {
     private func enterForest() {
         let audio = AudioManager.shared
         audio.setVolume(0.7)
-        audio.play(track: "rain", playback: false)
+        audio.play(track: "rain", playback: true)
         audio.fadeIn(duration: 2.0)
 
         withAnimation(.easeOut(duration: 0.4)) { fadingOut = true }
@@ -1696,7 +1696,7 @@ struct AmbientSoundsView: View {
             // Only start the track if it isn't already playing — e.g. when
             // the user came in via ForestLetterView, audio is already fading in.
             if !AudioManager.shared.isPlaying {
-                AudioManager.shared.play(track: "rain", playback: false)
+                AudioManager.shared.play(track: "rain", playback: true)
                 AudioManager.shared.setVolume(0.7)
                 AudioManager.shared.fadeIn(duration: 1.5)
             }
