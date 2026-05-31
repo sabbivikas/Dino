@@ -11,7 +11,6 @@ struct HomeView: View {
     @EnvironmentObject var dataManager: SharedDataManager
     @StateObject private var viewModel: HomeViewModel = HomeViewModel(dataManager: SharedDataManager.shared)
     @StateObject private var notificationStore = NotificationStore.shared
-    @StateObject private var paintingService = MoodPaintingService.shared
     @State private var showNotificationCenter = false
     @AppStorage("dino.showStreak") private var showStreak: Bool = true
     @AppStorage("dino.streakHintSeen") private var streakHintSeen: Bool = false
@@ -102,7 +101,6 @@ struct HomeView: View {
             .onChange(of: dataManager.streakData.currentStreak) { _, _ in refreshNotifications() }
             .onChange(of: dataManager.journalEntries.count) { _, _ in refreshNotifications() }
             .onChange(of: dataManager.gratitudeNotes.count) { _, _ in refreshNotifications() }
-            .onChange(of: paintingService.monthlyPaintings.count) { _, _ in refreshNotifications() }
             .onChange(of: dataManager.breathingSessions.count) { _, _ in refreshNotifications() }
             .onChange(of: dataManager.meditationSessions.count) { _, _ in refreshNotifications() }
         }
@@ -149,16 +147,16 @@ struct HomeView: View {
     }
 
     private func refreshNotifications() {
-        let today = Date()
-        let hasPainting = paintingService.hasPainting(for: today)
         let lastJournalDate = dataManager.journalEntries.first?.date
+        // Mood painting feature is currently disabled — pass safe defaults
+        // so the notification refresh signature is preserved for future re-enable.
         notificationStore.refreshFromData(
             streakDays: dataManager.streakData.currentStreak,
             journalCount: dataManager.journalEntries.count,
             gratitudeCount: dataManager.gratitudeNotes.count,
             lastJournalDate: lastJournalDate,
-            hasMonthlyPainting: hasPainting,
-            paintingMonthKey: paintingService.monthKey(today),
+            hasMonthlyPainting: false,
+            paintingMonthKey: "",
             breathingSessionCount: dataManager.breathingSessions.count,
             meditationSessionCount: dataManager.meditationSessions.count
         )

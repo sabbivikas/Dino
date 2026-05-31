@@ -103,8 +103,6 @@ private enum ProfileSheet: Identifiable {
     case gentleReminders
     case windDown
     case textSize
-    case paintingGallery
-    case paintingGenerator
     case feedback
     case ambientSounds
     case stub(ComingSoonContent)
@@ -121,8 +119,6 @@ private enum ProfileSheet: Identifiable {
         case .gentleReminders: return "gentleReminders"
         case .windDown:      return "windDown"
         case .textSize:      return "textSize"
-        case .paintingGallery: return "paintingGallery"
-        case .paintingGenerator: return "paintingGenerator"
         case .feedback: return "feedback"
         case .ambientSounds: return "ambientSounds"
         case .stub(let c):   return "stub-\(c.id)"
@@ -244,7 +240,6 @@ struct ProfileView: View {
                         .padding(.top, 6)
 
                     sectionPractice
-                    sectionPaintings
                     sectionJourney
                     sectionAppearance
                     sectionAccount
@@ -289,13 +284,6 @@ struct ProfileView: View {
                 SettingsView().environmentObject(dataManager)
             case .windDown:      WindDownView()
             case .textSize:      TextSizeView()
-            case .paintingGallery:
-                MoodPaintingGalleryView()
-            case .paintingGenerator:
-                MoodPaintingGeneratorView(
-                    month: Date(),
-                    moods: moodsForCurrentMonth()
-                )
             case .feedback: FeedbackView()
             case .ambientSounds: EmptyView() // presented via fullScreenCover instead
             case .stub(let content): ComingSoonView(content: content)
@@ -699,30 +687,6 @@ struct ProfileView: View {
     }
 
     // MARK: - Sections
-
-    private func moodsForCurrentMonth() -> [MoodEntry] {
-        let cal = Calendar.current
-        let now = Date()
-        let m = cal.component(.month, from: now)
-        let y = cal.component(.year, from: now)
-        return dataManager.moodEntries.filter {
-            cal.component(.month, from: $0.date) == m &&
-            cal.component(.year, from: $0.date) == y
-        }
-    }
-
-    private var sectionPaintings: some View {
-        PaperSection(
-            label: "your paintings \u{1F3A8}",
-            tapeColor: SB.lavender,
-            tilt: -0.4
-        ) {
-            PaintingsStrip(
-                onSeeAll: { activeSheet = .paintingGallery },
-                onGenerate: { activeSheet = .paintingGenerator }
-            )
-        }
-    }
 
     private var sectionJourney: some View {
         PaperSection(
@@ -1292,99 +1256,6 @@ private struct SBRow: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-    }
-}
-
-// MARK: - Paintings Strip
-
-private struct PaintingsStrip: View {
-    @StateObject private var service = MoodPaintingService.shared
-    let onSeeAll: () -> Void
-    let onGenerate: () -> Void
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Text("a month of feelings, painted")
-                    .font(DinoTheme.dinoFont(size: 12))
-                    .foregroundColor(SB.sage)
-                Spacer()
-                Button(action: onSeeAll) {
-                    Text("see all \u{2192}")
-                        .font(DinoTheme.dinoFont(size: 12))
-                        .foregroundColor(SB.rust)
-                }
-                .buttonStyle(.plain)
-            }
-
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 12) {
-                    let recent = Array(service.monthlyPaintings.suffix(3).reversed())
-                    if recent.isEmpty {
-                        placeholderCard
-                    } else {
-                        ForEach(recent, id: \.date) { item in
-                            paintingMini(item.image, date: item.date)
-                        }
-                    }
-                }
-            }
-
-            Button(action: onGenerate) {
-                HStack(spacing: 8) {
-                    Image(systemName: "paintbrush.fill")
-                        .font(.system(size: 12, weight: .medium))
-                    Text("generate this month's painting")
-                        .font(DinoTheme.dinoFont(size: 14))
-                }
-                .foregroundColor(.white)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 10)
-                .background(Capsule().fill(SB.lavender))
-            }
-            .buttonStyle(.plain)
-        }
-        .padding(.vertical, 4)
-        .onAppear { _ = service.loadAllPaintings() }
-    }
-
-    private func paintingMini(_ image: UIImage, date: Date) -> some View {
-        let f = DateFormatter()
-        f.dateFormat = "MMM yyyy"
-        return VStack(spacing: 6) {
-            Image(uiImage: image)
-                .resizable()
-                .scaledToFill()
-                .frame(width: 110, height: 140)
-                .clipped()
-                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                .shadow(color: .black.opacity(0.10), radius: 3, y: 2)
-            Text(f.string(from: date).lowercased())
-                .font(DinoTheme.dinoFont(size: 11))
-                .foregroundColor(SB.sage)
-        }
-    }
-
-    private var placeholderCard: some View {
-        VStack(spacing: 6) {
-            ZStack {
-                LinearGradient(
-                    colors: [SB.lavender.opacity(0.6), SB.peach.opacity(0.6), SB.sky.opacity(0.6)],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-                Text("your first painting\ngenerates end of month")
-                    .font(DinoTheme.dinoFont(size: 11))
-                    .foregroundColor(.white)
-                    .multilineTextAlignment(.center)
-                    .padding(8)
-            }
-            .frame(width: 110, height: 140)
-            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-            Text("coming soon")
-                .font(DinoTheme.dinoFont(size: 11))
-                .foregroundColor(SB.sage)
-        }
     }
 }
 
