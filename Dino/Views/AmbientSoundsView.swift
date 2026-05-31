@@ -1964,7 +1964,7 @@ private struct LilyPadTapZone: View {
     }
 }
 
-// MARK: - Forest letter overlay (the leaf)
+// MARK: - Forest letter overlay (envelope opens to reveal letter)
 
 private struct ForestLetterOverlay: View {
     let letter: ForestDailyLetter?
@@ -1974,176 +1974,399 @@ private struct ForestLetterOverlay: View {
     let onSave: () -> Void
     let onClose: () -> Void
 
+    @State private var landed: Bool = false
+    @State private var envelopeOpen: Bool = false
+    @State private var letterEmerged: Bool = false
+    @State private var dismissing: Bool = false
     @State private var animateLoading: Bool = false
+    @State private var hintOpacity: Double = 0.3
     @State private var saveAppeared: Bool = false
+    @State private var letterHeight: CGFloat = 240
 
     var body: some View {
         GeometryReader { geo in
-            let leafW = max(0, geo.size.width - 48)
-            let leafH = leafW * 1.5
+            let envW: CGFloat = max(0, geo.size.width - 48)
+            let envH: CGFloat = envW * 0.65
+            let flapH: CGFloat = envH * 0.45
+            let centerX: CGFloat = geo.size.width / 2
+            let centerY: CGFloat = geo.size.height / 2
+            let restRot: Double = landed ? -1 : (reduceMotion ? -1 : -8)
+            let yEntry: CGFloat = landed ? 0 : (reduceMotion ? 0 : -400)
+            let letterOffset: CGFloat = letterEmerged
+                ? -(envH / 2 + letterHeight / 2 + 16)
+                : 0
+
             ZStack {
-                Color.black.opacity(0.45)
+                // Tap-to-dismiss backdrop
+                Color.black.opacity(0.50)
                     .ignoresSafeArea()
                     .contentShape(Rectangle())
-                    .onTapGesture { onClose() }
+                    .onTapGesture { close() }
 
+                // Envelope cluster
                 ZStack {
-                    LeafLetterShape()
-                        .fill(
-                            LinearGradient(
-                                colors: [
-                                    Color(hex: "#E8F0E2"),
-                                    Color(hex: "#D4E8CC"),
-                                    Color(hex: "#C4DEB8")
-                                ],
-                                startPoint: .top, endPoint: .bottom
+                    // LETTER (behind body — slides up out of the envelope)
+                    LetterCard(
+                        letter: letter,
+                        loading: loading,
+                        savedToJar: savedToJar,
+                        animateLoading: animateLoading,
+                        saveAppeared: saveAppeared,
+                        width: envW,
+                        onSave: onSave,
+                        onClose: { close() }
+                    )
+                    .background(
+                        GeometryReader { proxy in
+                            Color.clear.preference(
+                                key: LetterHeightKey.self,
+                                value: proxy.size.height
                             )
+                        }
+                    )
+                    .offset(y: letterOffset)
+                    .opacity(letterEmerged ? 1 : 0)
+
+                    // ENVELOPE BODY
+                    EnvelopeBody(width: envW, height: envH)
+                        .onTapGesture { openEnvelope() }
+
+                    // FLAP (with wax seal) — occupies top 45% of envelope,
+                    // rotates -180° around its bottom edge (fold line) to open.
+                    EnvelopeFlap(width: envW, height: flapH)
+                        .frame(width: envW, height: flapH)
+                        .position(x: envW / 2, y: flapH / 2)
+                        .rotation3DEffect(
+                            .degrees(envelopeOpen ? -180 : 0),
+                            axis: (x: 1, y: 0, z: 0),
+                            anchor: .bottom,
+                            perspective: 0.6
                         )
-                    LeafVeins()
-                        .stroke(
-                            Color(hex: "#A8C5A0").opacity(0.25),
-                            lineWidth: 0.8
+                        .animation(
+                            reduceMotion
+                                ? .easeOut(duration: 0.35)
+                                : .easeInOut(duration: 0.5),
+                            value: envelopeOpen
                         )
-
-                    VStack(spacing: 0) {
-                        ForestLeafShape()
-                            .fill(Color(hex: "#3D6B3A").opacity(0.5))
-                            .frame(width: 18, height: 24)
-                            .padding(.top, 56)
-
-                        Text("a note from the forest")
-                            .font(DinoTheme.dinoFont(size: 11))
-                            .foregroundColor(Color(hex: "#3D6B3A").opacity(0.65))
-                            .tracking(1.5)
-                            .padding(.top, 14)
-
-                        Rectangle()
-                            .fill(Color(hex: "#A8C5A0").opacity(0.30))
-                            .frame(width: 36, height: 0.5)
-                            .padding(.vertical, 14)
-
-                        if loading {
-                            Text("the forest is writing\u{2026}")
-                                .font(DinoTheme.dinoFont(size: 14))
-                                .foregroundColor(Color(hex: "#3D6B3A").opacity(0.45))
-                                .opacity(reduceMotion ? 0.7 : (animateLoading ? 1.0 : 0.3))
-                        } else {
-                            Text(letter?.content ?? "")
-                                .font(DinoTheme.dinoFont(size: 15))
-                                .foregroundColor(Color(hex: "#2D4A20"))
-                                .lineSpacing(7)
-                                .multilineTextAlignment(.center)
-                                .padding(.horizontal, 36)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-
-                        Rectangle()
-                            .fill(Color(hex: "#A8C5A0").opacity(0.30))
-                            .frame(width: 36, height: 0.5)
-                            .padding(.vertical, 18)
-
-                        if !savedToJar && letter != nil && !loading {
-                            Button(action: onSave) {
-                                Text("save to jar \u{1FAD9}")
-                                    .font(DinoTheme.dinoFont(size: 14))
-                                    .foregroundColor(Color(hex: "#3D6B3A"))
-                                    .padding(.horizontal, 20)
-                                    .padding(.vertical, 10)
-                                    .background(Color.white.opacity(0.25))
-                                    .clipShape(Capsule())
-                            }
-                            .buttonStyle(.plain)
-                        }
-
-                        if savedToJar {
-                            HStack(spacing: 6) {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .font(.system(size: 14))
-                                    .foregroundColor(Color(hex: "#3D6B3A"))
-                                Text("saved to your jar")
-                                    .font(DinoTheme.dinoFont(size: 13))
-                                    .foregroundColor(Color(hex: "#3D6B3A"))
-                            }
-                            .opacity(saveAppeared ? 1 : 0)
-                            .scaleEffect(saveAppeared ? 1 : 0.85)
-                            .onAppear {
-                                withAnimation(.spring(response: 0.4, dampingFraction: 0.65)) {
-                                    saveAppeared = true
-                                }
-                            }
-                        }
-
-                        Button(action: onClose) {
-                            Text("close")
-                                .font(DinoTheme.dinoFont(size: 12))
-                                .foregroundColor(Color(hex: "#3D6B3A").opacity(0.4))
-                                .padding(.top, 12)
-                        }
-                        .buttonStyle(.plain)
-
-                        Spacer(minLength: 32)
-                    }
-                    .frame(width: leafW, height: leafH)
+                        .onTapGesture { openEnvelope() }
                 }
-                .frame(width: leafW, height: leafH)
-                .shadow(color: Color.black.opacity(0.18), radius: 24, x: 0, y: 10)
-                .position(x: geo.size.width / 2, y: geo.size.height / 2)
+                .frame(width: envW, height: envH)
+                .rotationEffect(.degrees(restRot))
+                .position(x: centerX, y: centerY)
+                .offset(y: yEntry)
+                .opacity(landed ? 1 : 0)
+
+                // "tap to open" hint below the envelope
+                if !envelopeOpen && !dismissing {
+                    Text("tap to open")
+                        .font(DinoTheme.dinoFont(size: 11))
+                        .foregroundColor(Color(hex: "#6B5B3E").opacity(hintOpacity))
+                        .position(x: centerX, y: centerY + envH / 2 + 28)
+                        .opacity(landed ? 1 : 0)
+                }
+            }
+            .onPreferenceChange(LetterHeightKey.self) { h in
+                if h > 0 { letterHeight = h }
             }
         }
-        .onAppear {
-            if !reduceMotion {
-                withAnimation(.easeInOut(duration: 1.0).repeatForever(autoreverses: true)) {
-                    animateLoading = true
+        .onAppear { startEntrance() }
+    }
+
+    // MARK: Animation
+
+    private func startEntrance() {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+            withAnimation(
+                reduceMotion
+                    ? .easeOut(duration: 0.4)
+                    : .spring(response: 0.7, dampingFraction: 0.72)
+            ) {
+                landed = true
+            }
+        }
+        if reduceMotion {
+            hintOpacity = 0.55
+        } else {
+            withAnimation(.easeInOut(duration: 1.0).repeatForever(autoreverses: true)) {
+                animateLoading = true
+                hintOpacity = 0.8
+            }
+        }
+    }
+
+    private func openEnvelope() {
+        guard !envelopeOpen, !dismissing else { return }
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        withAnimation(
+            reduceMotion
+                ? .easeOut(duration: 0.35)
+                : .spring(response: 0.6, dampingFraction: 0.7)
+        ) {
+            envelopeOpen = true
+        }
+        // Letter slides up after the flap finishes swinging open.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+            withAnimation(
+                reduceMotion
+                    ? .easeOut(duration: 0.35)
+                    : .spring(response: 0.6, dampingFraction: 0.75)
+            ) {
+                letterEmerged = true
+            }
+            // The "saved to jar" confirmation fades in next time the user taps save.
+            if savedToJar {
+                withAnimation(.spring(response: 0.4, dampingFraction: 0.65)) {
+                    saveAppeared = true
                 }
+            }
+        }
+    }
+
+    private func close() {
+        guard !dismissing else { return }
+        dismissing = true
+        let wasOpen = envelopeOpen
+
+        if wasOpen {
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+                letterEmerged = false
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                withAnimation(.easeOut(duration: 0.3)) {
+                    envelopeOpen = false
+                }
+            }
+        }
+
+        let flyAwayDelay: Double = wasOpen ? 0.55 : 0.05
+        DispatchQueue.main.asyncAfter(deadline: .now() + flyAwayDelay) {
+            withAnimation(.easeIn(duration: 0.35)) {
+                landed = false
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                onClose()
             }
         }
     }
 }
 
-// MARK: - Leaf shapes for the daily-letter overlay
+// MARK: - Envelope components
 
-private struct LeafLetterShape: Shape {
+private struct EnvelopeBody: View {
+    let width: CGFloat
+    let height: CGFloat
+
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 6)
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            Color(hex: "#F5EDD8"),
+                            Color(hex: "#EFE4CA")
+                        ],
+                        startPoint: .top, endPoint: .bottom
+                    )
+                )
+            // Two diagonal fold lines from bottom corners meeting at center bottom.
+            Canvas { ctx, size in
+                var p = Path()
+                p.move(to: CGPoint(x: 0, y: size.height))
+                p.addLine(to: CGPoint(x: size.width / 2, y: size.height / 2))
+                p.move(to: CGPoint(x: size.width, y: size.height))
+                p.addLine(to: CGPoint(x: size.width / 2, y: size.height / 2))
+                ctx.stroke(
+                    p,
+                    with: .color(Color(hex: "#C4A882").opacity(0.30)),
+                    lineWidth: 1
+                )
+            }
+        }
+        .frame(width: width, height: height)
+        .shadow(color: Color.black.opacity(0.20), radius: 16, x: 0, y: 8)
+    }
+}
+
+private struct EnvelopeFlap: View {
+    let width: CGFloat
+    let height: CGFloat
+
+    var body: some View {
+        ZStack {
+            FlapTriangleShape()
+                .fill(Color(hex: "#EDE0C4"))
+                .frame(width: width, height: height)
+
+            // Subtle crease along the fold line.
+            Path { p in
+                p.move(to: CGPoint(x: 0, y: height))
+                p.addLine(to: CGPoint(x: width, y: height))
+            }
+            .stroke(Color(hex: "#C4A882").opacity(0.40), lineWidth: 0.5)
+            .frame(width: width, height: height)
+
+            // Wax seal centered on the flap.
+            ZStack {
+                Circle()
+                    .fill(Color(hex: "#A8C5A0").opacity(0.20))
+                    .frame(width: 64, height: 64)
+                    .blur(radius: 12)
+                Circle()
+                    .fill(Color(hex: "#A8C5A0"))
+                    .frame(width: 44, height: 44)
+                VStack(spacing: 1) {
+                    ForestLeafShape()
+                        .fill(Color.white.opacity(0.70))
+                        .frame(width: 12, height: 14)
+                    Text("D")
+                        .font(DinoTheme.dinoFont(size: 16))
+                        .foregroundColor(.white)
+                }
+            }
+            .frame(width: width, height: height)
+        }
+    }
+}
+
+private struct FlapTriangleShape: Shape {
     func path(in r: CGRect) -> Path {
         var p = Path()
-        let top = CGPoint(x: r.midX, y: r.minY)
-        let bottom = CGPoint(x: r.midX, y: r.maxY)
-        p.move(to: top)
-        p.addCurve(
-            to: bottom,
-            control1: CGPoint(x: r.maxX, y: r.minY + r.height * 0.30),
-            control2: CGPoint(x: r.maxX, y: r.minY + r.height * 0.70)
-        )
-        p.addCurve(
-            to: top,
-            control1: CGPoint(x: r.minX, y: r.minY + r.height * 0.70),
-            control2: CGPoint(x: r.minX, y: r.minY + r.height * 0.30)
-        )
+        // Wide base along the top of the envelope, point at the fold line
+        // (bottom-center of the flap rect).
+        p.move(to: CGPoint(x: r.minX, y: r.minY))
+        p.addLine(to: CGPoint(x: r.maxX, y: r.minY))
+        p.addLine(to: CGPoint(x: r.midX, y: r.maxY))
         p.closeSubpath()
         return p
     }
 }
 
-private struct LeafVeins: Shape {
-    func path(in r: CGRect) -> Path {
-        var p = Path()
-        // Central spine (slightly inset from tip + base)
-        let top = CGPoint(x: r.midX, y: r.minY + r.height * 0.08)
-        let bottom = CGPoint(x: r.midX, y: r.maxY - r.height * 0.08)
-        p.move(to: top)
-        p.addLine(to: bottom)
+// MARK: - Letter card (slides out of the envelope)
 
-        // 6 side veins (3 pairs) angled 40° from vertical, growing toward the tip.
-        let angle = 40.0 * .pi / 180.0
-        let length = r.width * 0.32
-        for f in [0.32, 0.50, 0.68] {
-            let y = r.minY + r.height * f
-            let dx = sin(angle) * length
-            let dy = -cos(angle) * length
-            p.move(to: CGPoint(x: r.midX, y: y))
-            p.addLine(to: CGPoint(x: r.midX - dx, y: y + dy))
-            p.move(to: CGPoint(x: r.midX, y: y))
-            p.addLine(to: CGPoint(x: r.midX + dx, y: y + dy))
+private struct LetterCard: View {
+    let letter: ForestDailyLetter?
+    let loading: Bool
+    let savedToJar: Bool
+    let animateLoading: Bool
+    let saveAppeared: Bool
+    let width: CGFloat
+    let onSave: () -> Void
+    let onClose: () -> Void
+
+    var body: some View {
+        VStack(spacing: 12) {
+            // Opened wax seal imprint (outline + faint leaf)
+            ZStack {
+                Circle()
+                    .stroke(Color(hex: "#C4A882").opacity(0.30), lineWidth: 1)
+                    .frame(width: 24, height: 24)
+                ForestLeafShape()
+                    .fill(Color(hex: "#C4A882").opacity(0.30))
+                    .frame(width: 8, height: 10)
+            }
+
+            Text("a note from the forest")
+                .font(DinoTheme.dinoFont(size: 11))
+                .foregroundColor(Color(hex: "#6B5B3E").opacity(0.65))
+                .tracking(1.5)
+
+            Rectangle()
+                .fill(Color(hex: "#C4A882").opacity(0.40))
+                .frame(height: 0.5)
+                .padding(.horizontal, 60)
+
+            if loading {
+                Text("the forest is writing\u{2026}")
+                    .font(DinoTheme.dinoFont(size: 14))
+                    .foregroundColor(Color(hex: "#6B5B3E").opacity(0.45))
+                    .opacity(animateLoading ? 1.0 : 0.3)
+            } else {
+                Text(letter?.content ?? "")
+                    .font(DinoTheme.dinoFont(size: 15))
+                    .foregroundColor(Color(hex: "#3D2B1F"))
+                    .lineSpacing(7)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Rectangle()
+                .fill(Color(hex: "#C4A882").opacity(0.40))
+                .frame(height: 0.5)
+                .padding(.horizontal, 60)
+
+            if !savedToJar && letter != nil && !loading {
+                Button(action: onSave) {
+                    Text("save to jar \u{1FAD9}")
+                        .font(DinoTheme.dinoFont(size: 14))
+                        .foregroundColor(Color(hex: "#3D6B3A"))
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 10)
+                        .background(Color.white.opacity(0.25))
+                        .clipShape(Capsule())
+                }
+                .buttonStyle(.plain)
+            }
+
+            if savedToJar {
+                HStack(spacing: 6) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 14))
+                        .foregroundColor(Color(hex: "#3D6B3A"))
+                    Text("saved to your jar")
+                        .font(DinoTheme.dinoFont(size: 13))
+                        .foregroundColor(Color(hex: "#3D6B3A"))
+                }
+                .opacity(saveAppeared ? 1 : 0)
+                .scaleEffect(saveAppeared ? 1 : 0.85)
+            }
+
+            Button(action: onClose) {
+                Text("close")
+                    .font(DinoTheme.dinoFont(size: 12))
+                    .foregroundColor(Color(hex: "#6B5B3E").opacity(0.40))
+                    .padding(.top, 4)
+            }
+            .buttonStyle(.plain)
         }
-        return p
+        .padding(.horizontal, 24)
+        .padding(.vertical, 20)
+        .frame(width: width)
+        .background(
+            ZStack {
+                LinearGradient(
+                    colors: [
+                        Color(hex: "#FBF4E4"),
+                        Color(hex: "#F5EDD8")
+                    ],
+                    startPoint: .top, endPoint: .bottom
+                )
+                // Subtle diagonal grain lines (3 strokes at 2% opacity)
+                Canvas { ctx, size in
+                    for i in 0..<3 {
+                        let y0 = size.height * Double(i + 1) / 4.0
+                        var p = Path()
+                        p.move(to: CGPoint(x: 0, y: y0))
+                        p.addLine(to: CGPoint(x: size.width, y: y0 + 18))
+                        ctx.stroke(
+                            p,
+                            with: .color(Color(hex: "#8B7355").opacity(0.02)),
+                            lineWidth: 0.5
+                        )
+                    }
+                }
+            }
+        )
+        .cornerRadius(4)
+        .shadow(color: Color.black.opacity(0.15), radius: 12, x: 0, y: 6)
+        .rotationEffect(.degrees(-0.5))
+    }
+}
+
+// MARK: - Preference key for measuring the letter card height
+
+private struct LetterHeightKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
     }
 }
