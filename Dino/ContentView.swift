@@ -13,7 +13,9 @@ struct ContentView: View {
 
     @AppStorage("hasSeenLetter") private var hasSeenLetter = false
     @AppStorage("hasPassedAuth") private var hasPassedAuth = false
+    @AppStorage("lastPaintingPromptDate") private var lastPaintingPromptDate: String = ""
 
+    @Environment(\.scenePhase) private var scenePhase
     @State private var showMonthlyPaintingGenerator = false
 
     var body: some View {
@@ -52,6 +54,11 @@ struct ContentView: View {
                 DinoPendingDeepLink.url = nil
             }
         }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active {
+                checkMonthlyPaintingTrigger()
+            }
+        }
         .fullScreenCover(isPresented: $showMonthlyPaintingGenerator) {
             MoodPaintingGeneratorView(
                 month: Date(),
@@ -72,7 +79,15 @@ struct ContentView: View {
         guard let range = cal.range(of: .day, in: .month, for: today) else { return }
         let isLastDay = cal.component(.day, from: today) == range.upperBound - 1
         guard isLastDay else { return }
+
+        // Don't re-trigger if we've already prompted today, even if the user
+        // dismissed without saving a painting.
+        let todayStr = ISO8601DateFormatter().string(from: today).prefix(10).description
+        guard lastPaintingPromptDate != todayStr else { return }
+
         guard !paintingService.hasPainting(for: today) else { return }
+
+        lastPaintingPromptDate = todayStr
         showMonthlyPaintingGenerator = true
     }
 
