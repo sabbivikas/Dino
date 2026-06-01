@@ -38,6 +38,7 @@ struct StreakCalendarView: View {
                     HeroHeader(displayedMonth: displayedMonth)
                         .onAppear {
                             AnalyticsManager.shared.trackStreakCalendarOpened()
+                            AnalyticsManager.shared.trackScreen("streak_calendar")
                         }
                         .frame(height: 220)
 

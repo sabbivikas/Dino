@@ -128,7 +128,10 @@ struct EmotionalWeatherView: View {
             .background(DinoTheme.background.ignoresSafeArea())
             .navigationTitle("")
             .navigationBarHidden(true)
-            .onAppear { AnalyticsManager.shared.trackMoodScreenOpened() }
+            .onAppear {
+                AnalyticsManager.shared.trackMoodScreenOpened()
+                AnalyticsManager.shared.trackScreen("mood")
+            }
         }
     }
 }

@@ -117,7 +117,10 @@ struct VoiceJournalView: View {
                 )
             }
             .navigationBarHidden(true)
-            .onAppear { AnalyticsManager.shared.trackJournalOpened() }
+            .onAppear {
+                AnalyticsManager.shared.trackJournalOpened()
+                AnalyticsManager.shared.trackScreen("journal")
+            }
             .fullScreenCover(isPresented: $showAllMemories) {
                 JournalAllEntriesView(viewModel: viewModel)
                     .environmentObject(dataManager)

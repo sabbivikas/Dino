@@ -269,6 +269,7 @@ struct AffirmationsView: View {
             .onAppear {
                 onScreenAppear()
                 AnalyticsManager.shared.trackAffirmationsOpened()
+                AnalyticsManager.shared.trackScreen("affirmations")
             }
             .sheet(isPresented: $showCamera) {
                 CameraPicker(device: cameraDevice) { image in

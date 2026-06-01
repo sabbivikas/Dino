@@ -189,6 +189,9 @@ struct BreathingView: View {
             }
             .navigationBarBackButtonHidden(true)
         }
+        .onAppear {
+            AnalyticsManager.shared.trackScreen("breathing")
+        }
         .onDisappear {
             viewModel.stop()
             AudioManager.shared.stop()

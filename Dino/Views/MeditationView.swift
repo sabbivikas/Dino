@@ -181,6 +181,9 @@ struct MeditationView: View {
             }
             .navigationBarBackButtonHidden(true)
         }
+        .onAppear {
+            AnalyticsManager.shared.trackScreen("meditation")
+        }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)) { _ in
             print("[Meditation] app going to background")
         }

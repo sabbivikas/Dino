@@ -261,6 +261,7 @@ struct ProfileView: View {
                 UserDefaults.standard.set(Date(), forKey: "userJoinDate")
             }
             AnalyticsManager.shared.trackProfileOpened()
+            AnalyticsManager.shared.trackScreen("profile")
         }
         .sheet(item: $activeSheet, onDismiss: {
             savedProfilePhoto = PhotoStore.load()

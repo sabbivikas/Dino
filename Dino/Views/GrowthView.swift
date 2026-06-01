@@ -106,6 +106,9 @@ struct GrowthView: View {
                 Text("")
             }
         }
+        .onAppear {
+            AnalyticsManager.shared.trackScreen("growth_garden")
+        }
     }
 }
 

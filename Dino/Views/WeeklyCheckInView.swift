@@ -107,6 +107,9 @@ struct WeeklyCheckInView: View {
             }
         }
         .animation(.easeInOut, value: phase)
+        .onAppear {
+            AnalyticsManager.shared.trackScreen("weekly_checkin")
+        }
     }
 
     // MARK: - Helpers

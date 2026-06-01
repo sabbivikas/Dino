@@ -190,6 +190,7 @@ struct GratitudeJarView: View {
             .onAppear {
                 lastKnownNoteIds = viewModel.notes.map(\.id)
                 AnalyticsManager.shared.trackGratitudeJarOpened()
+                AnalyticsManager.shared.trackScreen("gratitude_jar")
             }
             .navigationTitle("")
             .navigationBarHidden(true)

@@ -1702,6 +1702,7 @@ struct AmbientSoundsView: View {
             }
 
             AnalyticsManager.shared.trackScreenViewed("ambient_sounds")
+            AnalyticsManager.shared.trackScreen("ambient_sounds")
 
             // Begin the lily-pad pulse after a 3s pause so the scene has
             // time to land before pointing at the tap target.

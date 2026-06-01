@@ -315,6 +315,19 @@ final class AnalyticsManager {
         capture("deep_link_opened", properties: ["screen": screen])
     }
 
+    // MARK: - Screen Tracking (autocaptured by PostHog as $screen)
+
+    func trackScreen(_ screenName: String, properties: [String: Any]? = nil) {
+        guard isEnabled else { return }
+        var props: [String: Any] = [
+            "$screen_name": screenName
+        ]
+        if let extra = properties {
+            props.merge(extra) { _, new in new }
+        }
+        PostHogSDK.shared.capture("$screen", properties: props)
+    }
+
     // MARK: - Identity
 
     func identify(uid: String) {

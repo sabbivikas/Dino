@@ -96,6 +96,7 @@ struct HomeView: View {
             .onAppear {
                 refreshNotifications()
                 AnalyticsManager.shared.trackHomeOpened()
+                AnalyticsManager.shared.trackScreen("home")
                 maybeShowWhatsNew()
             }
             .onChange(of: dataManager.streakData.currentStreak) { _, _ in refreshNotifications() }
