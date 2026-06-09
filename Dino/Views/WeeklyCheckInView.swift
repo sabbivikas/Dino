@@ -542,6 +542,14 @@ private struct ReportView: View {
                         .font(.system(size: 13))
                         .foregroundColor(mutedInk)
 
+                    if report.isMock == true {
+                        Text("offline summary")
+                            .font(DinoTheme.dinoFont(size: 12))
+                            .foregroundColor(sage)
+                            .frame(maxWidth: .infinity, alignment: .center)
+                            .padding(.top, 2)
+                    }
+
                     // Overall gauge
                     OverallGauge(
                         score: report.overallScore,

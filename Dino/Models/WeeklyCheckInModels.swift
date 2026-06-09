@@ -18,6 +18,9 @@ struct WeeklyReport: Codable, Equatable {
     let weeklyReflection: String
     let trend: String
     let trendNote: String
+    /// True when the report was generated from the local fallback instead of
+    /// the Cloud Function. Optional so older persisted reports still decode.
+    var isMock: Bool? = nil
 }
 
 struct WeeklyCheckInResult: Codable, Identifiable, Equatable {

@@ -2,11 +2,14 @@
 //  WeeklyCheckInService.swift
 //  Dino
 //
-//  NEVER throws. Always returns a WeeklyReport — real one if OpenAI succeeds,
-//  mock report on any failure path.
+//  NEVER throws. Always returns a WeeklyReport — real one if the
+//  `generateWeeklyReport` Firebase Cloud Function succeeds, mock report on
+//  any failure path (and the mock is flagged with `isMock: true` so the UI
+//  can show an "offline summary" badge).
 //
 
 import Foundation
+import FirebaseFunctions
 
 @MainActor
 final class WeeklyCheckInService {
@@ -20,128 +23,50 @@ final class WeeklyCheckInService {
         questionsAndAnswers: [(String, Int)],
         previousScores: [String: Int]? = nil
     ) async -> WeeklyReport {
-        let resolvedKey = readAPIKey() ?? ""
-        print("🦕 API KEY FOUND: \(!resolvedKey.isEmpty)")
-        guard !resolvedKey.isEmpty else {
-            print("🦕 USING MOCK - reason: OPENAI_API_KEY missing from Info.plist (Secrets.xcconfig not wired)")
-            return mockReport()
+        let qaPayload: [[String: Any]] = questionsAndAnswers.map { qa in
+            ["question": qa.0, "score": qa.1]
         }
-        let apiKey = resolvedKey
-
-        guard let url = URL(string: "https://api.openai.com/v1/chat/completions") else {
-            return mockReport()
+        let prevPayload: [[String: Any]] = (previousScores ?? [:]).map { kv in
+            ["key": kv.key, "score": kv.value]
         }
 
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.timeoutInterval = 30
-        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-
-        let userPrompt = buildPrompt(
-            weekNumber: weekNumber,
-            dateRange: dateRange,
-            questionsAndAnswers: questionsAndAnswers,
-            previousScores: previousScores
-        )
-        let body: [String: Any] = [
-            "model": "gpt-4o",
-            "response_format": ["type": "json_object"],
-            "messages": [
-                ["role": "system", "content": Self.systemPrompt],
-                ["role": "user", "content": userPrompt]
-            ]
-        ]
-
-        guard let httpBody = try? JSONSerialization.data(withJSONObject: body) else {
-            return mockReport()
-        }
-        request.httpBody = httpBody
-
-        print("🦕 USING REAL API")
         do {
-            let (data, response) = try await URLSession.shared.data(for: request)
-            guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
+            let functions = Functions.functions(region: "us-central1")
+            let callable = functions.httpsCallable("generateWeeklyReport")
+            let result = try await callable.call([
+                "weekNumber": weekNumber,
+                "dateRange": dateRange,
+                "questionsAndAnswers": qaPayload,
+                "previousScores": prevPayload
+            ])
+
+            guard let data = result.data as? [String: Any],
+                  let reportDict = data["report"] as? [String: Any] else {
                 #if DEBUG
-                let code = (response as? HTTPURLResponse)?.statusCode ?? -1
-                print("\u{1F995} WeeklyCheckInService: HTTP \(code) \u{2014} falling back to mock")
+                print("\u{1F995} WeeklyCheckInService: malformed response — falling back to mock")
                 #endif
                 return mockReport()
             }
-            return decodeReport(from: data) ?? mockReport()
+
+            // Round-trip the dictionary through JSONSerialization —> JSONDecoder so
+            // we get a real WeeklyReport with full Codable validation.
+            let jsonData = try JSONSerialization.data(withJSONObject: reportDict)
+            var report = try JSONDecoder().decode(WeeklyReport.self, from: jsonData)
+            // Real report from the function — force isMock = nil so the badge
+            // doesn't appear even if upstream included a stale key.
+            report.isMock = nil
+            return report
         } catch {
-            print("🦕 USING MOCK - reason: \(error)")
+            #if DEBUG
+            print("\u{1F995} WeeklyCheckInService Cloud Function error — falling back to mock: \(error)")
+            #endif
             return mockReport()
         }
-    }
-
-    private func readAPIKey() -> String? {
-        guard let v = Bundle.main.object(forInfoDictionaryKey: "OPENAI_API_KEY") as? String,
-              !v.isEmpty, !v.hasPrefix("$(") else { return nil }
-        return v
     }
 
     private static let systemPrompt = """
     You are Dino, a warm and empathetic mental wellness companion. You analyze weekly mental health check-in responses and generate caring, insightful wellness reports. Your tone is warm, personal, and encouraging \u{2014} never clinical or alarming. Always remind users this is a reflection tool not a diagnosis.
     """
-
-    private func buildPrompt(
-        weekNumber: Int,
-        dateRange: String,
-        questionsAndAnswers: [(String, Int)],
-        previousScores: [String: Int]?
-    ) -> String {
-        var lines: [String] = []
-        lines.append("A user completed their weekly mental health check-in (Week \(weekNumber), \(dateRange)). Here are their responses:")
-        lines.append("")
-        let labels = ["not at all", "several days", "more than half the days", "nearly every day"]
-        for (i, qa) in questionsAndAnswers.enumerated() {
-            let answerIdx = max(0, min(3, qa.1))
-            lines.append("Q\(i + 1): \(qa.0)")
-            lines.append("A: \(labels[answerIdx]) (\(answerIdx)/3)")
-        }
-        lines.append("")
-        if let prev = previousScores, !prev.isEmpty {
-            lines.append("Previous week scores: \(prev)")
-        } else {
-            lines.append("Previous week scores: none (first check-in)")
-        }
-        lines.append("")
-        lines.append("""
-        Return JSON with this exact shape:
-        {
-          "overallScore": number 0-100,
-          "overallLabel": string,
-          "overallEmoji": string,
-          "moodEnergyScore": number 0-100,
-          "moodEnergyInsight": string (2-3 warm sentences),
-          "anxietyStressScore": number 0-100,
-          "anxietyStressInsight": string (2-3 warm sentences),
-          "wellbeingScore": number 0-100,
-          "wellbeingInsight": string (2-3 warm sentences),
-          "weeklyReflection": string (3-4 sentences),
-          "trend": "improved" | "stable" | "needs attention",
-          "trendNote": string (one short line)
-        }
-        """)
-        return lines.joined(separator: "\n")
-    }
-
-    private func decodeReport(from data: Data) -> WeeklyReport? {
-        struct ChatResp: Decodable {
-            struct Choice: Decodable {
-                struct M: Decodable { let content: String }
-                let message: M
-            }
-            let choices: [Choice]
-        }
-        guard let chat = try? JSONDecoder().decode(ChatResp.self, from: data),
-              let content = chat.choices.first?.message.content,
-              let contentData = content.data(using: .utf8) else {
-            return nil
-        }
-        return try? JSONDecoder().decode(WeeklyReport.self, from: contentData)
-    }
 
     private func mockReport() -> WeeklyReport {
         WeeklyReport(
@@ -156,7 +81,8 @@ final class WeeklyCheckInService {
             wellbeingInsight: "you showed up for yourself in small ways. that counts.",
             weeklyReflection: "hey you \u{2014} this week felt a little lighter than last, and that's worth sitting with. you noticed when things got heavy and reached for tools that work for you. that's not nothing.",
             trend: "improved",
-            trendNote: "\u{2191} improved from last week"
+            trendNote: "\u{2191} improved from last week",
+            isMock: true
         )
     }
 }

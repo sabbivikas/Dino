@@ -115,6 +115,164 @@ export const generateForestLetter = onCall(
   }
 );
 
+// Weekly AI-generated check-in report. Server-side OpenAI call so the API
+// key never ships in the iOS binary. Rate limit: 2 reports per UID per ISO
+// week (so a regenerate-if-not-happy path is allowed, but abuse is bounded).
+const WEEKLY_LIMIT = 2;
+
+function isoWeekKey(date: Date): string {
+  // ISO 8601 week date — the Thursday of the current week defines the year.
+  const d = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+  d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  const weekNo = Math.ceil(
+    ((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7
+  );
+  return `${d.getUTCFullYear()}-W${String(weekNo).padStart(2, "0")}`;
+}
+
+export const generateWeeklyReport = onCall(
+  { secrets: [OPENAI_API_KEY], timeoutSeconds: 60, memory: "512MiB" },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "must be signed in");
+    }
+    const uid = request.auth.uid;
+
+    const weekNumber = Number(request.data?.weekNumber ?? 0);
+    const dateRange = String(request.data?.dateRange ?? "");
+    const questionsAndAnswers = (request.data?.questionsAndAnswers ?? []) as Array<{
+      question: string;
+      score: number;
+    }>;
+    const previousScores = (request.data?.previousScores ?? []) as Array<{ key: string; score: number }>;
+
+    if (!Array.isArray(questionsAndAnswers) || questionsAndAnswers.length === 0) {
+      throw new HttpsError("invalid-argument", "questionsAndAnswers required");
+    }
+
+    // Rate limit: WEEKLY_LIMIT successful generations per uid per ISO week.
+    const db = admin.firestore();
+    const weekKey = isoWeekKey(new Date());
+    const counterRef = db
+      .collection("weeklyReportLimits")
+      .doc(uid);
+
+    await db.runTransaction(async (tx) => {
+      const snap = await tx.get(counterRef);
+      const data = snap.data() ?? {};
+      const current = (data[weekKey] as number | undefined) ?? 0;
+      if (current >= WEEKLY_LIMIT) {
+        throw new HttpsError(
+          "resource-exhausted",
+          `weekly limit of ${WEEKLY_LIMIT} reports reached`
+        );
+      }
+      tx.set(
+        counterRef,
+        {
+          [weekKey]: current + 1,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      );
+    });
+
+    const systemPrompt =
+      "You are Dino, a warm and empathetic mental wellness companion. You analyze weekly mental health check-in responses and generate caring, insightful wellness reports. Your tone is warm, personal, and encouraging — never clinical or alarming. Always remind users this is a reflection tool not a diagnosis.";
+
+    const userPrompt = buildWeeklyPrompt(
+      weekNumber,
+      dateRange,
+      questionsAndAnswers,
+      previousScores
+    );
+
+    try {
+      const openai = new OpenAI({ apiKey: OPENAI_API_KEY.value() });
+      const resp = await openai.chat.completions.create({
+        model: "gpt-4o",
+        max_tokens: 800,
+        response_format: { type: "json_object" },
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+      });
+      const content = resp.choices?.[0]?.message?.content ?? "";
+      if (!content) {
+        throw new HttpsError("internal", "OpenAI returned empty content");
+      }
+      const report = JSON.parse(content);
+      return { report };
+    } catch (err) {
+      // Refund the quota on OpenAI failure so the user isn't billed against
+      // their weekly cap for a server-side failure.
+      await counterRef.set(
+        { [weekKey]: admin.firestore.FieldValue.increment(-1) },
+        { merge: true }
+      );
+      if (err instanceof HttpsError) throw err;
+      const message = err instanceof Error ? err.message : "OpenAI request failed";
+      throw new HttpsError("internal", message);
+    }
+  }
+);
+
+function buildWeeklyPrompt(
+  weekNumber: number,
+  dateRange: string,
+  questionsAndAnswers: Array<{ question: string; score: number }>,
+  previousScores: Array<{ key: string; score: number }>
+): string {
+  const labels = [
+    "not at all",
+    "several days",
+    "more than half the days",
+    "nearly every day",
+  ];
+  const lines: string[] = [];
+  lines.push(
+    `A user completed their weekly mental health check-in (Week ${weekNumber}, ${dateRange}). Here are their responses:`
+  );
+  lines.push("");
+  questionsAndAnswers.forEach((qa, i) => {
+    const score = Math.max(0, Math.min(3, Number(qa.score) || 0));
+    lines.push(`Q${i + 1}: ${qa.question}`);
+    lines.push(`A: ${labels[score]} (${score}/3)`);
+  });
+  lines.push("");
+  if (previousScores && previousScores.length > 0) {
+    const prevStr = previousScores
+      .map((p) => `${p.key}=${p.score}`)
+      .join(", ");
+    lines.push(`Previous week scores: ${prevStr}`);
+  } else {
+    lines.push("Previous week scores: none (first check-in)");
+  }
+  lines.push("");
+  lines.push(
+    [
+      "Return JSON with this exact shape:",
+      "{",
+      '  "overallScore": number 0-100,',
+      '  "overallLabel": string,',
+      '  "overallEmoji": string,',
+      '  "moodEnergyScore": number 0-100,',
+      '  "moodEnergyInsight": string (2-3 warm sentences),',
+      '  "anxietyStressScore": number 0-100,',
+      '  "anxietyStressInsight": string (2-3 warm sentences),',
+      '  "wellbeingScore": number 0-100,',
+      '  "wellbeingInsight": string (2-3 warm sentences),',
+      '  "weeklyReflection": string (3-4 sentences),',
+      '  "trend": "improved" | "stable" | "needs attention",',
+      '  "trendNote": string (one short line)',
+      "}",
+    ].join("\n")
+  );
+  return lines.join("\n");
+}
+
 export const sendWelcomeEmailAfterTwoDays = functions.auth.user().onCreate(async (user) => {
   const email = (user.email || "").trim();
   const uid = user.uid;
