@@ -48,7 +48,9 @@ final class MoodPaintingService: ObservableObject {
 
     nonisolated func analyzeMoods(entries: [MoodEntry]) -> MoodPattern {
         let cal = Calendar.current
-        let referenceDate = entries.first?.date ?? Date()
+        // Use the latest entry's date as the reference for month/year rather
+        // than assuming the array is newest-first.
+        let referenceDate = entries.map { $0.date }.max() ?? Date()
         let monthName = Self.monthName(from: referenceDate)
         let year = cal.component(.year, from: referenceDate)
 

@@ -79,10 +79,10 @@ struct WidgetDataProvider {
 
     var latestAffirmation: String {
         guard let affirmations = load([SavedAffirmation].self, key: "savedAffirmations"),
-              let first = affirmations.first else {
+              let latest = affirmations.max(by: { $0.savedAt < $1.savedAt }) else {
             return "you are enough, exactly as you are."
         }
-        return first.text
+        return latest.text
     }
 
     private func load<T: Decodable>(_ type: T.Type, key: String) -> T? {

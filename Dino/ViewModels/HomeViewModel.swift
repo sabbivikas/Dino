@@ -37,8 +37,9 @@ class HomeViewModel: ObservableObject {
     }
 
     var todaysFocus: String {
-        // Based on last mood or user intentions
-        if let lastMood = dataManager.moodEntries.first {
+        // Based on the most recent mood. Use `.max(by:)` so we don't depend on
+        // whether the array is newest-first or insertion-order.
+        if let lastMood = dataManager.moodEntries.max(by: { $0.date < $1.date }) {
             switch lastMood.weatherType {
             case .clear: return "Productivity"
             case .partlyCloudy: return "Balance"
@@ -53,7 +54,7 @@ class HomeViewModel: ObservableObject {
     }
 
     var todaysFocusEmoji: String {
-        if let lastMood = dataManager.moodEntries.first {
+        if let lastMood = dataManager.moodEntries.max(by: { $0.date < $1.date }) {
             return lastMood.weatherType.emoji
         }
         return "🌱"

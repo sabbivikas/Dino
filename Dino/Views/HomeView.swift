@@ -148,7 +148,9 @@ struct HomeView: View {
     }
 
     private func refreshNotifications() {
-        let lastJournalDate = dataManager.journalEntries.first?.date
+        // Use the most-recent journal date (not the first array element) so we
+        // don't depend on whether the array is newest-first or insertion-order.
+        let lastJournalDate = dataManager.journalEntries.map { $0.date }.max()
         // Mood painting feature is currently disabled — pass safe defaults
         // so the notification refresh signature is preserved for future re-enable.
         notificationStore.refreshFromData(
