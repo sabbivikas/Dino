@@ -77,15 +77,49 @@ export const generateMoodPainting = onCall(
 // Daily "forest letter" — short, poetic, single-paragraph note read aloud
 // from the ambient sounds screen. Authenticated to avoid anonymous abuse;
 // the iOS client caches per local-day so this is called ~once per user per day.
+// Rate limit: FOREST_LETTER_DAILY_LIMIT successful generations per UID per UTC
+// day so a cache-bypass loop can't burn OpenAI quota.
+const FOREST_LETTER_DAILY_LIMIT = 3;
+
 export const generateForestLetter = onCall(
   { secrets: [OPENAI_API_KEY], timeoutSeconds: 30, memory: "256MiB" },
   async (request) => {
     if (!request.auth) {
       throw new HttpsError("unauthenticated", "sign in required");
     }
+    const uid = request.auth.uid;
 
     const weekday = (request.data?.weekday ?? "") as string;
     const monthName = (request.data?.monthName ?? "") as string;
+
+    // Rate limit: FOREST_LETTER_DAILY_LIMIT successful generations per UID per
+    // UTC day. Mirrors the pattern used by generateMoodPainting (subcollection-
+    // free variant identical to generateWeeklyReport's per-field counter).
+    const db = admin.firestore();
+    const dayKey = new Date().toISOString().slice(0, 10); // yyyy-MM-dd UTC
+    const counterRef = db
+      .collection("forestLetterLimits")
+      .doc(uid);
+
+    await db.runTransaction(async (tx) => {
+      const snap = await tx.get(counterRef);
+      const data = snap.data() ?? {};
+      const current = (data[dayKey] as number | undefined) ?? 0;
+      if (current >= FOREST_LETTER_DAILY_LIMIT) {
+        throw new HttpsError(
+          "resource-exhausted",
+          "daily forest letter limit reached"
+        );
+      }
+      tx.set(
+        counterRef,
+        {
+          [dayKey]: current + 1,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      );
+    });
 
     const systemPrompt =
       "You are the forest. Write one short daily letter to someone who visits a quiet waterfall to find peace. Connect nature with mental health in a warm poetic way. Write in lowercase. Never use dashes. Keep under 150 words. No greeting or sign off. Just the letter body. Make each day feel completely different.";
@@ -108,6 +142,12 @@ export const generateForestLetter = onCall(
       }
       return { content: content.trim() };
     } catch (err) {
+      // Refund the quota on OpenAI failure so the user isn't billed against
+      // their daily cap for a server-side failure.
+      await counterRef.set(
+        { [dayKey]: admin.firestore.FieldValue.increment(-1) },
+        { merge: true }
+      );
       if (err instanceof HttpsError) throw err;
       const message = err instanceof Error ? err.message : "OpenAI request failed";
       throw new HttpsError("internal", message);
