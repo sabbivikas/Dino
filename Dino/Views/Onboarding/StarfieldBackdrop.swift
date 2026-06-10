@@ -11,23 +11,31 @@ import SwiftUI
 public struct StarfieldBackdrop: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    public init() {}
+    /// When false, the opaque navy gradient is skipped so a layer beneath
+    /// (e.g. the Metal aurora in OnboardingShaderBackground) shows through.
+    private let drawsBackground: Bool
+
+    public init(drawsBackground: Bool = true) {
+        self.drawsBackground = drawsBackground
+    }
 
     public var body: some View {
         TimelineView(.animation) { context in
             let t = reduceMotion ? 0 : context.date.timeIntervalSinceReferenceDate
             GeometryReader { geo in
                 ZStack {
-                    // a) Background navy gradient
-                    LinearGradient(
-                        colors: [
-                            Color(hex: "#1A1A33"),
-                            Color(hex: "#0F0F22")
-                        ],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                    .ignoresSafeArea()
+                    // a) Background navy gradient (optional — see drawsBackground)
+                    if drawsBackground {
+                        LinearGradient(
+                            colors: [
+                                Color(hex: "#1A1A33"),
+                                Color(hex: "#0F0F22")
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                        .ignoresSafeArea()
+                    }
 
                     // b) 2 aurora blobs
                     auroraLayer(t: t, size: geo.size)

@@ -82,11 +82,21 @@ struct OnboardingView: View {
         ZStack {
             // Backdrop
             if currentStep == 4 {
-                StarfieldBackdrop()
-                    .transition(.opacity)
+                // GPU aurora base with the starfield (stars, nebula, fireflies,
+                // shooting stars) layered on top — starfield skips its own navy
+                // gradient so the aurora shows through.
+                ZStack {
+                    OnboardingShaderBackground()
+                    StarfieldBackdrop(drawsBackground: false)
+                }
+                .transition(.opacity)
             } else {
-                NatureBackdrop()
-                    .transition(.opacity)
+                ZStack {
+                    NatureBackdrop()
+                    NatureMistOverlay()
+                        .allowsHitTesting(false)
+                }
+                .transition(.opacity)
             }
 
             VStack(spacing: 0) {
