@@ -19,7 +19,7 @@ final class GardenParallaxController {
     private var smoothedPitch: Float = 0
     private(set) var isRunning = false
 
-    private let maxOffsetRadians: Float = 3.0 * .pi / 180.0   // ±3° clamp
+    private let maxOffsetRadians: Float = 2.5 * .pi / 180.0   // ±2.5° clamp
     private let lerpFactor: Float = 0.1
 
     func start(pivot: SCNNode) {
