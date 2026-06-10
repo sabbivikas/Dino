@@ -270,7 +270,14 @@ final class AnalyticsManager {
     }
 
     func trackAppOpened() {
-        capture("app_opened")
+        // First-ever open on this device — lets PostHog funnel installs:
+        // app_opened(is_first_open) → user_signed_up → home_opened.
+        let firstOpenKey = "dino.hasOpenedBefore"
+        let isFirstOpen = !UserDefaults.standard.bool(forKey: firstOpenKey)
+        if isFirstOpen {
+            UserDefaults.standard.set(true, forKey: firstOpenKey)
+        }
+        capture("app_opened", properties: ["is_first_open": isFirstOpen])
     }
 
     func trackAppBackgrounded(sessionDuration: Double) {
