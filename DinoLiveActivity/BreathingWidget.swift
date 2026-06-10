@@ -83,7 +83,9 @@ struct BreathingWidgetEntryView: View {
             }
         }
         .widgetURL(URL(string: "dino://breathe"))
-        .containerBackground(WidgetGradients.breathing, for: .widget)
+        // Use a clear container so the widget sizes to the system frame; the
+        // gradient is painted inside each sub-view's ZStack.
+        .containerBackground(Color.clear, for: .widget)
     }
 }
 

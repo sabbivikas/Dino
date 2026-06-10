@@ -3,6 +3,23 @@
 //  Dino
 //
 
+import Combine
+
+/// Debounces calls so simultaneous data changes — e.g. a Firestore sync that
+/// updates streak, journal, gratitude, and breathing in the same tick —
+/// trigger a single refresh instead of 5 back-to-back ones.
+private final class RefreshDebouncer: ObservableObject {
+    private var cancellable: AnyCancellable?
+
+    func schedule(_ action: @escaping () -> Void) {
+        cancellable?.cancel()
+        cancellable = Just(())
+            .delay(for: .milliseconds(150), scheduler: RunLoop.main)
+            .sink { _ in action() }
+    }
+}
+//
+
 import SwiftUI
 
 struct HomeView: View {
@@ -11,6 +28,7 @@ struct HomeView: View {
     @EnvironmentObject var dataManager: SharedDataManager
     @StateObject private var viewModel: HomeViewModel = HomeViewModel(dataManager: SharedDataManager.shared)
     @StateObject private var notificationStore = NotificationStore.shared
+    @StateObject private var refreshDebouncer = RefreshDebouncer()
     @State private var showNotificationCenter = false
     @AppStorage("dino.showStreak") private var showStreak: Bool = true
     @AppStorage("dino.streakHintSeen") private var streakHintSeen: Bool = false
@@ -99,11 +117,13 @@ struct HomeView: View {
                 AnalyticsManager.shared.trackScreen("home")
                 maybeShowWhatsNew()
             }
-            .onChange(of: dataManager.streakData.currentStreak) { _, _ in refreshNotifications() }
-            .onChange(of: dataManager.journalEntries.count) { _, _ in refreshNotifications() }
-            .onChange(of: dataManager.gratitudeNotes.count) { _, _ in refreshNotifications() }
-            .onChange(of: dataManager.breathingSessions.count) { _, _ in refreshNotifications() }
-            .onChange(of: dataManager.meditationSessions.count) { _, _ in refreshNotifications() }
+            // Coalesce simultaneous data changes (typical during Firestore sync)
+            // into a single 150ms-debounced refresh.
+            .onChange(of: dataManager.streakData.currentStreak) { _, _ in refreshDebouncer.schedule { refreshNotifications() } }
+            .onChange(of: dataManager.journalEntries.count) { _, _ in refreshDebouncer.schedule { refreshNotifications() } }
+            .onChange(of: dataManager.gratitudeNotes.count) { _, _ in refreshDebouncer.schedule { refreshNotifications() } }
+            .onChange(of: dataManager.breathingSessions.count) { _, _ in refreshDebouncer.schedule { refreshNotifications() } }
+            .onChange(of: dataManager.meditationSessions.count) { _, _ in refreshDebouncer.schedule { refreshNotifications() } }
         }
     }
 

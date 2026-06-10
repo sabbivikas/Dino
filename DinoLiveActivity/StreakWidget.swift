@@ -113,7 +113,9 @@ struct StreakWidgetEntryView: View {
             }
         }
         .widgetURL(URL(string: "dino://journal"))
-        .containerBackground(WidgetGradients.streak, for: .widget)
+        // Use a clear container so the widget sizes to the system frame; the
+        // gradient is painted inside each sub-view's ZStack.
+        .containerBackground(Color.clear, for: .widget)
     }
 }
 

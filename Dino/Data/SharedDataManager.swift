@@ -61,19 +61,34 @@ final class SharedDataManager: ObservableObject {
         didSet { save(userIntentions, forKey: userKey("userIntentions")) }
     }
     @Published var moodEntries: [MoodEntry] {
-        didSet { save(moodEntries, forKey: userKey("moodEntries")) }
+        didSet {
+            save(moodEntries, forKey: userKey("moodEntries"))
+            scheduleWidgetReload()
+        }
     }
     @Published var journalEntries: [JournalEntry] {
-        didSet { save(journalEntries, forKey: userKey("journalEntries")) }
+        didSet {
+            save(journalEntries, forKey: userKey("journalEntries"))
+            scheduleWidgetReload()
+        }
     }
     @Published var gratitudeNotes: [GratitudeNote] {
-        didSet { save(gratitudeNotes, forKey: userKey("gratitudeNotes")) }
+        didSet {
+            save(gratitudeNotes, forKey: userKey("gratitudeNotes"))
+            scheduleWidgetReload()
+        }
     }
     @Published var savedAffirmations: [SavedAffirmation] {
-        didSet { save(savedAffirmations, forKey: userKey("savedAffirmations")) }
+        didSet {
+            save(savedAffirmations, forKey: userKey("savedAffirmations"))
+            scheduleWidgetReload()
+        }
     }
     @Published var breathingSessions: [BreathingSession] {
-        didSet { save(breathingSessions, forKey: userKey("breathingSessions")) }
+        didSet {
+            save(breathingSessions, forKey: userKey("breathingSessions"))
+            scheduleWidgetReload()
+        }
     }
     @Published var focusSessions: [FocusSession] {
         didSet { save(focusSessions, forKey: userKey("focusSessions")) }
@@ -90,7 +105,8 @@ final class SharedDataManager: ObservableObject {
     @Published var streakData: StreakData {
         didSet {
             save(streakData, forKey: userKey("streakData"))
-            print("🌱 PLANT NUDGE CHECK: streak=\(streakData.currentStreak) level=\(growthStats.level)")
+            scheduleWidgetReload()
+            print("\u{1F331} PLANT NUDGE CHECK: streak=\(streakData.currentStreak) level=\(growthStats.level)")
             NotificationManager.shared.checkAndSchedulePlantNudge(streakData: streakData, growthStats: growthStats)
         }
     }
