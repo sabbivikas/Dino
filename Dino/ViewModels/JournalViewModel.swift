@@ -27,6 +27,14 @@ class JournalViewModel: NSObject, ObservableObject {
         self.dataManager = dataManager
     }
 
+    deinit {
+        // AVAudioPlayer.delegate is unowned(unsafe) — clear it so a late
+        // didFinishPlaying callback can't message a freed view model.
+        audioPlayer?.delegate = nil
+        audioPlayer?.stop()
+        recordingTimer?.invalidate()
+    }
+
     // MARK: - Recording
     func startRecording() {
         let session = AVAudioSession.sharedInstance()
@@ -116,7 +124,11 @@ class JournalViewModel: NSObject, ObservableObject {
         recordingDuration = 0
         currentRecordingURL = nil
 
-        try? AVAudioSession.sharedInstance().setActive(false)
+        // Only deactivate the shared session when ambient audio isn't using it —
+        // deactivating mid-playback tears down live audio I/O under the player.
+        if !AudioManager.shared.isPlaying {
+            try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        }
     }
 
     // MARK: - Playback
@@ -145,11 +157,14 @@ class JournalViewModel: NSObject, ObservableObject {
     }
 
     func stopPlayback() {
+        audioPlayer?.delegate = nil
         audioPlayer?.stop()
         audioPlayer = nil
         isPlaying = false
         playingEntryId = nil
-        try? AVAudioSession.sharedInstance().setActive(false)
+        if !AudioManager.shared.isPlaying {
+            try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        }
     }
 
     func deleteEntry(_ entry: JournalEntry) {

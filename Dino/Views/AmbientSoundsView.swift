@@ -2116,6 +2116,7 @@ private struct ForestLetterOverlay: View {
         }
         // Letter slides up after the flap finishes swinging open.
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+            guard !dismissing else { return }
             withAnimation(
                 reduceMotion
                     ? .easeOut(duration: 0.35)
@@ -2142,6 +2143,7 @@ private struct ForestLetterOverlay: View {
                 letterEmerged = false
             }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                guard dismissing else { return }
                 withAnimation(.easeOut(duration: 0.3)) {
                     envelopeOpen = false
                 }
@@ -2150,10 +2152,12 @@ private struct ForestLetterOverlay: View {
 
         let flyAwayDelay: Double = wasOpen ? 0.55 : 0.05
         DispatchQueue.main.asyncAfter(deadline: .now() + flyAwayDelay) {
+            guard dismissing else { return }
             withAnimation(.easeIn(duration: 0.35)) {
                 landed = false
             }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                guard dismissing else { return }
                 onClose()
             }
         }

@@ -44,18 +44,23 @@ final class SpeechTranscriber: ObservableObject {
 
     func stop() {
         guard isRunning else { return }
-        audioEngine.stop()
+        // Remove the tap BEFORE stopping the engine so no in-flight buffer
+        // callback can race the teardown on the audio I/O thread.
         if audioEngine.inputNode.numberOfInputs > 0 {
             audioEngine.inputNode.removeTap(onBus: 0)
         }
+        audioEngine.stop()
         request?.endAudio()
         task?.finish()
         task = nil
         request = nil
         isRunning = false
 
-        // Reset audio session so we don't leave duck/record state on.
-        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        // Reset audio session so we don't leave duck/record state on — but only
+        // when ambient audio isn't mid-playback on the shared session.
+        if !AudioManager.shared.isPlaying {
+            try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        }
     }
 
     // MARK: - Private

@@ -609,11 +609,24 @@ private struct FocusCardScene: View {
 // MARK: - Sun (Canvas) — rays spin slowly, body pulses, eyes blink occasionally
 
 private struct FocusCardSun: View {
-    @State private var rayAngle: Double = 0
-    @State private var pulse: CGFloat = 1.0
-    @State private var blink: CGFloat = 1.0
-
     var body: some View {
+        TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { timeline in
+            let t = timeline.date.timeIntervalSinceReferenceDate
+            // All motion derived from wall-clock time — replaces an unmanaged
+            // repeating Timer that accumulated on every Home appearance and was
+            // never invalidated. Rays: one revolution / 14s. Pulse: 1.0↔1.08
+            // over a 3s round trip. Blink: snap shut ~0.28s every 4s.
+            let rayAngle = (t / 14.0).truncatingRemainder(dividingBy: 1.0) * 360.0
+            let pulse: CGFloat = 1.04 + 0.04 * CGFloat(sin(t * 2 * .pi / 3.0))
+            let cyc = t.truncatingRemainder(dividingBy: 4.0)
+            let blink: CGFloat = cyc < 0.08 ? (1.0 - 0.9 * CGFloat(cyc / 0.08))
+                : (cyc < 0.18 ? 0.1
+                : (cyc < 0.28 ? (0.1 + 0.9 * CGFloat((cyc - 0.18) / 0.1)) : 1.0))
+            sunCanvas(rayAngle: rayAngle, pulse: pulse, blink: blink)
+        }
+    }
+
+    private func sunCanvas(rayAngle: Double, pulse: CGFloat, blink: CGFloat) -> some View {
         Canvas { context, size in
             let cx = size.width / 2
             let cy = size.height / 2
@@ -661,21 +674,6 @@ private struct FocusCardSun: View {
             let rightBlush = Path(ellipseIn: CGRect(x: 3 + 0, y: 2, width: 2.6, height: 2.6))
             context.fill(leftBlush, with: .color(blushColor.opacity(0.6)))
             context.fill(rightBlush, with: .color(blushColor.opacity(0.6)))
-        }
-        .onAppear {
-            withAnimation(.linear(duration: 14).repeatForever(autoreverses: false)) {
-                rayAngle = 360
-            }
-            withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
-                pulse = 1.08
-            }
-            // Blink: hold open, then snap shut briefly, repeat every ~4s
-            Timer.scheduledTimer(withTimeInterval: 4, repeats: true) { _ in
-                withAnimation(.easeIn(duration: 0.08)) { blink = 0.1 }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
-                    withAnimation(.easeOut(duration: 0.1)) { blink = 1.0 }
-                }
-            }
         }
     }
 }
@@ -867,10 +865,19 @@ private struct PebbleTile: View {
 // MARK: - Walking stickman traveler
 
 private struct FocusCardWalker: View {
-    @State private var phase: Double = 0
-    @State private var bob: CGFloat = 0
-
     var body: some View {
+        TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { timeline in
+            // The old unmanaged Timer advanced `phase` by 0.22 per 1/30s tick
+            // (6.6 rad/s) and was never invalidated — it accumulated on every
+            // Home appearance. Deriving from wall-clock time leaks nothing.
+            let phase = timeline.date.timeIntervalSinceReferenceDate * 6.6
+            let bob = CGFloat(sin(phase) * 0.75 - 0.75)
+            walkerCanvas(phase: phase)
+                .offset(y: bob)
+        }
+    }
+
+    private func walkerCanvas(phase: Double) -> some View {
         Canvas { context, size in
             // viewBox 0..60 mapped into size
             let sx = size.width / 60
@@ -969,15 +976,6 @@ private struct FocusCardWalker: View {
             footR.move(to: CGPoint(x: legREnd.x - 2 * sx, y: legREnd.y))
             footR.addLine(to: CGPoint(x: legREnd.x + 2 * sx, y: legREnd.y))
             context.stroke(footR, with: .color(ink), style: StrokeStyle(lineWidth: 2.2, lineCap: .round))
-        }
-        .offset(y: bob)
-        .onAppear {
-            // Drive limb phase via a Timer (Canvas doesn't react to @State without redraw)
-            Timer.scheduledTimer(withTimeInterval: 1.0 / 30.0, repeats: true) { _ in
-                phase += 0.22
-                let b = sin(phase) * 0.75 - 0.75
-                bob = CGFloat(b)
-            }
         }
     }
 }

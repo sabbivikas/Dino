@@ -19,6 +19,7 @@ public struct MascotView: View {
     @State private var emoteScaleBoost: CGFloat = 0
     @State private var tapScale: CGFloat = 1
     @State private var emoteTimer: Timer? = nil
+    @State private var isVisible: Bool = false
 
     public init(imageName: String, size: CGFloat = 180) {
         self.imageName = imageName
@@ -66,8 +67,15 @@ public struct MascotView: View {
                     .onTapGesture { handleTap() }
             }
         }
-        .onAppear { startEmoteTimer() }
-        .onDisappear { emoteTimer?.invalidate(); emoteTimer = nil }
+        .onAppear {
+            isVisible = true
+            startEmoteTimer()
+        }
+        .onDisappear {
+            isVisible = false
+            emoteTimer?.invalidate()
+            emoteTimer = nil
+        }
     }
 
     private func handleTap() {
@@ -99,9 +107,17 @@ public struct MascotView: View {
     }
 
     private func scheduleNextEmote() {
+        guard isVisible else { return }
         let interval = Double.random(in: 5...8)
         emoteTimer?.invalidate()
-        emoteTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: false) { _ in
+        emoteTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: false) { timer in
+            // A fire can already be queued on the run loop when the view
+            // disappears; without this guard the chain re-arms itself forever
+            // against a dismissed view.
+            guard isVisible else {
+                timer.invalidate()
+                return
+            }
             playRandomEmote()
             scheduleNextEmote()
         }
