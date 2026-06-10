@@ -83,11 +83,7 @@ struct GrowthView: View {
             VStack(spacing: 20) {
                 GrowthHeader()
                 ProgressCard(vm: vm)
-                GardenPanel(
-                    vm: vm,
-                    scene: sceneKey(theme: themeManager.currentTheme, date: Date()),
-                    reduceMotion: reduceMotion
-                )
+                Garden3DPanel(vm: vm, reduceMotion: reduceMotion)
                 StatusLine(vm: vm)
                 PracticePillsRow(vm: vm)
                 WeeklyBloomLog(blooms: vm.weeklyBlooms)
@@ -397,6 +393,30 @@ private struct GardenPanel: View {
             withAnimation(.spring(response: 0.8, dampingFraction: 0.7)) {
                 appeared = true
             }
+            AnalyticsManager.shared.trackGrowthGardenOpened()
+        }
+    }
+}
+
+// MARK: - Garden3DPanel (SceneKit garden — GardenPanel above is kept, unused, for instant revert)
+
+private struct Garden3DPanel: View {
+    @ObservedObject var vm: GrowthViewModel
+    let reduceMotion: Bool
+
+    var body: some View {
+        GardenSceneView(
+            stage: vm.growthStage,
+            careState: vm.careState,
+            reduceMotion: reduceMotion
+        )
+        .frame(height: 280)
+        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .stroke(Color(hex: "#A8C5A0").opacity(0.3), lineWidth: 1)
+        )
+        .onAppear {
             AnalyticsManager.shared.trackGrowthGardenOpened()
         }
     }
