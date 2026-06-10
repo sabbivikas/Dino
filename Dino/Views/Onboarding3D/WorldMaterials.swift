@@ -31,13 +31,14 @@ enum WorldPalette {
     static let path         = UIColor(worldHex: 0xF5E6C8)   // warm cream
     static let soil         = UIColor(worldHex: 0xC4956A)
 
-    // Trees + plants (bright crown variants)
-    static let crown1       = UIColor(worldHex: 0x6BBF59)
-    static let crown2       = UIColor(worldHex: 0x85CF6B)
-    static let crown3       = UIColor(worldHex: 0x4FAD4F)
-    static let crown4       = UIColor(worldHex: 0x98D982)
+    // Trees + plants (organic canopy shades)
+    static let crown1       = UIColor(worldHex: 0x7EC86A)   // bright
+    static let crown2       = UIColor(worldHex: 0x5BAD5B)   // medium
+    static let crown3       = UIColor(worldHex: 0x4A9A4A)   // dark
+    static let crown4       = UIColor(worldHex: 0x98D982)   // highlight
     static let trunk        = UIColor(worldHex: 0x8B5E3C)
     static let bush         = UIColor(worldHex: 0x6BBF59)
+    static let birdInk      = UIColor(worldHex: 0x2D3142)   // charcoal silhouette
 
     // Flowers
     static let flowerPeach    = UIColor(worldHex: 0xFFB5A0)
@@ -152,7 +153,9 @@ enum WorldMaterials {
         return m
     }
 
-    /// Bright pond water with white shimmer (shader skipped under reduce-motion).
+    /// Living pond water: gentle vertex-wave displacement plus a scrolling
+    /// procedural caustic glow on the surface (both skipped under
+    /// reduce-motion for a fully static frame).
     static func water(shimmer: Bool) -> SCNMaterial {
         let m = SCNMaterial()
         m.diffuse.contents = WorldPalette.pond
@@ -162,12 +165,16 @@ enum WorldMaterials {
         m.isDoubleSided = true
         if shimmer {
             m.shaderModifiers = [
+                .geometry: """
+                _geometry.position.y += sin(_geometry.position.x * 2.0 + u_time) * 0.03;
+                """,
                 .surface: """
                 float t = u_time;
-                float band = sin(_surface.diffuseTexcoord.x * 22.0 + t * 1.4)
-                           * sin(_surface.diffuseTexcoord.y * 18.0 - t * 1.0);
-                float sparkle = smoothstep(0.82, 1.0, band);
-                _surface.diffuse.rgb += vec3(sparkle * 0.35);
+                vec2 uv = _surface.diffuseTexcoord;
+                float ca = sin(uv.x * 28.0 + t * 0.6) * sin(uv.y * 24.0 - t * 0.5);
+                float cb = sin((uv.x + uv.y) * 20.0 - t * 0.4);
+                float caustic = smoothstep(0.55, 1.0, ca * cb);
+                _surface.emission.rgb += vec3(1.0, 0.98, 0.9) * caustic * 0.28;
                 """
             ]
         }

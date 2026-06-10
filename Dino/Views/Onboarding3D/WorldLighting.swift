@@ -2,36 +2,40 @@
 //  WorldLighting.swift
 //  Dino
 //
-//  Illustrated-style lighting: bright flat ambient (the heart of the look),
-//  a gentle directional sun whose only job is the soft ground shadow, and
-//  one crossfading sky dome per region grade. Geometry keeps its bright
-//  palette at all times — only sky, fog, and a subtle ambient tint shift
-//  between regions. The overlook is always night.
+//  Dramatic-but-warm lighting for the organic world: a real directional sun
+//  with soft deferred shadows, a moodier ambient that shifts color per
+//  region, and a low fill light opposite the sun so shadows never go muddy.
+//  Sky domes crossfade per region; the overlook is always night.
 //
 
 import SceneKit
 import UIKit
 
 enum WorldRegion: CaseIterable {
-    case meadow      // bright day: sky blue → mint
-    case pond        // soft lavender → pale blue
-    case grove       // amber dusk → rose
-    case overlook    // night: navy → purple, stars + aurora + crescent moon
-    case returnDawn  // the loop home: warm coral → gold
+    case meadow      // bright day
+    case pond        // soft lavender daylight
+    case grove       // amber dusk + god rays
+    case overlook    // night: stars, aurora, crescent moon
+    case returnDawn  // the loop home: coral → gold
 }
 
 enum WorldLighting {
 
     struct Rig {
-        let sunNode: SCNNode            // directional — soft ground shadow only
-        let ambientNode: SCNNode        // bright flat illustrated base light
+        let sunNode: SCNNode
+        let ambientNode: SCNNode
+        let fillNode: SCNNode
         let domes: [WorldRegion: SCNNode]
-        let nightGroup: SCNNode         // stars + crescent moon + aurora
-        let sunDisc: SCNNode            // visible sun in day skies
+        let nightGroup: SCNNode
+        let sunDisc: SCNNode
     }
 
     private struct Grade {
+        let sunColor: UIColor
+        let sunIntensity: CGFloat
+        let sunEuler: SCNVector3
         let ambientColor: UIColor
+        let ambientIntensity: CGFloat
         let fogColor: UIColor
         let sunDiscVisible: Bool
         let nightGroupOpacity: CGFloat
@@ -41,31 +45,51 @@ enum WorldLighting {
         switch region {
         case .meadow:
             return Grade(
-                ambientColor: UIColor(red: 1.0, green: 0.99, blue: 0.95, alpha: 1),
+                sunColor: UIColor(red: 1.0, green: 0.973, blue: 0.941, alpha: 1),   // #FFF8F0
+                sunIntensity: 800,
+                sunEuler: SCNVector3(-1.0, 0.45, 0),
+                ambientColor: UIColor.white,
+                ambientIntensity: 600,
                 fogColor: WorldPalette.fogMeadow,
                 sunDiscVisible: true, nightGroupOpacity: 0
             )
         case .pond:
             return Grade(
-                ambientColor: UIColor(red: 0.96, green: 0.97, blue: 1.0, alpha: 1),
+                sunColor: UIColor(red: 1.0, green: 0.973, blue: 0.941, alpha: 1),
+                sunIntensity: 760,
+                sunEuler: SCNVector3(-1.05, 0.2, 0),
+                ambientColor: UIColor(red: 0.95, green: 0.96, blue: 1.0, alpha: 1),
+                ambientIntensity: 580,
                 fogColor: WorldPalette.fogPond,
                 sunDiscVisible: true, nightGroupOpacity: 0
             )
         case .grove:
             return Grade(
-                ambientColor: UIColor(red: 1.0, green: 0.92, blue: 0.82, alpha: 1),
+                sunColor: UIColor(red: 1.0, green: 0.565, blue: 0.251, alpha: 1),   // #FF9040
+                sunIntensity: 800,
+                sunEuler: SCNVector3(-0.42, -0.85, 0),
+                ambientColor: UIColor(red: 1.0, green: 0.502, blue: 0.251, alpha: 1), // #FF8040
+                ambientIntensity: 500,
                 fogColor: WorldPalette.fogGrove,
                 sunDiscVisible: true, nightGroupOpacity: 0
             )
         case .overlook:
             return Grade(
-                ambientColor: UIColor(red: 0.62, green: 0.62, blue: 0.80, alpha: 1),
+                sunColor: UIColor(red: 0.251, green: 0.376, blue: 0.627, alpha: 1), // #4060A0
+                sunIntensity: 800,
+                sunEuler: SCNVector3(-0.8, 0.4, 0),
+                ambientColor: UIColor(red: 0.125, green: 0.251, blue: 0.627, alpha: 1), // #2040A0
+                ambientIntensity: 400,
                 fogColor: WorldPalette.fogNight,
                 sunDiscVisible: false, nightGroupOpacity: 1
             )
         case .returnDawn:
             return Grade(
-                ambientColor: UIColor(red: 1.0, green: 0.94, blue: 0.84, alpha: 1),
+                sunColor: UIColor(red: 1.0, green: 0.831, blue: 0.627, alpha: 1),   // #FFD4A0
+                sunIntensity: 800,
+                sunEuler: SCNVector3(-0.55, 0.7, 0),
+                ambientColor: UIColor(red: 1.0, green: 0.878, blue: 0.627, alpha: 1), // #FFE0A0
+                ambientIntensity: 500,
                 fogColor: WorldPalette.fogDawn,
                 sunDiscVisible: true, nightGroupOpacity: 0
             )
@@ -75,29 +99,36 @@ enum WorldLighting {
     // MARK: - Rig construction (once)
 
     static func makeRig() -> Rig {
-        // Bright flat ambient carries the illustrated look (≈0.85 of a
-        // standard 1000-lumen key).
+        let sun = SCNLight()
+        sun.type = .directional
+        sun.intensity = 800
+        sun.castsShadow = true
+        sun.shadowMapSize = CGSize(width: 1024, height: 1024)
+        sun.shadowRadius = 8                                   // soft
+        sun.shadowColor = UIColor(white: 0, alpha: 0.35)
+        sun.shadowMode = .deferred
+        sun.orthographicScale = 22
+        let sunNode = SCNNode()
+        sunNode.light = sun
+
         let ambient = SCNLight()
         ambient.type = .ambient
-        ambient.intensity = 850
+        ambient.intensity = 600
         let ambientNode = SCNNode()
         ambientNode.light = ambient
 
-        // Gentle sun — exists for the one soft ground shadow, nothing more.
-        let sun = SCNLight()
-        sun.type = .directional
-        sun.intensity = 400
-        sun.color = UIColor(red: 1.0, green: 0.97, blue: 0.9, alpha: 1)
-        sun.castsShadow = true
-        sun.shadowMapSize = CGSize(width: 512, height: 512)
-        sun.shadowRadius = 3
-        sun.shadowColor = UIColor(white: 0, alpha: 0.2)
-        sun.orthographicScale = 18
-        let sunNode = SCNNode()
-        sunNode.light = sun
-        sunNode.eulerAngles = SCNVector3(-1.1, 0.4, 0)
+        // Low fill opposite the sun — keeps shadow sides readable.
+        let fill = SCNLight()
+        fill.type = .omni
+        fill.intensity = 200
+        fill.color = UIColor(red: 0.95, green: 0.97, blue: 1.0, alpha: 1)
+        fill.attenuationStartDistance = 10
+        fill.attenuationEndDistance = 60
+        fill.castsShadow = false
+        let fillNode = SCNNode()
+        fillNode.light = fill
+        fillNode.position = SCNVector3(-8, 7, 6)
 
-        // One sky dome per region grade, crossfaded by opacity.
         var domes: [WorldRegion: SCNNode] = [:]
         let skies: [WorldRegion: (UIColor, UIColor)] = [
             .meadow: (WorldPalette.skyMeadowTop, WorldPalette.skyMeadowBottom),
@@ -120,6 +151,7 @@ enum WorldLighting {
         return Rig(
             sunNode: sunNode,
             ambientNode: ambientNode,
+            fillNode: fillNode,
             domes: domes,
             nightGroup: nightGroup,
             sunDisc: sunDisc
@@ -142,29 +174,22 @@ enum WorldLighting {
         return node
     }
 
-    /// Bright sun disc with a soft halo — visible in all day skies.
     private static func makeSunDisc() -> SCNNode {
         let group = SCNNode()
-
         let halo = SCNPlane(width: 5.5, height: 5.5)
         halo.firstMaterial = WorldMaterials.ray(WorldPalette.sunDisc, alpha: 0.25)
-        let haloNode = SCNNode(geometry: halo)
-        group.addChildNode(haloNode)
+        group.addChildNode(SCNNode(geometry: halo))
 
         let discGeo = SCNSphere(radius: 1.1)
         discGeo.segmentCount = 14
         discGeo.firstMaterial = WorldMaterials.glow(WorldPalette.sunDisc)
-        let disc = SCNNode(geometry: discGeo)
-        group.addChildNode(disc)
+        group.addChildNode(SCNNode(geometry: discGeo))
 
         group.position = SCNVector3(7, 13, -38)
         group.castsShadow = false
         return group
     }
 
-    /// Stars, crescent moon (two overlapping spheres — the occluder matches
-    /// the night sky so it bites a crescent out of the disc), and three
-    /// soft aurora bands.
     private static func makeNightGroup() -> SCNNode {
         let group = SCNNode()
         group.castsShadow = false
@@ -187,8 +212,6 @@ enum WorldLighting {
             group.addChildNode(star)
         }
 
-        // Crescent moon: bright disc + night-colored occluder sphere offset
-        // to imply the crescent.
         let moonGeo = SCNSphere(radius: 1.2)
         moonGeo.segmentCount = 14
         moonGeo.firstMaterial = WorldMaterials.glow(WorldPalette.moon)
@@ -227,13 +250,15 @@ enum WorldLighting {
 
     // MARK: - Region application
 
-    /// Crossfade to a region grade. Geometry colors never change — only the
-    /// sky dome, fog, sun/moon visibility, and a gentle ambient tint.
     static func apply(region: WorldRegion, rig: Rig, scene: SCNScene, animated: Bool) {
         let g = grade(for: region)
 
         let work = {
+            rig.sunNode.light?.color = g.sunColor
+            rig.sunNode.light?.intensity = g.sunIntensity
+            rig.sunNode.eulerAngles = g.sunEuler
             rig.ambientNode.light?.color = g.ambientColor
+            rig.ambientNode.light?.intensity = g.ambientIntensity
             for (domeRegion, dome) in rig.domes {
                 dome.opacity = (domeRegion == region) ? 1 : 0
             }
