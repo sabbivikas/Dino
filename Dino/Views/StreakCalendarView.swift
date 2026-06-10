@@ -27,7 +27,7 @@ struct StreakCalendarView: View {
     fileprivate static let PEACH   = Color(hex: "#F5C6AA")
     fileprivate static let PEACH_D = Color(hex: "#D08060")
     fileprivate static let SKY     = Color(hex: "#A8D4E6")
-    fileprivate static let BORDER  = Color(red: 168/255, green: 197/255, blue: 160/255, opacity: 0.28)
+    fileprivate static let BORDER  = SAGE.opacity(0.28) // #A8C5A0 @ 28%
 
     var body: some View {
         ZStack {

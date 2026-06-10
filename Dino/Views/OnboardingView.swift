@@ -438,7 +438,7 @@ private struct StepFeelingPage: View {
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 18)
                 .padding(.horizontal, 28)
-                .background(isSelected ? Color(hex: "#A8C5A0") : Color(hex: "#F9FAFB"))
+                .background(isSelected ? OnboardingColors.sage : Color(hex: "#F9FAFB"))
                 .cornerRadius(16)
                 .shadow(color: .black.opacity(0.04), radius: 4, x: 0, y: 2)
                 .overlay(
@@ -530,7 +530,7 @@ private struct ChallengePillButton: View {
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 18)
                 .padding(.horizontal, 16)
-                .background(isSelected ? Color(hex: "#A8C5A0") : Color(hex: "#F9FAFB"))
+                .background(isSelected ? OnboardingColors.sage : Color(hex: "#F9FAFB"))
                 .cornerRadius(16)
                 .shadow(color: .black.opacity(0.04), radius: 4, x: 0, y: 2)
                 .overlay(
@@ -558,7 +558,7 @@ private struct StepEncouragementPage: View {
                 Circle()
                     .fill(
                         RadialGradient(
-                            colors: [Color(hex: "#A8C5A0").opacity(0.35), .clear],
+                            colors: [OnboardingColors.sage.opacity(0.35), .clear],
                             center: .center,
                             startRadius: 0,
                             endRadius: 140
@@ -881,7 +881,7 @@ private struct StepNamePage: View {
             .overlay(
                 RoundedRectangle(cornerRadius: 16)
                     .stroke(
-                        focused ? Color(hex: "#A8C5A0") : Color(hex: "#D1D5DB"),
+                        focused ? OnboardingColors.sage : Color(hex: "#D1D5DB"),
                         lineWidth: focused ? 2 : 1.5
                     )
             )
@@ -948,7 +948,7 @@ private struct StepAnxietyUseCasePage: View {
             ZStack {
                 // Layer 1 — outer glow ring
                 Circle()
-                    .fill(Color(hex: "#A8C5A0").opacity(0.25))
+                    .fill(OnboardingColors.sage.opacity(0.25))
                     .frame(width: 200, height: 200)
                     .blur(radius: 6)
                     .scaleEffect(reduceMotion ? 1.0 : outerScale)
@@ -956,7 +956,7 @@ private struct StepAnxietyUseCasePage: View {
 
                 // Layer 2 — mid ring
                 Circle()
-                    .stroke(Color(hex: "#A8C5A0").opacity(0.45), lineWidth: 2)
+                    .stroke(OnboardingColors.sage.opacity(0.45), lineWidth: 2)
                     .frame(width: 160, height: 160)
                     .scaleEffect(reduceMotion ? 1.0 : midScale)
                     .opacity(reduceMotion && dimmed ? 0.7 : 1.0)
@@ -965,7 +965,7 @@ private struct StepAnxietyUseCasePage: View {
                 Circle()
                     .fill(
                         LinearGradient(
-                            colors: [Color(hex: "#A8C5A0"), Color(hex: "#C8E6F5")],
+                            colors: [OnboardingColors.sage, Color(hex: "#C8E6F5")],
                             startPoint: .top,
                             endPoint: .bottom
                         )
@@ -978,7 +978,7 @@ private struct StepAnxietyUseCasePage: View {
 
             Text(breathPhase)
                 .font(DinoTheme.dinoFont(size: 14))
-                .foregroundColor(Color(hex: "#A8C5A0"))
+                .foregroundColor(OnboardingColors.sage)
                 .id(breathPhase)
                 .transition(.opacity.animation(.easeInOut(duration: 0.4)))
 
@@ -1322,9 +1322,9 @@ private struct StepRatingPage: View {
                                 .foregroundColor(.white)
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 16)
-                                .background(Color(hex: "#A8C5A0"))
+                                .background(OnboardingColors.sage)
                                 .cornerRadius(16)
-                                .shadow(color: Color(hex: "#A8C5A0").opacity(0.4), radius: 12, x: 0, y: 4)
+                                .shadow(color: OnboardingColors.sage.opacity(0.4), radius: 12, x: 0, y: 4)
                         }
                         .buttonStyle(ScaleButtonStyle())
                         .transition(.opacity)
@@ -1429,7 +1429,7 @@ private struct TestimonialCard: View {
             HStack(spacing: 6) {
                 Text(data.name)
                     .font(DinoTheme.dinoFont(size: 12))
-                    .foregroundColor(Color(hex: "#A8C5A0"))
+                    .foregroundColor(OnboardingColors.sage)
                 Text("\u{00B7}")
                     .font(DinoTheme.dinoFont(size: 12))
                     .foregroundColor(Color(hex: "#9E8E7E").opacity(0.5))

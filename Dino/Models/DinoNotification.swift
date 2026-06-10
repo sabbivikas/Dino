@@ -157,9 +157,28 @@ final class NotificationStore: ObservableObject {
     }
 
     private func saveFiredKeys() {
+        pruneFiredKeysIfNeeded()
         if let data = try? JSONEncoder().encode(Array(firedDedupeKeys)) {
             defaults.set(data, forKey: firedKeysStorageKey)
         }
+    }
+
+    /// Cap the fired-dedupe-key set so it can't grow unbounded over years of
+    /// use. Keys backing a currently-present notification are always retained
+    /// (so we never re-fire an existing notification); orphaned keys are
+    /// dropped first once we exceed the cap.
+    private func pruneFiredKeysIfNeeded() {
+        let maxKeys = 500
+        guard firedDedupeKeys.count > maxKeys else { return }
+        let activeKeys = Set(notifications.map { $0.dedupeKey })
+        var retained = firedDedupeKeys.intersection(activeKeys)
+        if retained.count < maxKeys {
+            for key in firedDedupeKeys.subtracting(retained) {
+                if retained.count >= maxKeys { break }
+                retained.insert(key)
+            }
+        }
+        firedDedupeKeys = retained
     }
 
     // MARK: - Auto-generation
