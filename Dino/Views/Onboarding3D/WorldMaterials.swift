@@ -2,10 +2,10 @@
 //  WorldMaterials.swift
 //  Dino
 //
-//  Palette + materials for the 3D onboarding world. Colors from
-//  colors_and_type.css (sage family) and season-scenes.jsx (soft skies).
-//  Flat lambert for the low-poly look; shader-modifier sway and shimmer
-//  are attached here so reduce-motion can skip them at build time.
+//  Illustrated-style palette + materials for the onboarding world.
+//  Tolan look: flat vibrant color, no specular, no reflections — a living
+//  children's-book illustration. Saturation pushed ~25% above the base
+//  css tokens per the illustrated-style spec.
 //
 
 import SceneKit
@@ -23,79 +23,108 @@ fileprivate extension UIColor {
 }
 
 enum WorldPalette {
-    // Greens (sage family — colors_and_type.css)
-    static let sage         = UIColor(worldHex: 0xA8C5A0)
-    static let sageDeep     = UIColor(worldHex: 0x7BA872)
-    static let grass        = UIColor(worldHex: 0x9CC094)
-    static let grassWarm    = UIColor(worldHex: 0xB8D4A8)
-    static let foliage      = UIColor(worldHex: 0x6FA065)
-    static let foliageDeep  = UIColor(worldHex: 0x5A8A52)
+    // Ground / terrain
+    static let grass        = UIColor(worldHex: 0x7EC86A)   // bright sage
+    static let grassTip     = UIColor(worldHex: 0xA8E896)
+    static let hillFar      = UIColor(worldHex: 0xA8D5A2)   // soft mint
+    static let hillNear     = UIColor(worldHex: 0x5BAD5B)   // rich green
+    static let path         = UIColor(worldHex: 0xF5E6C8)   // warm cream
+    static let soil         = UIColor(worldHex: 0xC4956A)
 
-    // Earth / wood / stone
-    static let bark         = UIColor(worldHex: 0x6E5A3E)
-    static let rock         = UIColor(worldHex: 0xA8A491)
-    static let rockDark     = UIColor(worldHex: 0x8E8E7C)
+    // Trees + plants (bright crown variants)
+    static let crown1       = UIColor(worldHex: 0x6BBF59)
+    static let crown2       = UIColor(worldHex: 0x85CF6B)
+    static let crown3       = UIColor(worldHex: 0x4FAD4F)
+    static let crown4       = UIColor(worldHex: 0x98D982)
+    static let trunk        = UIColor(worldHex: 0x8B5E3C)
+    static let bush         = UIColor(worldHex: 0x6BBF59)
+
+    // Flowers
+    static let flowerPeach    = UIColor(worldHex: 0xFFB5A0)
+    static let flowerLavender = UIColor(worldHex: 0xC4A8D4)
+    static let flowerYellow   = UIColor(worldHex: 0xFFE066)
+    static let flowerWhite    = UIColor(worldHex: 0xFFF8F0)
 
     // Water + pond life
-    static let water        = UIColor(worldHex: 0xA8D4E6)
-    static let lily         = UIColor(worldHex: 0x4E8C49)
-    static let cattail      = UIColor(worldHex: 0x8A6A42)
+    static let pond         = UIColor(worldHex: 0x4ECDC4)   // bright turquoise
+    static let pondDeep     = UIColor(worldHex: 0x3CB8B0)
+    static let lily         = UIColor(worldHex: 0x5CBF5C)
+    static let cattailTop   = UIColor(worldHex: 0x8B6914)
 
-    // Flowers / accents (lavender, peach, rose, cream)
-    static let lavender     = UIColor(worldHex: 0xC4B8D4)
-    static let peach        = UIColor(worldHex: 0xF5C6AA)
-    static let rose         = UIColor(worldHex: 0xE8B4B8)
-    static let cream        = UIColor(worldHex: 0xFFF7E8)
-    static let gold         = UIColor(worldHex: 0xF5C842)
+    // Rocks (warm grey, slight purple tint)
+    static let rock         = UIColor(worldHex: 0xB0A090)
+    static let rockShade    = UIColor(worldHex: 0x9A8C92)
 
     // Celestial
-    static let moon         = UIColor(worldHex: 0xF5E9C4)
+    static let sunDisc      = UIColor(worldHex: 0xFFE066)
+    static let moon         = UIColor(worldHex: 0xF5EFE0)
     static let star         = UIColor(worldHex: 0xF4EFE0)
+    static let cloud        = UIColor(worldHex: 0xFFFFFF)
 
-    // Sky stops (day from season-scenes.jsx spring; night from starfield navy)
-    static let skyDayTop      = UIColor(worldHex: 0xD9E4EF)
-    static let skyDayMid      = UIColor(worldHex: 0xEDE2D0)
-    static let skyDayBottom   = UIColor(worldHex: 0xE4D5BE)
-    static let skyNightTop    = UIColor(worldHex: 0x0F0F22)
-    static let skyNightMid    = UIColor(worldHex: 0x1B2C4C)
-    static let skyNightBottom = UIColor(worldHex: 0x2A3C5E)
+    // Sky stops per region (top, bottom)
+    static let skyMeadowTop    = UIColor(worldHex: 0x87CEEB)   // sky blue
+    static let skyMeadowBottom = UIColor(worldHex: 0xB8F0C8)   // mint
+    static let skyPondTop      = UIColor(worldHex: 0xE8D5F5)   // soft lavender
+    static let skyPondBottom   = UIColor(worldHex: 0xC5E8FF)   // pale blue
+    static let skyGroveTop     = UIColor(worldHex: 0xFFB347)   // amber
+    static let skyGroveBottom  = UIColor(worldHex: 0xFF8C69)   // rose
+    static let skyNightTop     = UIColor(worldHex: 0x1A1A3E)   // deep navy
+    static let skyNightBottom  = UIColor(worldHex: 0x2D1B69)   // purple
+    static let skyDawnTop      = UIColor(worldHex: 0xFFB347)   // warm coral
+    static let skyDawnBottom   = UIColor(worldHex: 0xFFD700)   // golden
 
-    // Fog tones per region grade
-    static let fogMeadow   = UIColor(worldHex: 0xE6DEC8)
-    static let fogPond     = UIColor(worldHex: 0xD8E4DE)
-    static let fogGrove    = UIColor(worldHex: 0xE8CFA8)
-    static let fogNight    = UIColor(worldHex: 0x1E2A44)
+    // Fog tones (match each sky's horizon so distance melts into it)
+    static let fogMeadow   = UIColor(worldHex: 0xBCEDC8)
+    static let fogPond     = UIColor(worldHex: 0xC9E6F8)
+    static let fogGrove    = UIColor(worldHex: 0xFF9E78)
+    static let fogNight    = UIColor(worldHex: 0x29215E)
+    static let fogDawn     = UIColor(worldHex: 0xFFCE6E)
+
+    // Aurora bands (overlook)
+    static let auroraSage     = UIColor(worldHex: 0xA8C5A0)
+    static let auroraLavender = UIColor(worldHex: 0xC4B8D4)
+    static let auroraPeach    = UIColor(worldHex: 0xF5C6AA)
 }
 
 enum WorldMaterials {
 
-    /// Flat matte low-poly material.
+    /// Flat illustrated material — lambert (soft shading, no specular),
+    /// double-sided so flat planes read from any angle.
     static func flat(_ color: UIColor) -> SCNMaterial {
         let m = SCNMaterial()
         m.diffuse.contents = color
         m.lightingModel = .lambert
+        m.specular.contents = UIColor.black
         m.roughness.contents = 1.0
+        m.isDoubleSided = true
         return m
     }
 
-    /// Unlit emissive (moon, stars).
-    static func glow(_ color: UIColor) -> SCNMaterial {
+    /// Fully unlit — always shows its exact color regardless of lighting.
+    /// Used for flower dots, clouds, sun, moon, stars.
+    static func unlit(_ color: UIColor) -> SCNMaterial {
         let m = SCNMaterial()
         m.diffuse.contents = color
-        m.emission.contents = color
         m.lightingModel = .constant
+        m.isDoubleSided = true
         return m
     }
 
-    /// Foliage / grass material with optional vertex-sway shader modifier.
-    /// Sway lives in the GEOMETRY stage so one material animates every blade
-    /// and crown — far cheaper than per-node actions.
+    /// Unlit emissive glow (sun disc, fireflies-adjacent accents).
+    static func glow(_ color: UIColor) -> SCNMaterial {
+        let m = unlit(color)
+        m.emission.contents = color
+        return m
+    }
+
+    /// Grass / crown material with optional vertex sway. Two-tone tip
+    /// gradient for blades comes from `verticalGradient`.
     static func swaying(_ color: UIColor, sway: Bool) -> SCNMaterial {
         let m = flat(color)
         if sway {
             m.shaderModifiers = [
                 .geometry: """
-                float phase = u_time * 1.4 + _geometry.position.x * 0.7 + _geometry.position.z * 0.5;
+                float phase = u_time * 1.3 + _geometry.position.x * 0.7 + _geometry.position.z * 0.5;
                 float amount = 0.05 * max(0.0, _geometry.position.y);
                 _geometry.position.x += sin(phase) * amount;
                 _geometry.position.z += cos(phase * 0.8) * amount * 0.5;
@@ -105,27 +134,47 @@ enum WorldMaterials {
         return m
     }
 
-    /// Pond water with time-based normal shimmer (skipped under reduce-motion).
-    static func water(shimmer: Bool) -> SCNMaterial {
+    /// Two-tone gradient material (grass blades with lighter tips, sky domes).
+    static func verticalGradient(top: UIColor, bottom: UIColor, sway: Bool = false) -> SCNMaterial {
         let m = SCNMaterial()
-        m.diffuse.contents = WorldPalette.water
-        m.specular.contents = UIColor(white: 1, alpha: 0.55)
-        m.lightingModel = .blinn
-        m.transparency = 0.92
-        if shimmer {
+        m.diffuse.contents = gradientImage(top: top, bottom: bottom)
+        m.lightingModel = .constant
+        m.isDoubleSided = true
+        if sway {
             m.shaderModifiers = [
-                .surface: """
-                float t = u_time;
-                float w = sin(_surface.diffuseTexcoord.x * 16.0 + t * 1.1)
-                        * sin(_surface.diffuseTexcoord.y * 13.0 - t * 0.8);
-                _surface.normal = normalize(_surface.normal + vec3(w * 0.05, 0.0, w * 0.05));
+                .geometry: """
+                float phase = u_time * 1.3 + _geometry.position.x * 0.7;
+                float amount = 0.05 * max(0.0, _geometry.position.y);
+                _geometry.position.x += sin(phase) * amount;
                 """
             ]
         }
         return m
     }
 
-    /// Translucent additive material for god-ray cones and aurora planes.
+    /// Bright pond water with white shimmer (shader skipped under reduce-motion).
+    static func water(shimmer: Bool) -> SCNMaterial {
+        let m = SCNMaterial()
+        m.diffuse.contents = WorldPalette.pond
+        m.lightingModel = .lambert
+        m.specular.contents = UIColor.black
+        m.transparency = 0.96
+        m.isDoubleSided = true
+        if shimmer {
+            m.shaderModifiers = [
+                .surface: """
+                float t = u_time;
+                float band = sin(_surface.diffuseTexcoord.x * 22.0 + t * 1.4)
+                           * sin(_surface.diffuseTexcoord.y * 18.0 - t * 1.0);
+                float sparkle = smoothstep(0.82, 1.0, band);
+                _surface.diffuse.rgb += vec3(sparkle * 0.35);
+                """
+            ]
+        }
+        return m
+    }
+
+    /// Translucent additive band (god rays, aurora, rainbow arcs).
     static func ray(_ color: UIColor, alpha: CGFloat) -> SCNMaterial {
         let m = SCNMaterial()
         m.diffuse.contents = color.withAlphaComponent(alpha)
@@ -136,14 +185,23 @@ enum WorldMaterials {
         return m
     }
 
-    /// Vertical 3-stop gradient image for the sky domes (generated in code,
-    /// no bundled assets).
-    static func gradientImage(top: UIColor, mid: UIColor, bottom: UIColor) -> UIImage {
+    /// Soft translucent flat color (rainbow at 0.3 alpha, non-additive).
+    static func tint(_ color: UIColor, alpha: CGFloat) -> SCNMaterial {
+        let m = SCNMaterial()
+        m.diffuse.contents = color.withAlphaComponent(alpha)
+        m.lightingModel = .constant
+        m.writesToDepthBuffer = false
+        m.isDoubleSided = true
+        return m
+    }
+
+    /// Vertical 2-stop gradient image, generated in code.
+    static func gradientImage(top: UIColor, bottom: UIColor) -> UIImage {
         let size = CGSize(width: 4, height: 256)
         let renderer = UIGraphicsImageRenderer(size: size)
         return renderer.image { ctx in
-            let colors = [top.cgColor, mid.cgColor, bottom.cgColor] as CFArray
-            let locations: [CGFloat] = [0.0, 0.55, 1.0]
+            let colors = [top.cgColor, bottom.cgColor] as CFArray
+            let locations: [CGFloat] = [0.0, 1.0]
             guard let gradient = CGGradient(
                 colorsSpace: CGColorSpaceCreateDeviceRGB(),
                 colors: colors,

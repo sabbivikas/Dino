@@ -112,13 +112,14 @@ private struct OnboardingWorldRepresentable: UIViewRepresentable {
             // Static cut, no dolly.
             rig.position = pose.position
             rig.eulerAngles = euler
+            handle.cameraNode.camera?.orthographicScale = pose.orthoScale
             WorldLighting.apply(region: pose.region, rig: handle.rig,
                                 scene: handle.scene, animated: false)
             applyParticles(for: pose.region, coordinator: coordinator)
             return
         }
 
-        // Bump to 60fps for the 2s dolly, then settle back to 30.
+        // Bump to 60fps for the dolly, then settle back to 30.
         view.preferredFramesPerSecond = 60
         coordinator.transitionGeneration &+= 1
         let generation = coordinator.transitionGeneration
@@ -140,6 +141,14 @@ private struct OnboardingWorldRepresentable: UIViewRepresentable {
             }
         }
 
+        // Animate the orthographic zoom alongside the dolly so regions
+        // breathe (wide meadow → intimate pond → sky-dominant overlook).
+        SCNTransaction.begin()
+        SCNTransaction.animationDuration = CameraJourney.transitionDuration
+        SCNTransaction.animationTimingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+        handle.cameraNode.camera?.orthographicScale = pose.orthoScale
+        SCNTransaction.commit()
+
         WorldLighting.apply(region: pose.region, rig: handle.rig,
                             scene: handle.scene, animated: true)
         applyParticles(for: pose.region, coordinator: coordinator)
@@ -157,12 +166,18 @@ private struct OnboardingWorldRepresentable: UIViewRepresentable {
         switch region {
         case .meadow:
             handle.regionAnchors[.meadow]?.addParticleSystem(WorldParticles.pollen())
+            handle.regionAnchors[.meadow]?.addParticleSystem(WorldParticles.petals())
+            handle.regionAnchors[.meadow]?.addParticleSystem(WorldParticles.sparkles())
         case .pond:
             handle.regionAnchors[.pond]?.addParticleSystem(WorldParticles.dragonflies())
+            handle.regionAnchors[.pond]?.addParticleSystem(WorldParticles.rain())
         case .grove:
             handle.regionAnchors[.grove]?.addParticleSystem(WorldParticles.motes())
         case .overlook:
             handle.regionAnchors[.overlook]?.addParticleSystem(WorldParticles.fireflies())
+        case .returnDawn:
+            handle.regionAnchors[.returnDawn]?.addParticleSystem(WorldParticles.petals())
+            handle.regionAnchors[.returnDawn]?.addParticleSystem(WorldParticles.pollen())
         }
     }
 
