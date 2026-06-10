@@ -80,24 +80,11 @@ struct OnboardingView: View {
 
     var body: some View {
         ZStack {
-            // Backdrop
-            if currentStep == 4 {
-                // GPU aurora base with the starfield (stars, nebula, fireflies,
-                // shooting stars) layered on top — starfield skips its own navy
-                // gradient so the aurora shows through.
-                ZStack {
-                    OnboardingShaderBackground()
-                    StarfieldBackdrop(drawsBackground: false)
-                }
-                .transition(.opacity)
-            } else {
-                ZStack {
-                    NatureBackdrop()
-                    NatureMistOverlay()
-                        .allowsHitTesting(false)
-                }
-                .transition(.opacity)
-            }
+            // Backdrop — one living 3D world; the camera dollies between steps.
+            // (The old 2D backdrops — NatureBackdrop, StarfieldBackdrop, and the
+            // Metal shader views — remain in the codebase, unused, for instant
+            // revert: swap this line back to the previous if/else.)
+            OnboardingWorldView(currentStep: currentStep)
 
             VStack(spacing: 0) {
                 topBar
