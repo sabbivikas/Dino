@@ -1710,10 +1710,19 @@ struct AmbientSoundsView: View {
                 withAnimation { lilyPadGlow = true }
             }
 
-            // Preload today's letter so the overlay reads instantly.
-            Task { await loadLetter() }
+            // Preload today's letter so the overlay reads instantly. Skip if
+            // we already have today's letter cached — SwiftUI fires .onAppear
+            // every time the view comes back from a sheet / nav transition.
+            if dailyLetter == nil {
+                Task { await loadLetter() }
+            }
         }
         .onDisappear {
+            UIApplication.shared.isIdleTimerDisabled = false
+        }
+        // Defensive: also reset the idle timer when the app loses active state.
+        // Protects against a crash mid-session leaving the screen permanently lit.
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)) { _ in
             UIApplication.shared.isIdleTimerDisabled = false
         }
     }
