@@ -2,11 +2,11 @@
 //  GardenLighting.swift
 //  Dino
 //
-//  Photoreal day/night for the explorable garden: seven clock-driven
-//  periods with multi-stop skies, a sun whose size/color/elevation track
-//  the hour, a moon with a real phase calculation (days since the
-//  2000-01-06 new moon mod 29.53) and procedural craters, 90 twinkling
-//  stars plus a faint Milky Way band, and period fog matched to the sky.
+//  Option 3: the sky is a programmatically illustrated CGImage — gradient
+//  bands plus painted extras (sun, clouds, birds, stars, Milky Way, moon)
+//  per time period — set as scene.background. Zero geometry, zero clipping;
+//  it always fills the frame. One directional light + ambient grade the 3D
+//  layer (the sunflower) to match.
 //
 
 import SceneKit
@@ -15,19 +15,14 @@ import UIKit
 enum GardenLighting {
 
     struct Rig {
-        let sunNode: SCNNode          // directional key + shadows
+        let sunNode: SCNNode
         let ambientNode: SCNNode
-        let sunDisc: SCNNode
-        let sunCorona: SCNNode
-        let moonGroup: SCNNode
-        let starGroup: SCNNode
-        let cloudGroup: SCNNode
     }
 
     enum Period: CaseIterable {
         case dawn            // 5–7
         case morning         // 7–10
-        case midday          // 10–15
+        case day             // 10–15
         case lateAfternoon   // 15–18
         case sunset          // 18–19 (spec 18:00–19:30, hour-granular)
         case dusk            // 19–20 (spec 19:30–20:30, hour-granular)
@@ -37,7 +32,7 @@ enum GardenLighting {
             switch hour {
             case 5..<7:   return .dawn
             case 7..<10:  return .morning
-            case 10..<15: return .midday
+            case 10..<15: return .day
             case 15..<18: return .lateAfternoon
             case 18..<19: return .sunset
             case 19..<20: return .dusk
@@ -46,392 +41,290 @@ enum GardenLighting {
         }
     }
 
+    // MARK: - Light grading (the 3D sunflower matches the painted sky)
+
     private struct Grade {
         let sunColor: UIColor
-        let sunIntensity: CGFloat
         let sunEuler: SCNVector3
         let ambientColor: UIColor
         let ambientIntensity: CGFloat
-        let fogColor: UIColor
-        let fogStart: CGFloat
-        let discPosition: SCNVector3
-        let discScale: Float          // larger near horizon
-        let discColor: UIColor
-        let discVisible: Bool
-        let moonVisible: Bool
-        let starsOpacity: CGFloat
-        let cloudsVisible: Bool
     }
 
     private static func grade(for period: Period) -> Grade {
         switch period {
         case .dawn:
-            return Grade(
-                sunColor: UIColor(hexRGB: 0xFF7B35), sunIntensity: 600,
-                sunEuler: SCNVector3(-0.18, 1.35, 0),
-                ambientColor: UIColor(hexRGB: 0xFFD9B0), ambientIntensity: 520,
-                fogColor: UIColor(hexRGB: 0xF0C9A8), fogStart: 14,
-                discPosition: SCNVector3(7, 4.8, -14), discScale: 1.4,
-                discColor: UIColor(hexRGB: 0xFF7B35),
-                discVisible: true, moonVisible: false, starsOpacity: 0,
-                cloudsVisible: true
-            )
+            return Grade(sunColor: UIColor(hexRGB: 0xFF9B60),
+                         sunEuler: SCNVector3(-0.3, 1.1, 0),
+                         ambientColor: UIColor(hexRGB: 0xC8A8D8), ambientIntensity: 480)
         case .morning:
-            return Grade(
-                sunColor: UIColor(hexRGB: 0xFFD4A0), sunIntensity: 750,
-                sunEuler: SCNVector3(-0.7, 0.9, 0),
-                ambientColor: UIColor(hexRGB: 0xFFF3DE), ambientIntensity: 620,
-                fogColor: UIColor(hexRGB: 0xE9E2C8), fogStart: 18,
-                discPosition: SCNVector3(5, 6, -14), discScale: 1.0,
-                discColor: UIColor(hexRGB: 0xFFE08A),
-                discVisible: true, moonVisible: false, starsOpacity: 0,
-                cloudsVisible: true
-            )
-        case .midday:
-            return Grade(
-                sunColor: UIColor(hexRGB: 0xFFF8F0), sunIntensity: 850,
-                sunEuler: SCNVector3(-1.35, 0.2, 0),
-                ambientColor: UIColor.white, ambientIntensity: 650,
-                fogColor: UIColor(hexRGB: 0xCDE8F5), fogStart: 24,
-                discPosition: SCNVector3(2, 7, -12), discScale: 0.8,
-                discColor: UIColor(hexRGB: 0xFFF6D8),
-                discVisible: true, moonVisible: false, starsOpacity: 0,
-                cloudsVisible: true
-            )
+            return Grade(sunColor: UIColor(hexRGB: 0xFFD4A0),
+                         sunEuler: SCNVector3(-0.7, 0.8, 0),
+                         ambientColor: UIColor(hexRGB: 0xFFF0D8), ambientIntensity: 560)
+        case .day:
+            return Grade(sunColor: UIColor(hexRGB: 0xFFF8F0),
+                         sunEuler: SCNVector3(-1.2, 0.2, 0),
+                         ambientColor: UIColor.white, ambientIntensity: 600)
         case .lateAfternoon:
-            return Grade(
-                sunColor: UIColor(hexRGB: 0xFFB347), sunIntensity: 750,
-                sunEuler: SCNVector3(-0.6, -0.9, 0),
-                ambientColor: UIColor(hexRGB: 0xFFE6BE), ambientIntensity: 560,
-                fogColor: UIColor(hexRGB: 0xF0D8A8), fogStart: 18,
-                discPosition: SCNVector3(-5, 6, -14), discScale: 1.1,
-                discColor: UIColor(hexRGB: 0xFFC25E),
-                discVisible: true, moonVisible: false, starsOpacity: 0,
-                cloudsVisible: true
-            )
+            return Grade(sunColor: UIColor(hexRGB: 0xFFB347),
+                         sunEuler: SCNVector3(-0.55, -0.85, 0),
+                         ambientColor: UIColor(hexRGB: 0xFFE2B8), ambientIntensity: 540)
         case .sunset:
-            return Grade(
-                sunColor: UIColor(hexRGB: 0xFF4500), sunIntensity: 620,
-                sunEuler: SCNVector3(-0.16, -1.35, 0),
-                ambientColor: UIColor(hexRGB: 0xFFAE85), ambientIntensity: 480,
-                fogColor: UIColor(hexRGB: 0xE89070), fogStart: 14,
-                discPosition: SCNVector3(-7, 4.8, -14), discScale: 1.5,
-                discColor: UIColor(hexRGB: 0xFF4500),
-                discVisible: true, moonVisible: false, starsOpacity: 0,
-                cloudsVisible: true
-            )
+            return Grade(sunColor: UIColor(hexRGB: 0xFF6040),
+                         sunEuler: SCNVector3(-0.25, -1.2, 0),
+                         ambientColor: UIColor(hexRGB: 0xF0A088), ambientIntensity: 480)
         case .dusk:
-            return Grade(
-                sunColor: UIColor(hexRGB: 0x6070B0), sunIntensity: 420,
-                sunEuler: SCNVector3(-0.5, 0.5, 0),
-                ambientColor: UIColor(hexRGB: 0x9FA0C8), ambientIntensity: 420,
-                fogColor: UIColor(hexRGB: 0x4A4670), fogStart: 14,
-                discPosition: SCNVector3(-7, 4.0, -14), discScale: 1.0,
-                discColor: UIColor(hexRGB: 0xFF6F40),
-                discVisible: false, moonVisible: true, starsOpacity: 0.35,
-                cloudsVisible: false
-            )
+            return Grade(sunColor: UIColor(hexRGB: 0x8088B8),
+                         sunEuler: SCNVector3(-0.5, 0.6, 0),
+                         ambientColor: UIColor(hexRGB: 0x9898C0), ambientIntensity: 420)
         case .night:
-            return Grade(
-                sunColor: UIColor(hexRGB: 0xA8B8E8), sunIntensity: 380,   // moonlight
-                sunEuler: SCNVector3(-0.9, 0.5, 0),
-                ambientColor: UIColor(hexRGB: 0x6A6A9A), ambientIntensity: 360,
-                fogColor: UIColor(hexRGB: 0x10142E), fogStart: 12,
-                discPosition: SCNVector3(7, 4.0, -14), discScale: 1.0,
-                discColor: UIColor(hexRGB: 0xFFE066),
-                discVisible: false, moonVisible: true, starsOpacity: 1.0,
-                cloudsVisible: false
-            )
+            return Grade(sunColor: UIColor(hexRGB: 0x8090C0),
+                         sunEuler: SCNVector3(-0.8, 0.5, 0),
+                         ambientColor: UIColor(hexRGB: 0x7878A8), ambientIntensity: 380)
         }
     }
 
-    // MARK: - Gradient sky background (bulletproof: no dome, no clipping —
-    // scene.background always fills the whole frame behind the geometry)
-
-    private static var backgroundCache: [Period: UIImage] = [:]
-
-    static func background(for period: Period) -> UIImage {
-        if let cached = backgroundCache[period] { return cached }
-        let size = CGSize(width: 512, height: 512)
-        let renderer = UIGraphicsImageRenderer(size: size)
-        let image: UIImage
-
-        if period == .night {
-            // Natural night: darkest at zenith, faintly lighter at the
-            // horizon, with a soft diagonal Milky Way smear.
-            image = renderer.image { ctx in
-                let cg = ctx.cgContext
-                let colors = [UIColor(hexRGB: 0x050818).cgColor,   // deep space
-                              UIColor(hexRGB: 0x0A0A1E).cgColor,   // navy
-                              UIColor(hexRGB: 0x0D1535).cgColor]   // horizon glow
-                    as CFArray
-                let locations: [CGFloat] = [0.0, 0.4, 0.7]
-                if let gradient = CGGradient(
-                    colorsSpace: CGColorSpaceCreateDeviceRGB(),
-                    colors: colors, locations: locations
-                ) {
-                    cg.drawLinearGradient(
-                        gradient,
-                        start: CGPoint(x: 0, y: 0),
-                        end: CGPoint(x: 0, y: size.height),
-                        options: [.drawsAfterEndLocation]
-                    )
-                }
-
-                // Milky Way: subtle diagonal band, top-left → bottom-right,
-                // ~15% of the image wide, fading to clear at both edges.
-                cg.saveGState()
-                cg.translateBy(x: size.width / 2, y: size.height / 2)
-                cg.rotate(by: -.pi / 4)
-                let bandHalf: CGFloat = 38   // ≈15% of 512
-                cg.clip(to: CGRect(x: -420, y: -bandHalf, width: 840, height: bandHalf * 2))
-                let bandColor = UIColor(hexRGB: 0x1A2040).withAlphaComponent(0.3)
-                let bandColors = [UIColor.clear.cgColor,
-                                  bandColor.cgColor,
-                                  UIColor.clear.cgColor] as CFArray
-                if let bandGradient = CGGradient(
-                    colorsSpace: CGColorSpaceCreateDeviceRGB(),
-                    colors: bandColors, locations: [0.0, 0.5, 1.0]
-                ) {
-                    cg.drawLinearGradient(
-                        bandGradient,
-                        start: CGPoint(x: 0, y: -bandHalf),
-                        end: CGPoint(x: 0, y: bandHalf),
-                        options: []
-                    )
-                }
-                cg.restoreGState()
-            }
-        } else {
-            let stops: (top: UInt32, bottom: UInt32)
-            switch period {
-            case .dawn:          stops = (0x1A0A2E, 0xFF6B35)
-            case .morning:       stops = (0x4A90D9, 0xFFE4A0)
-            case .midday:        stops = (0x1565C0, 0xBBDEFB)
-            case .lateAfternoon: stops = (0x3A7BC0, 0xFFB347)
-            case .sunset:        stops = (0x7B1FA2, 0xFF6F00)
-            case .dusk:          stops = (0x0D1B3E, 0x050510)
-            case .night:         stops = (0x0A0A1E, 0x1A2A4A)   // unreachable
-            }
-            image = renderer.image { ctx in
-                let colors = [UIColor(hexRGB: stops.top).cgColor,
-                              UIColor(hexRGB: stops.bottom).cgColor] as CFArray
-                let locations: [CGFloat] = [0.0, 1.0]
-                guard let gradient = CGGradient(
-                    colorsSpace: CGColorSpaceCreateDeviceRGB(),
-                    colors: colors, locations: locations
-                ) else { return }
-                ctx.cgContext.drawLinearGradient(
-                    gradient,
-                    start: CGPoint(x: 0, y: 0),
-                    end: CGPoint(x: 0, y: size.height),
-                    options: []
-                )
-            }
-        }
-        backgroundCache[period] = image
-        return image
-    }
-
-    // MARK: - Moon phase
-
-    /// 0 = new, 0.5 = full (days since the 2000-01-06 new moon, mod 29.53).
-    static func moonPhase(on date: Date) -> Double {
-        var components = DateComponents()
-        components.year = 2000; components.month = 1; components.day = 6
-        components.hour = 18
-        let calendar = Calendar(identifier: .gregorian)
-        guard let knownNewMoon = calendar.date(from: components) else { return 0.5 }
-        let days = date.timeIntervalSince(knownNewMoon) / 86_400
-        let cycle = days.truncatingRemainder(dividingBy: 29.53)
-        return (cycle < 0 ? cycle + 29.53 : cycle) / 29.53
-    }
-
-    // MARK: - Rig construction
-
-    static func makeRig(cloudGroup: SCNNode) -> Rig {
+    static func makeRig() -> Rig {
         let sun = SCNLight()
         sun.type = .directional
-        sun.intensity = 850
+        sun.intensity = 800
         sun.castsShadow = true
         sun.shadowMapSize = CGSize(width: 1024, height: 1024)
-        sun.shadowRadius = 5
+        sun.shadowRadius = 6
         sun.shadowColor = UIColor(white: 0, alpha: 0.3)
         sun.shadowMode = .deferred
-        sun.orthographicScale = 24
+        sun.orthographicScale = 10
         let sunNode = SCNNode()
         sunNode.light = sun
 
         let ambient = SCNLight()
         ambient.type = .ambient
-        ambient.intensity = 650
+        ambient.intensity = 500
+        ambient.color = UIColor.white
         let ambientNode = SCNNode()
         ambientNode.light = ambient
 
-        let (disc, corona) = makeSun()
-        let moonGroup = makeMoonGroup()
-        moonGroup.opacity = 0
-        let starGroup = makeStarGroup()
-        starGroup.opacity = 0
-
-        return Rig(sunNode: sunNode, ambientNode: ambientNode,
-                   sunDisc: disc, sunCorona: corona, moonGroup: moonGroup,
-                   starGroup: starGroup, cloudGroup: cloudGroup)
+        return Rig(sunNode: sunNode, ambientNode: ambientNode)
     }
-
-    private static func makeSun() -> (disc: SCNNode, corona: SCNNode) {
-        let discGeo = SCNSphere(radius: 1.0)
-        discGeo.segmentCount = 16
-        discGeo.firstMaterial = GardenMaterials.glow(GardenPalette.sunDisc)
-        let disc = SCNNode(geometry: discGeo)
-        disc.castsShadow = false
-
-        let coronaGeo = SCNSphere(radius: 1.9)
-        coronaGeo.segmentCount = 14
-        let m = SCNMaterial()
-        m.diffuse.contents = GardenPalette.sunDisc.withAlphaComponent(0.22)
-        m.emission.contents = GardenPalette.sunDisc.withAlphaComponent(0.22)
-        m.lightingModel = .constant
-        m.blendMode = .add
-        m.writesToDepthBuffer = false
-        coronaGeo.firstMaterial = m
-        let corona = SCNNode(geometry: coronaGeo)
-        corona.castsShadow = false
-        disc.addChildNode(corona)
-        return (disc, corona)
-    }
-
-    /// A clean glowing moon — a bright white circle with a soft golden
-    /// halo. Simple and beautiful; no craters, no phase occluder.
-    private static func makeMoonGroup() -> SCNNode {
-        let group = SCNNode()
-        group.castsShadow = false
-        group.position = SCNVector3(3, 7, -10)
-
-        let moonGeo = SCNSphere(radius: 1.2)
-        moonGeo.segmentCount = 24
-        let mm = SCNMaterial()
-        mm.diffuse.contents = UIColor(hexRGB: 0xFFFFF8)
-        mm.emission.contents = UIColor(hexRGB: 0xFFFFF8).withAlphaComponent(0.9)
-        mm.lightingModel = .constant
-        moonGeo.firstMaterial = mm
-        let moon = SCNNode(geometry: moonGeo)
-        moon.castsShadow = false
-        group.addChildNode(moon)
-
-        // Soft golden glow behind the disc.
-        let glowGeo = SCNSphere(radius: 2.0)
-        glowGeo.segmentCount = 16
-        let gm = SCNMaterial()
-        gm.diffuse.contents = UIColor(hexRGB: 0xFFFACD).withAlphaComponent(0.25)
-        gm.emission.contents = UIColor(hexRGB: 0xFFFACD).withAlphaComponent(0.25)
-        gm.lightingModel = .constant
-        gm.blendMode = .add
-        gm.writesToDepthBuffer = false
-        glowGeo.firstMaterial = gm
-        let glow = SCNNode(geometry: glowGeo)
-        glow.position = SCNVector3(0, 0, -0.4)
-        glow.castsShadow = false
-        group.addChildNode(glow)
-
-        return group
-    }
-
-    /// 60 stars, every one inside the camera frustum AND above the horizon
-    /// line (ground far edge → v ≈ 5.5): X ±9, Y 6–8, Z -6…-14 puts them at
-    /// v ≈ 6–10, the sky band of the frame. White constant spheres; a third
-    /// twinkle.
-    private static func makeStarGroup() -> SCNNode {
-        let group = SCNNode()
-        group.castsShadow = false
-        var rng = GardenSeededRandom(seed: 88)
-
-        let sizeMix: [CGFloat] = [0.03, 0.05, 0.08, 0.12]
-        for i in 0..<60 {
-            let radius = sizeMix[Int(rng.range(0, 3.99))]
-            let starGeo = SCNSphere(radius: radius)
-            starGeo.segmentCount = 6
-            starGeo.firstMaterial = GardenMaterials.glow(UIColor(hexRGB: 0xFFFFFF))
-            let star = SCNNode(geometry: starGeo)
-            star.position = SCNVector3(
-                Float(rng.range(-9, 9)),
-                Float(rng.range(6, 8)),
-                Float(rng.range(-14, -6))
-            )
-            star.opacity = CGFloat(rng.range(0.6, 1.0))
-            star.castsShadow = false
-            // 20 shimmer via SCALE (not opacity): 0.5 → 1.2 → 0.5, each with
-            // its own random period and start delay — a natural sparkle.
-            if i % 3 == 0 {
-                let half = rng.range(0.5, 2.0)        // full cycle 1–4s
-                star.scale = SCNVector3(0.5, 0.5, 0.5)
-                let grow = SCNAction.scale(to: 1.2, duration: half)
-                grow.timingMode = .easeInEaseOut
-                let shrink = SCNAction.scale(to: 0.5, duration: half)
-                shrink.timingMode = .easeInEaseOut
-                star.runAction(.sequence([
-                    .wait(duration: rng.range(0, 3)),
-                    .repeatForever(.sequence([grow, shrink]))
-                ]))
-            }
-            group.addChildNode(star)
-        }
-
-        // 5 "named" stars — larger, white with a blue cast, steady.
-        for _ in 0..<5 {
-            let brightGeo = SCNSphere(radius: 0.15)
-            brightGeo.segmentCount = 8
-            brightGeo.firstMaterial = GardenMaterials.glow(UIColor(hexRGB: 0xE8F0FF))
-            let bright = SCNNode(geometry: brightGeo)
-            bright.position = SCNVector3(
-                Float(rng.range(-8, 8)),
-                Float(rng.range(6.3, 7.8)),
-                Float(rng.range(-13, -7))
-            )
-            bright.castsShadow = false
-            group.addChildNode(bright)
-        }
-        return group
-    }
-
-    // MARK: - Period application
 
     static func apply(period: Period, rig: Rig, scene: SCNScene, animated: Bool) {
         let g = grade(for: period)
+        let image = makeBackgroundImage(period: period)
 
         let work = {
-            // Bulletproof sky: a screen-space gradient image always fills
-            // the frame behind the geometry — no dome, no clipping.
-            scene.background.contents = background(for: period)
+            scene.background.contents = image
             rig.sunNode.light?.color = g.sunColor
-            rig.sunNode.light?.intensity = g.sunIntensity
             rig.sunNode.eulerAngles = g.sunEuler
             rig.ambientNode.light?.color = g.ambientColor
             rig.ambientNode.light?.intensity = g.ambientIntensity
-            rig.sunDisc.position = g.discPosition
-            rig.sunDisc.scale = SCNVector3(g.discScale, g.discScale, g.discScale)
-            if let m = rig.sunDisc.geometry?.firstMaterial {
-                m.diffuse.contents = g.discColor
-                m.emission.contents = g.discColor
-            }
-            rig.sunDisc.opacity = g.discVisible ? 1 : 0
-            rig.moonGroup.opacity = g.moonVisible ? 1 : 0
-            rig.starGroup.opacity = g.starsOpacity
-            rig.cloudGroup.opacity = g.cloudsVisible ? 1 : 0
-            // Fog disabled entirely — it tinted the gradient background and
-            // swallowed celestial bodies. (1000/1001 ≈ off.)
-            scene.fogStartDistance = 1000
-            scene.fogEndDistance = 1001
         }
 
         if animated {
             SCNTransaction.begin()
-            SCNTransaction.animationDuration = 1.5
+            SCNTransaction.animationDuration = 3.0
             SCNTransaction.animationTimingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
             work()
             SCNTransaction.commit()
         } else {
             work()
         }
+    }
+
+    // MARK: - Illustrated background images
+
+    private static var backgroundCache: [Period: UIImage] = [:]
+
+    static func makeBackgroundImage(period: Period) -> UIImage {
+        if let cached = backgroundCache[period] { return cached }
+        let side: CGFloat = 512
+        let size = CGSize(width: side, height: side)
+        let renderer = UIGraphicsImageRenderer(size: size)
+
+        let image = renderer.image { ctx in
+            let cg = ctx.cgContext
+            drawSkyBands(cg, size: size, period: period)
+            drawExtras(cg, size: size, period: period)
+            drawGroundStrip(cg, size: size)
+        }
+        backgroundCache[period] = image
+        return image
+    }
+
+    /// Vertical gradient bands per period (locations are fractions of height).
+    private static func drawSkyBands(_ cg: CGContext, size: CGSize, period: Period) {
+        let stops: [(UInt32, CGFloat)]
+        switch period {
+        case .dawn:
+            stops = [(0x1A0A2E, 0.0), (0x6B2D8B, 0.4), (0xFF6B35, 0.7), (0xFFE4A0, 0.9)]
+        case .morning:
+            stops = [(0x4A90D9, 0.0), (0x9FC4E8, 0.5), (0xFFE4A0, 0.78), (0x7EC86A, 1.0)]
+        case .day:
+            stops = [(0x1565C0, 0.0), (0x42A5F5, 0.6), (0xBBDEFB, 0.82), (0x7EC86A, 1.0)]
+        case .lateAfternoon:
+            stops = [(0x1565C0, 0.0), (0x6FA0D0, 0.5), (0xFFB347, 0.8), (0xFF8C42, 1.0)]
+        case .sunset:
+            stops = [(0x0D47A1, 0.0), (0x7B1FA2, 0.3), (0xE91E63, 0.55), (0xFF6F00, 0.78), (0xFFD700, 0.9)]
+        case .dusk:
+            stops = [(0x0D1B3E, 0.0), (0x1A237E, 0.55), (0xFF6F00, 0.82), (0x1B2A1B, 1.0)]
+        case .night:
+            stops = [(0x050818, 0.0), (0x0A0A1E, 0.4), (0x0D1535, 0.7)]
+        }
+
+        let colors = stops.map { UIColor(hexRGB: $0.0).cgColor } as CFArray
+        let locations = stops.map { $0.1 }
+        guard let gradient = CGGradient(
+            colorsSpace: CGColorSpaceCreateDeviceRGB(),
+            colors: colors, locations: locations
+        ) else { return }
+        cg.drawLinearGradient(
+            gradient,
+            start: CGPoint(x: 0, y: 0),
+            end: CGPoint(x: 0, y: size.height),
+            options: [.drawsBeforeStartLocation, .drawsAfterEndLocation]
+        )
+    }
+
+    /// Painted extras: sun/moon, glow, clouds, birds, stars, Milky Way.
+    private static func drawExtras(_ cg: CGContext, size: CGSize, period: Period) {
+        let w = size.width, h = size.height
+        var rng = GardenSeededRandom(seed: 31)
+
+        func circle(_ center: CGPoint, _ radius: CGFloat, _ color: UIColor) {
+            cg.setFillColor(color.cgColor)
+            cg.fillEllipse(in: CGRect(x: center.x - radius, y: center.y - radius,
+                                      width: radius * 2, height: radius * 2))
+        }
+
+        func cloud(at center: CGPoint, scale: CGFloat) {
+            let white = UIColor.white
+            circle(center, 22 * scale, white)
+            circle(CGPoint(x: center.x - 24 * scale, y: center.y + 5 * scale), 16 * scale, white)
+            circle(CGPoint(x: center.x + 24 * scale, y: center.y + 5 * scale), 17 * scale, white)
+            circle(CGPoint(x: center.x + 4 * scale, y: center.y - 12 * scale), 14 * scale, white)
+        }
+
+        func bird(at p: CGPoint, span: CGFloat) {
+            cg.setStrokeColor(UIColor(hexRGB: 0x2D3142).cgColor)
+            cg.setLineWidth(2)
+            cg.setLineCap(.round)
+            cg.move(to: CGPoint(x: p.x - span, y: p.y))
+            cg.addQuadCurve(to: p, control: CGPoint(x: p.x - span / 2, y: p.y - span * 0.6))
+            cg.addQuadCurve(to: CGPoint(x: p.x + span, y: p.y),
+                            control: CGPoint(x: p.x + span / 2, y: p.y - span * 0.6))
+            cg.strokePath()
+        }
+
+        switch period {
+        case .dawn:
+            circle(CGPoint(x: w * 0.75, y: h * 0.65), h * 0.06,
+                   UIColor(hexRGB: 0xFF9040).withAlphaComponent(0.3))
+            circle(CGPoint(x: w * 0.75, y: h * 0.65), h * 0.03, UIColor(hexRGB: 0xFF7B35))
+
+        case .morning:
+            circle(CGPoint(x: w * 0.72, y: h * 0.22), h * 0.07,
+                   UIColor(hexRGB: 0xFFE8C0).withAlphaComponent(0.35))
+            circle(CGPoint(x: w * 0.72, y: h * 0.22), h * 0.04, UIColor(hexRGB: 0xFFD4A0))
+            cloud(at: CGPoint(x: w * 0.25, y: h * 0.18), scale: 1.0)
+            cloud(at: CGPoint(x: w * 0.55, y: h * 0.34), scale: 0.7)
+            bird(at: CGPoint(x: w * 0.35, y: h * 0.12), span: 9)
+            bird(at: CGPoint(x: w * 0.45, y: h * 0.16), span: 7)
+
+        case .day:
+            circle(CGPoint(x: w * 0.5, y: h * 0.12), h * 0.06,
+                   UIColor.white.withAlphaComponent(0.3))
+            circle(CGPoint(x: w * 0.5, y: h * 0.12), h * 0.035, UIColor(hexRGB: 0xFFF8F0))
+            cloud(at: CGPoint(x: w * 0.2, y: h * 0.22), scale: 1.1)
+            cloud(at: CGPoint(x: w * 0.78, y: h * 0.3), scale: 0.85)
+            cloud(at: CGPoint(x: w * 0.48, y: h * 0.42), scale: 0.6)
+            bird(at: CGPoint(x: w * 0.3, y: h * 0.15), span: 9)
+            bird(at: CGPoint(x: w * 0.62, y: h * 0.1), span: 7)
+            bird(at: CGPoint(x: w * 0.7, y: h * 0.2), span: 8)
+            // Subtle horizon line where sky meets implied ground.
+            cg.setFillColor(UIColor(hexRGB: 0xA8D4A0).withAlphaComponent(0.6).cgColor)
+            cg.fill(CGRect(x: 0, y: h * 0.8, width: w, height: 2))
+
+        case .lateAfternoon:
+            circle(CGPoint(x: w * 0.3, y: h * 0.55), h * 0.09,
+                   UIColor(hexRGB: 0xFFC870).withAlphaComponent(0.3))
+            circle(CGPoint(x: w * 0.3, y: h * 0.55), h * 0.05, UIColor(hexRGB: 0xFFB347))
+            // Warm haze at the horizon.
+            cg.setFillColor(UIColor(hexRGB: 0xFFD9A0).withAlphaComponent(0.25).cgColor)
+            cg.fill(CGRect(x: 0, y: h * 0.7, width: w, height: h * 0.15))
+
+        case .sunset:
+            circle(CGPoint(x: w * 0.5, y: h * 0.72), h * 0.12,
+                   UIColor(hexRGB: 0xFF6F40).withAlphaComponent(0.35))
+            circle(CGPoint(x: w * 0.5, y: h * 0.72), h * 0.06, UIColor(hexRGB: 0xFF4500))
+            // Slight warm overlay over everything.
+            cg.setFillColor(UIColor(hexRGB: 0xFF4500).withAlphaComponent(0.06).cgColor)
+            cg.fill(CGRect(x: 0, y: 0, width: w, height: h))
+
+        case .dusk:
+            for _ in 0..<8 {
+                let p = CGPoint(x: CGFloat(rng.range(0.05, 0.95)) * w,
+                                y: CGFloat(rng.range(0.04, 0.45)) * h)
+                circle(p, CGFloat(rng.range(1.0, 1.8)), UIColor.white.withAlphaComponent(0.8))
+            }
+            cg.setFillColor(UIColor(hexRGB: 0xFF8C50).withAlphaComponent(0.2).cgColor)
+            cg.fill(CGRect(x: 0, y: h * 0.76, width: w, height: h * 0.08))
+
+        case .night:
+            // Milky Way: soft diagonal band, top-left → bottom-right.
+            cg.saveGState()
+            cg.translateBy(x: w / 2, y: h / 2)
+            cg.rotate(by: -.pi / 4)
+            let bandHalf: CGFloat = w * 0.075
+            cg.clip(to: CGRect(x: -w, y: -bandHalf, width: w * 2, height: bandHalf * 2))
+            let bandColors = [UIColor.clear.cgColor,
+                              UIColor(hexRGB: 0x1A2040).withAlphaComponent(0.3).cgColor,
+                              UIColor.clear.cgColor] as CFArray
+            if let band = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(),
+                                     colors: bandColors, locations: [0, 0.5, 1]) {
+                cg.drawLinearGradient(band,
+                                      start: CGPoint(x: 0, y: -bandHalf),
+                                      end: CGPoint(x: 0, y: bandHalf), options: [])
+            }
+            cg.restoreGState()
+
+            // 60 stars in the top 60%, 20 with a soft glow.
+            for i in 0..<60 {
+                let p = CGPoint(x: CGFloat(rng.range(0.02, 0.98)) * w,
+                                y: CGFloat(rng.range(0.02, 0.6)) * h)
+                let r = CGFloat(rng.range(0.6, 1.6))
+                if i % 3 == 0 {
+                    circle(p, r + 2.4, UIColor.white.withAlphaComponent(0.2))
+                    circle(p, r + 0.5, UIColor.white)
+                } else {
+                    circle(p, r, UIColor.white.withAlphaComponent(0.9))
+                }
+            }
+
+            // Moon: clean white circle with a soft golden glow, upper right.
+            let moonCenter = CGPoint(x: w * 0.74, y: h * 0.2)
+            circle(moonCenter, w * 0.06, UIColor(hexRGB: 0xFFFACD).withAlphaComponent(0.2))
+            circle(moonCenter, w * 0.04, UIColor(hexRGB: 0xFFFFF0))
+        }
+    }
+
+    /// Bottom ≈20%: green horizon strip fading out — the 3D ground takes
+    /// over from here.
+    private static func drawGroundStrip(_ cg: CGContext, size: CGSize) {
+        let colors = [UIColor(hexRGB: 0x3D7024).cgColor,
+                      UIColor(hexRGB: 0x5BAD5B).cgColor,
+                      UIColor(hexRGB: 0x5BAD5B).withAlphaComponent(0).cgColor] as CFArray
+        guard let gradient = CGGradient(
+            colorsSpace: CGColorSpaceCreateDeviceRGB(),
+            colors: colors, locations: [0.0, 0.45, 1.0]
+        ) else { return }
+        cg.saveGState()
+        let strip = CGRect(x: 0, y: size.height * 0.8,
+                           width: size.width, height: size.height * 0.2)
+        cg.clip(to: strip)
+        cg.drawLinearGradient(
+            gradient,
+            start: CGPoint(x: 0, y: strip.minY),
+            end: CGPoint(x: 0, y: strip.maxY),
+            options: []
+        )
+        cg.restoreGState()
     }
 }
