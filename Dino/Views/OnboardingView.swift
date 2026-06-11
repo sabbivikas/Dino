@@ -2,8 +2,9 @@
 //  OnboardingView.swift
 //  Dino
 //
-//  v6 design-system onboarding. Uses NatureBackdrop / StarfieldBackdrop
-//  and the shared MascotView / WordRevealText / Confetti components.
+//  v6 design-system onboarding over the living 3D world. The star guide
+//  in the world is the character presence; pages use the shared
+//  WordRevealText / Confetti components.
 //
 
 import SwiftUI
@@ -333,8 +334,6 @@ private struct StepWelcomePage: View {
         VStack(spacing: 28) {
             Spacer(minLength: 12)
 
-            MascotView(imageName: "cut-DinoMascot", size: 200)
-
             WordRevealText(
                 welcomeQuote,
                 font: .custom(DinoTheme.customFontName, size: 22),
@@ -459,11 +458,36 @@ private struct StepFeelingPage: View {
 
 // MARK: - Step 2a: Doing great
 private struct StepDoingGreatPage: View {
+    @State private var appeared: Bool = false
+
     var body: some View {
         VStack(spacing: 24) {
             Spacer(minLength: 12)
 
-            MascotView(imageName: "cut-DinoBalloon", size: 200)
+            // Soft aura + rising hearts — gentle motion where the mascot stood.
+            ZStack {
+                Circle()
+                    .fill(
+                        RadialGradient(
+                            colors: [OnboardingColors.sage.opacity(0.30), .clear],
+                            center: .center,
+                            startRadius: 0,
+                            endRadius: 100
+                        )
+                    )
+                    .frame(width: 200, height: 200)
+
+                ForEach(0..<3, id: \.self) { i in
+                    RisingHeart(
+                        appeared: appeared,
+                        delay: Double(i) * 0.3,
+                        size: [14, 20, 16][i],
+                        wobble: [-5, 8, -8][i]
+                    )
+                    .offset(x: CGFloat([-40, 0, 40][i]), y: 30)
+                }
+            }
+            .frame(height: 160)
 
             Text("good to hear that! Dino will help you keep things up.")
                 .font(DinoTheme.dinoFont(size: 22))
@@ -474,6 +498,7 @@ private struct StepDoingGreatPage: View {
 
             Spacer()
         }
+        .onAppear { appeared = true }
     }
 }
 
@@ -485,8 +510,6 @@ private struct StepChallengePickerPage: View {
     var body: some View {
         VStack(spacing: 20) {
             Spacer(minLength: 4)
-
-            MascotView(imageName: "cut-DinoMascot", size: 140)
 
             Text("sorry to hear what's going on. what's been weighing on you most?")
                 .font(DinoTheme.dinoFont(size: 22))
@@ -562,12 +585,6 @@ private struct StepEncouragementPage: View {
                         )
                     )
                     .frame(width: 280, height: 280)
-
-                Image("cut-DinoPair")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 220, height: 180)
-                    .shadow(color: Color(hex: "#4A3520").opacity(0.18), radius: 12, x: 0, y: 6)
 
                 // Rising hearts — custom circle accents with wobble
                 ForEach(0..<3, id: \.self) { i in
@@ -648,11 +665,6 @@ private struct StepNavyQuotePage: View {
                     .frame(width: 300)
             }
 
-            Image("cut-DinoFlowers")
-                .resizable()
-                .scaledToFit()
-                .frame(width: 220, height: 220)
-
             Spacer()
         }
     }
@@ -665,8 +677,6 @@ private struct StepReferralPage: View {
     var body: some View {
         VStack(spacing: 24) {
             Spacer(minLength: 8)
-
-            MascotView(imageName: "cut-DinoFlower", size: 160)
 
             Text("how did you hear about us?")
                 .font(.custom(DinoTheme.customFontName, size: 24))
@@ -735,8 +745,6 @@ private struct StepNotificationsPage: View {
     var body: some View {
         VStack(spacing: 28) {
             Spacer(minLength: 12)
-
-            MascotView(imageName: "cut-DinoChecklist", size: 200)
 
             VStack(spacing: 8) {
                 Text("gentle reminders?")
@@ -850,8 +858,6 @@ private struct StepNamePage: View {
         VStack(spacing: 28) {
             Spacer(minLength: 12)
 
-            MascotView(imageName: "cut-DinoMascot", size: 160)
-
             Text("what should we call you?")
                 .font(.custom(DinoTheme.customFontName, size: 26))
                 .foregroundColor(OnboardingColors.textPrimary)
@@ -893,28 +899,12 @@ private struct StepNamePage: View {
 
 // MARK: - Step 8: Disclaimer + Confetti
 private struct StepDisclaimerPage: View {
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var appeared: Bool = false
-
     var body: some View {
         VStack(spacing: 24) {
             Spacer(minLength: 20)
 
-            MascotView(imageName: "cut-DinoPink", size: 180)
-                .scaleEffect(reduceMotion ? 1.0 : (appeared ? 1.0 : 0.8))
-                .opacity(appeared ? 1.0 : 0)
-                .onAppear {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                        withAnimation(
-                            reduceMotion
-                                ? .easeOut(duration: 0.4)
-                                : .spring(response: 0.6, dampingFraction: 0.55)
-                        ) {
-                            appeared = true
-                        }
-                    }
-                }
-
+            // Confetti (rendered by the parent on this step) carries the
+            // celebration — the copy stands on its own over the world.
             Text("thank you for being honest/brave. i know it isn't easy to talk about your struggles. let's get started!")
                 .font(DinoTheme.dinoFont(size: 17))
                 .foregroundColor(OnboardingColors.textSecondary)
@@ -1095,25 +1085,10 @@ private struct StepRoughDayUseCasePage: View {
     }
 
     private var jarStage: some View {
+        // No backing card — the jar (already translucent) floats over the
+        // world so the scene stays visible behind it.
         jarVisual
             .frame(width: 180, height: 220)
-            .padding(20)
-            .frame(maxWidth: .infinity)
-            .background(
-                RoundedRectangle(cornerRadius: 20)
-                    .fill(
-                        LinearGradient(
-                            colors: [Color(hex: "#FEFBF3"), Color(hex: "#F4F0E4")],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 20)
-                            .stroke(Color(hex: "#D1D5DB"), lineWidth: 1)
-                    )
-                    .shadow(color: Color.black.opacity(0.05), radius: 6, x: 0, y: 3)
-            )
     }
 
     private var jarVisual: some View {
@@ -1245,7 +1220,6 @@ private struct StepRatingPage: View {
     let onFinish: () -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var mascotAppeared: Bool = false
     @State private var cardAppeared: [Bool] = [false, false, false]
     @State private var starBounce: [CGFloat] = [1, 1, 1, 1, 1]
     @State private var selectedStars: Int = 0
@@ -1253,12 +1227,8 @@ private struct StepRatingPage: View {
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(spacing: 20) {
-                // TOP SECTION — mascot + headlines
+                // TOP SECTION — headlines
                 VStack(spacing: 8) {
-                    MascotView(imageName: "cut-DinoMascot", size: 90)
-                        .scaleEffect(reduceMotion ? 1.0 : (mascotAppeared ? 1.0 : 0.8))
-                        .opacity(mascotAppeared ? 1 : 0)
-
                     Text("enjoying dino?")
                         .font(DinoTheme.dinoFont(size: 28))
                         .foregroundColor(Color(hex: "#2D3142"))
@@ -1352,15 +1322,6 @@ private struct StepRatingPage: View {
     }
 
     private func startEntranceAnimations() {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-            withAnimation(
-                reduceMotion
-                    ? .easeOut(duration: 0.4)
-                    : .spring(response: 0.6, dampingFraction: 0.55)
-            ) {
-                mascotAppeared = true
-            }
-        }
         for i in 0..<ratingTestimonials.count {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3 + Double(i) * 0.1) {
                 withAnimation(
