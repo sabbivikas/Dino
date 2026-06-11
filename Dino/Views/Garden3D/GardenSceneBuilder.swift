@@ -99,17 +99,57 @@ enum GardenSceneBuilder {
         ground.castsShadow = false
         scene.rootNode.addChildNode(ground)
 
-        // ── Center: the sunflower on its soil, ringed by detail.
+        // ── Center: the sunflower exactly ON the ground (stem base at Y 0,
+        //    growing upward only — the ground plane is at Y 0).
         let sunflower = SunflowerNode(reduceMotion: reduceMotion)
-        sunflower.position = SCNVector3(0, 0.02, 0)
+        sunflower.position = SCNVector3(0, 0, 0)
         scene.rootNode.addChildNode(sunflower)
+
+        // Soft soil-to-grass transition: a vertex-colored ring (≈0.3 wide)
+        // blending the soil patch into the lawn — no hard circle edge.
+        scene.rootNode.addChildNode(makeSoilBlendRing(
+            innerRadius: 0.78, outerRadius: 1.1
+        ))
 
         scatterGrass(into: scene.rootNode, center: SCNVector3Zero, count: 30,
                      spread: 4.5, sway: animate, rng: &rng)
+        // Near-field grass: the ground in the lower half of the frame
+        // (toward the camera) gets its own tuft cover + green patches.
+        scatterGrass(into: scene.rootNode, center: SCNVector3(0, 0, 6), count: 40,
+                     spread: 5.5, sway: animate, rng: &rng)
+        for _ in 0..<8 {
+            let patchGeo = SCNCylinder(radius: CGFloat(rng.range(0.5, 1.1)), height: 0.015)
+            patchGeo.radialSegmentCount = 14
+            patchGeo.firstMaterial = GardenMaterials.flat(
+                rng.next() > 0.5 ? GardenPalette.grassTip : GardenPalette.hillNear
+            )
+            let patch = SCNNode(geometry: patchGeo)
+            patch.position = SCNVector3(
+                Float(rng.range(-8, 8)), 0.008, Float(rng.range(1, 10))
+            )
+            patch.scale = SCNVector3(1.0, 1.0, Float(rng.range(0.5, 0.8)))
+            patch.castsShadow = false
+            scene.rootNode.addChildNode(patch)
+        }
         scatterPebbles(into: scene.rootNode, center: SCNVector3Zero,
                        count: 10, spread: 4.0, rng: &rng)
         scatterFlowerDots(into: scene.rootNode, center: SCNVector3Zero,
                           count: 8, spread: 4.0, rng: &rng)
+
+        // ── Background trees: always present so the horizon is never empty.
+        //    Behind the flower (z -5 … -20), in front of the sky, scaled up
+        //    so their crowns ride above the horizon line in the 3/4 view.
+        let backTreeSpecs: [(x: Float, z: Float, boost: Float)] = [
+            (-14, -18, 1.7), (-8, -12, 1.45), (-3.5, -7, 1.2),
+            (3.5, -6, 1.25), (8, -11, 1.5), (14, -17, 1.75),
+            (-11, -6, 1.1), (11, -5.5, 1.05)
+        ]
+        for spec in backTreeSpecs {
+            let tree = makeTree(rng: &rng, crown: GardenPalette.crown1,
+                                sway: animate, scaleBoost: spec.boost)
+            tree.position = SCNVector3(spec.x, 0, spec.z)
+            scene.rootNode.addChildNode(tree)
+        }
 
         // ── Center creatures (visibility toggled by SceneView).
         let beeGroup = SCNNode()
@@ -581,6 +621,61 @@ enum GardenSceneBuilder {
             root.addChildNode(sub)
         }
         return root
+    }
+
+    /// Flat annulus with per-vertex colors blending soil cream (inner) into
+    /// lawn green (outer) — the natural grass line around the plant.
+    private static func makeSoilBlendRing(innerRadius: Float, outerRadius: Float) -> SCNNode {
+        let segments = 40
+        var vertices: [SCNVector3] = []
+        var normals: [SCNVector3] = []
+        var colors: [Float] = []
+        var indices: [Int32] = []
+
+        // Inner color ≈ soil cream, outer = ground green (linear RGBA).
+        let inner: [Float] = [0.93, 0.87, 0.74, 1.0]   // soilCream-ish
+        let outer: [Float] = [0.49, 0.78, 0.42, 1.0]   // ground green
+
+        for i in 0...segments {
+            let angle = Float(i) / Float(segments) * 2 * .pi
+            let ca = cos(angle), sa = sin(angle)
+            vertices.append(SCNVector3(ca * innerRadius, 0, sa * innerRadius))
+            vertices.append(SCNVector3(ca * outerRadius, 0, sa * outerRadius))
+            normals.append(SCNVector3(0, 1, 0))
+            normals.append(SCNVector3(0, 1, 0))
+            colors.append(contentsOf: inner)
+            colors.append(contentsOf: outer)
+            if i < segments {
+                let base = Int32(i * 2)
+                indices.append(contentsOf: [base, base + 2, base + 1,
+                                            base + 1, base + 2, base + 3])
+            }
+        }
+
+        let colorData = colors.withUnsafeBufferPointer { Data(buffer: $0) }
+        let colorSource = SCNGeometrySource(
+            data: colorData, semantic: .color,
+            vectorCount: vertices.count, usesFloatComponents: true,
+            componentsPerVector: 4, bytesPerComponent: MemoryLayout<Float>.size,
+            dataOffset: 0, dataStride: MemoryLayout<Float>.size * 4
+        )
+        let geometry = SCNGeometry(
+            sources: [SCNGeometrySource(vertices: vertices),
+                      SCNGeometrySource(normals: normals),
+                      colorSource],
+            elements: [SCNGeometryElement(indices: indices, primitiveType: .triangles)]
+        )
+        let m = SCNMaterial()
+        m.diffuse.contents = UIColor.white      // vertex colors carry the blend
+        m.lightingModel = .lambert
+        m.specular.contents = UIColor.black
+        m.isDoubleSided = true
+        geometry.firstMaterial = m
+
+        let node = SCNNode(geometry: geometry)
+        node.position = SCNVector3(0, 0.035, 0)   // just over the patch edge
+        node.castsShadow = false
+        return node
     }
 
     private static func makeCloud(rng: inout GardenSeededRandom) -> SCNNode {
