@@ -107,11 +107,11 @@ enum GardenSceneBuilder {
 
         // Ground extension toward/behind the camera — fills the gap at the
         // bottom of the frame so no background strip shows below the lawn.
-        let extensionGeo = SCNPlane(width: 500, height: 100)
+        let extensionGeo = SCNPlane(width: 500, height: 150)
         extensionGeo.firstMaterial = GardenMaterials.flat(GardenPalette.ground)
         let groundExtension = SCNNode(geometry: extensionGeo)
         groundExtension.eulerAngles.x = -Float.pi / 2
-        groundExtension.position = SCNVector3(0, -0.02, 25)
+        groundExtension.position = SCNVector3(0, -0.02, 35)
         groundExtension.castsShadow = false
         scene.rootNode.addChildNode(groundExtension)
 

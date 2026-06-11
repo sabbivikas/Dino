@@ -301,71 +301,38 @@ enum GardenLighting {
         return (disc, corona)
     }
 
-    /// Moon with phase-accurate occluder + procedural crater patches + glow.
-    /// Positioned inside the camera frustum: camera at (0,5,18) looking just
-    /// above the ground sees X ±15-ish, Y up to ~25, Z 0…-60.
+    /// A clean glowing moon — a bright white circle with a soft golden
+    /// halo. Simple and beautiful; no craters, no phase occluder.
     private static func makeMoonGroup() -> SCNNode {
         let group = SCNNode()
         group.castsShadow = false
-        // Frustum math (camera (0,5,18), 12.5° down, ortho half-height 10):
-        // v ≈ 0.976(y-5) + 0.216(18-z). (4, 6.5, -12) → v ≈ 7.9 with the
-        // 1.8 disc topping out ≈ 9.7 — fully inside the frame, clearly in
-        // the sky band. (Spec y 7 would push the disc top past the frame
-        // edge; lowered 0.5 so the moon is never cut off.)
-        group.position = SCNVector3(4, 6.5, -12)
+        group.position = SCNVector3(3, 7, -10)
 
-        let moonGeo = SCNSphere(radius: 1.8)
-        moonGeo.segmentCount = 20
-        moonGeo.firstMaterial = GardenMaterials.glow(UIColor(hexRGB: 0xFFFFF0))
+        let moonGeo = SCNSphere(radius: 1.2)
+        moonGeo.segmentCount = 24
+        let mm = SCNMaterial()
+        mm.diffuse.contents = UIColor(hexRGB: 0xFFFFF8)
+        mm.emission.contents = UIColor(hexRGB: 0xFFFFF8).withAlphaComponent(0.9)
+        mm.lightingModel = .constant
+        moonGeo.firstMaterial = mm
         let moon = SCNNode(geometry: moonGeo)
         moon.castsShadow = false
         group.addChildNode(moon)
 
-        // Procedural craters — subtle darker patches on the face.
-        var rng = GardenSeededRandom(seed: 1969)
-        for _ in 0..<6 {
-            let craterGeo = SCNSphere(radius: CGFloat(rng.range(0.11, 0.27)))
-            craterGeo.segmentCount = 8
-            craterGeo.firstMaterial = GardenMaterials.glow(
-                UIColor(hexRGB: 0xD8D2BE).withAlphaComponent(0.85)
-            )
-            let crater = SCNNode(geometry: craterGeo)
-            let a = rng.range(0, 6.28)
-            let r = rng.range(0.25, 1.15)
-            crater.position = SCNVector3(
-                Float(cos(a) * r), Float(sin(a) * r), 1.56
-            )
-            crater.scale = SCNVector3(1, 1, 0.15)
-            crater.castsShadow = false
-            group.addChildNode(crater)
-        }
-
-        // Glow sphere — white at 20%, always bright.
-        let glowGeo = SCNSphere(radius: 2.5)
-        glowGeo.segmentCount = 14
+        // Soft golden glow behind the disc.
+        let glowGeo = SCNSphere(radius: 2.0)
+        glowGeo.segmentCount = 16
         let gm = SCNMaterial()
-        gm.diffuse.contents = UIColor.white.withAlphaComponent(0.2)
-        gm.emission.contents = UIColor.white.withAlphaComponent(0.2)
+        gm.diffuse.contents = UIColor(hexRGB: 0xFFFACD).withAlphaComponent(0.25)
+        gm.emission.contents = UIColor(hexRGB: 0xFFFACD).withAlphaComponent(0.25)
         gm.lightingModel = .constant
         gm.blendMode = .add
         gm.writesToDepthBuffer = false
         glowGeo.firstMaterial = gm
         let glow = SCNNode(geometry: glowGeo)
+        glow.position = SCNVector3(0, 0, -0.4)
         glow.castsShadow = false
         group.addChildNode(glow)
-
-        // Phase occluder: night-sky-colored sphere offset by illumination.
-        let phase = moonPhase(on: Date())
-        let illumination = sin(phase * .pi)            // 0 new → 1 full
-        let waxing = phase < 0.5
-        let occluderGeo = SCNSphere(radius: 1.74)
-        occluderGeo.segmentCount = 18
-        occluderGeo.firstMaterial = GardenMaterials.unlit(UIColor(hexRGB: 0x0A0A1E))
-        let occluder = SCNNode(geometry: occluderGeo)
-        let offset = Float(0.19 + 3.75 * illumination)  // full → occluder fully off-disc
-        occluder.position = SCNVector3(waxing ? -offset : offset, 0, 0.19)
-        occluder.castsShadow = false
-        group.addChildNode(occluder)
 
         return group
     }

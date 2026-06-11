@@ -410,12 +410,10 @@ private struct Garden3DPanel: View {
             careState: vm.careState,
             reduceMotion: reduceMotion
         )
-        .frame(height: 420)   // a window into the explorable world, not a card
-        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .stroke(Color(hex: "#A8C5A0").opacity(0.3), lineWidth: 1)
-        )
+        .frame(height: 380)
+        // Edge-to-edge window into the world: no corners, border or shadow.
+        // The negative padding cancels the parent VStack's 20pt insets.
+        .padding(.horizontal, -20)
         .onAppear {
             AnalyticsManager.shared.trackGrowthGardenOpened()
         }
