@@ -211,19 +211,23 @@ enum GardenSceneBuilder {
             anchors[region] = anchor
         }
 
-        // ── Camera: pannable rig; camera at Y12 with a 15° forward tilt
-        //    (i.e. 75° down), orthographic scale 6 — a tighter window onto
-        //    a much bigger world.
+        // ── Camera: pannable rig; player-perspective 3/4 view — standing in
+        //    the garden looking across it, not hovering above it. The camera
+        //    sits behind and above (0, 8, 12) looking at the world center,
+        //    so the frame shows sky above, horizon in the middle, and the
+        //    sunflower on the ground below. Sun, moon and stars are visible.
+        //    The rig pans in X/Z only — height stays fixed at 8, and the
+        //    look-direction (toward the horizon) never changes.
         let cameraRig = SCNNode()
         let camera = SCNCamera()
         camera.usesOrthographicProjection = true
-        camera.orthographicScale = 6.0
+        camera.orthographicScale = 8.0
         camera.zNear = 0.1
-        camera.zFar = 120
+        camera.zFar = 140
         let cameraNode = SCNNode()
         cameraNode.camera = camera
-        cameraNode.position = SCNVector3(0, 12, 3.2)
-        cameraNode.eulerAngles.x = -(.pi / 2 - .pi / 12)   // 75° down
+        cameraNode.position = SCNVector3(0, 8, 12)
+        cameraNode.eulerAngles.x = -atan2(8, 12)   // ≈33.7° down — looks at (0,0,0)
         cameraRig.addChildNode(cameraNode)
         scene.rootNode.addChildNode(cameraRig)
 
