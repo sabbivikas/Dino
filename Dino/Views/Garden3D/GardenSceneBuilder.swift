@@ -117,20 +117,6 @@ enum GardenSceneBuilder {
         // (toward the camera) gets its own tuft cover + green patches.
         scatterGrass(into: scene.rootNode, center: SCNVector3(0, 0, 6), count: 40,
                      spread: 5.5, sway: animate, rng: &rng)
-        for _ in 0..<8 {
-            let patchGeo = SCNCylinder(radius: CGFloat(rng.range(0.5, 1.1)), height: 0.015)
-            patchGeo.radialSegmentCount = 14
-            patchGeo.firstMaterial = GardenMaterials.flat(
-                rng.next() > 0.5 ? GardenPalette.grassTip : GardenPalette.hillNear
-            )
-            let patch = SCNNode(geometry: patchGeo)
-            patch.position = SCNVector3(
-                Float(rng.range(-8, 8)), 0.008, Float(rng.range(1, 10))
-            )
-            patch.scale = SCNVector3(1.0, 1.0, Float(rng.range(0.5, 0.8)))
-            patch.castsShadow = false
-            scene.rootNode.addChildNode(patch)
-        }
         scatterPebbles(into: scene.rootNode, center: SCNVector3Zero,
                        count: 10, spread: 4.0, rng: &rng)
         scatterFlowerDots(into: scene.rootNode, center: SCNVector3Zero,
@@ -261,13 +247,21 @@ enum GardenSceneBuilder {
         let cameraRig = SCNNode()
         let camera = SCNCamera()
         camera.usesOrthographicProjection = true
-        camera.orthographicScale = 8.0
+        camera.orthographicScale = 10.0   // wide — sky fills the upper half
         camera.zNear = 0.1
-        camera.zFar = 140
+        camera.zFar = 160
         let cameraNode = SCNNode()
         cameraNode.camera = camera
-        cameraNode.position = SCNVector3(0, 8, 12)
-        cameraNode.eulerAngles.x = -atan2(8, 12)   // ≈33.7° down — looks at (0,0,0)
+        // Low and far back, aimed just above the ground — a shallow ≈12.5°
+        // tilt that puts the horizon mid-frame and sky in the top half.
+        cameraNode.position = SCNVector3(0, 5, 18)
+        let target = SCNVector3(0, 1, 0)
+        let dx = target.x - cameraNode.position.x
+        let dy = target.y - cameraNode.position.y
+        let dz = target.z - cameraNode.position.z
+        let pitch = atan2(dy, sqrt(dx * dx + dz * dz))   // negative → looks down
+        let yaw = atan2(dx, -dz)
+        cameraNode.eulerAngles = SCNVector3(pitch, yaw, 0)
         cameraRig.addChildNode(cameraNode)
         scene.rootNode.addChildNode(cameraRig)
 
@@ -632,9 +626,11 @@ enum GardenSceneBuilder {
         var colors: [Float] = []
         var indices: [Int32] = []
 
-        // Inner color ≈ soil cream, outer = ground green (linear RGBA).
-        let inner: [Float] = [0.93, 0.87, 0.74, 1.0]   // soilCream-ish
-        let outer: [Float] = [0.49, 0.78, 0.42, 1.0]   // ground green
+        // Warm brown #8B6914 inner → bright green #7EC86A outer. Vertex
+        // colors render in linear space, so these are the linearized values
+        // of those sRGB hexes (raw sRGB floats read grey-purple on screen).
+        let inner: [Float] = [0.258, 0.140, 0.024, 1.0]   // #8B6914 linearized
+        let outer: [Float] = [0.209, 0.578, 0.145, 1.0]   // #7EC86A linearized
 
         for i in 0...segments {
             let angle = Float(i) / Float(segments) * 2 * .pi
