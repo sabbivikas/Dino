@@ -266,15 +266,17 @@ enum GardenLighting {
         return (disc, corona)
     }
 
-    /// Moon with phase-accurate occluder + procedural crater patches + halo.
+    /// Moon with phase-accurate occluder + procedural crater patches + glow.
+    /// Positioned inside the camera frustum: camera at (0,5,18) looking just
+    /// above the ground sees X ±15-ish, Y up to ~25, Z 0…-60.
     private static func makeMoonGroup() -> SCNNode {
         let group = SCNNode()
         group.castsShadow = false
-        group.position = SCNVector3(-13, 11, -28)
+        group.position = SCNVector3(10, 18, -25)
 
-        let moonGeo = SCNSphere(radius: 1.1)
-        moonGeo.segmentCount = 18
-        moonGeo.firstMaterial = GardenMaterials.glow(GardenPalette.moon)
+        let moonGeo = SCNSphere(radius: 2.5)
+        moonGeo.segmentCount = 20
+        moonGeo.firstMaterial = GardenMaterials.glow(UIColor(hexRGB: 0xFFFFF0))
         let moon = SCNNode(geometry: moonGeo)
         moon.castsShadow = false
         group.addChildNode(moon)
@@ -282,126 +284,85 @@ enum GardenLighting {
         // Procedural craters — subtle darker patches on the face.
         var rng = GardenSeededRandom(seed: 1969)
         for _ in 0..<6 {
-            let craterGeo = SCNSphere(radius: CGFloat(rng.range(0.08, 0.2)))
+            let craterGeo = SCNSphere(radius: CGFloat(rng.range(0.18, 0.45)))
             craterGeo.segmentCount = 8
             craterGeo.firstMaterial = GardenMaterials.glow(
                 UIColor(hexRGB: 0xD8D2BE).withAlphaComponent(0.85)
             )
             let crater = SCNNode(geometry: craterGeo)
             let a = rng.range(0, 6.28)
-            let r = rng.range(0.15, 0.7)
+            let r = rng.range(0.3, 1.6)
             crater.position = SCNVector3(
-                Float(cos(a) * r), Float(sin(a) * r), 0.95
+                Float(cos(a) * r), Float(sin(a) * r), 2.15
             )
             crater.scale = SCNVector3(1, 1, 0.15)
             crater.castsShadow = false
             group.addChildNode(crater)
         }
 
-        // Halo.
-        let haloGeo = SCNSphere(radius: 1.9)
-        haloGeo.segmentCount = 12
-        let hm = SCNMaterial()
-        hm.diffuse.contents = GardenPalette.moon.withAlphaComponent(0.12)
-        hm.emission.contents = GardenPalette.moon.withAlphaComponent(0.12)
-        hm.lightingModel = .constant
-        hm.blendMode = .add
-        hm.writesToDepthBuffer = false
-        haloGeo.firstMaterial = hm
-        let halo = SCNNode(geometry: haloGeo)
-        halo.castsShadow = false
-        group.addChildNode(halo)
+        // Glow sphere — white at 20%, always bright.
+        let glowGeo = SCNSphere(radius: 3.5)
+        glowGeo.segmentCount = 14
+        let gm = SCNMaterial()
+        gm.diffuse.contents = UIColor.white.withAlphaComponent(0.2)
+        gm.emission.contents = UIColor.white.withAlphaComponent(0.2)
+        gm.lightingModel = .constant
+        gm.blendMode = .add
+        gm.writesToDepthBuffer = false
+        glowGeo.firstMaterial = gm
+        let glow = SCNNode(geometry: glowGeo)
+        glow.castsShadow = false
+        group.addChildNode(glow)
 
         // Phase occluder: night-sky-colored sphere offset by illumination.
         let phase = moonPhase(on: Date())
         let illumination = sin(phase * .pi)            // 0 new → 1 full
         let waxing = phase < 0.5
-        let occluderGeo = SCNSphere(radius: 1.06)
-        occluderGeo.segmentCount = 16
+        let occluderGeo = SCNSphere(radius: 2.42)
+        occluderGeo.segmentCount = 18
         occluderGeo.firstMaterial = GardenMaterials.unlit(UIColor(hexRGB: 0x0A0A1E))
         let occluder = SCNNode(geometry: occluderGeo)
-        let offset = Float(0.12 + 2.3 * illumination)  // full → occluder fully off-disc
-        occluder.position = SCNVector3(waxing ? -offset : offset, 0, 0.12)
+        let offset = Float(0.27 + 5.2 * illumination)  // full → occluder fully off-disc
+        occluder.position = SCNVector3(waxing ? -offset : offset, 0, 0.27)
         occluder.castsShadow = false
         group.addChildNode(occluder)
 
         return group
     }
 
-    /// 90 varied stars (some twinkling) + a faint Milky Way band of 120 dots.
+    /// 60 stars inside the camera frustum (X ±20, Y 8–22, Z -15…-55),
+    /// bright white constant spheres; a third of them twinkle.
     private static func makeStarGroup() -> SCNNode {
         let group = SCNNode()
         group.castsShadow = false
         var rng = GardenSeededRandom(seed: 88)
 
-        let tiers: [(count: Int, radius: CGFloat, color: UIColor)] = [
-            (18, 0.1, UIColor(hexRGB: 0xFFFFFF)),
-            (32, 0.07, UIColor(hexRGB: 0xE8E8FF)),
-            (40, 0.05, UIColor(hexRGB: 0xC8C8F0))
-        ]
-        for tier in tiers {
-            for i in 0..<tier.count {
-                let plane = SCNPlane(width: tier.radius * 2, height: tier.radius * 2)
-                plane.cornerRadius = tier.radius
-                plane.firstMaterial = GardenMaterials.glow(tier.color)
-                let star = SCNNode(geometry: plane)
-                star.position = SCNVector3(
-                    Float(rng.range(-26, 26)),
-                    Float(rng.range(5, 24)),
-                    Float(rng.range(-36, -28))
-                )
-                let billboard = SCNBillboardConstraint()
-                billboard.freeAxes = .all
-                star.constraints = [billboard]
-                star.opacity = CGFloat(rng.range(0.5, 1.0))
-                star.castsShadow = false
-                // Twinkle a third of them.
-                if i % 3 == 0 {
-                    let dim = SCNAction.fadeOpacity(to: 0.25, duration: rng.range(0.8, 1.8))
-                    dim.timingMode = .easeInEaseOut
-                    let bright = SCNAction.fadeOpacity(to: 1.0, duration: rng.range(0.8, 1.8))
-                    bright.timingMode = .easeInEaseOut
-                    star.runAction(.sequence([
-                        .wait(duration: rng.range(0, 2)),
-                        .repeatForever(.sequence([dim, bright]))
-                    ]))
-                }
-                group.addChildNode(star)
-            }
-        }
-
-        // Milky Way: faint diagonal band of tiny dim dots.
-        for _ in 0..<120 {
-            let t = rng.range(0, 1)
-            let plane = SCNPlane(width: 0.05, height: 0.05)
-            plane.cornerRadius = 0.025
-            plane.firstMaterial = GardenMaterials.glow(UIColor(hexRGB: 0xB8B8E0))
-            let dot = SCNNode(geometry: plane)
-            dot.position = SCNVector3(
-                Float(-24 + 48 * t + rng.range(-2.5, 2.5)),
-                Float(8 + 14 * t + rng.range(-2.0, 2.0)),
-                Float(rng.range(-37, -33))
+        for i in 0..<60 {
+            let starGeo = SCNSphere(radius: CGFloat(rng.range(0.06, 0.12)))
+            starGeo.segmentCount = 6
+            starGeo.firstMaterial = GardenMaterials.glow(UIColor(hexRGB: 0xFFFFFF))
+            let star = SCNNode(geometry: starGeo)
+            star.position = SCNVector3(
+                Float(rng.range(-20, 20)),
+                Float(rng.range(8, 22)),
+                Float(rng.range(-55, -15))
             )
-            let billboard = SCNBillboardConstraint()
-            billboard.freeAxes = .all
-            dot.constraints = [billboard]
-            dot.opacity = CGFloat(rng.range(0.1, 0.32))
-            dot.castsShadow = false
-            group.addChildNode(dot)
+            star.opacity = CGFloat(rng.range(0.6, 1.0))
+            star.castsShadow = false
+            // Twinkle 20 of them: 0.4 → 1.0 → 0.4 over a random 1.5–3s.
+            if i % 3 == 0 {
+                let half = rng.range(0.75, 1.5)
+                let dim = SCNAction.fadeOpacity(to: 0.4, duration: half)
+                dim.timingMode = .easeInEaseOut
+                let bright = SCNAction.fadeOpacity(to: 1.0, duration: half)
+                bright.timingMode = .easeInEaseOut
+                star.runAction(.sequence([
+                    .wait(duration: rng.range(0, 2)),
+                    .repeatForever(.sequence([dim, bright]))
+                ]))
+            }
+            group.addChildNode(star)
         }
-
-        // Venus — one bright low star.
-        let venusGeo = SCNPlane(width: 0.26, height: 0.26)
-        venusGeo.cornerRadius = 0.13
-        venusGeo.firstMaterial = GardenMaterials.glow(UIColor.white)
-        let venus = SCNNode(geometry: venusGeo)
-        venus.position = SCNVector3(-18, 4.5, -32)
-        let vb = SCNBillboardConstraint()
-        vb.freeAxes = .all
-        venus.constraints = [vb]
-        venus.castsShadow = false
-        group.addChildNode(venus)
-
         return group
     }
 
@@ -431,8 +392,11 @@ enum GardenLighting {
             rig.cloudGroup.opacity = g.cloudsVisible ? 1 : 0
             scene.fogColor = g.fogColor
             scene.fogStartDistance = g.fogStart
-            scene.fogEndDistance = 52
-            scene.fogDensityExponent = 1.5
+            // Far enough that celestial bodies (moon ≈45u, stars up to ≈70u
+            // from the camera) are never fogged out — the original 52 made
+            // them invisible at night.
+            scene.fogEndDistance = 130
+            scene.fogDensityExponent = 1.2
         }
 
         if animated {

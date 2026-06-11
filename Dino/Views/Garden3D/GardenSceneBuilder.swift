@@ -91,8 +91,9 @@ enum GardenSceneBuilder {
         var rng = GardenSeededRandom(seed: 20_260_610)
         let animate = !reduceMotion
 
-        // ── Ground: one 44×44 bright plane, the shadow receiver.
-        let groundGeo = SCNPlane(width: 44, height: 44)
+        // ── Ground: one 200×200 bright plane at Y 0 — reaches the horizon
+        //    in every direction, the shadow receiver.
+        let groundGeo = SCNPlane(width: 200, height: 200)
         groundGeo.firstMaterial = GardenMaterials.flat(GardenPalette.ground)
         let ground = SCNNode(geometry: groundGeo)
         ground.eulerAngles.x = -.pi / 2
