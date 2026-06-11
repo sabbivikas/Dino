@@ -2,13 +2,12 @@
 //  GardenSceneBuilder.swift
 //  Dino
 //
-//  Builds the illustrated personal garden: flat bright ground + smooth
-//  hill mounds, 4 round trees, billboarded flower dots, turquoise pond,
-//  egg rocks, drifting clouds, birds, a butterfly that keeps the bloom
-//  company. Orthographic camera, fixed — an intimate still view, the
-//  sunflower always center frame. Fixed seed: the same garden every launch.
-//
-//  Triangle budget ≈ 11k of the 15k cap (itemized at each section).
+//  The explorable 40×40 garden world. The sunflower lives at the center;
+//  four discovery regions surround it — orchard (north), pond (east),
+//  meadow (west), forest edge (south) — populated lazily as the camera
+//  approaches AND as the plant grows (growth stage gates which regions
+//  exist at all). Orthographic camera on a pannable rig. Fixed seeds:
+//  the same world every launch. Tree crowns carry distance LODs.
 //
 
 import SceneKit
@@ -29,46 +28,70 @@ struct GardenSeededRandom {
     }
 }
 
+/// The discoverable regions of the world.
+enum GardenRegion: CaseIterable {
+    case orchard   // north (-z)
+    case pond      // east  (+x)
+    case meadow    // west  (-x)
+    case forest    // south (+z)
+
+    var center: SCNVector3 {
+        switch self {
+        case .orchard: return SCNVector3(0, 0, -12)
+        case .pond:    return SCNVector3(12, 0, 0)
+        case .meadow:  return SCNVector3(-12, 0, 0)
+        case .forest:  return SCNVector3(0, 0, 12)
+        }
+    }
+}
+
 /// Everything GardenSceneView needs to drive the cached scene.
 final class GardenSceneHandle {
     let scene: SCNScene
     let sunflower: SunflowerNode
     let rig: GardenLighting.Rig
-    let cameraPivot: SCNNode
-    let particleAnchor: SCNNode
-    let butterfly: SCNNode
+    let cameraRig: SCNNode
+    let regionAnchors: [GardenRegion: SCNNode]
+    var populatedRegions: Set<GardenRegion> = []
+    let beeGroup: SCNNode          // bloom + daytime only
+    let butterflyGroup: SCNNode    // near the bloom
+    let fireflyGroup: SCNNode      // night only
+    let morningBirds: SCNNode
+    let middayBird: SCNNode
+    let sunsetFormation: SCNNode
     let builtForReduceMotion: Bool
 
     init(scene: SCNScene, sunflower: SunflowerNode, rig: GardenLighting.Rig,
-         cameraPivot: SCNNode, particleAnchor: SCNNode, butterfly: SCNNode,
+         cameraRig: SCNNode, regionAnchors: [GardenRegion: SCNNode],
+         beeGroup: SCNNode, butterflyGroup: SCNNode, fireflyGroup: SCNNode,
+         morningBirds: SCNNode, middayBird: SCNNode, sunsetFormation: SCNNode,
          builtForReduceMotion: Bool) {
         self.scene = scene
         self.sunflower = sunflower
         self.rig = rig
-        self.cameraPivot = cameraPivot
-        self.particleAnchor = particleAnchor
-        self.butterfly = butterfly
+        self.cameraRig = cameraRig
+        self.regionAnchors = regionAnchors
+        self.beeGroup = beeGroup
+        self.butterflyGroup = butterflyGroup
+        self.fireflyGroup = fireflyGroup
+        self.morningBirds = morningBirds
+        self.middayBird = middayBird
+        self.sunsetFormation = sunsetFormation
         self.builtForReduceMotion = builtForReduceMotion
     }
 }
 
 enum GardenSceneBuilder {
 
-    private static let seed: UInt64 = 20_260_610
+    static let worldHalf: Float = 18      // hard camera bound
+    static let softEdge: Float = 3        // resistance starts here
 
     static func build(reduceMotion: Bool) -> GardenSceneHandle {
         let scene = SCNScene()
-        var rng = GardenSeededRandom(seed: seed)
+        var rng = GardenSeededRandom(seed: 20_260_610)
         let animate = !reduceMotion
 
-        let crownMaterials = [
-            GardenMaterials.swaying(GardenPalette.crown1, sway: animate),
-            GardenMaterials.swaying(GardenPalette.crown2, sway: animate),
-            GardenMaterials.swaying(GardenPalette.crown3, sway: animate)
-        ]
-        let grassMaterial = GardenMaterials.swaying(GardenPalette.grassTip, sway: animate)
-
-        // ── Ground: flat bright plane (2 tris) — the only shadow receiver.
+        // ── Ground: one 44×44 bright plane, the shadow receiver.
         let groundGeo = SCNPlane(width: 44, height: 44)
         groundGeo.firstMaterial = GardenMaterials.flat(GardenPalette.ground)
         let ground = SCNNode(geometry: groundGeo)
@@ -76,78 +99,93 @@ enum GardenSceneBuilder {
         ground.castsShadow = false
         scene.rootNode.addChildNode(ground)
 
-        // ── Hills: smooth sphere halves — far mint, near rich (≈ 1k tris).
-        let hillSpecs: [(x: Float, z: Float, r: CGFloat, far: Bool)] = [
-            (-9, -12, 4.5, true), (10, -14, 5.0, true), (0, -18, 6.0, true),
-            (-6, -6, 2.2, false), (7, -7, 2.5, false)
-        ]
-        for spec in hillSpecs {
-            let mound = SCNSphere(radius: spec.r)
-            mound.segmentCount = 12
-            mound.firstMaterial = GardenMaterials.flat(
-                spec.far ? GardenPalette.hillFar : GardenPalette.hillNear
-            )
-            let node = SCNNode(geometry: mound)
-            node.position = SCNVector3(spec.x, Float(-spec.r) * 0.62, spec.z)
-            node.scale = SCNVector3(1.0, 0.85, 1.0)
-            node.castsShadow = false
-            scene.rootNode.addChildNode(node)
+        // ── Center: the sunflower on its soil, ringed by detail.
+        let sunflower = SunflowerNode(reduceMotion: reduceMotion)
+        sunflower.position = SCNVector3(0, 0.02, 0)
+        scene.rootNode.addChildNode(sunflower)
+
+        scatterGrass(into: scene.rootNode, center: SCNVector3Zero, count: 30,
+                     spread: 4.5, sway: animate, rng: &rng)
+        scatterPebbles(into: scene.rootNode, center: SCNVector3Zero,
+                       count: 10, spread: 4.0, rng: &rng)
+        scatterFlowerDots(into: scene.rootNode, center: SCNVector3Zero,
+                          count: 8, spread: 4.0, rng: &rng)
+
+        // ── Center creatures (visibility toggled by SceneView).
+        let beeGroup = SCNNode()
+        beeGroup.isHidden = true
+        let headHeight = sunflower.bloomHeadHeight
+        for (i, spec) in [(Float(0.5), 5.5, 2.5), (0.85, 7.0, 3.5), (1.2, 8.5, 2.0)].enumerated() {
+            beeGroup.addChildNode(GardenCreatures.beeOrbit(
+                headHeight: headHeight, radius: spec.0,
+                lapSeconds: spec.1, pauseSeconds: spec.2,
+                phase: Float(i) * 2.1, animate: animate
+            ))
         }
+        scene.rootNode.addChildNode(beeGroup)
 
-        // ── Trees: 4 around the garden rim, 12-seg round crowns (≈ 3.6k tris).
-        for (i, angle) in [0.9, 2.5, 3.9, 5.5].enumerated() {
-            let tree = makeTree(rng: &rng, crown: crownMaterials[i % crownMaterials.count])
-            let radius = rng.range(4.0, 6.0)
-            tree.position = SCNVector3(
-                Float(cos(angle) * radius),
-                0,
-                Float(sin(angle) * radius) - 1.5
+        let butterflyGroup = SCNNode()
+        butterflyGroup.isHidden = true
+        butterflyGroup.addChildNode(GardenCreatures.butterflyFlight(
+            color: GardenPalette.monarch, orbitRadius: 1.6,
+            height: headHeight + 0.4, period: 12, animate: animate))
+        butterflyGroup.addChildNode(GardenCreatures.butterflyFlight(
+            color: GardenPalette.violetWing, orbitRadius: 2.2,
+            height: headHeight - 0.4, period: 16, animate: animate))
+        scene.rootNode.addChildNode(butterflyGroup)
+
+        // ── Fireflies: 16 around center and toward the forest, night only.
+        let fireflyGroup = SCNNode()
+        fireflyGroup.isHidden = true
+        var fireflyRng = GardenSeededRandom(seed: 4242)
+        for i in 0..<16 {
+            let fly = GardenCreatures.firefly(rng: &fireflyRng, animate: animate)
+            let towardForest = i >= 9
+            let a = fireflyRng.range(0, 6.28)
+            let r = fireflyRng.range(1.5, towardForest ? 5.0 : 4.0)
+            fly.position = SCNVector3(
+                Float(cos(a) * r),
+                Float(fireflyRng.range(0.3, 2.5)),
+                Float(sin(a) * r) + (towardForest ? 8 : 0)
             )
-            scene.rootNode.addChildNode(tree)
+            fireflyGroup.addChildNode(fly)
         }
+        scene.rootNode.addChildNode(fireflyGroup)
 
-        // ── Flower dots: bright billboarded discs (≈ 60 tris) + grass blades.
-        scatterFlowerDots(into: scene.rootNode, count: 26, rng: &rng)
-        scatterGrassBlades(into: scene.rootNode, count: 14, material: grassMaterial, rng: &rng)
+        // ── Birds per period.
+        let morningBirds = SCNNode()
+        morningBirds.isHidden = true
+        morningBirds.addChildNode(GardenCreatures.birdOrbit(
+            height: 8, radius: 9, duration: 40, phase: 0, animate: animate))
+        morningBirds.addChildNode(GardenCreatures.birdOrbit(
+            height: 9.5, radius: 12, duration: 55, phase: .pi, animate: animate))
+        morningBirds.addChildNode(GardenCreatures.birdOrbit(
+            height: 7, radius: 7, duration: 33, phase: 2, animate: animate))
+        scene.rootNode.addChildNode(morningBirds)
 
-        // ── Pond: small turquoise disc with shimmer, one side (≈ 100 tris).
-        let pondGeo = SCNCylinder(radius: 1.3, height: 0.05)
-        pondGeo.radialSegmentCount = 20
-        pondGeo.firstMaterial = GardenMaterials.water(shimmer: animate)
-        let pond = SCNNode(geometry: pondGeo)
-        pond.position = SCNVector3(2.6, 0.04, 1.2)
-        pond.castsShadow = false
-        scene.rootNode.addChildNode(pond)
+        let middayBird = GardenCreatures.birdOrbit(
+            height: 13, radius: 14, duration: 70, phase: 1, animate: animate)
+        middayBird.isHidden = true
+        scene.rootNode.addChildNode(middayBird)
 
-        // ── Rocks: smooth eggs (≈ 700 tris).
-        for _ in 0..<4 {
-            let rock = SCNSphere(radius: CGFloat(rng.range(0.15, 0.3)))
-            rock.segmentCount = 12
-            rock.firstMaterial = GardenMaterials.flat(
-                rng.next() > 0.5 ? GardenPalette.rock : GardenPalette.rockShade
-            )
-            let node = SCNNode(geometry: rock)
-            node.scale = SCNVector3(1.25, 0.8, 1.0)
-            let a = rng.range(0, 6.28)
-            let r = rng.range(1.8, 4.5)
-            node.position = SCNVector3(Float(cos(a) * r), 0.05, Float(sin(a) * r) - 0.8)
-            scene.rootNode.addChildNode(node)
-        }
+        let sunsetFormation = GardenCreatures.vFormation(animate: animate)
+        sunsetFormation.isHidden = true
+        scene.rootNode.addChildNode(sunsetFormation)
 
-        // ── Clouds: 3 white clusters drifting slowly (≈ 1.2k tris).
+        // ── Clouds: volumetric, casting real ground shadows. None at night
+        //    (lighting rig fades the group).
         let cloudGroup = SCNNode()
-        cloudGroup.castsShadow = false
         let cloudSpecs: [(y: Float, z: Float, scale: Float, duration: TimeInterval)] = [
-            (8.0, -16, 0.9, 70), (9.5, -20, 1.2, 95), (7.0, -12, 0.7, 60)
+            (9, -8, 0.9, 80), (11, 4, 1.2, 105), (8.5, -2, 0.7, 65), (12, 10, 1.0, 120)
         ]
         for (i, spec) in cloudSpecs.enumerated() {
             let cloud = makeCloud(rng: &rng)
             cloud.scale = SCNVector3(spec.scale, spec.scale, spec.scale)
-            cloud.position = SCNVector3(-12 + Float(i) * 8, spec.y, spec.z)
+            cloud.position = SCNVector3(-16 + Float(i) * 8, spec.y, spec.z)
             if animate {
                 let drift = SCNAction.sequence([
-                    .moveBy(x: 24, y: 0, z: 0, duration: spec.duration),
-                    .run { node in node.position.x = -12 }
+                    .moveBy(x: 32, y: 0, z: 0, duration: spec.duration),
+                    .run { node in node.position.x = -16 }
                 ])
                 cloud.runAction(.repeatForever(drift))
             }
@@ -155,131 +193,422 @@ enum GardenSceneBuilder {
         }
         scene.rootNode.addChildNode(cloudGroup)
 
-        // ── Birds: 1-2 crossing the sky, morning/day only (≈ 80 tris).
-        let birdGroup = SCNNode()
-        birdGroup.castsShadow = false
-        if animate {
-            birdGroup.addChildNode(makeBirdOrbit(height: 6.5, radius: 8, duration: 40, phase: 0))
-            birdGroup.addChildNode(makeBirdOrbit(height: 5.5, radius: 10, duration: 55, phase: .pi))
-        }
-        scene.rootNode.addChildNode(birdGroup)
-
-        // ── Butterfly: keeps the bloom company (visibility set by SceneView).
-        let butterfly = makeButterfly(wingColor: GardenPalette.flowerPeach, animate: animate)
-        butterfly.position = SCNVector3(0.8, 1.4, 0.6)
-        scene.rootNode.addChildNode(butterfly)
-
-        // ── Sunflower at center.
-        let sunflower = SunflowerNode()
-        sunflower.position = SCNVector3(0, 0.02, 0)
-        scene.rootNode.addChildNode(sunflower)
-
-        // ── Lighting rig + domes + celestial.
-        let rig = GardenLighting.makeRig(cloudGroup: cloudGroup, birdGroup: birdGroup)
+        // ── Lighting rig.
+        let rig = GardenLighting.makeRig(cloudGroup: cloudGroup)
         scene.rootNode.addChildNode(rig.sunNode)
         scene.rootNode.addChildNode(rig.ambientNode)
-        for (_, dome) in rig.domes {
-            scene.rootNode.addChildNode(dome)
-        }
+        for (_, dome) in rig.domes { scene.rootNode.addChildNode(dome) }
         scene.rootNode.addChildNode(rig.sunDisc)
-        scene.rootNode.addChildNode(rig.nightGroup)
+        scene.rootNode.addChildNode(rig.moonGroup)
+        scene.rootNode.addChildNode(rig.starGroup)
 
-        // ── Camera: orthographic, fixed, ≈11° down-tilt, sunflower centered.
-        let cameraPivot = SCNNode()
-        cameraPivot.position = SCNVector3(0, 1.0, 0)
+        // ── Region anchors — empty parents, populated lazily.
+        var anchors: [GardenRegion: SCNNode] = [:]
+        for region in GardenRegion.allCases {
+            let anchor = SCNNode()
+            anchor.position = region.center
+            scene.rootNode.addChildNode(anchor)
+            anchors[region] = anchor
+        }
 
+        // ── Camera: pannable rig; camera at Y12 with a 15° forward tilt
+        //    (i.e. 75° down), orthographic scale 6 — a tighter window onto
+        //    a much bigger world.
+        let cameraRig = SCNNode()
         let camera = SCNCamera()
         camera.usesOrthographicProjection = true
-        camera.orthographicScale = 7.0
+        camera.orthographicScale = 6.0
         camera.zNear = 0.1
-        camera.zFar = 90
+        camera.zFar = 120
         let cameraNode = SCNNode()
         cameraNode.camera = camera
-        cameraNode.position = SCNVector3(0, 2.6, 9.0)
-        // ≈11° down from horizontal — just enough ground to feel depth.
-        cameraNode.eulerAngles.x = -0.19
-        cameraPivot.addChildNode(cameraNode)
-        scene.rootNode.addChildNode(cameraPivot)
-
-        // Particle anchor near the sunflower.
-        let particleAnchor = SCNNode()
-        particleAnchor.position = SCNVector3(0, 1.0, 0)
-        scene.rootNode.addChildNode(particleAnchor)
+        cameraNode.position = SCNVector3(0, 12, 3.2)
+        cameraNode.eulerAngles.x = -(.pi / 2 - .pi / 12)   // 75° down
+        cameraRig.addChildNode(cameraNode)
+        scene.rootNode.addChildNode(cameraRig)
 
         return GardenSceneHandle(
-            scene: scene,
-            sunflower: sunflower,
-            rig: rig,
-            cameraPivot: cameraPivot,
-            particleAnchor: particleAnchor,
-            butterfly: butterfly,
+            scene: scene, sunflower: sunflower, rig: rig, cameraRig: cameraRig,
+            regionAnchors: anchors, beeGroup: beeGroup,
+            butterflyGroup: butterflyGroup, fireflyGroup: fireflyGroup,
+            morningBirds: morningBirds, middayBird: middayBird,
+            sunsetFormation: sunsetFormation,
             builtForReduceMotion: reduceMotion
         )
     }
 
-    // MARK: - Props
+    // MARK: - Lazy region population
 
-    private static func makeTree(rng: inout GardenSeededRandom, crown: SCNMaterial) -> SCNNode {
-        let root = SCNNode()
-        let scale = Float(rng.range(0.8, 1.2))
+    static func populate(region: GardenRegion, into anchor: SCNNode,
+                         reduceMotion: Bool) {
+        let animate = !reduceMotion
+        switch region {
+        case .orchard:  buildOrchard(into: anchor, animate: animate)
+        case .pond:     buildPond(into: anchor, animate: animate)
+        case .meadow:   buildMeadow(into: anchor, animate: animate)
+        case .forest:   buildForest(into: anchor, animate: animate)
+        }
+    }
 
-        let trunkHeight = CGFloat(1.0 * scale)
-        let trunk = SCNCylinder(radius: 0.13, height: trunkHeight)
-        trunk.radialSegmentCount = 10
-        trunk.firstMaterial = GardenMaterials.flat(GardenPalette.trunk)
-        let trunkNode = SCNNode(geometry: trunk)
-        trunkNode.position = SCNVector3(0, Float(trunkHeight) / 2, 0)
-        root.addChildNode(trunkNode)
+    /// NORTH — fruit trees, fallen apples, a beehive with worker bees.
+    private static func buildOrchard(into anchor: SCNNode, animate: Bool) {
+        var rng = GardenSeededRandom(seed: 111)
+        for i in 0..<6 {
+            let tree = makeTree(rng: &rng, crown: GardenPalette.crown1,
+                                sway: animate)
+            let a = Double(i) / 6.0 * 6.28 + rng.range(-0.3, 0.3)
+            let r = rng.range(2.0, 4.8)
+            tree.position = SCNVector3(Float(cos(a) * r), 0, Float(sin(a) * r))
+            // Apples in the crown + fallen at the base.
+            for _ in 0..<3 {
+                let apple = SCNSphere(radius: 0.06)
+                apple.segmentCount = 8
+                apple.firstMaterial = GardenMaterials.flat(GardenPalette.appleRed)
+                let node = SCNNode(geometry: apple)
+                let aa = rng.range(0, 6.28)
+                node.position = SCNVector3(
+                    Float(cos(aa) * rng.range(0.2, 0.6)),
+                    Float(rng.range(1.4, 2.0)),
+                    Float(sin(aa) * rng.range(0.2, 0.6))
+                )
+                tree.addChildNode(node)
+            }
+            for _ in 0..<2 {
+                let fallen = SCNSphere(radius: 0.055)
+                fallen.segmentCount = 8
+                fallen.firstMaterial = GardenMaterials.flat(GardenPalette.appleRed)
+                let node = SCNNode(geometry: fallen)
+                let aa = rng.range(0, 6.28)
+                node.position = SCNVector3(
+                    tree.position.x + Float(cos(aa) * rng.range(0.4, 0.9)),
+                    0.05,
+                    tree.position.z + Float(sin(aa) * rng.range(0.4, 0.9))
+                )
+                anchor.addChildNode(node)
+            }
+            anchor.addChildNode(tree)
 
-        let blobCount = 2 + Int(rng.range(0, 1.99))
-        for _ in 0..<blobCount {
-            let blob = SCNSphere(radius: CGFloat(rng.range(0.5, 0.8)) * CGFloat(scale))
-            blob.segmentCount = 12
-            blob.firstMaterial = crown
-            let blobNode = SCNNode(geometry: blob)
-            blobNode.position = SCNVector3(
-                Float(rng.range(-0.3, 0.3)),
-                Float(trunkHeight) + Float(rng.range(0.1, 0.55)) * scale,
-                Float(rng.range(-0.3, 0.3))
+            // Beehive in the first tree, with a small worker-bee orbit.
+            if i == 0 {
+                let hiveGeo = SCNSphere(radius: 0.18)
+                hiveGeo.segmentCount = 10
+                hiveGeo.firstMaterial = GardenMaterials.flat(GardenPalette.beehive)
+                let hive = SCNNode(geometry: hiveGeo)
+                hive.scale = SCNVector3(0.8, 1.15, 0.8)
+                hive.position = SCNVector3(0.35, 1.35, 0.15)
+                tree.addChildNode(hive)
+
+                for k in 0..<2 {
+                    let worker = GardenCreatures.beeOrbit(
+                        headHeight: 1.35, radius: 0.5 + Float(k) * 0.3,
+                        lapSeconds: 4.5 + Double(k), pauseSeconds: 1.5,
+                        phase: Float(k) * 3, animate: animate
+                    )
+                    worker.position = tree.position
+                    anchor.addChildNode(worker)
+                }
+            }
+        }
+    }
+
+    /// EAST — big living pond: ducks, frogs on pads, dragonflies, willow.
+    private static func buildPond(into anchor: SCNNode, animate: Bool) {
+        var rng = GardenSeededRandom(seed: 222)
+
+        let waterGeo = SCNCylinder(radius: 3.4, height: 0.05)
+        waterGeo.radialSegmentCount = 30
+        waterGeo.firstMaterial = GardenMaterials.water(shimmer: animate)
+        let water = SCNNode(geometry: waterGeo)
+        water.position = SCNVector3(0, 0.04, 0)
+        water.castsShadow = false
+        anchor.addChildNode(water)
+
+        // Lily pads + frogs on two of them.
+        var padPositions: [SCNVector3] = []
+        for _ in 0..<6 {
+            let pad = SCNCylinder(radius: CGFloat(rng.range(0.2, 0.36)), height: 0.03)
+            pad.radialSegmentCount = 12
+            pad.firstMaterial = GardenMaterials.flat(GardenPalette.leaf)
+            let node = SCNNode(geometry: pad)
+            let a = rng.range(0, 6.28)
+            let r = rng.range(0.8, 2.6)
+            node.position = SCNVector3(Float(cos(a) * r), 0.09, Float(sin(a) * r))
+            node.castsShadow = false
+            padPositions.append(node.position)
+            anchor.addChildNode(node)
+        }
+        for k in 0..<2 where padPositions.count > k * 2 + 1 {
+            let from = padPositions[k * 2]
+            let to = padPositions[k * 2 + 1]
+            let hop = SCNVector3(to.x - from.x, 0, to.z - from.z)
+            let frog = GardenCreatures.frog(hopTo: hop, animate: animate, rng: &rng)
+            frog.position = SCNVector3(from.x, 0.16, from.z)
+            anchor.addChildNode(frog)
+        }
+
+        // Ducks drifting slow circles.
+        for k in 0..<2 {
+            let duck = GardenCreatures.duck(
+                drift: 1.2 + Float(k) * 0.9, period: 40 + Double(k) * 14,
+                phase: Float(k) * 2.4, animate: animate
             )
-            root.addChildNode(blobNode)
+            anchor.addChildNode(duck)
+        }
+
+        // Dragonflies skimming.
+        for k in 0..<2 {
+            anchor.addChildNode(GardenCreatures.dragonfly(
+                radius: 2.0 + Float(k) * 0.8, period: 7 + Double(k) * 3,
+                phase: Float(k) * 2, animate: animate
+            ))
+        }
+
+        // Weeping willow at the edge: tall trunk + drooping frond strips.
+        let willow = SCNNode()
+        let trunkGeo = SCNCone(topRadius: 0.08, bottomRadius: 0.14, height: 2.0)
+        trunkGeo.radialSegmentCount = 10
+        trunkGeo.firstMaterial = GardenMaterials.flat(GardenPalette.trunk)
+        let trunk = SCNNode(geometry: trunkGeo)
+        trunk.position = SCNVector3(0, 1.0, 0)
+        willow.addChildNode(trunk)
+        let crownGeo = SCNSphere(radius: 0.9)
+        crownGeo.segmentCount = 12
+        crownGeo.firstMaterial = GardenMaterials.swaying(GardenPalette.willowGreen, sway: animate)
+        let crown = SCNNode(geometry: crownGeo)
+        crown.scale = SCNVector3(1.2, 0.7, 1.2)
+        crown.position = SCNVector3(0, 2.15, 0)
+        willow.addChildNode(crown)
+        for i in 0..<10 {
+            let frondGeo = SCNBox(width: 0.05, height: CGFloat(rng.range(0.9, 1.5)),
+                                  length: 0.02, chamferRadius: 0.01)
+            frondGeo.firstMaterial = GardenMaterials.swaying(GardenPalette.willowGreen, sway: animate)
+            let frond = SCNNode(geometry: frondGeo)
+            let a = Float(i) / 10 * 2 * .pi
+            let h = Float(frondGeo.height)
+            frond.position = SCNVector3(cos(a) * 1.0, 2.1 - h / 2, sin(a) * 1.0)
+            frond.castsShadow = false
+            willow.addChildNode(frond)
+        }
+        willow.position = SCNVector3(-3.0, 0, -2.4)
+        anchor.addChildNode(willow)
+
+        // Low mist wisps at the water's edge.
+        for i in 0..<5 {
+            let mistGeo = SCNSphere(radius: CGFloat(rng.range(0.3, 0.5)))
+            mistGeo.segmentCount = 8
+            let m = SCNMaterial()
+            m.diffuse.contents = UIColor(white: 1.0, alpha: 0.15)
+            m.lightingModel = .constant
+            m.writesToDepthBuffer = false
+            mistGeo.firstMaterial = m
+            let mist = SCNNode(geometry: mistGeo)
+            let a = Double(i) / 5.0 * 6.28
+            mist.position = SCNVector3(Float(cos(a) * 3.6), 0.2, Float(sin(a) * 3.6))
+            mist.castsShadow = false
+            if animate {
+                let drift = SCNAction.sequence([
+                    .moveBy(x: 0.35, y: 0.06, z: 0, duration: 7),
+                    .moveBy(x: -0.35, y: -0.06, z: 0, duration: 7)
+                ])
+                drift.timingMode = .easeInEaseOut
+                mist.runAction(.repeatForever(drift))
+            }
+            anchor.addChildNode(mist)
+        }
+    }
+
+    /// WEST — open wildflower field, drifting butterflies, a wooden bench.
+    private static func buildMeadow(into anchor: SCNNode, animate: Bool) {
+        var rng = GardenSeededRandom(seed: 333)
+        scatterGrass(into: anchor, center: SCNVector3Zero, count: 40,
+                     spread: 5.0, sway: animate, rng: &rng)
+        scatterFlowerDots(into: anchor, center: SCNVector3Zero, count: 26,
+                          spread: 5.0, rng: &rng)
+
+        let colors = [GardenPalette.monarch, GardenPalette.morpho,
+                      GardenPalette.violetWing, GardenPalette.monarch,
+                      GardenPalette.morpho]
+        for (k, color) in colors.enumerated() {
+            let fly = GardenCreatures.butterflyFlight(
+                color: color, orbitRadius: 1.2 + Float(k) * 0.5,
+                height: 0.8 + Float(k % 3) * 0.4,
+                period: 10 + Double(k) * 3, animate: animate
+            )
+            fly.position = SCNVector3(Float(rng.range(-2.5, 2.5)), 0,
+                                      Float(rng.range(-2.5, 2.5)))
+            anchor.addChildNode(fly)
+        }
+
+        // Wooden bench: two leg boxes + seat + backrest.
+        let bench = SCNNode()
+        let wood = GardenMaterials.flat(GardenPalette.benchWood)
+        let seatGeo = SCNBox(width: 1.2, height: 0.06, length: 0.35, chamferRadius: 0.02)
+        seatGeo.firstMaterial = wood
+        let seat = SCNNode(geometry: seatGeo)
+        seat.position = SCNVector3(0, 0.4, 0)
+        bench.addChildNode(seat)
+        let backGeo = SCNBox(width: 1.2, height: 0.32, length: 0.05, chamferRadius: 0.02)
+        backGeo.firstMaterial = wood
+        let back = SCNNode(geometry: backGeo)
+        back.position = SCNVector3(0, 0.62, -0.16)
+        back.eulerAngles.x = 0.12
+        bench.addChildNode(back)
+        for side in [Float(-1), Float(1)] {
+            let legGeo = SCNBox(width: 0.07, height: 0.4, length: 0.3, chamferRadius: 0.01)
+            legGeo.firstMaterial = wood
+            let leg = SCNNode(geometry: legGeo)
+            leg.position = SCNVector3(side * 0.5, 0.2, 0)
+            bench.addChildNode(leg)
+        }
+        bench.position = SCNVector3(-1.8, 0, 1.6)
+        bench.eulerAngles.y = 0.6
+        anchor.addChildNode(bench)
+    }
+
+    /// SOUTH — darker forest edge: dense trees, mushrooms, a stream,
+    /// dim daytime fireflies.
+    private static func buildForest(into anchor: SCNNode, animate: Bool) {
+        var rng = GardenSeededRandom(seed: 444)
+        for i in 0..<5 {
+            let tree = makeTree(rng: &rng, crown: GardenPalette.forestCrown,
+                                sway: animate, trunkColor: GardenPalette.forestTrunk,
+                                scaleBoost: 1.25)
+            let a = Double(i) / 5.0 * 6.28 + rng.range(-0.25, 0.25)
+            let r = rng.range(1.6, 4.4)
+            tree.position = SCNVector3(Float(cos(a) * r), 0, Float(sin(a) * r) + 1.0)
+            anchor.addChildNode(tree)
+        }
+
+        // Mushrooms: cream stems, red caps.
+        for _ in 0..<7 {
+            let mushroom = SCNNode()
+            let stemGeo = SCNCylinder(radius: 0.03, height: 0.12)
+            stemGeo.radialSegmentCount = 8
+            stemGeo.firstMaterial = GardenMaterials.flat(GardenPalette.mushroomStem)
+            let stem = SCNNode(geometry: stemGeo)
+            stem.position = SCNVector3(0, 0.06, 0)
+            mushroom.addChildNode(stem)
+            let capGeo = SCNSphere(radius: 0.07)
+            capGeo.segmentCount = 10
+            capGeo.firstMaterial = GardenMaterials.flat(GardenPalette.mushroomCap)
+            let cap = SCNNode(geometry: capGeo)
+            cap.scale = SCNVector3(1, 0.6, 1)
+            cap.position = SCNVector3(0, 0.13, 0)
+            mushroom.addChildNode(cap)
+            let a = rng.range(0, 6.28)
+            let r = rng.range(0.8, 4.0)
+            mushroom.position = SCNVector3(Float(cos(a) * r), 0, Float(sin(a) * r))
+            anchor.addChildNode(mushroom)
+        }
+
+        // Small stream: long thin shimmer band.
+        let streamGeo = SCNPlane(width: 1.0, height: 9.0)
+        streamGeo.firstMaterial = GardenMaterials.water(shimmer: animate)
+        let stream = SCNNode(geometry: streamGeo)
+        stream.eulerAngles = SCNVector3(-.pi / 2, 0.4, 0)
+        stream.position = SCNVector3(2.8, 0.03, 1.0)
+        stream.castsShadow = false
+        anchor.addChildNode(stream)
+
+        // Dim daytime fireflies among the trunks.
+        var fireflyRng = GardenSeededRandom(seed: 555)
+        for _ in 0..<5 {
+            let fly = GardenCreatures.firefly(rng: &fireflyRng, animate: animate)
+            fly.opacity = 0.35
+            let a = fireflyRng.range(0, 6.28)
+            let r = fireflyRng.range(1.0, 3.5)
+            fly.position = SCNVector3(
+                Float(cos(a) * r),
+                Float(fireflyRng.range(0.3, 1.4)),
+                Float(sin(a) * r) + 1.0
+            )
+            anchor.addChildNode(fly)
+        }
+    }
+
+    // MARK: - Shared props
+
+    /// Organic tree with LOD: full multi-cluster crown nearby, a single
+    /// cheap sphere beyond 16 units.
+    private static func makeTree(rng: inout GardenSeededRandom, crown: UIColor,
+                                 sway: Bool, trunkColor: UIColor = GardenPalette.trunk,
+                                 scaleBoost: Float = 1.0) -> SCNNode {
+        let root = SCNNode()
+        let scale = Float(rng.range(0.85, 1.2)) * scaleBoost
+        let trunkHeight = Float(rng.range(1.0, 1.5)) * scale
+
+        let trunkGeo = SCNCone(topRadius: 0.08, bottomRadius: 0.13,
+                               height: CGFloat(trunkHeight))
+        trunkGeo.radialSegmentCount = 9
+        trunkGeo.firstMaterial = GardenMaterials.flat(trunkColor)
+        let trunk = SCNNode(geometry: trunkGeo)
+        trunk.position = SCNVector3(0, trunkHeight / 2, 0)
+        root.addChildNode(trunk)
+
+        let crownMaterial = GardenMaterials.swaying(crown, sway: sway)
+        let crownY = trunkHeight + 0.3 * scale
+
+        // Main crown carries the LOD: full 12-seg sphere → 6-seg at 16 units.
+        let mainGeo = SCNSphere(radius: CGFloat(rng.range(0.7, 0.95)) * CGFloat(scale))
+        mainGeo.segmentCount = 12
+        mainGeo.firstMaterial = crownMaterial
+        let lowGeo = SCNSphere(radius: mainGeo.radius)
+        lowGeo.segmentCount = 6
+        lowGeo.firstMaterial = crownMaterial
+        mainGeo.levelsOfDetail = [SCNLevelOfDetail(geometry: lowGeo, worldSpaceDistance: 16)]
+        let main = SCNNode(geometry: mainGeo)
+        main.position = SCNVector3(0, crownY, 0)
+        root.addChildNode(main)
+
+        for _ in 0..<3 {
+            let subGeo = SCNSphere(radius: CGFloat(rng.range(0.35, 0.55)) * CGFloat(scale))
+            subGeo.segmentCount = 8
+            subGeo.firstMaterial = crownMaterial
+            let subLow = SCNSphere(radius: subGeo.radius)
+            subLow.segmentCount = 5
+            subLow.firstMaterial = crownMaterial
+            subGeo.levelsOfDetail = [SCNLevelOfDetail(geometry: subLow, worldSpaceDistance: 16)]
+            let sub = SCNNode(geometry: subGeo)
+            let a = rng.range(0, 6.28)
+            let d = Float(rng.range(0.3, 0.6)) * scale
+            sub.position = SCNVector3(cos(Float(a)) * d,
+                                      crownY + Float(rng.range(-0.2, 0.35)) * scale,
+                                      sin(Float(a)) * d)
+            root.addChildNode(sub)
         }
         return root
     }
 
-    private static func scatterFlowerDots(into parent: SCNNode, count: Int,
-                                          rng: inout GardenSeededRandom) {
-        let colors: [UIColor] = [
-            GardenPalette.flowerPeach, GardenPalette.flowerLavender,
-            GardenPalette.flowerYellow, GardenPalette.flowerWhite
+    private static func makeCloud(rng: inout GardenSeededRandom) -> SCNNode {
+        let cloud = SCNNode()
+        let material = GardenMaterials.unlit(GardenPalette.cloud)
+        let blobs: [(Float, Float, CGFloat)] = [
+            (0, 0, 0.7), (-0.7, -0.08, 0.5), (0.7, -0.08, 0.55), (0.1, 0.3, 0.42)
         ]
-        for i in 0..<count {
-            let dot = SCNPlane(width: 0.13, height: 0.13)
-            dot.cornerRadius = 0.065
-            dot.firstMaterial = GardenMaterials.unlit(colors[i % colors.count])
-            let node = SCNNode(geometry: dot)
-            let a = rng.range(0, 6.28)
-            let r = rng.range(1.2, 5.0)
-            node.position = SCNVector3(
-                Float(cos(a) * r),
-                Float(rng.range(0.06, 0.14)),
-                Float(sin(a) * r) - 0.8
-            )
-            let billboard = SCNBillboardConstraint()
-            billboard.freeAxes = .Y
-            node.constraints = [billboard]
-            node.castsShadow = false
-            parent.addChildNode(node)
+        for blob in blobs {
+            let geo = SCNSphere(radius: blob.2)
+            geo.segmentCount = 8
+            geo.firstMaterial = material
+            let node = SCNNode(geometry: geo)
+            node.position = SCNVector3(blob.0 + Float(rng.range(-0.1, 0.1)), blob.1, 0)
+            node.castsShadow = true   // clouds shadow the ground
+            cloud.addChildNode(node)
         }
+        return cloud
     }
 
-    private static func scatterGrassBlades(into parent: SCNNode, count: Int,
-                                           material: SCNMaterial, rng: inout GardenSeededRandom) {
-        for _ in 0..<count {
+    private static func scatterGrass(into parent: SCNNode, center: SCNVector3,
+                                     count: Int, spread: Double, sway: Bool,
+                                     rng: inout GardenSeededRandom) {
+        let materials = [
+            GardenMaterials.swaying(GardenPalette.grassTip, sway: sway),
+            GardenMaterials.swaying(GardenPalette.leaf, sway: sway)
+        ]
+        for i in 0..<count {
             let tuft = SCNNode()
             for k in 0..<2 {
-                let blade = SCNPlane(width: 0.18, height: CGFloat(rng.range(0.25, 0.4)))
-                blade.firstMaterial = material
+                let blade = SCNPlane(width: 0.07, height: CGFloat(rng.range(0.15, 0.28)))
+                blade.firstMaterial = materials[i % materials.count]
                 let bladeNode = SCNNode(geometry: blade)
                 bladeNode.position = SCNVector3(0, Float(blade.height) / 2, 0)
                 bladeNode.eulerAngles.y = Float(k) * .pi / 2 + Float(rng.range(-0.3, 0.3))
@@ -287,111 +616,55 @@ enum GardenSceneBuilder {
                 tuft.addChildNode(bladeNode)
             }
             let a = rng.range(0, 6.28)
-            let r = rng.range(1.0, 4.5)
-            tuft.position = SCNVector3(Float(cos(a) * r), 0, Float(sin(a) * r) - 0.8)
+            let r = rng.range(0.9, spread)
+            tuft.position = SCNVector3(center.x + Float(cos(a) * r), 0,
+                                       center.z + Float(sin(a) * r))
             parent.addChildNode(tuft)
         }
     }
 
-    private static func makeCloud(rng: inout GardenSeededRandom) -> SCNNode {
-        let cloud = SCNNode()
-        let material = GardenMaterials.unlit(GardenPalette.cloud)
-        let blobs: [(Float, Float, CGFloat)] = [
-            (0, 0, 0.8), (-0.8, -0.1, 0.55), (0.8, -0.1, 0.6), (0.15, 0.35, 0.5)
-        ]
-        for blob in blobs {
-            let geo = SCNSphere(radius: blob.2)
-            geo.segmentCount = 10
-            geo.firstMaterial = material
-            let node = SCNNode(geometry: geo)
-            node.position = SCNVector3(blob.0 + Float(rng.range(-0.1, 0.1)), blob.1, 0)
+    private static func scatterPebbles(into parent: SCNNode, center: SCNVector3,
+                                       count: Int, spread: Double,
+                                       rng: inout GardenSeededRandom) {
+        for _ in 0..<count {
+            let pebble = SCNSphere(radius: CGFloat(rng.range(0.04, 0.09)))
+            pebble.segmentCount = 6
+            pebble.firstMaterial = GardenMaterials.flat(
+                rng.next() > 0.5 ? GardenPalette.rock : GardenPalette.rockShade
+            )
+            let node = SCNNode(geometry: pebble)
+            node.scale = SCNVector3(1.2, 0.7, 1.0)
+            let a = rng.range(0, 6.28)
+            let r = rng.range(1.0, spread)
+            node.position = SCNVector3(center.x + Float(cos(a) * r), 0.03,
+                                       center.z + Float(sin(a) * r))
             node.castsShadow = false
-            cloud.addChildNode(node)
+            parent.addChildNode(node)
         }
-        cloud.castsShadow = false
-        return cloud
     }
 
-    private static func makeBirdOrbit(height: Float, radius: Float,
-                                      duration: TimeInterval, phase: Float) -> SCNNode {
-        let orbit = SCNNode()
-        orbit.position = SCNVector3(0, height, -3)
-        orbit.eulerAngles.y = phase
-
-        let bird = SCNNode()
-        bird.position = SCNVector3(radius, 0, 0)
-        bird.eulerAngles.y = .pi / 2
-
-        let bodyGeo = SCNCapsule(capRadius: 0.05, height: 0.24)
-        bodyGeo.firstMaterial = GardenMaterials.flat(UIColor(white: 0.25, alpha: 1))
-        let body = SCNNode(geometry: bodyGeo)
-        body.eulerAngles.x = .pi / 2
-        bird.addChildNode(body)
-
-        for side in [Float(-1), Float(1)] {
-            let wingGeo = SCNPlane(width: 0.3, height: 0.14)
-            wingGeo.firstMaterial = GardenMaterials.flat(UIColor(white: 0.3, alpha: 1))
-            let wing = SCNNode(geometry: wingGeo)
-            wing.pivot = SCNMatrix4MakeTranslation(side * -0.15, 0, 0)
-            wing.position = SCNVector3(side * 0.04, 0.02, 0)
-            wing.eulerAngles.x = -.pi / 2
-            bird.addChildNode(wing)
-
-            let flap = SCNAction.customAction(duration: 0.9) { node, elapsed in
-                let f = 0.35 + 0.65 * abs(sin(Float(elapsed) * 2 * .pi / 0.9))
-                node.scale = SCNVector3(1, f, 1)
-            }
-            wing.runAction(.repeatForever(flap))
+    private static func scatterFlowerDots(into parent: SCNNode, center: SCNVector3,
+                                          count: Int, spread: Double,
+                                          rng: inout GardenSeededRandom) {
+        let colors: [UIColor] = [
+            GardenPalette.flowerPeach, GardenPalette.flowerLavender,
+            GardenPalette.flowerYellow, GardenPalette.flowerWhite
+        ]
+        for i in 0..<count {
+            let dot = SCNPlane(width: 0.11, height: 0.11)
+            dot.cornerRadius = 0.055
+            dot.firstMaterial = GardenMaterials.unlit(colors[i % colors.count])
+            let node = SCNNode(geometry: dot)
+            let a = rng.range(0, 6.28)
+            let r = rng.range(1.0, spread)
+            node.position = SCNVector3(center.x + Float(cos(a) * r),
+                                       Float(rng.range(0.05, 0.12)),
+                                       center.z + Float(sin(a) * r))
+            let billboard = SCNBillboardConstraint()
+            billboard.freeAxes = .Y
+            node.constraints = [billboard]
+            node.castsShadow = false
+            parent.addChildNode(node)
         }
-
-        orbit.addChildNode(bird)
-        orbit.runAction(.repeatForever(.rotateBy(x: 0, y: 2 * .pi, z: 0, duration: duration)))
-        return orbit
-    }
-
-    private static func makeButterfly(wingColor: UIColor, animate: Bool) -> SCNNode {
-        let outer = SCNNode()
-        let inner = SCNNode()
-        inner.position = SCNVector3(0.5, 0, 0)
-        outer.addChildNode(inner)
-
-        let butterfly = SCNNode()
-        inner.addChildNode(butterfly)
-
-        let bodyGeo = SCNCapsule(capRadius: 0.016, height: 0.1)
-        bodyGeo.firstMaterial = GardenMaterials.flat(UIColor(white: 0.25, alpha: 1))
-        butterfly.addChildNode(SCNNode(geometry: bodyGeo))
-
-        for side in [Float(-1), Float(1)] {
-            let wingGeo = SCNPlane(width: 0.12, height: 0.1)
-            wingGeo.cornerRadius = 0.045
-            wingGeo.firstMaterial = GardenMaterials.unlit(wingColor)
-            let wing = SCNNode(geometry: wingGeo)
-            wing.pivot = SCNMatrix4MakeTranslation(side * -0.06, 0, 0)
-            wing.position = SCNVector3(side * 0.018, 0.02, 0)
-            wing.eulerAngles.x = -.pi / 2.4
-            butterfly.addChildNode(wing)
-
-            if animate {
-                let flap = SCNAction.customAction(duration: 0.45) { node, elapsed in
-                    let f = 0.3 + 0.7 * abs(sin(Float(elapsed) * 2 * .pi / 0.45))
-                    node.scale = SCNVector3(1, f, 1)
-                }
-                wing.runAction(.repeatForever(flap))
-            }
-        }
-
-        if animate {
-            outer.runAction(.repeatForever(.rotateBy(x: 0, y: 2 * .pi, z: 0, duration: 11)))
-            inner.runAction(.repeatForever(.rotateBy(x: 0, y: -4 * .pi, z: 0, duration: 11)))
-            let bob = SCNAction.sequence([
-                .moveBy(x: 0, y: 0.2, z: 0, duration: 1.2),
-                .moveBy(x: 0, y: -0.2, z: 0, duration: 1.2)
-            ])
-            bob.timingMode = .easeInEaseOut
-            butterfly.runAction(.repeatForever(bob))
-        }
-
-        return outer
     }
 }

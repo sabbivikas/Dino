@@ -65,6 +65,37 @@ enum GardenPalette {
     static let rock         = UIColor(hexRGB: 0xB0A090)
     static let rockShade    = UIColor(hexRGB: 0x9A8C92)
 
+    // Photoreal sunflower
+    static let stemDeep     = UIColor(hexRGB: 0x2D6A2D)
+    static let leafTop      = UIColor(hexRGB: 0x4A8F3F)
+    static let leafUnder    = UIColor(hexRGB: 0x6DB56D)
+    static let petalBack    = UIColor(hexRGB: 0xDAA520)
+    static let petalFront   = UIColor(hexRGB: 0xFFD700)
+    static let discBrown    = UIColor(hexRGB: 0x3D1C02)
+    static let seedDark     = UIColor(hexRGB: 0x2A1201)
+    static let sepalGreen   = UIColor(hexRGB: 0x2D5A1B)
+    static let witherBrown  = UIColor(hexRGB: 0x8B5A2B)
+
+    // World regions
+    static let appleRed     = UIColor(hexRGB: 0xD9483B)
+    static let beehive      = UIColor(hexRGB: 0xD8A24A)
+    static let willowGreen  = UIColor(hexRGB: 0x8FBF7F)
+    static let benchWood    = UIColor(hexRGB: 0xA9794F)
+    static let forestCrown  = UIColor(hexRGB: 0x2F6B3A)
+    static let forestTrunk  = UIColor(hexRGB: 0x5E4630)
+    static let mushroomCap  = UIColor(hexRGB: 0xC4554A)
+    static let mushroomStem = UIColor(hexRGB: 0xEFE5D0)
+    static let duckBody     = UIColor(hexRGB: 0xF2EFE6)
+    static let duckHead     = UIColor(hexRGB: 0x2E7D4F)
+    static let duckBill     = UIColor(hexRGB: 0xE8923A)
+    static let frogGreen    = UIColor(hexRGB: 0x5BA84A)
+    static let monarch      = UIColor(hexRGB: 0xFF6B00)
+    static let morpho       = UIColor(hexRGB: 0x0066CC)
+    static let violetWing   = UIColor(hexRGB: 0x6B35A0)
+    static let beeYellow    = UIColor(hexRGB: 0xFFD700)
+    static let beeBlack     = UIColor(hexRGB: 0x1C1C1C)
+    static let birdInk      = UIColor(hexRGB: 0x2D3142)
+
     // Celestial
     static let sunDisc      = UIColor(hexRGB: 0xFFE066)
     static let moon         = UIColor(hexRGB: 0xF5EFE0)
@@ -165,6 +196,27 @@ enum GardenMaterials {
         m.writesToDepthBuffer = false
         m.isDoubleSided = true
         return m
+    }
+
+    /// Vertical multi-stop gradient image (rich dawn/sunset skies).
+    static func gradientImage(stops: [(color: UIColor, location: CGFloat)]) -> UIImage {
+        let size = CGSize(width: 4, height: 256)
+        let renderer = UIGraphicsImageRenderer(size: size)
+        return renderer.image { ctx in
+            let colors = stops.map { $0.color.cgColor } as CFArray
+            let locations: [CGFloat] = stops.map { $0.location }
+            guard let gradient = CGGradient(
+                colorsSpace: CGColorSpaceCreateDeviceRGB(),
+                colors: colors,
+                locations: locations
+            ) else { return }
+            ctx.cgContext.drawLinearGradient(
+                gradient,
+                start: CGPoint(x: 0, y: 0),
+                end: CGPoint(x: 0, y: size.height),
+                options: []
+            )
+        }
     }
 
     /// Vertical 2-stop gradient image, generated in code (sky domes).

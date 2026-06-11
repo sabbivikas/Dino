@@ -56,6 +56,29 @@ enum GardenParticles {
         return p
     }
 
+    /// One-shot water-droplet sparkle for the watering-recovery moment —
+    /// cool blue-white drops arcing off the plant.
+    static func waterDroplets() -> SCNParticleSystem {
+        let p = SCNParticleSystem()
+        p.birthRate = 50
+        p.emissionDuration = 0.6
+        p.loops = false
+        p.particleLifeSpan = 1.1
+        p.particleLifeSpanVariation = 0.3
+        p.particleSize = 0.045
+        p.particleColor = UIColor(red: 0.78, green: 0.92, blue: 1.0, alpha: 0.95)
+        p.particleVelocity = 1.0
+        p.particleVelocityVariation = 0.5
+        p.emittingDirection = SCNVector3(0, 1, 0)
+        p.spreadingAngle = 60
+        p.acceleration = SCNVector3(0, -2.2, 0)
+        p.isAffectedByGravity = false
+        p.blendMode = .additive
+        p.birthLocation = .surface
+        p.emitterShape = SCNSphere(radius: 0.5)
+        return p
+    }
+
     /// One-shot golden sparkle burst for the watering-recovery moment.
     /// Emits for ~0.6s then dies; caller removes the system after ~2.5s.
     static func recoveryBurst() -> SCNParticleSystem {

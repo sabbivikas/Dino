@@ -2,11 +2,12 @@
 //  SunflowerNode.swift
 //  Dino
 //
-//  The illustrated centerpiece sunflower. Five discrete stage nodes,
-//  visibility-toggled (no morphing). Care state — read from
-//  GrowthViewModel via GardenSceneView, using the OLD GardenPanel's exact
-//  CareParams numbers — drives droop + desaturation + dry soil. Watering
-//  recovery animates upright + re-saturates over 1.5s.
+//  The photorealistic centerpiece sunflower. Custom-mesh petals and leaves
+//  (curved, seeded per-petal variation), a domed seed disc with Fibonacci
+//  seed rings that catch light individually, a naturally curved stem, and
+//  green sepals. Care state — read from GrowthViewModel via GardenSceneView
+//  — drives droop, petal curl, browning, desaturation and dry soil.
+//  Watering recovery straightens, unfurls and re-colors over 2s.
 //
 
 import SceneKit
@@ -22,22 +23,27 @@ final class SunflowerNode: SCNNode {
 
     private var stageNodes: [Stage: SCNNode] = [:]
     private var headNodes: [Stage: SCNNode] = [:]
+    private var leafNodes: [SCNNode] = []                  // droop with neglect
+    private var petalNodes: [(node: SCNNode, baseEuler: SCNVector3)] = []
+    private var petalMaterials: [(material: SCNMaterial, base: UIColor)] = []
     private var tintables: [(material: SCNMaterial, base: UIColor)] = []
 
-    // Soil patch under the plant — cream when healthy, dry cracked when not.
+    /// World-space height of the bloom head — creatures orbit here.
+    private(set) var bloomHeadHeight: Float = 2.6
+
     private let soilMaterial = GardenMaterials.flat(GardenPalette.soilCream)
     private var crackGroup = SCNNode()
-
-    // Bees orbit the open bloom (day + bloom stage only).
-    private var beeOrbit = SCNNode()
-
     private let swayKey = "garden.sway"
+    private let animateMotion: Bool
 
-    override init() {
+    init(reduceMotion: Bool) {
+        self.animateMotion = !reduceMotion
         super.init()
         buildSoil()
         buildAllStages()
-        buildBees()
+        if animateMotion {
+            startPetalFlutter()
+        }
     }
 
     @available(*, unavailable)
@@ -45,41 +51,67 @@ final class SunflowerNode: SCNNode {
 
     // MARK: - Public API
 
-    /// Show one stage with care-driven droop/desaturation. When `animated`,
-    /// changes ease over 1.5s — the watering-recovery moment.
+    /// Show one stage with care-driven look. `heliotropism` is -1 (morning,
+    /// head east) … 0 (noon, up) … +1 (evening, head west). When `animated`,
+    /// changes ease over 2s — the watering-recovery moment.
     func apply(stage: Stage, droopDegrees: Double, saturation: CGFloat,
-               soilDryness: CGFloat, sway: Bool, showBees: Bool, animated: Bool) {
+               soilDryness: CGFloat, heliotropism: Float,
+               sway: Bool, animated: Bool) {
+        let dry = max(0, min(1, soilDryness))
+        let browning = max(0, (dry - 0.55) / 0.45)   // brown creeps in from wilting onward
+
         let work = { [self] in
             for (s, node) in stageNodes {
                 node.isHidden = (s != stage)
             }
 
+            // Stem lean + head droop.
             let lean = Float(droopDegrees * 0.35 * .pi / 180.0)
             let pitch = Float(droopDegrees * .pi / 180.0)
             for (_, node) in stageNodes {
                 node.eulerAngles.z = -lean
             }
-            for (_, head) in headNodes {
-                head.eulerAngles.x = pitch
+            for (s, head) in headNodes {
+                head.eulerAngles.x = pitch + (s == .fullBloom ? 0.25 : 0)
+                if s == .fullBloom {
+                    head.eulerAngles.z = heliotropism * 0.14
+                }
             }
 
-            for entry in tintables {
+            // Leaves droop more severely than the stem.
+            for (i, leaf) in leafNodes.enumerated() {
+                let side: Float = (i % 2 == 0) ? -1 : 1
+                leaf.eulerAngles.z = side * 0.45 + side * Float(droopDegrees) * 0.012
+            }
+
+            // Petal curl inward + brown-from-tips (approximated as a blend).
+            let curl = Float(dry) * 0.5
+            for petal in self.petalNodes {
+                petal.node.eulerAngles = SCNVector3(
+                    petal.baseEuler.x + curl * 0.6,
+                    petal.baseEuler.y,
+                    petal.baseEuler.z
+                )
+            }
+            for entry in self.petalMaterials {
+                let desat = entry.base.gardenDesaturated(to: saturation)
+                entry.material.diffuse.contents = self.blend(
+                    desat, GardenPalette.witherBrown, t: CGFloat(browning) * 0.6
+                )
+            }
+            for entry in self.tintables {
                 entry.material.diffuse.contents = entry.base.gardenDesaturated(to: saturation)
             }
 
-            // Soil: cream → dry cracked brown as care worsens.
-            let dry = max(0, min(1, soilDryness))
             self.soilMaterial.diffuse.contents = self.blend(
                 GardenPalette.soilCream, GardenPalette.soilBrown, t: dry
             )
             self.crackGroup.opacity = dry
-
-            self.beeOrbit.isHidden = !(showBees && stage == .fullBloom)
         }
 
         if animated {
             SCNTransaction.begin()
-            SCNTransaction.animationDuration = 1.5
+            SCNTransaction.animationDuration = 2.0
             SCNTransaction.animationTimingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
             work()
             SCNTransaction.commit()
@@ -87,18 +119,94 @@ final class SunflowerNode: SCNNode {
             work()
         }
 
-        // Gentle idle sway on the whole plant when healthy and motion allowed.
         removeAction(forKey: swayKey)
-        if sway {
-            let amp: CGFloat = 0.017   // ≈1° — visible but calm, 3s round trip
-            let a = SCNAction.rotateBy(x: 0, y: 0, z: amp, duration: 1.5)
+        if sway && animateMotion {
+            let amp: CGFloat = 0.035   // ±2°, 4s round trip
+            let a = SCNAction.rotateBy(x: 0, y: 0, z: amp, duration: 2.0)
             a.timingMode = .easeInEaseOut
-            let b = SCNAction.rotateBy(x: 0, y: 0, z: -amp, duration: 1.5)
+            let b = SCNAction.rotateBy(x: 0, y: 0, z: -amp, duration: 2.0)
             b.timingMode = .easeInEaseOut
             runAction(.repeatForever(.sequence([a, b])), forKey: swayKey)
-        } else {
-            eulerAngles.z = 0
         }
+    }
+
+    // MARK: - Custom geometry
+
+    /// Curved teardrop petal strip: wide base → narrow tip, concave bow.
+    private func petalGeometry(length: CGFloat, baseWidth: CGFloat,
+                               tipWidth: CGFloat, bow: CGFloat) -> SCNGeometry {
+        let segments = 7
+        var vertices: [SCNVector3] = []
+        var normals: [SCNVector3] = []
+        var indices: [Int32] = []
+
+        for i in 0...segments {
+            let t = CGFloat(i) / CGFloat(segments)
+            let y = Float(length * t)
+            // Teardrop profile: bulge near base third, taper to tip.
+            let half = Float((baseWidth / 2) * (1 - t) + (tipWidth / 2) * t
+                             + 0.05 * sin(t * .pi))
+            let z = Float(bow * sin(t * .pi))
+            vertices.append(SCNVector3(-half, y, z))
+            vertices.append(SCNVector3(half, y, z))
+            normals.append(SCNVector3(0, 0, 1))
+            normals.append(SCNVector3(0, 0, 1))
+            if i < segments {
+                let base = Int32(i * 2)
+                indices.append(contentsOf: [base, base + 1, base + 2,
+                                            base + 1, base + 3, base + 2])
+            }
+        }
+
+        let geometry = SCNGeometry(
+            sources: [SCNGeometrySource(vertices: vertices),
+                      SCNGeometrySource(normals: normals)],
+            elements: [SCNGeometryElement(indices: indices, primitiveType: .triangles)]
+        )
+        return geometry
+    }
+
+    /// Heart/teardrop leaf with a gentle lengthwise bend (≈15°).
+    private func leafGeometry(length: CGFloat, width: CGFloat) -> SCNGeometry {
+        let segments = 6
+        var vertices: [SCNVector3] = []
+        var normals: [SCNVector3] = []
+        var indices: [Int32] = []
+
+        for i in 0...segments {
+            let t = CGFloat(i) / CGFloat(segments)
+            let y = Float(length * t)
+            // Heart profile: widest a third of the way up.
+            let half = Float(width / 2 * sin(min(t * 1.45, 1.0) * .pi))
+            let z = Float(-0.26 * length * sin(t * .pi / 2))   // ≈15° bend
+            vertices.append(SCNVector3(-half, y, z))
+            vertices.append(SCNVector3(half, y, z))
+            normals.append(SCNVector3(0, 0.3, 1))
+            normals.append(SCNVector3(0, 0.3, 1))
+            if i < segments {
+                let base = Int32(i * 2)
+                indices.append(contentsOf: [base, base + 1, base + 2,
+                                            base + 1, base + 3, base + 2])
+            }
+        }
+
+        return SCNGeometry(
+            sources: [SCNGeometrySource(vertices: vertices),
+                      SCNGeometrySource(normals: normals)],
+            elements: [SCNGeometryElement(indices: indices, primitiveType: .triangles)]
+        )
+    }
+
+    private func petalMaterial(_ color: UIColor) -> SCNMaterial {
+        let m = GardenMaterials.flat(color)
+        petalMaterials.append((m, color))
+        return m
+    }
+
+    private func tintable(_ color: UIColor) -> SCNMaterial {
+        let m = GardenMaterials.flat(color)
+        tintables.append((m, color))
+        return m
     }
 
     private func blend(_ a: UIColor, _ b: UIColor, t: CGFloat) -> UIColor {
@@ -110,47 +218,27 @@ final class SunflowerNode: SCNNode {
                        blue: ab + (bb - ab) * t, alpha: 1)
     }
 
-    private func tintable(_ color: UIColor) -> SCNMaterial {
-        let m = GardenMaterials.flat(color)
-        tintables.append((m, color))
-        return m
-    }
-
-    // MARK: - Soil patch + cracks
+    // MARK: - Soil
 
     private func buildSoil() {
-        let patch = SCNCylinder(radius: 0.65, height: 0.04)
-        patch.radialSegmentCount = 18
+        let patch = SCNCylinder(radius: 0.8, height: 0.04)
+        patch.radialSegmentCount = 20
         patch.firstMaterial = soilMaterial
         let patchNode = SCNNode(geometry: patch)
         patchNode.position = SCNVector3(0, 0.02, 0)
         patchNode.castsShadow = false
         addChildNode(patchNode)
 
-        // A few brown patches for the healthy look.
         var rng = GardenSeededRandom(seed: 41)
-        for _ in 0..<3 {
-            let spot = SCNCylinder(radius: CGFloat(rng.range(0.08, 0.14)), height: 0.045)
-            spot.radialSegmentCount = 10
-            spot.firstMaterial = GardenMaterials.flat(GardenPalette.soilBrown)
-            let node = SCNNode(geometry: spot)
-            let a = rng.range(0, 6.28)
-            let r = rng.range(0.2, 0.45)
-            node.position = SCNVector3(Float(cos(a) * r), 0.022, Float(sin(a) * r))
-            node.castsShadow = false
-            addChildNode(node)
-        }
-
-        // Dry cracks — thin dark slats, faded in with dryness.
         crackGroup = SCNNode()
         crackGroup.opacity = 0
         for i in 0..<5 {
-            let crack = SCNBox(width: CGFloat(rng.range(0.25, 0.5)),
-                               height: 0.005, length: 0.02, chamferRadius: 0)
+            let crack = SCNBox(width: CGFloat(rng.range(0.3, 0.6)),
+                               height: 0.005, length: 0.025, chamferRadius: 0)
             crack.firstMaterial = GardenMaterials.unlit(GardenPalette.soilCrack)
             let node = SCNNode(geometry: crack)
             node.position = SCNVector3(
-                Float(rng.range(-0.3, 0.3)), 0.045, Float(rng.range(-0.3, 0.3))
+                Float(rng.range(-0.4, 0.4)), 0.045, Float(rng.range(-0.4, 0.4))
             )
             node.eulerAngles.y = Float(i) * 1.25
             node.castsShadow = false
@@ -159,7 +247,7 @@ final class SunflowerNode: SCNNode {
         addChildNode(crackGroup)
     }
 
-    // MARK: - Stage construction
+    // MARK: - Stages
 
     private func buildAllStages() {
         stageNodes[.seedMound] = makeSeedMound()
@@ -173,233 +261,247 @@ final class SunflowerNode: SCNNode {
         }
     }
 
-    /// Stage 1 — SEED: warm brown mound with a hopeful crack of light.
     private func makeSeedMound() -> SCNNode {
         let root = SCNNode()
-
-        let mound = SCNSphere(radius: 0.3)
-        mound.segmentCount = 14
+        let mound = SCNSphere(radius: 0.32)
+        mound.segmentCount = 16
         mound.firstMaterial = tintable(GardenPalette.seedSoil)
         let moundNode = SCNNode(geometry: mound)
         moundNode.scale = SCNVector3(1.0, 0.5, 1.0)
         moundNode.position = SCNVector3(0, 0.1, 0)
         root.addChildNode(moundNode)
 
-        // The crack — a sliver of pale gold light where the seed will break through.
-        let crack = SCNBox(width: 0.16, height: 0.012, length: 0.025, chamferRadius: 0.005)
+        let crack = SCNBox(width: 0.18, height: 0.012, length: 0.028, chamferRadius: 0.005)
         crack.firstMaterial = GardenMaterials.glow(GardenPalette.budPale)
         let crackNode = SCNNode(geometry: crack)
-        crackNode.position = SCNVector3(0, 0.245, 0.02)
+        crackNode.position = SCNVector3(0, 0.26, 0.02)
         crackNode.eulerAngles.y = 0.4
         root.addChildNode(crackNode)
-
         return root
     }
 
-    /// Stage 2 — SPROUT: short stem, two bright rounded leaves reaching up.
     private func makeSprout() -> SCNNode {
         let root = SCNNode()
-
-        let stem = SCNCylinder(radius: 0.035, height: 0.42)
-        stem.radialSegmentCount = 10
-        stem.firstMaterial = tintable(GardenPalette.stem)
-        let stemNode = SCNNode(geometry: stem)
-        stemNode.position = SCNVector3(0, 0.21, 0)
-        root.addChildNode(stemNode)
+        let stem = makeCurvedStem(height: 0.45, radius: 0.03)
+        root.addChildNode(stem.node)
 
         for (i, side) in [Float(-1), Float(1)].enumerated() {
-            let leaf = SCNSphere(radius: 0.12)
-            leaf.segmentCount = 12
-            leaf.firstMaterial = tintable(GardenPalette.leaf)
-            let leafNode = SCNNode(geometry: leaf)
-            leafNode.scale = SCNVector3(1.4, 0.4, 0.7)
-            leafNode.position = SCNVector3(side * 0.15, 0.38 + Float(i) * 0.05, 0)
-            leafNode.eulerAngles.z = side * 0.55   // reaching upward
-            root.addChildNode(leafNode)
+            let leaf = SCNNode(geometry: leafGeometry(length: 0.3, width: 0.18))
+            leaf.geometry?.firstMaterial = tintable(GardenPalette.leafTop)
+            leaf.position = SCNVector3(side * 0.03, 0.32 + Float(i) * 0.06, 0)
+            leaf.eulerAngles = SCNVector3(-0.5, side * .pi / 2, 0)
+            leafNodes.append(leaf)
+            root.addChildNode(leaf)
         }
-
         return root
     }
 
-    /// Stage 3 — GROWING: taller stem, 4 leaves, pale bud forming.
     private func makeGrowing() -> SCNNode {
-        let root = makeStemAndLeaves(height: 1.0, leafCount: 4)
-        let headPivot = SCNNode()
-        headPivot.position = SCNVector3(0, 1.0, 0)
-        root.addChildNode(headPivot)
+        let root = SCNNode()
+        let stem = makeCurvedStem(height: 1.2, radius: 0.045)
+        root.addChildNode(stem.node)
+        addLeaves(to: root, stemHeight: 1.2, count: 4, leafLength: 0.45)
 
-        let bud = SCNSphere(radius: 0.11)
-        bud.segmentCount = 12
+        let headPivot = SCNNode()
+        headPivot.position = SCNVector3(stem.topOffset, 1.2, 0)
+        let bud = SCNSphere(radius: 0.12)
+        bud.segmentCount = 14
         bud.firstMaterial = tintable(GardenPalette.budPale)
         let budNode = SCNNode(geometry: bud)
-        budNode.scale = SCNVector3(0.9, 1.15, 0.9)
-        budNode.position = SCNVector3(0, 0.08, 0)
+        budNode.scale = SCNVector3(0.9, 1.2, 0.9)
+        budNode.position = SCNVector3(0, 0.09, 0)
         headPivot.addChildNode(budNode)
-
+        root.addChildNode(headPivot)
         headNodes[.stemWithLeaves] = headPivot
         return root
     }
 
-    /// Stage 4 — BUDDING: full height, bright yellow bud, green sepals.
     private func makeBudding() -> SCNNode {
-        let root = makeStemAndLeaves(height: 1.3, leafCount: 4)
-        let headPivot = SCNNode()
-        headPivot.position = SCNVector3(0, 1.3, 0)
-        root.addChildNode(headPivot)
+        let root = SCNNode()
+        let stem = makeCurvedStem(height: 1.9, radius: 0.055)
+        root.addChildNode(stem.node)
+        addLeaves(to: root, stemHeight: 1.9, count: 5, leafLength: 0.55)
 
-        let bud = SCNSphere(radius: 0.15)
-        bud.segmentCount = 12
+        let headPivot = SCNNode()
+        headPivot.position = SCNVector3(stem.topOffset, 1.9, 0)
+
+        let bud = SCNSphere(radius: 0.17)
+        bud.segmentCount = 14
         bud.firstMaterial = tintable(GardenPalette.budBright)
         let budNode = SCNNode(geometry: bud)
-        budNode.scale = SCNVector3(0.95, 1.25, 0.95)
-        budNode.position = SCNVector3(0, 0.12, 0)
+        budNode.scale = SCNVector3(0.95, 1.3, 0.95)
+        budNode.position = SCNVector3(0, 0.13, 0)
         headPivot.addChildNode(budNode)
 
-        // Four green sepals cupping the bud — about to open.
-        for i in 0..<4 {
-            let sepal = SCNSphere(radius: 0.07)
-            sepal.segmentCount = 10
-            sepal.firstMaterial = tintable(GardenPalette.stem)
-            let sepalNode = SCNNode(geometry: sepal)
-            sepalNode.scale = SCNVector3(0.5, 1.4, 0.3)
-            let angle = Float(i) * .pi / 2
-            sepalNode.position = SCNVector3(cos(angle) * 0.11, 0.02, sin(angle) * 0.11)
-            sepalNode.eulerAngles = SCNVector3(0.35 * sin(angle), 0, -0.35 * cos(angle))
-            headPivot.addChildNode(sepalNode)
-        }
-
+        addSepals(to: headPivot, count: 6, radius: 0.13, scale: 0.7)
+        root.addChildNode(headPivot)
         headNodes[.bud] = headPivot
         return root
     }
 
-    /// Stage 5 — FULL BLOOM: 16 golden petals, rich brown seed disc with a
-    /// dotted seed-spiral, proud and center frame. The most beautiful moment
-    /// in the app.
+    /// FULL BLOOM — the star of the garden. 8 deep-gold back petals, 16
+    /// bright-gold front petals (seeded ±5% size, ±3° variation), domed seed
+    /// disc with Fibonacci rings (21 + 13 lit seeds), 8 sepals behind.
     private func makeFullBloom() -> SCNNode {
-        let root = makeStemAndLeaves(height: 1.55, leafCount: 4)
+        let root = SCNNode()
+        let height: Float = 2.6
+        bloomHeadHeight = height
+        let stem = makeCurvedStem(height: CGFloat(height), radius: 0.06)
+        root.addChildNode(stem.node)
+        addLeaves(to: root, stemHeight: height, count: 6, leafLength: 0.65)
+
         let headPivot = SCNNode()
-        headPivot.position = SCNVector3(0, 1.55, 0)
-        // Face the head slightly toward the camera so the disc reads.
-        headPivot.eulerAngles.x = 0.18
+        headPivot.position = SCNVector3(stem.topOffset, height, 0)
+        headPivot.eulerAngles.x = 0.25   // face slightly toward the viewer
         root.addChildNode(headPivot)
 
-        // Center disc — rich brown.
-        let center = SCNSphere(radius: 0.19)
-        center.segmentCount = 14
-        center.firstMaterial = tintable(GardenPalette.bloomCenter)
-        let centerNode = SCNNode(geometry: center)
-        centerNode.scale = SCNVector3(1.0, 1.0, 0.5)
-        centerNode.position = SCNVector3(0, 0.16, 0.02)
-        headPivot.addChildNode(centerNode)
+        var rng = GardenSeededRandom(seed: 7_2026)
 
-        // Seed pattern: an outer ring of 10 dots + inner ring of 5.
-        let dotMaterial = GardenMaterials.unlit(GardenPalette.seedDot)
-        for (count, ringRadius) in [(10, Float(0.115)), (5, Float(0.055))] {
-            for i in 0..<count {
-                let angle = Float(i) / Float(count) * 2 * .pi
-                let dot = SCNSphere(radius: 0.014)
-                dot.segmentCount = 6
-                dot.firstMaterial = dotMaterial
-                let dotNode = SCNNode(geometry: dot)
-                dotNode.position = SCNVector3(
-                    cos(angle) * ringRadius,
-                    0.16 + sin(angle) * ringRadius,
-                    0.115
-                )
-                headPivot.addChildNode(dotNode)
-            }
+        // Sepals — 8 pointed green shapes behind everything.
+        addSepals(to: headPivot, count: 8, radius: 0.3, scale: 1.0, z: -0.06)
+
+        // Back petals — 8 deep golden, slightly larger.
+        for i in 0..<8 {
+            let angle = Float(i) / 8 * 2 * .pi + .pi / 16
+            addPetal(to: headPivot, angle: angle, ringRadius: 0.34,
+                     length: 0.88, color: GardenPalette.petalBack,
+                     z: -0.03, rng: &rng)
+        }
+        // Front petals — 16 bright golden, angled slightly toward the viewer.
+        for i in 0..<16 {
+            let angle = Float(i) / 16 * 2 * .pi
+            addPetal(to: headPivot, angle: angle, ringRadius: 0.36,
+                     length: 0.8, color: GardenPalette.petalFront,
+                     z: 0.02, rng: &rng)
         }
 
-        // 16 bright golden petals — two subtle length variants for life.
-        let petalCount = 16
-        for i in 0..<petalCount {
-            let angle = Float(i) / Float(petalCount) * 2 * .pi
-            let long = (i % 2 == 0)
-            let petal = SCNSphere(radius: long ? 0.115 : 0.10)
-            petal.segmentCount = 8
-            petal.firstMaterial = tintable(GardenPalette.petal)
-            let petalNode = SCNNode(geometry: petal)
-            petalNode.scale = SCNVector3(0.5, 1.6, 0.22)
-            let ringRadius: Float = long ? 0.30 : 0.27
-            petalNode.position = SCNVector3(
-                cos(angle) * ringRadius,
-                0.16 + sin(angle) * ringRadius,
-                0
-            )
-            petalNode.eulerAngles.z = angle - .pi / 2
-            headPivot.addChildNode(petalNode)
+        // Center disc: shallow cylinder + raised dome, rich dark brown.
+        let disc = SCNCylinder(radius: 0.4, height: 0.05)
+        disc.radialSegmentCount = 24
+        disc.firstMaterial = tintable(GardenPalette.discBrown)
+        let discNode = SCNNode(geometry: disc)
+        discNode.eulerAngles.x = .pi / 2
+        discNode.position = SCNVector3(0, 0, 0.04)
+        headPivot.addChildNode(discNode)
+
+        let dome = SCNSphere(radius: 0.4)
+        dome.segmentCount = 20
+        dome.firstMaterial = tintable(GardenPalette.discBrown)
+        let domeNode = SCNNode(geometry: dome)
+        domeNode.scale = SCNVector3(1.0, 1.0, 0.35)
+        domeNode.position = SCNVector3(0, 0, 0.05)
+        headPivot.addChildNode(domeNode)
+
+        // Fibonacci seed rings — 21 outer + 13 inner, each a lit sphere.
+        let golden: Float = 2.39996
+        for (count, baseRadius) in [(21, Float(0.30)), (13, Float(0.17))] {
+            for i in 0..<count {
+                let angle = Float(i) * golden
+                let r = baseRadius + Float(rng.range(-0.012, 0.012))
+                let seed = SCNSphere(radius: 0.022)
+                seed.segmentCount = 6
+                seed.firstMaterial = GardenMaterials.flat(GardenPalette.seedDark)
+                let seedNode = SCNNode(geometry: seed)
+                let lift = 0.16 * sqrt(max(0, 1 - (r / 0.42) * (r / 0.42)))
+                seedNode.position = SCNVector3(cos(angle) * r, sin(angle) * r, 0.05 + lift)
+                headPivot.addChildNode(seedNode)
+            }
         }
 
         headNodes[.fullBloom] = headPivot
         return root
     }
 
-    /// Shared tall-stage builder: stem + alternating bright leaves.
-    private func makeStemAndLeaves(height: Float, leafCount: Int) -> SCNNode {
+    private func addPetal(to head: SCNNode, angle: Float, ringRadius: Float,
+                          length: CGFloat, color: UIColor, z: Float,
+                          rng: inout GardenSeededRandom) {
+        let sizeVar = CGFloat(rng.range(0.95, 1.05))          // ±5%
+        let angleVar = Float(rng.range(-0.052, 0.052))        // ±3°
+        let geo = petalGeometry(length: length * sizeVar, baseWidth: 0.25,
+                                tipWidth: 0.05, bow: 0.06)
+        geo.firstMaterial = petalMaterial(color)
+        let petal = SCNNode(geometry: geo)
+        petal.position = SCNVector3(cos(angle) * ringRadius,
+                                    sin(angle) * ringRadius, z)
+        // Point outward, tipped slightly up toward the viewer.
+        let euler = SCNVector3(-0.18, 0, angle - .pi / 2 + angleVar)
+        petal.eulerAngles = euler
+        petalNodes.append((petal, euler))
+        head.addChildNode(petal)
+    }
+
+    private func addSepals(to head: SCNNode, count: Int, radius: Float,
+                           scale: CGFloat, z: Float = -0.04) {
+        for i in 0..<count {
+            let angle = Float(i) / Float(count) * 2 * .pi + .pi / Float(count)
+            let geo = petalGeometry(length: 0.4 * scale, baseWidth: 0.16,
+                                    tipWidth: 0.02, bow: 0.04)
+            geo.firstMaterial = tintable(GardenPalette.sepalGreen)
+            let sepal = SCNNode(geometry: geo)
+            sepal.position = SCNVector3(cos(angle) * radius, sin(angle) * radius, z)
+            sepal.eulerAngles = SCNVector3(-0.1, 0, angle - .pi / 2)
+            head.addChildNode(sepal)
+        }
+    }
+
+    /// Naturally curved stem: three stacked segments, top offset ~0.1 east.
+    private func makeCurvedStem(height: CGFloat, radius: CGFloat)
+        -> (node: SCNNode, topOffset: Float) {
         let root = SCNNode()
+        let segs = 3
+        let topOffset: Float = 0.1 * Float(min(height / 2.6, 1.0))
+        var prevX: Float = 0
+        for i in 0..<segs {
+            let t0 = Float(i) / Float(segs)
+            let t1 = Float(i + 1) / Float(segs)
+            let x0 = topOffset * t0 * t0
+            let x1 = topOffset * t1 * t1
+            let segHeight = height / CGFloat(segs)
+            let cyl = SCNCylinder(radius: radius * CGFloat(1.0 - 0.25 * Double(t0)),
+                                  height: segHeight * 1.06)
+            cyl.radialSegmentCount = 10
+            cyl.firstMaterial = tintable(GardenPalette.stemDeep)
+            let seg = SCNNode(geometry: cyl)
+            seg.position = SCNVector3((x0 + x1) / 2,
+                                      Float(height) * (t0 + t1) / 2, 0)
+            seg.eulerAngles.z = -atan2(x1 - x0, Float(height) / Float(segs))
+            root.addChildNode(seg)
+            prevX = x1
+        }
+        _ = prevX
+        return (root, topOffset)
+    }
 
-        let stem = SCNCylinder(radius: 0.05, height: CGFloat(height))
-        stem.radialSegmentCount = 10
-        stem.firstMaterial = tintable(GardenPalette.stem)
-        let stemNode = SCNNode(geometry: stem)
-        stemNode.position = SCNVector3(0, height / 2, 0)
-        root.addChildNode(stemNode)
-
-        for i in 0..<leafCount {
-            let f = Float(i + 1) / Float(leafCount + 1)
+    private func addLeaves(to root: SCNNode, stemHeight: Float,
+                           count: Int, leafLength: CGFloat) {
+        for i in 0..<count {
+            let f = Float(i + 1) / Float(count + 1)
             let side: Float = (i % 2 == 0) ? -1 : 1
-            let leaf = SCNSphere(radius: 0.15)
-            leaf.segmentCount = 12
-            leaf.firstMaterial = tintable(GardenPalette.leaf)
-            let leafNode = SCNNode(geometry: leaf)
-            leafNode.scale = SCNVector3(1.6, 0.32, 0.8)
-            leafNode.position = SCNVector3(side * 0.2, height * f, 0)
-            leafNode.eulerAngles.z = side * 0.45
-            root.addChildNode(leafNode)
-        }
-
-        return root
-    }
-
-    // MARK: - Bees (orbit the open bloom, day only)
-
-    private func buildBees() {
-        beeOrbit = SCNNode()
-        beeOrbit.position = SCNVector3(0, 1.7, 0)
-        beeOrbit.isHidden = true
-
-        for k in 0..<2 {
-            let bee = SCNNode()
-            let bodyGeo = SCNSphere(radius: 0.035)
-            bodyGeo.segmentCount = 8
-            bodyGeo.firstMaterial = GardenMaterials.unlit(GardenPalette.flowerYellow)
-            let body = SCNNode(geometry: bodyGeo)
-            bee.addChildNode(body)
-
-            let stripeGeo = SCNSphere(radius: 0.02)
-            stripeGeo.segmentCount = 6
-            stripeGeo.firstMaterial = GardenMaterials.unlit(UIColor(white: 0.15, alpha: 1))
-            let stripe = SCNNode(geometry: stripeGeo)
-            stripe.position = SCNVector3(0.02, 0, 0)
-            bee.addChildNode(stripe)
-
-            let radius: Float = 0.45 + Float(k) * 0.12
-            bee.position = SCNVector3(radius, Float(k) * 0.1 - 0.05, 0)
-            beeOrbit.addChildNode(bee)
-        }
-        addChildNode(beeOrbit)
-    }
-
-    /// Start/stop the bee orbit action (kept separate so reduce-motion can
-    /// show static bees — in practice bees are hidden under reduce-motion).
-    func setBeesAnimating(_ animating: Bool) {
-        let key = "garden.bees"
-        beeOrbit.removeAction(forKey: key)
-        if animating {
-            beeOrbit.runAction(
-                .repeatForever(.rotateBy(x: 0, y: 2 * .pi, z: 0, duration: 7)),
-                forKey: key
+            let leaf = SCNNode(geometry: leafGeometry(length: leafLength, width: leafLength * 0.62))
+            leaf.geometry?.firstMaterial = tintable(
+                i % 2 == 0 ? GardenPalette.leafTop : GardenPalette.leafUnder
             )
+            leaf.position = SCNVector3(side * 0.05, stemHeight * f * 0.92, 0)
+            // Out from the stem, slight natural droop.
+            leaf.eulerAngles = SCNVector3(-0.35, side * .pi / 2, side * 0.45)
+            leafNodes.append(leaf)
+            root.addChildNode(leaf)
+        }
+    }
+
+    /// Subtle individual petal flutter — ±0.5°, distinct phase per petal.
+    private func startPetalFlutter() {
+        var rng = GardenSeededRandom(seed: 99)
+        for petal in petalNodes {
+            let amp = CGFloat(0.0087)   // 0.5°
+            let period = rng.range(1.6, 2.6)
+            let delay = rng.range(0, 1.2)
+            let a = SCNAction.rotateBy(x: amp, y: 0, z: 0, duration: period / 2)
+            a.timingMode = .easeInEaseOut
+            let b = SCNAction.rotateBy(x: -amp, y: 0, z: 0, duration: period / 2)
+            b.timingMode = .easeInEaseOut
+            petal.node.runAction(.sequence([.wait(duration: delay),
+                                            .repeatForever(.sequence([a, b]))]))
         }
     }
 }

@@ -2,16 +2,16 @@
 //  GardenSceneView.swift
 //  Dino
 //
-//  SwiftUI wrapper for the illustrated 3D garden. Reads growth stage and
-//  care state as plain values (the scene never writes back). The nine
-//  GrowthStage cases map exhaustively to five visual stages; care look
-//  uses the OLD GardenPanel's exact CareParams numbers. Watering recovery
-//  animates over 1.5s with a golden sparkle burst. Scene built once and
-//  cached; renderer + gyro pause on disappear.
+//  SwiftUI window into the explorable garden world. Reads growth stage and
+//  care state as plain values (never writes back). Pan to explore (with
+//  momentum and soft world boundaries), double-tap or the compass button
+//  to spring home to the sunflower. Regions populate lazily as the camera
+//  approaches — and only once the plant has grown enough to earn them.
 //
 
 import SwiftUI
 import SceneKit
+import Combine
 
 // MARK: - Scene cache (build once per process / reduce-motion mode)
 
@@ -29,6 +29,12 @@ enum GardenSceneCache {
     }
 }
 
+// MARK: - Camera bridge (SwiftUI button → coordinator)
+
+final class GardenCameraBridge: ObservableObject {
+    var recenter: (() -> Void)?
+}
+
 // MARK: - Public SwiftUI view
 
 struct GardenSceneView: View {
@@ -37,14 +43,29 @@ struct GardenSceneView: View {
     let reduceMotion: Bool
 
     @State private var isActive: Bool = false
+    @StateObject private var bridge = GardenCameraBridge()
 
     var body: some View {
-        GardenSceneRepresentable(
-            stage: stage,
-            careState: careState,
-            reduceMotion: reduceMotion,
-            isActive: isActive
-        )
+        ZStack(alignment: .bottomTrailing) {
+            GardenSceneRepresentable(
+                stage: stage,
+                careState: careState,
+                reduceMotion: reduceMotion,
+                isActive: isActive,
+                bridge: bridge
+            )
+
+            Button {
+                bridge.recenter?()
+            } label: {
+                Image(systemName: "location.north.circle.fill")
+                    .font(.system(size: 28))
+                    .foregroundStyle(.white.opacity(0.85), .black.opacity(0.25))
+                    .shadow(color: .black.opacity(0.2), radius: 4, y: 2)
+            }
+            .accessibilityLabel("return to sunflower")
+            .padding(12)
+        }
         .onAppear { isActive = true }
         .onDisappear { isActive = false }
     }
@@ -64,10 +85,21 @@ private func sunflowerStage(for stage: GrowthStage) -> SunflowerNode.Stage {
     }
 }
 
+/// Which world regions exist at each visual stage — the world grows with
+/// the plant. Seed: empty horizons. Full bloom: everything.
+private func allowedRegions(for stage: SunflowerNode.Stage) -> Set<GardenRegion> {
+    switch stage {
+    case .seedMound:      return []
+    case .sprout:         return [.pond]
+    case .stemWithLeaves: return [.pond, .meadow]
+    case .bud:            return [.pond, .meadow, .orchard]
+    case .fullBloom:      return [.pond, .meadow, .orchard, .forest]
+    }
+}
+
 /// Care → (droop°, saturation, soil dryness). The droop and saturation
-/// columns are the OLD GardenPanel CareParams numbers exactly — the
-/// functional reference. Thresholds (daysSince → CareState) live in
-/// GrowthViewModel and are inherited by construction.
+/// columns are the OLD GardenPanel CareParams numbers exactly. Thresholds
+/// (daysSince → CareState) live in GrowthViewModel, inherited by construction.
 private func careLook(for state: CareState) -> (droop: Double, saturation: CGFloat, dryness: CGFloat) {
     switch state {
     case .healthy:    return (0,  1.0,  0.0)
@@ -79,7 +111,6 @@ private func careLook(for state: CareState) -> (droop: Double, saturation: CGFlo
     }
 }
 
-/// Care ranking used to detect recovery (watering after neglect).
 private func careRank(_ state: CareState) -> Int {
     switch state {
     case .healthy: return 0
@@ -91,6 +122,17 @@ private func careRank(_ state: CareState) -> Int {
     }
 }
 
+/// Heliotropism: -1 morning (head east) … 0 noon … +1 evening (head west).
+private func heliotropism(for period: GardenLighting.Period) -> Float {
+    switch period {
+    case .dawn, .morning: return -1
+    case .midday: return 0
+    case .lateAfternoon: return 0.6
+    case .sunset, .dusk: return 1
+    case .night: return 0
+    }
+}
+
 // MARK: - UIViewRepresentable
 
 private struct GardenSceneRepresentable: UIViewRepresentable {
@@ -98,6 +140,7 @@ private struct GardenSceneRepresentable: UIViewRepresentable {
     let careState: CareState
     let reduceMotion: Bool
     let isActive: Bool
+    let bridge: GardenCameraBridge
 
     func makeCoordinator() -> Coordinator {
         Coordinator()
@@ -110,28 +153,33 @@ private struct GardenSceneRepresentable: UIViewRepresentable {
         view.scene = handle.scene
         view.preferredFramesPerSecond = 30
         view.antialiasingMode = .multisampling2X
+        view.isJitteringEnabled = false
         view.rendersContinuously = false
         view.allowsCameraControl = false
         view.backgroundColor = .clear
-        view.isUserInteractionEnabled = false
 
-        context.coordinator.handle = handle
+        let coordinator = context.coordinator
+        coordinator.handle = handle
+        coordinator.reduceMotion = reduceMotion
 
-        // Appear pop — parity with the old GardenPanel's spring scale-in.
-        if reduceMotion {
-            handle.sunflower.scale = SCNVector3(1, 1, 1)
-        } else {
-            handle.sunflower.scale = SCNVector3(0.01, 0.01, 0.01)
-            SCNTransaction.begin()
-            SCNTransaction.animationDuration = 0.8
-            SCNTransaction.animationTimingFunction = CAMediaTimingFunction(
-                controlPoints: 0.34, 1.45, 0.64, 1.0   // soft overshoot ≈ spring
-            )
-            handle.sunflower.scale = SCNVector3(1, 1, 1)
-            SCNTransaction.commit()
+        // Pan to explore. Double-tap to come home.
+        let pan = UIPanGestureRecognizer(target: coordinator,
+                                         action: #selector(Coordinator.handlePan(_:)))
+        pan.maximumNumberOfTouches = 1
+        view.addGestureRecognizer(pan)
+        coordinator.panGesture = pan
+
+        let doubleTap = UITapGestureRecognizer(target: coordinator,
+                                               action: #selector(Coordinator.handleDoubleTap(_:)))
+        doubleTap.numberOfTapsRequired = 2
+        view.addGestureRecognizer(doubleTap)
+
+        bridge.recenter = { [weak coordinator] in
+            coordinator?.springHome()
         }
 
-        applyState(view: view, coordinator: context.coordinator, animatedCare: false)
+        applyState(view: view, coordinator: coordinator, animatedCare: false)
+        coordinator.refreshWorld()
         return view
     }
 
@@ -146,95 +194,229 @@ private struct GardenSceneRepresentable: UIViewRepresentable {
     }
 
     static func dismantleUIView(_ view: SCNView, coordinator: Coordinator) {
-        coordinator.parallax.stop()
+        coordinator.stopMomentum()
+        coordinator.panGesture?.isEnabled = false
         view.isPlaying = false
     }
 
     private func applyState(view: SCNView, coordinator: Coordinator, animatedCare: Bool) {
         guard let handle = coordinator.handle else { return }
 
+        let visualStage = sunflowerStage(for: stage)
         let look = careLook(for: careState)
-        let period = GardenLighting.Period.current(
-            hour: Calendar.current.component(.hour, from: Date())
-        )
+        // reduceMotion → static well-lit noon scene (health still visible).
+        let period: GardenLighting.Period = reduceMotion
+            ? .midday
+            : GardenLighting.Period.current(
+                hour: Calendar.current.component(.hour, from: Date())
+              )
         let sway = !reduceMotion && (careState == .healthy || careState == .tired)
-        let isBloom = (stage == .bloomed || stage == .thriving)
-        let showBees = isBloom && (period == .day || period == .morning) && !reduceMotion
+        let isBloom = (visualStage == .fullBloom)
 
-        // Recovery detection: care improved since last application → animate
-        // upright + re-saturate over 1.5s and fire the golden sparkle burst.
         var recovering = false
-        if let last = coordinator.lastCareState,
-           careRank(careState) < careRank(last) {
+        if let last = coordinator.lastCareState, careRank(careState) < careRank(last) {
             recovering = true
         }
         let animateThisApply = animatedCare && !reduceMotion &&
             (recovering || coordinator.lastCareState != careState)
 
         handle.sunflower.apply(
-            stage: sunflowerStage(for: stage),
+            stage: visualStage,
             droopDegrees: look.droop,
             saturation: look.saturation,
             soilDryness: look.dryness,
+            heliotropism: heliotropism(for: period),
             sway: sway,
-            showBees: showBees,
             animated: animateThisApply
         )
-        handle.sunflower.setBeesAnimating(showBees)
 
         if recovering && !reduceMotion {
-            let burst = GardenParticles.recoveryBurst()
-            handle.sunflower.addParticleSystem(burst)
+            let droplets = GardenParticles.waterDroplets()
+            let sparkle = GardenParticles.recoveryBurst()
+            handle.sunflower.addParticleSystem(droplets)
+            handle.sunflower.addParticleSystem(sparkle)
             handle.sunflower.runAction(.sequence([
                 .wait(duration: 2.5),
-                .run { node in node.removeParticleSystem(burst) }
+                .run { node in
+                    node.removeParticleSystem(droplets)
+                    node.removeParticleSystem(sparkle)
+                }
             ]))
         }
         coordinator.lastCareState = careState
 
-        // Time-of-day lighting + celestial/cloud/bird visibility.
         GardenLighting.apply(
             period: period, rig: handle.rig, scene: handle.scene,
             animated: animatedCare && !reduceMotion && coordinator.lastPeriod != period
         )
         coordinator.lastPeriod = period
 
-        // Butterfly keeps the bloom company (day periods, motion allowed).
-        handle.butterfly.isHidden = !(isBloom && !reduceMotion &&
-                                      (period == .day || period == .morning))
+        // Creature visibility: bees + butterflies need the bloom and daylight;
+        // fireflies own the night; birds vary through the day. All hidden
+        // under reduce-motion (static scene), per spec.
+        let daylight: Set<GardenLighting.Period> = [.dawn, .morning, .midday, .lateAfternoon]
+        handle.beeGroup.isHidden = !(isBloom && daylight.contains(period) && !reduceMotion)
+        handle.butterflyGroup.isHidden = !(isBloom && daylight.contains(period) && !reduceMotion)
+        handle.fireflyGroup.isHidden = !((period == .night || period == .dusk) && !reduceMotion)
+        handle.morningBirds.isHidden = !((period == .dawn || period == .morning) && !reduceMotion)
+        handle.middayBird.isHidden = !((period == .midday || period == .lateAfternoon) && !reduceMotion)
+        handle.sunsetFormation.isHidden = !(period == .sunset && !reduceMotion)
 
-        // Period particles (none under reduce-motion; day life is node-based).
-        handle.particleAnchor.removeAllParticleSystems()
-        if !reduceMotion && isActive {
-            switch period {
-            case .morning:
-                handle.particleAnchor.addParticleSystem(GardenParticles.pollen())
-            case .day:
-                break   // butterflies + bees are nodes, not particles
-            case .evening:
-                handle.particleAnchor.addParticleSystem(GardenParticles.petals())
-            case .night:
-                handle.particleAnchor.addParticleSystem(GardenParticles.fireflies())
-            }
-        }
+        // World gating by growth + camera proximity.
+        coordinator.allowed = allowedRegions(for: visualStage)
+        coordinator.refreshWorld()
 
-        // Renderer + parallax lifecycle.
+        // Renderer + gestures lifecycle. Pan stays enabled under reduce-motion
+        // (exploration must remain accessible) — the scene still re-renders
+        // on camera change even with isPlaying false.
         view.isPlaying = isActive && !reduceMotion
-        if isActive && !reduceMotion {
-            coordinator.parallax.start(pivot: handle.cameraPivot)
-        } else {
-            coordinator.parallax.stop()
+        coordinator.panGesture?.isEnabled = isActive
+        if !isActive {
+            coordinator.stopMomentum()
         }
     }
 
-    final class Coordinator {
+    // MARK: - Coordinator: pan, momentum, boundaries, home, lazy world
+
+    final class Coordinator: NSObject {
         var handle: GardenSceneHandle?
         var lastCareState: CareState?
         var lastPeriod: GardenLighting.Period?
-        let parallax = GardenParallaxController()
+        var reduceMotion = false
+        var allowed: Set<GardenRegion> = []
+        weak var panGesture: UIPanGestureRecognizer?
+
+        private var displayLink: CADisplayLink?
+        private var velocity = SIMD2<Float>(0, 0)   // world units per frame
+        private let sensitivity: Float = 0.015
+        private let homeKey = "garden.home"
 
         deinit {
-            parallax.stop()
+            displayLink?.invalidate()
+        }
+
+        // MARK: Pan
+
+        @objc func handlePan(_ gesture: UIPanGestureRecognizer) {
+            guard let handle else { return }
+            switch gesture.state {
+            case .began:
+                stopMomentum()
+                handle.cameraRig.removeAction(forKey: homeKey)
+            case .changed:
+                let translation = gesture.translation(in: gesture.view)
+                gesture.setTranslation(.zero, in: gesture.view)
+                move(dx: Float(-translation.x) * sensitivity,
+                     dz: Float(-translation.y) * sensitivity)
+            case .ended, .cancelled:
+                let v = gesture.velocity(in: gesture.view)
+                velocity = SIMD2(Float(-v.x) * sensitivity / 30.0,
+                                 Float(-v.y) * sensitivity / 30.0)
+                startMomentum()
+            default:
+                break
+            }
+        }
+
+        private func move(dx: Float, dz: Float) {
+            guard let handle else { return }
+            var p = handle.cameraRig.position
+            p.x = softClamp(p.x + dx)
+            p.z = softClamp(p.z + dz)
+            handle.cameraRig.position = p
+            refreshWorld()
+        }
+
+        /// Soft boundary: resistance grows over the last 3 units; hard clamp ±18.
+        private func softClamp(_ value: Float) -> Float {
+            let hard = GardenSceneBuilder.worldHalf
+            let soft = hard - GardenSceneBuilder.softEdge
+            let magnitude = abs(value)
+            guard magnitude > soft else { return value }
+            let over = min(magnitude - soft, GardenSceneBuilder.softEdge * 2)
+            let resisted = soft + over * (1 - over / (4 * GardenSceneBuilder.softEdge))
+            let clamped = min(resisted, hard)
+            return value > 0 ? clamped : -clamped
+        }
+
+        // MARK: Momentum
+
+        private func startMomentum() {
+            guard simd_length(velocity) > 0.001 else { return }
+            displayLink?.invalidate()
+            let link = CADisplayLink(target: self, selector: #selector(momentumTick))
+            link.preferredFrameRateRange = CAFrameRateRange(minimum: 30, maximum: 30, preferred: 30)
+            link.add(to: .main, forMode: .common)
+            displayLink = link
+        }
+
+        @objc private func momentumTick() {
+            move(dx: velocity.x, dz: velocity.y)
+            velocity *= 0.92
+            if simd_length(velocity) < 0.001 {
+                stopMomentum()
+            }
+        }
+
+        func stopMomentum() {
+            displayLink?.invalidate()
+            displayLink = nil
+            velocity = .zero
+        }
+
+        // MARK: Home
+
+        @objc func handleDoubleTap(_ gesture: UITapGestureRecognizer) {
+            springHome()
+        }
+
+        func springHome() {
+            guard let handle else { return }
+            stopMomentum()
+            handle.cameraRig.removeAction(forKey: homeKey)
+            if reduceMotion {
+                handle.cameraRig.position = SCNVector3Zero
+                refreshWorld()
+                return
+            }
+            let home = SCNAction.move(to: SCNVector3Zero, duration: 0.8)
+            home.timingMode = .easeInEaseOut
+            handle.cameraRig.runAction(.sequence([
+                home,
+                .run { [weak self] _ in
+                    DispatchQueue.main.async { self?.refreshWorld() }
+                }
+            ]), forKey: homeKey)
+        }
+
+        // MARK: Lazy world population + creature activity gating
+
+        func refreshWorld() {
+            guard let handle else { return }
+            let cam = handle.cameraRig.position
+
+            for region in GardenRegion.allCases {
+                guard let anchor = handle.regionAnchors[region] else { continue }
+                let isAllowed = allowed.contains(region)
+                anchor.isHidden = !isAllowed && handle.populatedRegions.contains(region)
+
+                let dx = cam.x - region.center.x
+                let dz = cam.z - region.center.z
+                let distance = sqrt(dx * dx + dz * dz)
+
+                // Populate once when allowed and the camera comes within 15.
+                if isAllowed && !handle.populatedRegions.contains(region) && distance < 15 {
+                    GardenSceneBuilder.populate(region: region, into: anchor,
+                                                reduceMotion: reduceMotion)
+                    handle.populatedRegions.insert(region)
+                    anchor.isHidden = false
+                }
+
+                // Activity gating: pause creature/idle actions beyond 12 units.
+                if handle.populatedRegions.contains(region) {
+                    anchor.isPaused = distance > 12
+                }
+            }
         }
     }
 }

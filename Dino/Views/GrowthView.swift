@@ -410,7 +410,7 @@ private struct Garden3DPanel: View {
             careState: vm.careState,
             reduceMotion: reduceMotion
         )
-        .frame(height: 280)
+        .frame(height: 420)   // a window into the explorable world, not a card
         .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 20, style: .continuous)
