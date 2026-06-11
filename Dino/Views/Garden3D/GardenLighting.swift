@@ -17,7 +17,6 @@ enum GardenLighting {
     struct Rig {
         let sunNode: SCNNode          // directional key + shadows
         let ambientNode: SCNNode
-        let domes: [Period: SCNNode]
         let sunDisc: SCNNode
         let sunCorona: SCNNode
         let moonGroup: SCNNode
@@ -72,7 +71,7 @@ enum GardenLighting {
                 sunEuler: SCNVector3(-0.18, 1.35, 0),
                 ambientColor: UIColor(hexRGB: 0xFFD9B0), ambientIntensity: 520,
                 fogColor: UIColor(hexRGB: 0xF0C9A8), fogStart: 14,
-                discPosition: SCNVector3(16, 2.2, -30), discScale: 1.5,
+                discPosition: SCNVector3(7, 4.8, -14), discScale: 1.4,
                 discColor: UIColor(hexRGB: 0xFF7B35),
                 discVisible: true, moonVisible: false, starsOpacity: 0,
                 cloudsVisible: true
@@ -83,7 +82,7 @@ enum GardenLighting {
                 sunEuler: SCNVector3(-0.7, 0.9, 0),
                 ambientColor: UIColor(hexRGB: 0xFFF3DE), ambientIntensity: 620,
                 fogColor: UIColor(hexRGB: 0xE9E2C8), fogStart: 18,
-                discPosition: SCNVector3(12, 8, -30), discScale: 1.1,
+                discPosition: SCNVector3(5, 6, -14), discScale: 1.0,
                 discColor: UIColor(hexRGB: 0xFFE08A),
                 discVisible: true, moonVisible: false, starsOpacity: 0,
                 cloudsVisible: true
@@ -94,7 +93,7 @@ enum GardenLighting {
                 sunEuler: SCNVector3(-1.35, 0.2, 0),
                 ambientColor: UIColor.white, ambientIntensity: 650,
                 fogColor: UIColor(hexRGB: 0xCDE8F5), fogStart: 24,
-                discPosition: SCNVector3(4, 15, -28), discScale: 0.85,
+                discPosition: SCNVector3(2, 7, -12), discScale: 0.8,
                 discColor: UIColor(hexRGB: 0xFFF6D8),
                 discVisible: true, moonVisible: false, starsOpacity: 0,
                 cloudsVisible: true
@@ -105,7 +104,7 @@ enum GardenLighting {
                 sunEuler: SCNVector3(-0.6, -0.9, 0),
                 ambientColor: UIColor(hexRGB: 0xFFE6BE), ambientIntensity: 560,
                 fogColor: UIColor(hexRGB: 0xF0D8A8), fogStart: 18,
-                discPosition: SCNVector3(-12, 7, -30), discScale: 1.2,
+                discPosition: SCNVector3(-5, 6, -14), discScale: 1.1,
                 discColor: UIColor(hexRGB: 0xFFC25E),
                 discVisible: true, moonVisible: false, starsOpacity: 0,
                 cloudsVisible: true
@@ -116,7 +115,7 @@ enum GardenLighting {
                 sunEuler: SCNVector3(-0.16, -1.35, 0),
                 ambientColor: UIColor(hexRGB: 0xFFAE85), ambientIntensity: 480,
                 fogColor: UIColor(hexRGB: 0xE89070), fogStart: 14,
-                discPosition: SCNVector3(-16, 2.4, -30), discScale: 1.7,
+                discPosition: SCNVector3(-7, 4.8, -14), discScale: 1.5,
                 discColor: UIColor(hexRGB: 0xFF4500),
                 discVisible: true, moonVisible: false, starsOpacity: 0,
                 cloudsVisible: true
@@ -127,7 +126,7 @@ enum GardenLighting {
                 sunEuler: SCNVector3(-0.5, 0.5, 0),
                 ambientColor: UIColor(hexRGB: 0x9FA0C8), ambientIntensity: 420,
                 fogColor: UIColor(hexRGB: 0x4A4670), fogStart: 14,
-                discPosition: SCNVector3(-16, 1.0, -30), discScale: 1.0,
+                discPosition: SCNVector3(-7, 4.0, -14), discScale: 1.0,
                 discColor: UIColor(hexRGB: 0xFF6F40),
                 discVisible: false, moonVisible: true, starsOpacity: 0.35,
                 cloudsVisible: false
@@ -138,7 +137,7 @@ enum GardenLighting {
                 sunEuler: SCNVector3(-0.9, 0.5, 0),
                 ambientColor: UIColor(hexRGB: 0x6A6A9A), ambientIntensity: 360,
                 fogColor: UIColor(hexRGB: 0x10142E), fogStart: 12,
-                discPosition: SCNVector3(16, 2, -30), discScale: 1.0,
+                discPosition: SCNVector3(7, 4.0, -14), discScale: 1.0,
                 discColor: UIColor(hexRGB: 0xFFE066),
                 discVisible: false, moonVisible: true, starsOpacity: 1.0,
                 cloudsVisible: false
@@ -146,32 +145,42 @@ enum GardenLighting {
         }
     }
 
-    /// Multi-stop sky per period.
-    private static func skyStops(for period: Period) -> [(UIColor, CGFloat)] {
+    // MARK: - Gradient sky background (bulletproof: no dome, no clipping —
+    // scene.background always fills the whole frame behind the geometry)
+
+    private static var backgroundCache: [Period: UIImage] = [:]
+
+    static func background(for period: Period) -> UIImage {
+        if let cached = backgroundCache[period] { return cached }
+        let stops: (top: UInt32, bottom: UInt32)
         switch period {
-        case .dawn:
-            return [(UIColor(hexRGB: 0x1A0A2E), 0.0), (UIColor(hexRGB: 0x6B2D8B), 0.45),
-                    (UIColor(hexRGB: 0xFF6B35), 0.78), (UIColor(hexRGB: 0xFFE4A0), 1.0)]
-        case .morning:
-            return [(UIColor(hexRGB: 0x4A90D9), 0.0), (UIColor(hexRGB: 0x8FC0E8), 0.6),
-                    (UIColor(hexRGB: 0xFFF2D0), 1.0)]
-        case .midday:
-            return [(UIColor(hexRGB: 0x1565C0), 0.0), (UIColor(hexRGB: 0x42A5F5), 0.5),
-                    (UIColor(hexRGB: 0xBBDEFB), 1.0)]
-        case .lateAfternoon:
-            return [(UIColor(hexRGB: 0x3A7BC0), 0.0), (UIColor(hexRGB: 0x7FAED8), 0.55),
-                    (UIColor(hexRGB: 0xFFD9A0), 1.0)]
-        case .sunset:
-            return [(UIColor(hexRGB: 0x0D47A1), 0.0), (UIColor(hexRGB: 0x7B1FA2), 0.35),
-                    (UIColor(hexRGB: 0xE91E63), 0.6), (UIColor(hexRGB: 0xFF6F00), 0.82),
-                    (UIColor(hexRGB: 0xFFD700), 1.0)]
-        case .dusk:
-            return [(UIColor(hexRGB: 0x0A0A24), 0.0), (UIColor(hexRGB: 0x1C1A4A), 0.6),
-                    (UIColor(hexRGB: 0x4A3A6A), 0.88), (UIColor(hexRGB: 0x8A5A50), 1.0)]
-        case .night:
-            return [(UIColor(hexRGB: 0x0A0A1E), 0.0), (UIColor(hexRGB: 0x0D1B3E), 0.6),
-                    (UIColor(hexRGB: 0x162040), 1.0)]
+        case .dawn:          stops = (0x1A0A2E, 0xFF6B35)
+        case .morning:       stops = (0x4A90D9, 0xFFE4A0)
+        case .midday:        stops = (0x1565C0, 0xBBDEFB)
+        case .lateAfternoon: stops = (0x3A7BC0, 0xFFB347)
+        case .sunset:        stops = (0x7B1FA2, 0xFF6F00)
+        case .dusk:          stops = (0x0D1B3E, 0x050510)
+        case .night:         stops = (0x0A0A1E, 0x1A2A4A)
         }
+        let size = CGSize(width: 512, height: 512)
+        let renderer = UIGraphicsImageRenderer(size: size)
+        let image = renderer.image { ctx in
+            let colors = [UIColor(hexRGB: stops.top).cgColor,
+                          UIColor(hexRGB: stops.bottom).cgColor] as CFArray
+            let locations: [CGFloat] = [0.0, 1.0]
+            guard let gradient = CGGradient(
+                colorsSpace: CGColorSpaceCreateDeviceRGB(),
+                colors: colors, locations: locations
+            ) else { return }
+            ctx.cgContext.drawLinearGradient(
+                gradient,
+                start: CGPoint(x: 0, y: 0),
+                end: CGPoint(x: 0, y: size.height),
+                options: []
+            )
+        }
+        backgroundCache[period] = image
+        return image
     }
 
     // MARK: - Moon phase
@@ -209,39 +218,15 @@ enum GardenLighting {
         let ambientNode = SCNNode()
         ambientNode.light = ambient
 
-        var domes: [Period: SCNNode] = [:]
-        for period in Period.allCases {
-            let dome = makeDome(stops: skyStops(for: period))
-            dome.opacity = (period == .midday) ? 1 : 0
-            domes[period] = dome
-        }
-
         let (disc, corona) = makeSun()
         let moonGroup = makeMoonGroup()
         moonGroup.opacity = 0
         let starGroup = makeStarGroup()
         starGroup.opacity = 0
 
-        return Rig(sunNode: sunNode, ambientNode: ambientNode, domes: domes,
+        return Rig(sunNode: sunNode, ambientNode: ambientNode,
                    sunDisc: disc, sunCorona: corona, moonGroup: moonGroup,
                    starGroup: starGroup, cloudGroup: cloudGroup)
-    }
-
-    private static func makeDome(stops: [(UIColor, CGFloat)]) -> SCNNode {
-        let sphere = SCNSphere(radius: 42)
-        sphere.segmentCount = 14
-        let m = SCNMaterial()
-        m.diffuse.contents = GardenMaterials.gradientImage(
-            stops: stops.map { (color: $0.0, location: $0.1) }
-        )
-        m.lightingModel = .constant
-        m.cullMode = .front
-        m.writesToDepthBuffer = false
-        sphere.firstMaterial = m
-        let node = SCNNode(geometry: sphere)
-        node.renderingOrder = -100
-        node.castsShadow = false
-        return node
     }
 
     private static func makeSun() -> (disc: SCNNode, corona: SCNNode) {
@@ -272,9 +257,13 @@ enum GardenLighting {
     private static func makeMoonGroup() -> SCNNode {
         let group = SCNNode()
         group.castsShadow = false
-        group.position = SCNVector3(10, 18, -25)
+        // Frustum math (camera (0,5,18), 12.5° down, ortho half-height 10):
+        // v ≈ 0.976(y-5) + 0.216(18-z). (6, 6, -14) → v ≈ 7.9 — reliably in
+        // the upper frame against the gradient. The old (10,18,-25) was v≈22,
+        // a full frame-height above the top edge — why the moon never showed.
+        group.position = SCNVector3(6, 6, -14)
 
-        let moonGeo = SCNSphere(radius: 2.5)
+        let moonGeo = SCNSphere(radius: 1.5)
         moonGeo.segmentCount = 20
         moonGeo.firstMaterial = GardenMaterials.glow(UIColor(hexRGB: 0xFFFFF0))
         let moon = SCNNode(geometry: moonGeo)
@@ -284,16 +273,16 @@ enum GardenLighting {
         // Procedural craters — subtle darker patches on the face.
         var rng = GardenSeededRandom(seed: 1969)
         for _ in 0..<6 {
-            let craterGeo = SCNSphere(radius: CGFloat(rng.range(0.18, 0.45)))
+            let craterGeo = SCNSphere(radius: CGFloat(rng.range(0.11, 0.27)))
             craterGeo.segmentCount = 8
             craterGeo.firstMaterial = GardenMaterials.glow(
                 UIColor(hexRGB: 0xD8D2BE).withAlphaComponent(0.85)
             )
             let crater = SCNNode(geometry: craterGeo)
             let a = rng.range(0, 6.28)
-            let r = rng.range(0.3, 1.6)
+            let r = rng.range(0.2, 0.95)
             crater.position = SCNVector3(
-                Float(cos(a) * r), Float(sin(a) * r), 2.15
+                Float(cos(a) * r), Float(sin(a) * r), 1.3
             )
             crater.scale = SCNVector3(1, 1, 0.15)
             crater.castsShadow = false
@@ -301,7 +290,7 @@ enum GardenLighting {
         }
 
         // Glow sphere — white at 20%, always bright.
-        let glowGeo = SCNSphere(radius: 3.5)
+        let glowGeo = SCNSphere(radius: 2.2)
         glowGeo.segmentCount = 14
         let gm = SCNMaterial()
         gm.diffuse.contents = UIColor.white.withAlphaComponent(0.2)
@@ -318,20 +307,22 @@ enum GardenLighting {
         let phase = moonPhase(on: Date())
         let illumination = sin(phase * .pi)            // 0 new → 1 full
         let waxing = phase < 0.5
-        let occluderGeo = SCNSphere(radius: 2.42)
+        let occluderGeo = SCNSphere(radius: 1.45)
         occluderGeo.segmentCount = 18
         occluderGeo.firstMaterial = GardenMaterials.unlit(UIColor(hexRGB: 0x0A0A1E))
         let occluder = SCNNode(geometry: occluderGeo)
-        let offset = Float(0.27 + 5.2 * illumination)  // full → occluder fully off-disc
-        occluder.position = SCNVector3(waxing ? -offset : offset, 0, 0.27)
+        let offset = Float(0.16 + 3.1 * illumination)  // full → occluder fully off-disc
+        occluder.position = SCNVector3(waxing ? -offset : offset, 0, 0.16)
         occluder.castsShadow = false
         group.addChildNode(occluder)
 
         return group
     }
 
-    /// 60 stars inside the camera frustum (X ±20, Y 8–22, Z -15…-55),
-    /// bright white constant spheres; a third of them twinkle.
+    /// 60 stars, every one inside the camera frustum AND above the horizon
+    /// line (ground far edge → v ≈ 5.5): X ±9, Y 6–8, Z -6…-14 puts them at
+    /// v ≈ 6–10, the sky band of the frame. White constant spheres; a third
+    /// twinkle.
     private static func makeStarGroup() -> SCNNode {
         let group = SCNNode()
         group.castsShadow = false
@@ -343,9 +334,9 @@ enum GardenLighting {
             starGeo.firstMaterial = GardenMaterials.glow(UIColor(hexRGB: 0xFFFFFF))
             let star = SCNNode(geometry: starGeo)
             star.position = SCNVector3(
-                Float(rng.range(-20, 20)),
-                Float(rng.range(8, 22)),
-                Float(rng.range(-55, -15))
+                Float(rng.range(-9, 9)),
+                Float(rng.range(6, 8)),
+                Float(rng.range(-14, -6))
             )
             star.opacity = CGFloat(rng.range(0.6, 1.0))
             star.castsShadow = false
@@ -372,14 +363,14 @@ enum GardenLighting {
         let g = grade(for: period)
 
         let work = {
+            // Bulletproof sky: a screen-space gradient image always fills
+            // the frame behind the geometry — no dome, no clipping.
+            scene.background.contents = background(for: period)
             rig.sunNode.light?.color = g.sunColor
             rig.sunNode.light?.intensity = g.sunIntensity
             rig.sunNode.eulerAngles = g.sunEuler
             rig.ambientNode.light?.color = g.ambientColor
             rig.ambientNode.light?.intensity = g.ambientIntensity
-            for (domePeriod, dome) in rig.domes {
-                dome.opacity = (domePeriod == period) ? 1 : 0
-            }
             rig.sunDisc.position = g.discPosition
             rig.sunDisc.scale = SCNVector3(g.discScale, g.discScale, g.discScale)
             if let m = rig.sunDisc.geometry?.firstMaterial {
@@ -390,13 +381,10 @@ enum GardenLighting {
             rig.moonGroup.opacity = g.moonVisible ? 1 : 0
             rig.starGroup.opacity = g.starsOpacity
             rig.cloudGroup.opacity = g.cloudsVisible ? 1 : 0
-            scene.fogColor = g.fogColor
-            scene.fogStartDistance = g.fogStart
-            // Far enough that celestial bodies (moon ≈45u, stars up to ≈70u
-            // from the camera) are never fogged out — the original 52 made
-            // them invisible at night.
-            scene.fogEndDistance = 130
-            scene.fogDensityExponent = 1.2
+            // Fog disabled entirely — it tinted the gradient background and
+            // swallowed celestial bodies. (1000/1001 ≈ off.)
+            scene.fogStartDistance = 1000
+            scene.fogEndDistance = 1001
         }
 
         if animated {

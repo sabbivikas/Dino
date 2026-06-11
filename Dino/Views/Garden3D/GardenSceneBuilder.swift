@@ -91,12 +91,17 @@ enum GardenSceneBuilder {
         var rng = GardenSeededRandom(seed: 20_260_610)
         let animate = !reduceMotion
 
-        // ── Ground: one 200×200 bright plane at Y 0 — reaches the horizon
-        //    in every direction, the shadow receiver.
-        let groundGeo = SCNPlane(width: 200, height: 200)
+        // ── Ground: 500 wide, 70 deep (z -30…+40), just under Y 0.
+        //    The depth is deliberate: with the shallow camera tilt, the far
+        //    edge at z -30 projects to ≈55% frame height — that edge IS the
+        //    horizon line, with the gradient background (sky) above it. A
+        //    500×500 plane would cover the entire frame and no sky could
+        //    ever show — the root cause of the previous all-green screens.
+        let groundGeo = SCNPlane(width: 500, height: 70)
         groundGeo.firstMaterial = GardenMaterials.flat(GardenPalette.ground)
         let ground = SCNNode(geometry: groundGeo)
-        ground.eulerAngles.x = -.pi / 2
+        ground.eulerAngles.x = -Float.pi / 2
+        ground.position = SCNVector3(0, -0.01, 5)
         ground.castsShadow = false
         scene.rootNode.addChildNode(ground)
 
@@ -202,8 +207,9 @@ enum GardenSceneBuilder {
         // ── Clouds: volumetric, casting real ground shadows. None at night
         //    (lighting rig fades the group).
         let cloudGroup = SCNNode()
+        // Cloud heights chosen for the sky band of the frame (v ≈ 6–9).
         let cloudSpecs: [(y: Float, z: Float, scale: Float, duration: TimeInterval)] = [
-            (9, -8, 0.9, 80), (11, 4, 1.2, 105), (8.5, -2, 0.7, 65), (12, 10, 1.0, 120)
+            (6.5, -10, 0.8, 80), (7.5, -13, 1.0, 105), (6, -8, 0.6, 65), (8, -14, 0.9, 120)
         ]
         for (i, spec) in cloudSpecs.enumerated() {
             let cloud = makeCloud(rng: &rng)
@@ -224,7 +230,6 @@ enum GardenSceneBuilder {
         let rig = GardenLighting.makeRig(cloudGroup: cloudGroup)
         scene.rootNode.addChildNode(rig.sunNode)
         scene.rootNode.addChildNode(rig.ambientNode)
-        for (_, dome) in rig.domes { scene.rootNode.addChildNode(dome) }
         scene.rootNode.addChildNode(rig.sunDisc)
         scene.rootNode.addChildNode(rig.moonGroup)
         scene.rootNode.addChildNode(rig.starGroup)
