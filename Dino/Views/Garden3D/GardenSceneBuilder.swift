@@ -105,6 +105,16 @@ enum GardenSceneBuilder {
         ground.castsShadow = false
         scene.rootNode.addChildNode(ground)
 
+        // Ground extension toward/behind the camera — fills the gap at the
+        // bottom of the frame so no background strip shows below the lawn.
+        let extensionGeo = SCNPlane(width: 500, height: 100)
+        extensionGeo.firstMaterial = GardenMaterials.flat(GardenPalette.ground)
+        let groundExtension = SCNNode(geometry: extensionGeo)
+        groundExtension.eulerAngles.x = -Float.pi / 2
+        groundExtension.position = SCNVector3(0, -0.02, 25)
+        groundExtension.castsShadow = false
+        scene.rootNode.addChildNode(groundExtension)
+
         // ── Center: the sunflower exactly ON the ground (stem base at Y 0,
         //    growing upward only — the ground plane is at Y 0).
         let sunflower = SunflowerNode(reduceMotion: reduceMotion)

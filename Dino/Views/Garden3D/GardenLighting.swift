@@ -152,32 +152,82 @@ enum GardenLighting {
 
     static func background(for period: Period) -> UIImage {
         if let cached = backgroundCache[period] { return cached }
-        let stops: (top: UInt32, bottom: UInt32)
-        switch period {
-        case .dawn:          stops = (0x1A0A2E, 0xFF6B35)
-        case .morning:       stops = (0x4A90D9, 0xFFE4A0)
-        case .midday:        stops = (0x1565C0, 0xBBDEFB)
-        case .lateAfternoon: stops = (0x3A7BC0, 0xFFB347)
-        case .sunset:        stops = (0x7B1FA2, 0xFF6F00)
-        case .dusk:          stops = (0x0D1B3E, 0x050510)
-        case .night:         stops = (0x0A0A1E, 0x1A2A4A)
-        }
         let size = CGSize(width: 512, height: 512)
         let renderer = UIGraphicsImageRenderer(size: size)
-        let image = renderer.image { ctx in
-            let colors = [UIColor(hexRGB: stops.top).cgColor,
-                          UIColor(hexRGB: stops.bottom).cgColor] as CFArray
-            let locations: [CGFloat] = [0.0, 1.0]
-            guard let gradient = CGGradient(
-                colorsSpace: CGColorSpaceCreateDeviceRGB(),
-                colors: colors, locations: locations
-            ) else { return }
-            ctx.cgContext.drawLinearGradient(
-                gradient,
-                start: CGPoint(x: 0, y: 0),
-                end: CGPoint(x: 0, y: size.height),
-                options: []
-            )
+        let image: UIImage
+
+        if period == .night {
+            // Natural night: darkest at zenith, faintly lighter at the
+            // horizon, with a soft diagonal Milky Way smear.
+            image = renderer.image { ctx in
+                let cg = ctx.cgContext
+                let colors = [UIColor(hexRGB: 0x050818).cgColor,   // deep space
+                              UIColor(hexRGB: 0x0A0A1E).cgColor,   // navy
+                              UIColor(hexRGB: 0x0D1535).cgColor]   // horizon glow
+                    as CFArray
+                let locations: [CGFloat] = [0.0, 0.4, 0.7]
+                if let gradient = CGGradient(
+                    colorsSpace: CGColorSpaceCreateDeviceRGB(),
+                    colors: colors, locations: locations
+                ) {
+                    cg.drawLinearGradient(
+                        gradient,
+                        start: CGPoint(x: 0, y: 0),
+                        end: CGPoint(x: 0, y: size.height),
+                        options: [.drawsAfterEndLocation]
+                    )
+                }
+
+                // Milky Way: subtle diagonal band, top-left → bottom-right,
+                // ~15% of the image wide, fading to clear at both edges.
+                cg.saveGState()
+                cg.translateBy(x: size.width / 2, y: size.height / 2)
+                cg.rotate(by: -.pi / 4)
+                let bandHalf: CGFloat = 38   // ≈15% of 512
+                cg.clip(to: CGRect(x: -420, y: -bandHalf, width: 840, height: bandHalf * 2))
+                let bandColor = UIColor(hexRGB: 0x1A2040).withAlphaComponent(0.3)
+                let bandColors = [UIColor.clear.cgColor,
+                                  bandColor.cgColor,
+                                  UIColor.clear.cgColor] as CFArray
+                if let bandGradient = CGGradient(
+                    colorsSpace: CGColorSpaceCreateDeviceRGB(),
+                    colors: bandColors, locations: [0.0, 0.5, 1.0]
+                ) {
+                    cg.drawLinearGradient(
+                        bandGradient,
+                        start: CGPoint(x: 0, y: -bandHalf),
+                        end: CGPoint(x: 0, y: bandHalf),
+                        options: []
+                    )
+                }
+                cg.restoreGState()
+            }
+        } else {
+            let stops: (top: UInt32, bottom: UInt32)
+            switch period {
+            case .dawn:          stops = (0x1A0A2E, 0xFF6B35)
+            case .morning:       stops = (0x4A90D9, 0xFFE4A0)
+            case .midday:        stops = (0x1565C0, 0xBBDEFB)
+            case .lateAfternoon: stops = (0x3A7BC0, 0xFFB347)
+            case .sunset:        stops = (0x7B1FA2, 0xFF6F00)
+            case .dusk:          stops = (0x0D1B3E, 0x050510)
+            case .night:         stops = (0x0A0A1E, 0x1A2A4A)   // unreachable
+            }
+            image = renderer.image { ctx in
+                let colors = [UIColor(hexRGB: stops.top).cgColor,
+                              UIColor(hexRGB: stops.bottom).cgColor] as CFArray
+                let locations: [CGFloat] = [0.0, 1.0]
+                guard let gradient = CGGradient(
+                    colorsSpace: CGColorSpaceCreateDeviceRGB(),
+                    colors: colors, locations: locations
+                ) else { return }
+                ctx.cgContext.drawLinearGradient(
+                    gradient,
+                    start: CGPoint(x: 0, y: 0),
+                    end: CGPoint(x: 0, y: size.height),
+                    options: []
+                )
+            }
         }
         backgroundCache[period] = image
         return image
@@ -258,12 +308,13 @@ enum GardenLighting {
         let group = SCNNode()
         group.castsShadow = false
         // Frustum math (camera (0,5,18), 12.5° down, ortho half-height 10):
-        // v ≈ 0.976(y-5) + 0.216(18-z). (6, 6, -14) → v ≈ 7.9 — reliably in
-        // the upper frame against the gradient. The old (10,18,-25) was v≈22,
-        // a full frame-height above the top edge — why the moon never showed.
-        group.position = SCNVector3(6, 6, -14)
+        // v ≈ 0.976(y-5) + 0.216(18-z). (4, 6.5, -12) → v ≈ 7.9 with the
+        // 1.8 disc topping out ≈ 9.7 — fully inside the frame, clearly in
+        // the sky band. (Spec y 7 would push the disc top past the frame
+        // edge; lowered 0.5 so the moon is never cut off.)
+        group.position = SCNVector3(4, 6.5, -12)
 
-        let moonGeo = SCNSphere(radius: 1.5)
+        let moonGeo = SCNSphere(radius: 1.8)
         moonGeo.segmentCount = 20
         moonGeo.firstMaterial = GardenMaterials.glow(UIColor(hexRGB: 0xFFFFF0))
         let moon = SCNNode(geometry: moonGeo)
@@ -280,9 +331,9 @@ enum GardenLighting {
             )
             let crater = SCNNode(geometry: craterGeo)
             let a = rng.range(0, 6.28)
-            let r = rng.range(0.2, 0.95)
+            let r = rng.range(0.25, 1.15)
             crater.position = SCNVector3(
-                Float(cos(a) * r), Float(sin(a) * r), 1.3
+                Float(cos(a) * r), Float(sin(a) * r), 1.56
             )
             crater.scale = SCNVector3(1, 1, 0.15)
             crater.castsShadow = false
@@ -290,7 +341,7 @@ enum GardenLighting {
         }
 
         // Glow sphere — white at 20%, always bright.
-        let glowGeo = SCNSphere(radius: 2.2)
+        let glowGeo = SCNSphere(radius: 2.5)
         glowGeo.segmentCount = 14
         let gm = SCNMaterial()
         gm.diffuse.contents = UIColor.white.withAlphaComponent(0.2)
@@ -307,12 +358,12 @@ enum GardenLighting {
         let phase = moonPhase(on: Date())
         let illumination = sin(phase * .pi)            // 0 new → 1 full
         let waxing = phase < 0.5
-        let occluderGeo = SCNSphere(radius: 1.45)
+        let occluderGeo = SCNSphere(radius: 1.74)
         occluderGeo.segmentCount = 18
         occluderGeo.firstMaterial = GardenMaterials.unlit(UIColor(hexRGB: 0x0A0A1E))
         let occluder = SCNNode(geometry: occluderGeo)
-        let offset = Float(0.16 + 3.1 * illumination)  // full → occluder fully off-disc
-        occluder.position = SCNVector3(waxing ? -offset : offset, 0, 0.16)
+        let offset = Float(0.19 + 3.75 * illumination)  // full → occluder fully off-disc
+        occluder.position = SCNVector3(waxing ? -offset : offset, 0, 0.19)
         occluder.castsShadow = false
         group.addChildNode(occluder)
 
@@ -328,8 +379,10 @@ enum GardenLighting {
         group.castsShadow = false
         var rng = GardenSeededRandom(seed: 88)
 
+        let sizeMix: [CGFloat] = [0.03, 0.05, 0.08, 0.12]
         for i in 0..<60 {
-            let starGeo = SCNSphere(radius: CGFloat(rng.range(0.06, 0.12)))
+            let radius = sizeMix[Int(rng.range(0, 3.99))]
+            let starGeo = SCNSphere(radius: radius)
             starGeo.segmentCount = 6
             starGeo.firstMaterial = GardenMaterials.glow(UIColor(hexRGB: 0xFFFFFF))
             let star = SCNNode(geometry: starGeo)
@@ -340,19 +393,36 @@ enum GardenLighting {
             )
             star.opacity = CGFloat(rng.range(0.6, 1.0))
             star.castsShadow = false
-            // Twinkle 20 of them: 0.4 → 1.0 → 0.4 over a random 1.5–3s.
+            // 20 shimmer via SCALE (not opacity): 0.5 → 1.2 → 0.5, each with
+            // its own random period and start delay — a natural sparkle.
             if i % 3 == 0 {
-                let half = rng.range(0.75, 1.5)
-                let dim = SCNAction.fadeOpacity(to: 0.4, duration: half)
-                dim.timingMode = .easeInEaseOut
-                let bright = SCNAction.fadeOpacity(to: 1.0, duration: half)
-                bright.timingMode = .easeInEaseOut
+                let half = rng.range(0.5, 2.0)        // full cycle 1–4s
+                star.scale = SCNVector3(0.5, 0.5, 0.5)
+                let grow = SCNAction.scale(to: 1.2, duration: half)
+                grow.timingMode = .easeInEaseOut
+                let shrink = SCNAction.scale(to: 0.5, duration: half)
+                shrink.timingMode = .easeInEaseOut
                 star.runAction(.sequence([
-                    .wait(duration: rng.range(0, 2)),
-                    .repeatForever(.sequence([dim, bright]))
+                    .wait(duration: rng.range(0, 3)),
+                    .repeatForever(.sequence([grow, shrink]))
                 ]))
             }
             group.addChildNode(star)
+        }
+
+        // 5 "named" stars — larger, white with a blue cast, steady.
+        for _ in 0..<5 {
+            let brightGeo = SCNSphere(radius: 0.15)
+            brightGeo.segmentCount = 8
+            brightGeo.firstMaterial = GardenMaterials.glow(UIColor(hexRGB: 0xE8F0FF))
+            let bright = SCNNode(geometry: brightGeo)
+            bright.position = SCNVector3(
+                Float(rng.range(-8, 8)),
+                Float(rng.range(6.3, 7.8)),
+                Float(rng.range(-13, -7))
+            )
+            bright.castsShadow = false
+            group.addChildNode(bright)
         }
         return group
     }
