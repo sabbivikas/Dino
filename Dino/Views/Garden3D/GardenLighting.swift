@@ -183,7 +183,8 @@ enum GardenLighting {
         )
     }
 
-    /// Painted extras: sun/moon, glow, clouds, birds, stars, Milky Way.
+    /// Painted extras: sun/moon, glow, stars, Milky Way. (Clouds and birds
+    /// are animated SceneKit nodes now — see GardenSceneBuilder.)
     private static func drawExtras(_ cg: CGContext, size: CGSize, period: Period) {
         let w = size.width, h = size.height
         var rng = GardenSeededRandom(seed: 31)
@@ -192,25 +193,6 @@ enum GardenLighting {
             cg.setFillColor(color.cgColor)
             cg.fillEllipse(in: CGRect(x: center.x - radius, y: center.y - radius,
                                       width: radius * 2, height: radius * 2))
-        }
-
-        func cloud(at center: CGPoint, scale: CGFloat) {
-            let white = UIColor.white
-            circle(center, 22 * scale, white)
-            circle(CGPoint(x: center.x - 24 * scale, y: center.y + 5 * scale), 16 * scale, white)
-            circle(CGPoint(x: center.x + 24 * scale, y: center.y + 5 * scale), 17 * scale, white)
-            circle(CGPoint(x: center.x + 4 * scale, y: center.y - 12 * scale), 14 * scale, white)
-        }
-
-        func bird(at p: CGPoint, span: CGFloat) {
-            cg.setStrokeColor(UIColor(hexRGB: 0x2D3142).cgColor)
-            cg.setLineWidth(2)
-            cg.setLineCap(.round)
-            cg.move(to: CGPoint(x: p.x - span, y: p.y))
-            cg.addQuadCurve(to: p, control: CGPoint(x: p.x - span / 2, y: p.y - span * 0.6))
-            cg.addQuadCurve(to: CGPoint(x: p.x + span, y: p.y),
-                            control: CGPoint(x: p.x + span / 2, y: p.y - span * 0.6))
-            cg.strokePath()
         }
 
         switch period {
@@ -223,21 +205,11 @@ enum GardenLighting {
             circle(CGPoint(x: w * 0.72, y: h * 0.22), h * 0.07,
                    UIColor(hexRGB: 0xFFE8C0).withAlphaComponent(0.35))
             circle(CGPoint(x: w * 0.72, y: h * 0.22), h * 0.04, UIColor(hexRGB: 0xFFD4A0))
-            cloud(at: CGPoint(x: w * 0.25, y: h * 0.18), scale: 1.0)
-            cloud(at: CGPoint(x: w * 0.55, y: h * 0.34), scale: 0.7)
-            bird(at: CGPoint(x: w * 0.35, y: h * 0.12), span: 9)
-            bird(at: CGPoint(x: w * 0.45, y: h * 0.16), span: 7)
 
         case .day:
             circle(CGPoint(x: w * 0.5, y: h * 0.12), h * 0.06,
                    UIColor.white.withAlphaComponent(0.3))
             circle(CGPoint(x: w * 0.5, y: h * 0.12), h * 0.035, UIColor(hexRGB: 0xFFF8F0))
-            cloud(at: CGPoint(x: w * 0.2, y: h * 0.22), scale: 1.1)
-            cloud(at: CGPoint(x: w * 0.78, y: h * 0.3), scale: 0.85)
-            cloud(at: CGPoint(x: w * 0.48, y: h * 0.42), scale: 0.6)
-            bird(at: CGPoint(x: w * 0.3, y: h * 0.15), span: 9)
-            bird(at: CGPoint(x: w * 0.62, y: h * 0.1), span: 7)
-            bird(at: CGPoint(x: w * 0.7, y: h * 0.2), span: 8)
             // Subtle horizon line where sky meets implied ground.
             cg.setFillColor(UIColor(hexRGB: 0xA8D4A0).withAlphaComponent(0.6).cgColor)
             cg.fill(CGRect(x: 0, y: h * 0.8, width: w, height: 2))

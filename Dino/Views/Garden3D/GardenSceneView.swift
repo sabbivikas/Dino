@@ -98,6 +98,25 @@ private func heliotropism(for period: GardenLighting.Period) -> Float {
     }
 }
 
+/// Cloud tint per period: bright white by day, warm near the sun's edges,
+/// dim blue-grey at dusk/night.
+private func cloudTint(for period: GardenLighting.Period) -> UIColor {
+    switch period {
+    case .morning, .day:           return UIColor.white
+    case .dawn, .lateAfternoon:    return UIColor(hexRGB: 0xFFE0C0)
+    case .sunset:                  return UIColor(hexRGB: 0xFFC8A0)
+    case .dusk, .night:            return UIColor(hexRGB: 0x9AA6C0)
+    }
+}
+
+/// Birds fly in the brighter daytime periods only — hidden by dusk.
+private func birdsVisible(for period: GardenLighting.Period) -> Bool {
+    switch period {
+    case .dawn, .morning, .day: return true
+    case .lateAfternoon, .sunset, .dusk, .night: return false
+    }
+}
+
 // MARK: - UIViewRepresentable
 
 private struct GardenSceneRepresentable: UIViewRepresentable {
@@ -187,10 +206,28 @@ private struct GardenSceneRepresentable: UIViewRepresentable {
         }
         coordinator.lastCareState = careState
 
+        let periodChanged = coordinator.lastPeriod != period
         GardenLighting.apply(
             period: period, rig: handle.rig, scene: handle.scene,
-            animated: animatedCare && !reduceMotion && coordinator.lastPeriod != period
+            animated: animatedCare && !reduceMotion && periodChanged
         )
+
+        // Tint the cloud nodes + fade the birds for the time of day.
+        let tint = cloudTint(for: period)
+        let birdsOn = birdsVisible(for: period)
+        let applyVisuals = {
+            for m in handle.cloudMaterials { m.diffuse.contents = tint }
+            handle.birdGroup.opacity = birdsOn ? 1 : 0
+        }
+        if animatedCare && !reduceMotion && periodChanged {
+            SCNTransaction.begin()
+            SCNTransaction.animationDuration = 3.0
+            SCNTransaction.animationTimingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            applyVisuals()
+            SCNTransaction.commit()
+        } else {
+            applyVisuals()
+        }
         coordinator.lastPeriod = period
 
         // Period particles in the 3D layer (none under reduce-motion).

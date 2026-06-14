@@ -19,6 +19,7 @@ enum GardenParticles {
         p.birthRate = 1.0
         p.particleLifeSpan = 6
         p.particleSize = 0.05
+        p.particleImage = circleParticle()
         p.particleColor = UIColor(red: 1.0, green: 0.93, blue: 0.6, alpha: 0.8)
         p.particleVelocity = 0.14
         p.blendMode = .alpha
@@ -32,6 +33,7 @@ enum GardenParticles {
         p.birthRate = 1.1
         p.particleLifeSpan = 7
         p.particleSize = 0.07
+        p.particleImage = circleParticle()
         p.particleColor = GardenPalette.flowerPeach
         p.particleColorVariation = SCNVector4(0.06, 0.04, 0.05, 0.0)
         p.particleVelocity = 0.28
@@ -43,17 +45,38 @@ enum GardenParticles {
         return p
     }
 
-    /// Night: ~10 warm yellow fireflies pulsing.
+    /// Night: ~10 warm yellow fireflies pulsing — round, additive glow.
     static func fireflies() -> SCNParticleSystem {
         let p = base()
         p.birthRate = 1.3
         p.particleLifeSpan = 7.5
         p.particleSize = 0.06
+        p.particleImage = circleParticle()
         p.particleColor = GardenPalette.firefly
         p.particleVelocity = 0.2
         p.blendMode = .additive
         p.emitterShape = SCNBox(width: 6.5, height: 3, length: 5.5, chamferRadius: 0)
         return p
+    }
+
+    /// Soft round white dot — a radial-gradient sprite so motes read as
+    /// circles, not squares. Cached.
+    private static var cachedCircle: UIImage?
+    private static func circleParticle() -> UIImage {
+        if let cachedCircle { return cachedCircle }
+        let size = CGSize(width: 32, height: 32)
+        let image = UIGraphicsImageRenderer(size: size).image { ctx in
+            let cg = ctx.cgContext
+            let colors = [UIColor.white.cgColor,
+                          UIColor.white.withAlphaComponent(0).cgColor] as CFArray
+            guard let g = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(),
+                                     colors: colors, locations: [0, 1]) else { return }
+            let c = CGPoint(x: 16, y: 16)
+            cg.drawRadialGradient(g, startCenter: c, startRadius: 0,
+                                  endCenter: c, endRadius: 16, options: [])
+        }
+        cachedCircle = image
+        return image
     }
 
     /// One-shot water-droplet sparkle for the watering-recovery moment —

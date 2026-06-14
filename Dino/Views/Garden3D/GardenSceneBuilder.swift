@@ -33,14 +33,22 @@ final class GardenSceneHandle {
     let sunflower: SunflowerNode
     let rig: GardenLighting.Rig
     let particleAnchor: SCNNode
+    let cloudGroup: SCNNode
+    let cloudMaterials: [SCNMaterial]   // tinted per time period
+    let birdGroup: SCNNode              // day/dawn only
     let builtForReduceMotion: Bool
 
     init(scene: SCNScene, sunflower: SunflowerNode, rig: GardenLighting.Rig,
-         particleAnchor: SCNNode, builtForReduceMotion: Bool) {
+         particleAnchor: SCNNode, cloudGroup: SCNNode,
+         cloudMaterials: [SCNMaterial], birdGroup: SCNNode,
+         builtForReduceMotion: Bool) {
         self.scene = scene
         self.sunflower = sunflower
         self.rig = rig
         self.particleAnchor = particleAnchor
+        self.cloudGroup = cloudGroup
+        self.cloudMaterials = cloudMaterials
+        self.birdGroup = birdGroup
         self.builtForReduceMotion = builtForReduceMotion
     }
 }
@@ -95,6 +103,62 @@ enum GardenSceneBuilder {
             scene.rootNode.addChildNode(tree)
         }
 
+        // ── Animated clouds: soft puffy node clusters drifting across the
+        //    sky behind the flower, varied speeds, wrapping offscreen.
+        let cloudGroup = SCNNode()
+        var cloudMaterials: [SCNMaterial] = []
+        let cloudSpecs: [(x: Float, y: Float, z: Float, scale: Float, duration: TimeInterval)] = [
+            (-8, 6.2, -9, 1.0, 70),
+            (-2, 7.0, -11, 1.3, 95),
+            (4, 5.8, -8, 0.8, 52),
+            (8, 6.6, -10, 1.05, 80)
+        ]
+        for spec in cloudSpecs {
+            let (cloud, mats) = makeCloud(animate: !reduceMotion)
+            cloud.scale = SCNVector3(spec.scale, spec.scale, spec.scale)
+            cloud.position = SCNVector3(spec.x, spec.y, spec.z)
+            if !reduceMotion {
+                let drift = SCNAction.sequence([
+                    .moveBy(x: 22, y: 0, z: 0, duration: spec.duration),
+                    .run { node in node.position.x = -11 }
+                ])
+                cloud.runAction(.repeatForever(drift))
+            }
+            cloudMaterials.append(contentsOf: mats)
+            cloudGroup.addChildNode(cloud)
+        }
+        scene.rootNode.addChildNode(cloudGroup)
+
+        // ── Animated birds: small dark silhouettes flapping across the sky
+        //    (visibility toggled day/dawn-only by GardenSceneView).
+        let birdGroup = SCNNode()
+        let birdSpecs: [(y: Float, z: Float, scale: Float, duration: TimeInterval, startFrac: Float)] = [
+            (7.2, -9, 1.0, 26, 0.0),
+            (6.3, -7, 0.8, 34, 0.5)
+        ]
+        for spec in birdSpecs {
+            let outer = SCNNode()
+            outer.position = SCNVector3(-10 + spec.startFrac * 20, spec.y, spec.z)
+            let bird = makeBird(animate: !reduceMotion)
+            bird.scale = SCNVector3(spec.scale, spec.scale, spec.scale)
+            outer.addChildNode(bird)
+            if !reduceMotion {
+                let drift = SCNAction.sequence([
+                    .moveBy(x: 20, y: 0, z: 0, duration: spec.duration),
+                    .run { node in node.position.x = -10 }
+                ])
+                outer.runAction(.repeatForever(drift))
+                let bob = SCNAction.sequence([
+                    .moveBy(x: 0, y: 0.3, z: 0, duration: spec.duration / 2),
+                    .moveBy(x: 0, y: -0.3, z: 0, duration: spec.duration / 2)
+                ])
+                bob.timingMode = .easeInEaseOut
+                bird.runAction(.repeatForever(bob))
+            }
+            birdGroup.addChildNode(outer)
+        }
+        scene.rootNode.addChildNode(birdGroup)
+
         // ── Lighting.
         let rig = GardenLighting.makeRig()
         scene.rootNode.addChildNode(rig.sunNode)
@@ -122,8 +186,84 @@ enum GardenSceneBuilder {
         return GardenSceneHandle(
             scene: scene, sunflower: sunflower, rig: rig,
             particleAnchor: particleAnchor,
+            cloudGroup: cloudGroup, cloudMaterials: cloudMaterials,
+            birdGroup: birdGroup,
             builtForReduceMotion: reduceMotion
         )
+    }
+
+    // MARK: - Animated cloud + bird nodes
+
+    /// A soft puffy cloud: overlapping flattened white spheres, grouped on
+    /// an inner node that bobs gently (the outer node handles drift). Returns
+    /// the outer node and its puff materials (tinted per period by the view).
+    private static func makeCloud(animate: Bool) -> (node: SCNNode, materials: [SCNMaterial]) {
+        let outer = SCNNode()
+        let puffs = SCNNode()
+        outer.addChildNode(puffs)
+
+        var materials: [SCNMaterial] = []
+        let blobs: [(x: Float, y: Float, r: CGFloat)] = [
+            (0, 0, 0.9), (-0.9, -0.1, 0.62), (0.9, -0.1, 0.66), (0.25, 0.32, 0.52)
+        ]
+        for blob in blobs {
+            let geo = SCNSphere(radius: blob.r)
+            geo.segmentCount = 12
+            let m = SCNMaterial()
+            m.diffuse.contents = UIColor.white
+            m.lightingModel = .constant
+            m.transparency = 0.85
+            m.writesToDepthBuffer = false
+            geo.firstMaterial = m
+            materials.append(m)
+            let node = SCNNode(geometry: geo)
+            node.position = SCNVector3(blob.x, blob.y, 0)
+            node.scale = SCNVector3(1.0, 0.6, 0.55)   // flattened, soft
+            node.castsShadow = false
+            puffs.addChildNode(node)
+        }
+        if animate {
+            let up = SCNAction.moveBy(x: 0, y: 0.15, z: 0, duration: 2.2)
+            up.timingMode = .easeInEaseOut
+            let down = SCNAction.moveBy(x: 0, y: -0.15, z: 0, duration: 2.2)
+            down.timingMode = .easeInEaseOut
+            puffs.runAction(.repeatForever(.sequence([up, down])))
+        }
+        outer.castsShadow = false
+        return (outer, materials)
+    }
+
+    /// A small dark bird: two thin wings hinged at the body, flapping by
+    /// rotation (a gentle V opening and closing).
+    private static func makeBird(animate: Bool) -> SCNNode {
+        let bird = SCNNode()
+        let ink = UIColor(hexRGB: 0x2D3142)
+        for side in [Float(-1), Float(1)] {
+            let wingGeo = SCNBox(width: 0.45, height: 0.015, length: 0.12, chamferRadius: 0.01)
+            let m = SCNMaterial()
+            m.diffuse.contents = ink
+            m.lightingModel = .constant
+            m.isDoubleSided = true
+            wingGeo.firstMaterial = m
+            let wing = SCNNode(geometry: wingGeo)
+            // Hinge at the body (inner edge of the wing).
+            wing.pivot = SCNMatrix4MakeTranslation(side * -0.225, 0, 0)
+            wing.position = SCNVector3(side * 0.03, 0, 0)
+            wing.eulerAngles.z = side * 0.25   // slight V at rest
+            wing.castsShadow = false
+            if animate {
+                let up = SCNAction.rotateTo(x: 0, y: 0, z: CGFloat(side) * 0.7,
+                                            duration: 0.45, usesShortestUnitArc: true)
+                up.timingMode = .easeInEaseOut
+                let down = SCNAction.rotateTo(x: 0, y: 0, z: CGFloat(side) * 0.05,
+                                              duration: 0.45, usesShortestUnitArc: true)
+                down.timingMode = .easeInEaseOut
+                wing.runAction(.repeatForever(.sequence([up, down])))
+            }
+            bird.addChildNode(wing)
+        }
+        bird.castsShadow = false
+        return bird
     }
 
     // MARK: - Illustrated tree images (120×160, drawn in CGContext)
