@@ -90,6 +90,9 @@ struct HomeView: View {
             .navigationDestination(isPresented: $viewModel.showAssessment) {
                 AssessmentView().environmentObject(dataManager)
             }
+            .navigationDestination(isPresented: $viewModel.showRhythms) {
+                RhythmsView(analysis: RhythmsDataAdapter.currentAnalysis())
+            }
             .navigationDestination(isPresented: $viewModel.showResources) {
                 ResourcesView().environmentObject(dataManager)
             }
@@ -413,7 +416,7 @@ struct HomeView: View {
                 ActionItem(id: "affirmations", title: "Affirm", icon: "sparkles", color: DinoTheme.warmRose, tab: nil),
             ],
             [
-                ActionItem(id: "assessment", title: "Assess", icon: "chart.bar.fill", color: DinoTheme.skyBlue.opacity(0.8), tab: nil),
+                ActionItem(id: "rhythms", title: "rhythms", icon: "waveform.path", color: DinoTheme.lavender, tab: nil),
                 ActionItem(id: "growth", title: "Growth", icon: "tree.fill", color: DinoTheme.sageGreen, tab: nil),
                 ActionItem(id: "resources", title: "Help", icon: "heart.fill", color: DinoTheme.warmRose.opacity(0.8), tab: nil),
             ]
@@ -513,6 +516,8 @@ struct HomeView: View {
                     viewModel.showGrowth = true
                 case "assessment":
                     viewModel.showAssessment = true
+                case "rhythms":
+                    viewModel.showRhythms = true
                 case "resources":
                     viewModel.showResources = true
                 default:
