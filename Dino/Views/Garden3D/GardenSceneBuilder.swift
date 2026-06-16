@@ -58,11 +58,13 @@ enum GardenSceneBuilder {
     static func build(reduceMotion: Bool) -> GardenSceneHandle {
         let scene = SCNScene()
 
-        // ── Ground: a soft sage plane that mostly catches the sunflower's
-        //    shadow — the background image paints the horizon above it.
+        // ── Ground: rich brown soil foreground (design-system Growth soil
+        //    #9A7550 → #5E4220, far → near). It catches the sunflower's shadow
+        //    and meets the painted soil at the horizon; period lighting grades
+        //    it cooler/darker at night just like the rest of the 3D layer.
         let groundGeo = SCNPlane(width: 20, height: 20)
         let groundMaterial = SCNMaterial()
-        groundMaterial.diffuse.contents = UIColor(hexRGB: 0x7EC86A).withAlphaComponent(0.8)
+        groundMaterial.diffuse.contents = soilGradientImage()
         groundMaterial.lightingModel = .lambert
         groundMaterial.specular.contents = UIColor.black
         groundMaterial.isDoubleSided = true
@@ -77,31 +79,8 @@ enum GardenSceneBuilder {
         sunflower.position = SCNVector3(0, 0, 0)
         scene.rootNode.addChildNode(sunflower)
 
-        // ── Illustrated billboard trees framing the flower.
-        let treeSpecs: [(x: Float, z: Float, scale: Float, variant: Int)] = [
-            (-3.5, -2.0, 1.0, 0),
-            (3.5, -2.5, 1.1, 1),
-            (-5.0, -4.0, 1.25, 2),
-            (5.0, -3.5, 1.2, 0)
-        ]
-        for spec in treeSpecs {
-            let height: CGFloat = 3.2 * CGFloat(spec.scale)
-            let width = height * 0.75
-            let plane = SCNPlane(width: width, height: height)
-            let m = SCNMaterial()
-            m.diffuse.contents = makeTreeImage(variant: spec.variant)
-            m.lightingModel = .constant
-            m.isDoubleSided = true
-            m.transparencyMode = .aOne
-            plane.firstMaterial = m
-            let tree = SCNNode(geometry: plane)
-            tree.position = SCNVector3(spec.x, Float(height) / 2, spec.z)
-            let billboard = SCNBillboardConstraint()
-            billboard.freeAxes = .Y
-            tree.constraints = [billboard]
-            tree.castsShadow = false
-            scene.rootNode.addChildNode(tree)
-        }
+        // (The two flat cartoon billboard trees were removed — the painted
+        //  rolling hills + sunflower field now frame the scene.)
 
         // ── Animated clouds: soft puffy node clusters drifting across the
         //    sky behind the flower, varied speeds, wrapping offscreen.
@@ -266,39 +245,24 @@ enum GardenSceneBuilder {
         return bird
     }
 
-    // MARK: - Illustrated tree images (120×160, drawn in CGContext)
+    // MARK: - Brown soil gradient (design-system Growth soil)
 
-    private static var treeImageCache: [Int: UIImage] = [:]
+    private static var cachedSoil: UIImage?
 
-    private static func makeTreeImage(variant: Int) -> UIImage {
-        if let cached = treeImageCache[variant] { return cached }
-        let size = CGSize(width: 120, height: 160)
-        let renderer = UIGraphicsImageRenderer(size: size)
-        var rng = GardenSeededRandom(seed: UInt64(variant) * 17 + 5)
-
-        let image = renderer.image { ctx in
-            let cg = ctx.cgContext
-
-            // Trunk.
-            cg.setFillColor(UIColor(hexRGB: 0x8B5E3C).cgColor)
-            cg.fill(CGRect(x: 52, y: 95, width: 16, height: 65))
-
-            // Crown: overlapping circles in three greens.
-            let greens: [UInt32] = [0x6BBF59, 0x4A9A4A, 0x85CF6B]
-            let blobs: [(x: CGFloat, y: CGFloat, r: CGFloat)] = [
-                (60, 60, 42), (32, 75, 28), (88, 75, 27),
-                (45, 38, 24), (76, 40, 23), (60, 88, 26)
-            ]
-            for (i, blob) in blobs.enumerated() {
-                cg.setFillColor(UIColor(hexRGB: greens[i % greens.count]).cgColor)
-                let jx = CGFloat(rng.range(-4, 4))
-                let jy = CGFloat(rng.range(-3, 3))
-                cg.fillEllipse(in: CGRect(x: blob.x - blob.r + jx,
-                                          y: blob.y - blob.r + jy,
-                                          width: blob.r * 2, height: blob.r * 2))
-            }
+    /// Vertical gradient #9A7550 (far) → #5E4220 (near) for the ground plane.
+    private static func soilGradientImage() -> UIImage {
+        if let cachedSoil { return cachedSoil }
+        let size = CGSize(width: 8, height: 256)
+        let image = UIGraphicsImageRenderer(size: size).image { ctx in
+            let colors = [UIColor(hexRGB: 0x9A7550).cgColor,
+                          UIColor(hexRGB: 0x6E4E2A).cgColor,
+                          UIColor(hexRGB: 0x5E4220).cgColor] as CFArray
+            guard let g = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(),
+                                     colors: colors, locations: [0, 0.55, 1]) else { return }
+            ctx.cgContext.drawLinearGradient(
+                g, start: CGPoint(x: 0, y: 0), end: CGPoint(x: 0, y: size.height), options: [])
         }
-        treeImageCache[variant] = image
+        cachedSoil = image
         return image
     }
 }
