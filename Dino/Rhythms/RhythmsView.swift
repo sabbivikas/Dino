@@ -76,6 +76,7 @@ private func weekdayShort(_ wd: Int) -> String { String(weekdayName(wd).prefix(3
 
 struct RhythmsView: View {
     let analysis: RhythmsAnalysis
+    var moodSequence: [HelixMood] = []   // oldest → newest, one per recent day
     var calendar: Calendar = .current
     var now: Date = Date()
 
@@ -83,7 +84,8 @@ struct RhythmsView: View {
         ZStack {
             RH.cream.ignoresSafeArea()
             if analysis.hasEnoughData {
-                RhythmsForecastView(analysis: analysis, calendar: calendar, now: now)
+                RhythmsForecastView(analysis: analysis, moodSequence: moodSequence,
+                                    calendar: calendar, now: now)
             } else {
                 RhythmsLearningView(daysAvailable: analysis.daysOfDataAvailable)
             }
@@ -196,8 +198,10 @@ private struct LearningStrandPlaceholder: View {
 
 private struct RhythmsForecastView: View {
     let analysis: RhythmsAnalysis
+    let moodSequence: [HelixMood]
     let calendar: Calendar
     let now: Date
+    @State private var shape: HelixShape = .helix
 
     private var todayWeekday: Int { calendar.component(.weekday, from: now) }
     private var tomorrowWeekday: Int { wd(offset: 1) }
@@ -220,11 +224,31 @@ private struct RhythmsForecastView: View {
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 0) {
+                // HERO: the emotional-DNA helix, morphing between formations.
                 VStack(alignment: .leading, spacing: 2) {
                     Text("your rhythms")
                         .font(DinoTheme.dinoFont(size: 13)).foregroundColor(RH.ink2)
-                    Text("your inner weather")
+                    Text("emotional dna")
                         .font(DinoTheme.dinoFont(size: 28)).foregroundColor(RH.ink)
+                }
+                .padding(.bottom, 10)
+
+                RhythmsHelix(moods: moodSequence, ghostCount: 3, shape: shape)
+                    .frame(height: 300)
+                    .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous)
+                        .stroke(Color.white.opacity(0.06), lineWidth: 1))
+
+                Picker("formation", selection: $shape) {
+                    ForEach(HelixShape.allCases) { Text($0.label).tag($0) }
+                }
+                .pickerStyle(.segmented)
+                .padding(.top, 12).padding(.bottom, 22)
+
+                // FORECAST
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("your inner weather")
+                        .font(DinoTheme.dinoFont(size: 22)).foregroundColor(RH.ink)
                 }
                 .padding(.bottom, 14)
 
@@ -470,7 +494,20 @@ private let hardFixture = RhythmsAnalysis(
                          factors: RiskFactors(weekdayGap: 0.43, downwardTrajectory: 0.4, belowBaseline: 0.2, noPracticeToday: 1)),
     daysOfDataAvailable: 63, hasEnoughData: true)
 
+private let sampleMoods: [HelixMood] = (0..<60).map { i in
+    // Varied rise/fall (two sines + jitter), banded into the 5 moods; gold rare.
+    let t = Double(i)
+    let raw = sin(t * 0.28) * 0.6 + sin(t * 0.11 + 0.7) * 0.4
+    let jitter = [0.0, 0.18, -0.16, 0.10, -0.22, 0.07][i % 6]
+    let norm = min(1, max(0, (raw + 1) / 2 + jitter))
+    if norm > 0.93 { return .breakthrough }
+    if norm > 0.66 { return .steady }
+    if norm > 0.44 { return .growing }
+    if norm > 0.22 { return .tender }
+    return .hard
+}
+
 #Preview("learning") { RhythmsView(analysis: learningFixture) }
-#Preview("forecast — calm") { RhythmsView(analysis: calmFixture) }
-#Preview("forecast — likely hard") { RhythmsView(analysis: hardFixture) }
+#Preview("forecast — calm") { RhythmsView(analysis: calmFixture, moodSequence: sampleMoods) }
+#Preview("forecast — likely hard") { RhythmsView(analysis: hardFixture, moodSequence: sampleMoods) }
 #endif

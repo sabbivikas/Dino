@@ -91,7 +91,8 @@ struct HomeView: View {
                 AssessmentView().environmentObject(dataManager)
             }
             .navigationDestination(isPresented: $viewModel.showRhythms) {
-                RhythmsView(analysis: RhythmsDataAdapter.currentAnalysis())
+                RhythmsView(analysis: RhythmsDataAdapter.currentAnalysis(),
+                            moodSequence: RhythmsDataAdapter.recentMoodSequence())
             }
             .navigationDestination(isPresented: $viewModel.showResources) {
                 ResourcesView().environmentObject(dataManager)
