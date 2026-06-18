@@ -175,7 +175,6 @@ struct DailyAffirmationSmallView: View {
         }
         .padding(12)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(affirmationBackground)
     }
 }
 
@@ -217,7 +216,6 @@ struct DailyAffirmationMediumView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(14)
-        .background(affirmationBackground)
     }
 }
 
@@ -267,7 +265,6 @@ struct DailyAffirmationLargeView: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(affirmationBackground)
     }
 }
 
@@ -291,7 +288,11 @@ struct DailyAffirmationEntryView: View {
             }
         }
         .widgetURL(URL(string: "dino://affirmation"))
-        .containerBackground(.clear, for: .widget)
+        // The gradient must live in the container background — on iOS 17+ the
+        // system renders the widget through `.containerBackground`, so a
+        // `.clear` container renders blank. The closure form supplies a real
+        // background and still sizes to the system frame.
+        .containerBackground(for: .widget) { affirmationBackground }
     }
 }
 

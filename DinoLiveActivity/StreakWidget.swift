@@ -113,9 +113,11 @@ struct StreakWidgetEntryView: View {
             }
         }
         .widgetURL(URL(string: "dino://journal"))
-        // Use a clear container so the widget sizes to the system frame; the
-        // gradient is painted inside each sub-view's ZStack.
-        .containerBackground(Color.clear, for: .widget)
+        // The gradient must live in the container background — on iOS 17+ the
+        // system renders the widget through `.containerBackground`, so a
+        // `.clear` container renders blank. The closure form supplies a real
+        // background and still sizes to the system frame.
+        .containerBackground(for: .widget) { WidgetGradients.streak }
     }
 }
 

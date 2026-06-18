@@ -15,9 +15,8 @@ struct BreathingSmallView: View {
     let entry: BreathingSnapshot
 
     var body: some View {
+        // Background now comes from the widget's `.containerBackground`.
         ZStack {
-            WidgetGradients.breathing
-
             VStack(spacing: 6) {
                 BreathingBloomShape(breathPhase: entry.breathPhase)
                     .frame(width: 72, height: 72)
@@ -42,9 +41,8 @@ struct BreathingMediumView: View {
     let entry: BreathingSnapshot
 
     var body: some View {
+        // Background now comes from the widget's `.containerBackground`.
         ZStack {
-            WidgetGradients.breathing
-
             HStack(spacing: 16) {
                 BreathingBloomShape(breathPhase: entry.breathPhase)
                     .frame(width: 96, height: 96)

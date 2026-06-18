@@ -15,9 +15,8 @@ struct StreakSmallView: View {
     let entry: StreakSnapshot
 
     var body: some View {
+        // Background now comes from the widget's `.containerBackground`.
         ZStack {
-            WidgetGradients.streak
-
             VStack(alignment: .leading, spacing: 4) {
                 FlameShape(flickerPhase: entry.flickerPhase)
                     .frame(width: 64, height: 64)
@@ -71,9 +70,8 @@ struct StreakMediumView: View {
     }
 
     var body: some View {
+        // Background now comes from the widget's `.containerBackground`.
         ZStack {
-            WidgetGradients.streak
-
             HStack(spacing: 14) {
                 // Left: flame + count
                 VStack(spacing: 2) {

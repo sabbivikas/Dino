@@ -187,7 +187,6 @@ struct TodaysFocusSmallView: View {
         }
         .padding(10)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(focusBackground)
     }
 }
 
@@ -239,7 +238,6 @@ struct TodaysFocusMediumView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(14)
-        .background(focusBackground)
     }
 }
 
@@ -265,7 +263,11 @@ struct TodaysFocusWidgetEntryView: View {
             }
         }
         .widgetURL(URL(string: "dino://focus"))
-        .containerBackground(.clear, for: .widget)
+        // The gradient must live in the container background — on iOS 17+ the
+        // system renders the widget through `.containerBackground`, so a
+        // `.clear` container renders blank. The closure form supplies a real
+        // background and still sizes to the system frame.
+        .containerBackground(for: .widget) { focusBackground }
     }
 }
 

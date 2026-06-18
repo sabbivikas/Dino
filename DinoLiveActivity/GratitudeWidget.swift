@@ -164,7 +164,6 @@ struct GratitudeSmallView: View {
                 .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(gratitudeBackground)
     }
 }
 
@@ -221,7 +220,6 @@ struct GratitudeMediumView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(14)
-        .background(gratitudeBackground)
     }
 }
 
@@ -293,7 +291,6 @@ struct GratitudeLargeView: View {
                 .foregroundColor(Color(hex: "#C26A1E"))
         }
         .padding(16)
-        .background(gratitudeBackground)
     }
 }
 
@@ -325,7 +322,11 @@ struct GratitudeWidgetEntryView: View {
             }
         }
         .widgetURL(URL(string: "dino://gratitude"))
-        .containerBackground(.clear, for: .widget)
+        // The gradient must live in the container background — on iOS 17+ the
+        // system renders the widget through `.containerBackground`, so a
+        // `.clear` container renders blank. The closure form supplies a real
+        // background and still sizes to the system frame.
+        .containerBackground(for: .widget) { gratitudeBackground }
     }
 }
 
