@@ -2,10 +2,11 @@
 //  AmbientWorldView.swift
 //  Dino
 //
-//  SwiftUI window into the ambient waterfall world. Renders the cached
-//  SceneKit diorama, applies day/night, runs period particles, and reports
-//  the lily pad's projected screen position so the SwiftUI tap zone can
-//  sit exactly over the 3D pad.
+//  SwiftUI window into the ambient waterfall world. Self-drives the time-of-
+//  day period from the device clock (re-checked every 60s, timer invalidated
+//  on disappear, 4s crossfade), runs night fireflies/mist, and reports the
+//  lily-pad screen position so the SwiftUI tap zone sits over the painted pad.
+//  `forcedPeriod` pins the period (used by the forest-letter backdrop).
 //
 
 import SwiftUI
@@ -26,38 +27,53 @@ enum AmbientSceneCache {
 }
 
 struct AmbientWorldView: View {
-    let isNight: Bool
+    var forcedPeriod: AmbientPeriod? = nil
     var onLilyPadPosition: ((CGPoint) -> Void)? = nil
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var isActive: Bool = false
+    @State private var isActive = false
+    @State private var period: AmbientPeriod = AmbientPeriod.current(
+        hour: Calendar.current.component(.hour, from: Date()))
+    @State private var clock: Timer?
+
+    private var activePeriod: AmbientPeriod { forcedPeriod ?? period }
 
     var body: some View {
         AmbientWorldRepresentable(
-            isNight: isNight,
+            period: activePeriod,
             reduceMotion: reduceMotion,
             isActive: isActive,
             onLilyPadPosition: onLilyPadPosition
         )
-        .onAppear { isActive = true }
-        .onDisappear { isActive = false }
+        .onAppear {
+            isActive = true
+            if forcedPeriod == nil {
+                period = AmbientPeriod.current(hour: Calendar.current.component(.hour, from: Date()))
+                let t = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { _ in
+                    period = AmbientPeriod.current(hour: Calendar.current.component(.hour, from: Date()))
+                }
+                clock = t
+            }
+        }
+        .onDisappear {
+            isActive = false
+            clock?.invalidate()
+            clock = nil
+        }
     }
 }
 
 private struct AmbientWorldRepresentable: UIViewRepresentable {
-    let isNight: Bool
+    let period: AmbientPeriod
     let reduceMotion: Bool
     let isActive: Bool
     let onLilyPadPosition: ((CGPoint) -> Void)?
 
-    func makeCoordinator() -> Coordinator {
-        Coordinator()
-    }
+    func makeCoordinator() -> Coordinator { Coordinator() }
 
     func makeUIView(context: Context) -> SCNView {
         let view = SCNView()
         let handle = AmbientSceneCache.handle(reduceMotion: reduceMotion)
-
         view.scene = handle.scene
         view.preferredFramesPerSecond = 30
         view.antialiasingMode = .multisampling2X
@@ -65,7 +81,6 @@ private struct AmbientWorldRepresentable: UIViewRepresentable {
         view.allowsCameraControl = false
         view.backgroundColor = .black
         view.isUserInteractionEnabled = false   // taps handled by SwiftUI overlays
-
         context.coordinator.handle = handle
         apply(view: view, coordinator: context.coordinator, animated: false)
         return view
@@ -82,49 +97,42 @@ private struct AmbientWorldRepresentable: UIViewRepresentable {
     private func apply(view: SCNView, coordinator: Coordinator, animated: Bool) {
         guard let handle = coordinator.handle else { return }
 
-        if coordinator.lastIsNight != isNight {
+        if coordinator.lastPeriod != period {
             AmbientLighting.apply(
-                isNight: isNight, rig: handle.rig, scene: handle.scene,
-                treeMaterials: handle.treeMaterials,
-                animated: animated && !reduceMotion && coordinator.lastIsNight != nil
+                period: period, scene: handle.scene,
+                animated: animated && !reduceMotion && coordinator.lastPeriod != nil
             )
-            handle.waterfall.setNight(isNight)
+            handle.waterfall.setPeriod(isNight: period.isNight)
+            for f in handle.fish { f.setPeriod(isNight: period.isNight) }
 
-            // Period particles in the 3D layer.
+            // Night life: round fireflies + mist over the pool.
             handle.particleAnchor.removeAllParticleSystems()
-            if !reduceMotion {
-                if isNight {
-                    handle.particleAnchor.addParticleSystem(AmbientParticles.fireflies())
-                    handle.particleAnchor.addParticleSystem(AmbientParticles.mist())
-                } else {
-                    handle.particleAnchor.addParticleSystem(AmbientParticles.pollen())
-                }
+            if !reduceMotion && period.isNight {
+                handle.particleAnchor.addParticleSystem(AmbientParticles.fireflies())
+                handle.particleAnchor.addParticleSystem(AmbientParticles.mist())
             }
-            coordinator.lastIsNight = isNight
+            coordinator.lastPeriod = period
         }
 
-        // Renderer runs while visible; waterfall flow is the point of this
-        // screen. reduceMotion builds a static scene (no shaders/particles),
-        // so pausing play there keeps it a still, lit frame.
         view.isPlaying = isActive && !reduceMotion
 
-        // Report the lily pad's screen position once the view has real bounds.
+        // Report the lily marker's screen position once bounds are real.
         let size = view.bounds.size
         if size.width > 1, size.height > 1, coordinator.lastProjectedSize != size {
             coordinator.lastProjectedSize = size
-            let worldPos = handle.lilyPad.worldPosition
+            let worldPos = handle.lilyMarker.worldPosition
             let callback = onLilyPadPosition
             DispatchQueue.main.async { [weak view] in
                 guard let view, view.bounds.size == size else { return }
-                let projected = view.projectPoint(worldPos)
-                callback?(CGPoint(x: CGFloat(projected.x), y: CGFloat(projected.y)))
+                let p = view.projectPoint(worldPos)
+                callback?(CGPoint(x: CGFloat(p.x), y: CGFloat(p.y)))
             }
         }
     }
 
     final class Coordinator {
         var handle: AmbientSceneHandle?
-        var lastIsNight: Bool?
+        var lastPeriod: AmbientPeriod?
         var lastProjectedSize: CGSize = .zero
     }
 }

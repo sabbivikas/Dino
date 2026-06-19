@@ -118,7 +118,7 @@ private struct WaveBars: View {
 /// `ForestLetterView` as a hauntingly dim background.
 struct WaterfallDayScene: View {
     var body: some View {
-        AmbientWorldView(isNight: false)
+        AmbientWorldView(forcedPeriod: .day)
     }
 }
 
@@ -517,9 +517,8 @@ struct AmbientSoundsView: View {
             ZStack {
                 Color.black.ignoresSafeArea()
 
-                // LAYER 1: the 3D world.
+                // LAYER 1: the 3D world (self-drives its own time-of-day period).
                 AmbientWorldView(
-                    isNight: isNight,
                     onLilyPadPosition: { pos in
                         lilyPadScreenPos = pos
                     }

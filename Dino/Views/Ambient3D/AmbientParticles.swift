@@ -2,8 +2,9 @@
 //  AmbientParticles.swift
 //  Dino
 //
-//  Life for the ambient waterfall world: pollen by day, fireflies and
-//  water-edge mist by night, plus the waterfall's own mist and splash.
+//  Round-sprite particle systems for the ambient waterfall: foam + mist at
+//  the plunge, and warm fireflies at night. EVERY system uses a code-drawn
+//  circular particleImage so nothing ever ships as a square.
 //
 
 import SceneKit
@@ -11,97 +12,79 @@ import UIKit
 
 enum AmbientParticles {
 
-    /// Day: 6 golden motes drifting upward.
-    static func pollen() -> SCNParticleSystem {
-        let p = SCNParticleSystem()
-        p.birthRate = 1.0
-        p.particleLifeSpan = 6
-        p.particleLifeSpanVariation = 1.2
-        p.particleSize = 0.05
-        p.particleColor = UIColor(red: 1.0, green: 0.93, blue: 0.6, alpha: 0.8)
-        p.particleVelocity = 0.14
-        p.emittingDirection = SCNVector3(0, 1, 0)
-        p.spreadingAngle = 180
-        p.acceleration = SCNVector3(0, 0.012, 0)
-        p.isAffectedByGravity = false
-        p.blendMode = .alpha
-        p.birthLocation = .volume
-        p.emitterShape = SCNBox(width: 7, height: 3, length: 5, chamferRadius: 0)
-        return p
+    /// Soft round white dot (radial gradient) — the shared particle sprite.
+    private static var cachedCircle: UIImage?
+    static func circleSprite() -> UIImage {
+        if let cachedCircle { return cachedCircle }
+        let size = CGSize(width: 32, height: 32)
+        let img = UIGraphicsImageRenderer(size: size).image { ctx in
+            let cg = ctx.cgContext
+            let colors = [UIColor.white.cgColor,
+                          UIColor.white.withAlphaComponent(0).cgColor] as CFArray
+            guard let g = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(),
+                                     colors: colors, locations: [0, 1]) else { return }
+            let c = CGPoint(x: 16, y: 16)
+            cg.drawRadialGradient(g, startCenter: c, startRadius: 0, endCenter: c, endRadius: 16, options: [])
+        }
+        cachedCircle = img
+        return img
     }
 
-    /// Night: ~15 warm fireflies — drift, pause, pulse.
+    /// Night: ~12 warm round fireflies drifting low over the pool.
     static func fireflies() -> SCNParticleSystem {
-        let p = SCNParticleSystem()
-        p.birthRate = 3.0
+        let p = base()
+        p.birthRate = 2.4
         p.particleLifeSpan = 5
         p.particleLifeSpanVariation = 1.5
-        p.particleSize = 0.06
+        p.particleSize = 0.07
         p.particleColor = UIColor(hexRGB: 0xFFE066)
-        p.particleVelocity = 0.18
+        p.particleVelocity = 0.16
         p.spreadingAngle = 180
-        p.isAffectedByGravity = false
         p.blendMode = .additive
-        p.birthLocation = .volume
-        // Low over the pool and toward the trees — their glow doubles as
-        // reflections near the water surface.
-        p.emitterShape = SCNBox(width: 8, height: 2.2, length: 5, chamferRadius: 0)
+        p.emitterShape = SCNBox(width: 9, height: 3, length: 1, chamferRadius: 0)
         return p
     }
 
-    /// Night: large soft mist wisps at the water's edge.
+    /// Soft mist drifting above the pool surface.
     static func mist() -> SCNParticleSystem {
-        let p = SCNParticleSystem()
+        let p = base()
         p.birthRate = 0.8
         p.particleLifeSpan = 8
-        p.particleSize = 0.3
-        p.particleSizeVariation = 0.1
-        p.particleColor = UIColor(white: 1.0, alpha: 0.3)
+        p.particleSize = 0.34
+        p.particleSizeVariation = 0.12
+        p.particleColor = UIColor(white: 1.0, alpha: 0.22)
         p.particleVelocity = 0.06
         p.spreadingAngle = 180
-        p.isAffectedByGravity = false
         p.blendMode = .alpha
-        p.birthLocation = .volume
-        p.emitterShape = SCNBox(width: 7, height: 0.6, length: 4, chamferRadius: 0)
+        p.emitterShape = SCNBox(width: 8, height: 0.6, length: 0.6, chamferRadius: 0)
         return p
     }
 
-    /// Waterfall base mist — always on; opacity graded by day/night.
-    static func waterfallMist() -> SCNParticleSystem {
-        let p = SCNParticleSystem()
-        p.birthRate = 8
-        p.particleLifeSpan = 2.5
-        p.particleSize = 0.15
-        p.particleSizeVariation = 0.06
-        p.particleColor = UIColor(white: 1.0, alpha: 0.6)
-        p.particleVelocity = 0.4
-        p.particleVelocityVariation = 0.2
+    /// Foam/mist boiling up where the falls hits the pool. Always on; the
+    /// color is graded for day vs night by the caller.
+    static func foam() -> SCNParticleSystem {
+        let p = base()
+        p.birthRate = 14
+        p.particleLifeSpan = 2.2
+        p.particleLifeSpanVariation = 0.6
+        p.particleSize = 0.18
+        p.particleSizeVariation = 0.07
+        p.particleColor = UIColor(white: 1.0, alpha: 0.7)
+        p.particleVelocity = 0.45
+        p.particleVelocityVariation = 0.25
         p.emittingDirection = SCNVector3(0, 1, 0)
-        p.spreadingAngle = 70
-        p.isAffectedByGravity = false
+        p.spreadingAngle = 75
         p.blendMode = .additive
-        p.birthLocation = .volume
-        p.emitterShape = SCNBox(width: 1.8, height: 0.3, length: 0.6, chamferRadius: 0)
+        p.emitterShape = SCNBox(width: 1.4, height: 0.3, length: 0.4, chamferRadius: 0)
         return p
     }
 
-    /// Waterfall impact splash — tiny white dots scattering outward.
-    static func splash() -> SCNParticleSystem {
+    private static func base() -> SCNParticleSystem {
         let p = SCNParticleSystem()
-        p.birthRate = 20
-        p.particleLifeSpan = 0.5
-        p.particleLifeSpanVariation = 0.15
-        p.particleSize = 0.035
-        p.particleColor = UIColor(white: 1.0, alpha: 0.8)
-        p.particleVelocity = 0.8
-        p.particleVelocityVariation = 0.4
-        p.emittingDirection = SCNVector3(0, 1, 0)
-        p.spreadingAngle = 80
-        p.acceleration = SCNVector3(0, -1.6, 0)
+        p.particleImage = circleSprite()          // round — never square
         p.isAffectedByGravity = false
-        p.blendMode = .additive
-        p.birthLocation = .surface
-        p.emitterShape = SCNSphere(radius: 0.25)
+        p.birthLocation = .volume
+        p.emittingDirection = SCNVector3(0, 1, 0)
         return p
     }
 }
