@@ -107,11 +107,15 @@ enum GardenSceneBuilder {
         //    sky behind the flower, varied speeds, wrapping offscreen.
         let cloudGroup = SCNNode()
         var cloudMaterials: [SCNMaterial] = []
+        // Positions verified against the fixed ortho frustum (cam (0,3,8),
+        // scale 4 → ±4 vertical): y≈4–4.6 / z≈5–6 lands these at screen-v
+        // ≈2.7–3.2 — upper third, clear of the +4 top edge. Drift wraps
+        // within ±6 (visible half-width ≈4.4) so they stay mostly on screen.
         let cloudSpecs: [(x: Float, y: Float, z: Float, scale: Float, duration: TimeInterval)] = [
-            (-8, 6.2, -9, 1.0, 70),
-            (-2, 7.0, -11, 1.3, 95),
-            (4, 5.8, -8, 0.8, 52),
-            (8, 6.6, -10, 1.05, 80)
+            (-3.5, 4.5, -5, 1.0, 70),
+            (-1.0, 4.2, -6, 1.2, 95),
+            (1.5, 4.6, -5, 0.85, 52),
+            (3.0, 4.0, -6, 1.05, 80)
         ]
         for spec in cloudSpecs {
             let (cloud, mats) = makeCloud(animate: !reduceMotion)
@@ -119,8 +123,8 @@ enum GardenSceneBuilder {
             cloud.position = SCNVector3(spec.x, spec.y, spec.z)
             if !reduceMotion {
                 let drift = SCNAction.sequence([
-                    .moveBy(x: 22, y: 0, z: 0, duration: spec.duration),
-                    .run { node in node.position.x = -11 }
+                    .moveBy(x: 12, y: 0, z: 0, duration: spec.duration),
+                    .run { node in node.position.x = -6 }
                 ])
                 cloud.runAction(.repeatForever(drift))
             }
@@ -132,20 +136,22 @@ enum GardenSceneBuilder {
         // ── Animated birds: small dark silhouettes flapping across the sky
         //    (visibility toggled day/dawn-only by GardenSceneView).
         let birdGroup = SCNNode()
+        // Birds sit just below the clouds (screen-v ≈1.9–2.3) and bigger so
+        // they read at ortho scale 4 (literal size — no distance falloff).
         let birdSpecs: [(y: Float, z: Float, scale: Float, duration: TimeInterval, startFrac: Float)] = [
-            (7.2, -9, 1.0, 26, 0.0),
-            (6.3, -7, 0.8, 34, 0.5)
+            (3.8, -4, 1.3, 26, 0.0),
+            (3.4, -3, 1.05, 34, 0.5)
         ]
         for spec in birdSpecs {
             let outer = SCNNode()
-            outer.position = SCNVector3(-10 + spec.startFrac * 20, spec.y, spec.z)
+            outer.position = SCNVector3(-6 + spec.startFrac * 12, spec.y, spec.z)
             let bird = makeBird(animate: !reduceMotion)
             bird.scale = SCNVector3(spec.scale, spec.scale, spec.scale)
             outer.addChildNode(bird)
             if !reduceMotion {
                 let drift = SCNAction.sequence([
-                    .moveBy(x: 20, y: 0, z: 0, duration: spec.duration),
-                    .run { node in node.position.x = -10 }
+                    .moveBy(x: 12, y: 0, z: 0, duration: spec.duration),
+                    .run { node in node.position.x = -6 }
                 ])
                 outer.runAction(.repeatForever(drift))
                 let bob = SCNAction.sequence([

@@ -249,6 +249,23 @@ private struct GardenSceneRepresentable: UIViewRepresentable {
         }
 
         view.isPlaying = isActive && !reduceMotion
+
+        #if DEBUG
+        // TEMP: confirm clouds/birds land inside [0..w, 0..h]. Remove once verified.
+        if !coordinator.didDebug, view.bounds.width > 1 {
+            coordinator.didDebug = true
+            if let cloud = handle.cloudGroup.childNodes.first {
+                let wp = cloud.worldPosition
+                let sp = view.projectPoint(wp)
+                print("\u{1F325}\u{FE0F} cloud world=(\(wp.x), \(wp.y), \(wp.z)) screen=(\(sp.x), \(sp.y)) view=\(view.bounds.size)")
+            }
+            if let birdOuter = handle.birdGroup.childNodes.first {
+                let wp = birdOuter.worldPosition
+                let sp = view.projectPoint(wp)
+                print("\u{1F426} bird  world=(\(wp.x), \(wp.y), \(wp.z)) screen=(\(sp.x), \(sp.y)) view=\(view.bounds.size)")
+            }
+        }
+        #endif
     }
 
     final class Coordinator {
@@ -256,5 +273,6 @@ private struct GardenSceneRepresentable: UIViewRepresentable {
         var lastCareState: CareState?
         var lastPeriod: GardenLighting.Period?
         var lastParticlePeriod: GardenLighting.Period?
+        var didDebug: Bool = false
     }
 }

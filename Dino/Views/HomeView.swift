@@ -314,10 +314,9 @@ struct HomeView: View {
 
     private var focusCard: some View {
         VStack(spacing: 0) {
-            // Golden weather scene (130pt) — sun, drifting clouds, parallax hills,
-            // ground line, and a walking stickman traveler.
-            FocusCardScene()
-                .frame(height: 130)
+            // Cozy living-room scene that follows the device clock —
+            // morning / midday / evening / night, with slow ambient motion.
+            FocusRoomScene()
 
             // Content section
             VStack(alignment: .leading, spacing: 12) {
@@ -326,19 +325,23 @@ struct HomeView: View {
                     .foregroundColor(DinoTheme.textSecondary)
                     .tracking(0.3)
 
-                HStack(spacing: 8) {
-                    Text(viewModel.todaysFocusEmoji)
-                        .font(DinoTheme.dinoFont(size: 24))
-                    Text(viewModel.todaysFocus)
-                        .font(DinoTheme.dinoDisplayFont(size: 26))
-                        .foregroundColor(DinoTheme.textPrimary)
-                }
-                .padding(.top, -4)
+                Text(viewModel.todaysFocus)
+                    .font(DinoTheme.dinoDisplayFont(size: 26))
+                    .foregroundColor(DinoTheme.textPrimary)
+                    .padding(.top, -4)
 
                 weeklyTracker
                     .padding(.top, 4)
+
+                // Ambient caption — the room's current mood, tied to the clock.
+                Text(FocusRoomScene.hint(at: Date()))
+                    .font(DinoTheme.dinoFont(size: 12))
+                    .foregroundColor(DinoTheme.textSecondary.opacity(0.55))
+                    .tracking(0.2)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.top, 4)
             }
-            .padding(EdgeInsets(top: 14, leading: 20, bottom: 14, trailing: 20))
+            .padding(EdgeInsets(top: 14, leading: 20, bottom: 16, trailing: 20))
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(DinoTheme.surfacePrimary)
         }
