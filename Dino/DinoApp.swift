@@ -94,10 +94,11 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
             default:
                 let action = response.notification.request.content.userInfo["action"] as? String ?? "home"
                 switch action {
-                case "mood":      path = "dino://mood"
-                case "journal":   path = "dino://journal"
-                case "gratitude": path = "dino://gratitude"
-                default:          path = nil
+                case "mood":          path = "dino://mood"
+                case "journal":       path = "dino://journal"
+                case "gratitude":     path = "dino://gratitude"
+                case "rhythmsletter": path = "dino://rhythmsletter"
+                default:               path = nil
                 }
             }
         default:
@@ -195,6 +196,9 @@ struct DinoApp: App {
                     case .active:
                         sessionStartTime = Date()
                         AnalyticsManager.shared.trackSessionStarted()
+                        // Evening check: schedule a night-before rhythms letter
+                        // if tomorrow is confidently predicted to be hard.
+                        Task { await RhythmsLetterScheduler.shared.evaluateAndScheduleIfNeeded() }
                     case .inactive, .background:
                         let duration = Date().timeIntervalSince(sessionStartTime)
                         if duration > 0 {
