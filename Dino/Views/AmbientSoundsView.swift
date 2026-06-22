@@ -1748,6 +1748,7 @@ struct AmbientSoundsView: View {
         guard let letter = dailyLetter, !savedToJar else { return }
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
         savedToJar = true
+        AnalyticsManager.shared.trackForestLetterSavedToJar()
         Task { await ForestLetterService.shared.saveToGratitudeJar(letter) }
     }
 
@@ -1758,6 +1759,7 @@ struct AmbientSoundsView: View {
         dailyLetter = letter
         savedToJar = letter.savedToJar
         letterLoading = false
+        AnalyticsManager.shared.trackForestLetterOpened()
     }
 
     private func close() {

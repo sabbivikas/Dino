@@ -151,6 +151,7 @@ final class MoodPaintingService: ObservableObject {
         guard let image = UIImage(data: imageData) else {
             throw MoodPaintingError.decodeFailed
         }
+        AnalyticsManager.shared.trackMoodPaintingCreated()
         return image
     }
 

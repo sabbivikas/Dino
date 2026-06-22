@@ -51,10 +51,6 @@ final class AnalyticsManager {
         capture("onboarding_step_viewed", properties: ["step": step, "total": total])
     }
 
-    func trackOnboardingStepViewed(step: Int) {
-        capture("onboarding_step_viewed", properties: ["step_number": step])
-    }
-
     func trackOnboardingComplete() {
         capture("onboarding_completed")
     }
@@ -314,6 +310,78 @@ final class AnalyticsManager {
         capture("session_ended", properties: [
             "duration_seconds": durationSeconds
         ])
+    }
+
+    // MARK: - Rhythms
+
+    func trackRhythmsOpened() {
+        capture("rhythms_opened")
+    }
+
+    func trackRhythmsLearningStateShown(daysRemaining: Int) {
+        capture("rhythms_learning_state_shown", properties: ["days_remaining": daysRemaining])
+    }
+
+    func trackRhythmsForecastViewed(tomorrowRisk: String) {
+        capture("rhythms_forecast_viewed", properties: ["tomorrow_risk": tomorrowRisk])
+    }
+
+    func trackRhythmsHelixFormationChanged(formation: String) {
+        capture("rhythms_helix_formation_changed", properties: ["formation": formation])
+    }
+
+    func trackRhythmsInsightViewed(insightType: String) {
+        capture("rhythms_insight_viewed", properties: ["insight_type": insightType])
+    }
+
+    func trackRhythmsHardDayPredicted(weekday: String) {
+        capture("rhythms_hard_day_predicted", properties: ["weekday": weekday])
+    }
+
+    func trackRhythmsLetterReceived() {
+        capture("rhythms_letter_received")
+    }
+
+    func trackRhythmsLetterSaved() {
+        capture("rhythms_letter_saved")
+    }
+
+    // MARK: - Weekly Check-In
+
+    func trackWeeklyCheckInCompleted() {
+        capture("weekly_checkin_completed")
+    }
+
+    // MARK: - Mood Painting
+
+    func trackMoodPaintingCreated() {
+        capture("mood_painting_created")
+    }
+
+    // MARK: - Forest Letter
+
+    func trackForestLetterOpened() {
+        capture("forest_letter_opened")
+    }
+
+    func trackForestLetterSavedToJar() {
+        capture("forest_letter_saved_to_jar")
+    }
+
+    // MARK: - Account
+
+    func trackAccountDeleted() {
+        capture("account_deleted")
+    }
+
+    // MARK: - Voice Journal
+
+    func trackVoiceRecordingStarted() {
+        capture("voice_recording_started")
+    }
+
+    func trackVoiceTranscriptionCompleted() {
+        capture("voice_transcription_completed")
     }
 
     // MARK: - Deep Links

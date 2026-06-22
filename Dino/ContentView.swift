@@ -38,12 +38,14 @@ struct ContentView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .dinoOpenURL)) { note in
             if let url = note.object as? URL {
+                AnalyticsManager.shared.trackNotificationTapped(type: url.host ?? "unknown")
                 handleDeepLink(url)
                 DinoPendingDeepLink.url = nil
             }
         }
         .onAppear {
             if let url = DinoPendingDeepLink.url {
+                AnalyticsManager.shared.trackNotificationTapped(type: url.host ?? "unknown")
                 handleDeepLink(url)
                 DinoPendingDeepLink.url = nil
             }
@@ -64,6 +66,7 @@ struct ContentView: View {
 
     private func handleDeepLink(_ url: URL) {
         guard url.scheme == "dino" else { return }
+        AnalyticsManager.shared.trackDeepLinkOpened(screen: url.host ?? "unknown")
         switch url.host {
         case "mood":
             dataManager.deepLinkTab = 2
