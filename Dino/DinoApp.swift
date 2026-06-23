@@ -94,10 +94,11 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
             default:
                 let action = response.notification.request.content.userInfo["action"] as? String ?? "home"
                 switch action {
-                case "mood":      path = "dino://mood"
-                case "journal":   path = "dino://journal"
-                case "gratitude": path = "dino://gratitude"
-                default:          path = nil
+                case "mood":       path = "dino://mood"
+                case "journal":    path = "dino://journal"
+                case "gratitude":  path = "dino://gratitude"
+                case "meditation": path = "dino://meditation"
+                default:           path = nil
                 }
             }
         default:

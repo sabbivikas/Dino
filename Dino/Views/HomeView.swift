@@ -103,6 +103,11 @@ struct HomeView: View {
                 viewModel.showFocus = true
                 dataManager.showFocusFromDeepLink = false
             }
+            .onReceive(dataManager.$showMeditationFromDeepLink) { shouldShow in
+                guard shouldShow else { return }
+                viewModel.showMeditation = true
+                dataManager.showMeditationFromDeepLink = false
+            }
             .sheet(isPresented: $showNotificationCenter) {
                 NotificationCenterView()
             }

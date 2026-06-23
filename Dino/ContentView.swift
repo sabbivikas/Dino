@@ -79,6 +79,10 @@ struct ContentView: View {
             // Ambient sounds present as a full-screen cover on top of
             // whatever tab is active — no tab change required.
             dataManager.showAmbientFromDeepLink = true
+        case "meditation":
+            // Break-finder reminder opens meditation over the home tab.
+            dataManager.deepLinkTab = 0
+            dataManager.showMeditationFromDeepLink = true
         default:
             break
         }

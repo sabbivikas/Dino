@@ -138,6 +138,20 @@ final class SharedDataManager: ObservableObject {
     @Published var showBreathingFromDeepLink: Bool = false
     @Published var showFocusFromDeepLink: Bool = false
     @Published var showAmbientFromDeepLink: Bool = false
+    @Published var showMeditationFromDeepLink: Bool = false
+
+    // MARK: - Break-finder (once-per-day suggestion gate)
+    private let lastBreakSuggestionKey = "dino.lastBreakSuggestionDate"
+    var lastBreakSuggestionDate: Date? {
+        get { UserDefaults.standard.object(forKey: lastBreakSuggestionKey) as? Date }
+        set { UserDefaults.standard.set(newValue, forKey: lastBreakSuggestionKey) }
+    }
+    /// True if no break has been suggested yet today (local day).
+    var shouldSuggestBreakToday: Bool {
+        guard let last = lastBreakSuggestionDate else { return true }
+        return !Calendar.current.isDateInToday(last)
+    }
+    func markBreakSuggested() { lastBreakSuggestionDate = Date() }
     @Published var presentAddGratitude: Bool = false
 
     // MARK: - Member Since
