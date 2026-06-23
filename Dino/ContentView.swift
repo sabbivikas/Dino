@@ -49,6 +49,12 @@ struct ContentView: View {
             }
         }
         .fullScreenCover(isPresented: Binding(
+            get: { dataManager.showRhythmsLetterFromDeepLink },
+            set: { dataManager.showRhythmsLetterFromDeepLink = $0 }
+        )) {
+            RhythmsLetterView(onDismiss: { dataManager.showRhythmsLetterFromDeepLink = false })
+        }
+        .fullScreenCover(isPresented: Binding(
             get: { dataManager.showAmbientFromDeepLink },
             set: { dataManager.showAmbientFromDeepLink = $0 }
         )) {
@@ -79,6 +85,10 @@ struct ContentView: View {
             // Ambient sounds present as a full-screen cover on top of
             // whatever tab is active — no tab change required.
             dataManager.showAmbientFromDeepLink = true
+        case "rhythmsletter":
+            // The night-before rhythms letter opens the envelope UI over
+            // whatever tab is active.
+            dataManager.showRhythmsLetterFromDeepLink = true
         default:
             break
         }

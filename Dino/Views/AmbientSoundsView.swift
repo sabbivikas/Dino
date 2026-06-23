@@ -1976,7 +1976,7 @@ private struct LilyPadTapZone: View {
 
 // MARK: - Forest letter overlay (envelope opens to reveal letter)
 
-private struct ForestLetterOverlay: View {
+struct ForestLetterOverlay: View {
     let letter: ForestDailyLetter?
     let loading: Bool
     let savedToJar: Bool

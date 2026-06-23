@@ -16,6 +16,7 @@ class HomeViewModel: ObservableObject {
     @Published var showGrowth: Bool = false
     @Published var showAssessment: Bool = false
     @Published var showResources: Bool = false
+    @Published var showRhythms: Bool = false
 
     // Track card tap animations
     @Published var tappedCard: String? = nil

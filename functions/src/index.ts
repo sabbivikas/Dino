@@ -160,6 +160,137 @@ export const generateForestLetter = onCall(
 // week (so a regenerate-if-not-happy path is allowed, but abuse is bounded).
 const WEEKLY_LIMIT = 2;
 
+// Rhythms "letter from the forest" — the night before a predicted hard day.
+// PRIVACY: this function receives an ANONYMIZED, STRUCTURED summary ONLY.
+// It never receives or logs journal/gratitude/free text. The prompt is built
+// entirely server-side from a small allowlist of enum-like fields, and any
+// unexpected field is rejected so raw content cannot reach the model even if
+// the client is tampered with.
+const RHYTHMS_LETTER_WEEKLY_LIMIT = 3;
+
+export const generateRhythmsLetter = onCall(
+  { secrets: [OPENAI_API_KEY], timeoutSeconds: 30, memory: "256MiB" },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "sign in required");
+    }
+    const uid = request.auth.uid;
+
+    // ---- Validate + sanitize the anonymized summary (allowlist only) ----
+    const d = (request.data ?? {}) as Record<string, unknown>;
+    const ALLOWED_KEYS = [
+      "hardWeekday", "recentTrend", "recoveryDays", "helpfulPractice", "streakState",
+    ];
+    for (const k of Object.keys(d)) {
+      if (!ALLOWED_KEYS.includes(k)) {
+        // Reject unknown fields outright — prevents any free-text smuggling.
+        throw new HttpsError("invalid-argument", `unexpected field: ${k}`);
+      }
+    }
+
+    const WEEKDAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
+    const TRENDS = ["down", "flat", "up"];
+    const PRACTICES = ["journaling", "breathing", "gratitude", "movement", "rest", "none"];
+    const STREAKS = ["growing", "steady", "fresh", "broken", "none"];
+
+    const hardWeekday = WEEKDAYS.includes(String(d.hardWeekday)) ? String(d.hardWeekday) : "";
+    const recentTrend = TRENDS.includes(String(d.recentTrend)) ? String(d.recentTrend) : "flat";
+    const helpfulPractice = PRACTICES.includes(String(d.helpfulPractice)) ? String(d.helpfulPractice) : "none";
+    const streakState = STREAKS.includes(String(d.streakState)) ? String(d.streakState) : "none";
+    let recoveryDays = Number(d.recoveryDays);
+    if (!Number.isFinite(recoveryDays) || recoveryDays < 0 || recoveryDays > 30) recoveryDays = 0;
+    recoveryDays = Math.round(recoveryDays);
+
+    if (!hardWeekday) {
+      throw new HttpsError("invalid-argument", "hardWeekday required");
+    }
+
+    // ---- Rate limit: per-UID, per ISO week (letters only fire on predicted
+    //      hard days, so this should rarely trigger). Increment now, refund on
+    //      failure so a server error never burns the cap. ----
+    const db = admin.firestore();
+    const weekKey = isoWeekKey(new Date());
+    const counterRef = db.collection("rhythmsLetterLimits").doc(uid);
+
+    await db.runTransaction(async (tx) => {
+      const snap = await tx.get(counterRef);
+      const data = snap.data() ?? {};
+      const current = (data[weekKey] as number | undefined) ?? 0;
+      if (current >= RHYTHMS_LETTER_WEEKLY_LIMIT) {
+        throw new HttpsError("resource-exhausted", "weekly rhythms letter limit reached");
+      }
+      tx.set(
+        counterRef,
+        { [weekKey]: current + 1, updatedAt: admin.firestore.FieldValue.serverTimestamp() },
+        { merge: true }
+      );
+    });
+
+    // ---- Build the prompt entirely server-side from the safe fields ----
+    const systemPrompt =
+      "you are the forest, writing one short private letter to someone the night before a day that tends to be hard for them. " +
+      "you have noticed only the shape of their days, never their words. " +
+      "acknowledge the coming day softly, without alarm. gently name what tends to help them, and remind them they have moved through days like this before. " +
+      "voice: warm, lowercase, plain, like a kind old tree, not a doctor. " +
+      "never use clinical or diagnostic language. never mention data, tracking, apps, scores, or percentages. " +
+      "no greeting line. never use dashes. keep it under 90 words. end with the signature on its own final line: the forest";
+
+    const trendPhrase =
+      recentTrend === "down" ? "the last few days have asked more of them" :
+      recentTrend === "up" ? "the last few days have felt a little lighter" :
+      "the last few days have held fairly steady";
+    const practicePhrase =
+      helpfulPractice === "none" ? "they have not leaned on anything in particular lately" :
+      `${helpfulPractice} tends to steady them`;
+    const recoveryPhrase =
+      recoveryDays > 0
+        ? `after a hard day they usually find their feet again within about ${recoveryDays} day${recoveryDays === 1 ? "" : "s"}`
+        : "they have always found their way back before";
+    const streakPhrase =
+      streakState === "growing" ? "they have been showing up for themselves lately" :
+      streakState === "steady" ? "they have kept a steady rhythm lately" :
+      streakState === "broken" ? "they have missed a few days lately, and that is okay" :
+      streakState === "fresh" ? "they have just begun again" : "";
+
+    const userPrompt = [
+      `tomorrow is a ${hardWeekday}, a day that tends to ask a lot of them.`,
+      `${trendPhrase}.`,
+      `${practicePhrase}.`,
+      `${recoveryPhrase}.`,
+      streakPhrase ? `${streakPhrase}.` : "",
+      "write tomorrow's letter from the forest.",
+    ].filter(Boolean).join(" ");
+
+    try {
+      const openai = new OpenAI({ apiKey: OPENAI_API_KEY.value() });
+      const resp = await openai.chat.completions.create({
+        model: "gpt-4o",
+        max_tokens: 200,
+        temperature: 0.85,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+      });
+      const content = resp.choices?.[0]?.message?.content ?? "";
+      if (!content) {
+        throw new HttpsError("internal", "OpenAI returned empty content");
+      }
+      return { content: content.trim() };
+    } catch (err) {
+      // Refund the weekly quota on failure so the user isn't billed against
+      // their cap for a server-side error.
+      await counterRef.set(
+        { [weekKey]: admin.firestore.FieldValue.increment(-1) },
+        { merge: true }
+      );
+      if (err instanceof HttpsError) throw err;
+      const message = err instanceof Error ? err.message : "OpenAI request failed";
+      throw new HttpsError("internal", message);
+    }
+  }
+);
+
 function isoWeekKey(date: Date): string {
   // ISO 8601 week date — the Thursday of the current week defines the year.
   const d = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));

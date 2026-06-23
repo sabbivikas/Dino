@@ -523,6 +523,50 @@ class NotificationManager: ObservableObject {
     // MARK: - Test Notification
 
     /// Send a test notification in 5 seconds to verify the system works.
+    /// Schedules the rhythms "letter from the forest" for a specific date — the
+    /// night before a day the pattern engine confidently predicts will be hard.
+    /// Tapping opens the letter envelope via the "rhythmsletter" deep link.
+    func scheduleRhythmsLetter(at fireDate: Date) {
+        guard notificationsEnabled else { return }
+        UNUserNotificationCenter.current().getNotificationSettings { settings in
+            guard Self.isPermissionGranted(settings.authorizationStatus) else { return }
+            let content = UNMutableNotificationContent()
+            content.title = "a letter from the forest 🌲"
+            content.body = "something arrived for tomorrow. tap to read it."
+            content.sound = .default
+            content.userInfo = ["action": "rhythmsletter"]
+
+            let comps = Calendar.current.dateComponents(
+                [.year, .month, .day, .hour, .minute], from: fireDate)
+            let trigger = UNCalendarNotificationTrigger(dateMatching: comps, repeats: false)
+            let request = UNNotificationRequest(
+                identifier: "rhythms_letter", content: content, trigger: trigger)
+            let center = UNUserNotificationCenter.current()
+            center.removePendingNotificationRequests(withIdentifiers: ["rhythms_letter"])
+            center.add(request) { error in
+                #if DEBUG
+                if let error = error { print("[Rhythms] letter schedule ERROR: \(error)") }
+                #endif
+            }
+        }
+    }
+
+    #if DEBUG
+    /// Manual QA helper: fire the rhythms letter notification in ~5s (no
+    /// network). Pair with RhythmsLetterScheduler.scheduleTestLetter().
+    func scheduleRhythmsLetterTest() {
+        let content = UNMutableNotificationContent()
+        content.title = "a letter from the forest 🌲"
+        content.body = "something arrived for tomorrow. tap to read it."
+        content.sound = .default
+        content.userInfo = ["action": "rhythmsletter"]
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 5, repeats: false)
+        let request = UNNotificationRequest(
+            identifier: "rhythms_letter_test", content: content, trigger: trigger)
+        UNUserNotificationCenter.current().add(request, withCompletionHandler: nil)
+    }
+    #endif
+
     func sendTestNotification() {
         let content = UNMutableNotificationContent()
         content.title = "dino is here"
