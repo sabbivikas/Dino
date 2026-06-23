@@ -130,7 +130,7 @@ struct DinoApp: App {
 
     init() {
         let config = PostHogConfig(
-            apiKey: "phc_sjfNi7Wc5A9EKLuAcDN8LPUaCGcXnywCmryM6aWz2obb",
+            projectToken: "phc_sjfNi7Wc5A9EKLuAcDN8LPUaCGcXnywCmryM6aWz2obb",
             host: "https://us.i.posthog.com"
         )
         // Manual app_opened / app_backgrounded / session_* events are richer
