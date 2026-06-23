@@ -391,6 +391,7 @@ class AuthManager: ObservableObject {
         }
         do {
             try await user.delete()
+            AnalyticsManager.shared.trackAccountDeleted()
             #if DEBUG
             print("[Auth] auth account deleted")
             #endif

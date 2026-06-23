@@ -516,7 +516,7 @@ private struct BottomStrip: View {
                     .padding(.vertical, 4)
                     .overlay(Capsule().stroke(Color(hex: "#C4B4A4"), lineWidth: 1))
                 Spacer()
-                Button(action: onWriteBack) {
+                Button(action: { AnalyticsManager.shared.trackAffirmationWriteBackTapped(); onWriteBack() }) {
                     Text("write back →")
                         .font(.custom(DinoTheme.customFontName, size: 12))
                         .foregroundColor(Color(hex: "#8B7A6A"))
@@ -567,6 +567,7 @@ private struct CelebrationOverlay: View {
                     .font(.custom(DinoTheme.customFontName, size: 22))
                     .foregroundColor(Color(hex: "#3D2B18"))
                     .multilineTextAlignment(.center)
+                    .onAppear { AnalyticsManager.shared.trackAffirmationMirrorFull() }
                 Text("you showed up every single day.\nnow go stick your notes on your real mirror\nand take a picture 🪞")
                     .font(.custom(DinoTheme.customFontName, size: 13))
                     .foregroundColor(Color(hex: "#6B5040"))

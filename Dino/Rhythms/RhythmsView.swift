@@ -90,6 +90,7 @@ struct RhythmsView: View {
                 RhythmsLearningView(daysAvailable: analysis.daysOfDataAvailable)
             }
         }
+        .onAppear { AnalyticsManager.shared.trackRhythmsOpened() }
     }
 }
 
@@ -159,6 +160,9 @@ private struct RhythmsLearningView: View {
 
             Spacer(minLength: 0)
             PrivacyLineView().padding(.bottom, 18)
+        }
+        .onAppear {
+            AnalyticsManager.shared.trackRhythmsLearningStateShown(daysRemaining: remaining)
         }
     }
 }
@@ -274,7 +278,12 @@ private struct RhythmsForecastView: View {
                         .font(DinoTheme.dinoFont(size: 14)).foregroundColor(RH.ink2)
                         .padding(.bottom, 10)
                     VStack(spacing: 10) {
-                        ForEach(insights.indices, id: \.self) { i in InsightCardView(vm: insights[i]) }
+                        ForEach(insights.indices, id: \.self) { i in
+                            InsightCardView(vm: insights[i])
+                                .onAppear {
+                                    AnalyticsManager.shared.trackRhythmsInsightViewed(insightType: insights[i].type)
+                                }
+                        }
                     }
                 }
 
@@ -283,6 +292,17 @@ private struct RhythmsForecastView: View {
             .padding(.horizontal, 20)
             .padding(.top, 14)
             .padding(.bottom, 30)
+        }
+        .onAppear {
+            AnalyticsManager.shared.trackRhythmsForecastViewed(
+                tomorrowRisk: analysis.risk.likelyHard ? "hard" : "calm")
+            if analysis.risk.likelyHard && analysis.risk.confident {
+                AnalyticsManager.shared.trackRhythmsHardDayPredicted(
+                    weekday: weekdayName(tomorrowWeekday))
+            }
+        }
+        .onChange(of: shape) { _, newShape in
+            AnalyticsManager.shared.trackRhythmsHelixFormationChanged(formation: newShape.label)
         }
     }
 
@@ -299,7 +319,8 @@ private struct RhythmsForecastView: View {
             if gap >= 0.3 {
                 let strength = gap >= 1.0 ? 3 : (gap >= 0.5 ? 2 : 1)
                 out.append(InsightVM(symbol: "cloud.rain.fill", color: RH.hard,
-                                     text: "\(weekdayName(hardest))s ask a lot of you", strength: strength))
+                                     text: "\(weekdayName(hardest))s ask a lot of you", strength: strength,
+                                     type: "weekday"))
             }
         }
 
@@ -308,7 +329,7 @@ private struct RhythmsForecastView: View {
             let strength = pc.liftRatio >= 1.8 ? 3 : (pc.liftRatio >= 1.3 ? 2 : 1)
             out.append(InsightVM(symbol: "pencil.and.outline", color: RH.sage,
                                  text: "journaling lifts you \(ratioText(pc.liftRatio))× the next day",
-                                 strength: strength))
+                                 strength: strength, type: "practice"))
         }
 
         // 3) Recovery time — only when a cycle was observed.
@@ -317,7 +338,8 @@ private struct RhythmsForecastView: View {
             let strength = r <= 2 ? 3 : (r <= 4 ? 2 : 1)
             let dayWord = days == 1 ? "day" : "days"
             out.append(InsightVM(symbol: "leaf.fill", color: RH.growing,
-                                 text: "you bounce back in about \(days) \(dayWord)", strength: strength))
+                                 text: "you bounce back in about \(days) \(dayWord)", strength: strength,
+                                 type: "recovery"))
         }
         return out
     }
@@ -397,6 +419,7 @@ private struct InsightVM {
     let color: Color
     let text: String
     let strength: Int
+    let type: String   // "weekday" | "practice" | "recovery" (for analytics)
 }
 
 private struct InsightCardView: View {

@@ -34,7 +34,7 @@ struct RhythmsLetterView: View {
                 loading: loading,
                 savedToJar: true,
                 reduceMotion: reduceMotion,
-                onSave: {},
+                onSave: { AnalyticsManager.shared.trackRhythmsLetterSaved() },
                 onClose: onDismiss
             )
         }
@@ -48,5 +48,6 @@ struct RhythmsLetterView: View {
             ?? RhythmsLetterService.dayKey(for: Date(), calendar: .current)
         letter = ForestDailyLetter(date: key, content: content, savedToJar: true)
         loading = false
+        AnalyticsManager.shared.trackRhythmsLetterReceived()
     }
 }

@@ -616,8 +616,10 @@ private struct JournalComposerCard: View {
         if isTranscribing {
             transcriber.stop()
             isTranscribing = false
+            AnalyticsManager.shared.trackVoiceTranscriptionCompleted()
         } else {
             isTranscribing = true
+            AnalyticsManager.shared.trackVoiceRecordingStarted()
             transcriber.start(initialText: composerText)
         }
     }
@@ -867,12 +869,17 @@ struct JournalPolaroidCard: View {
             }
         }
         .onTapGesture {
+            AnalyticsManager.shared.trackJournalFlipped()
+            let willShowBack = !flipped
             if reduceMotion {
                 flipped.toggle()
             } else {
                 withAnimation(.timingCurve(0.34, 1.1, 0.4, 1, duration: 0.8)) {
                     flipped.toggle()
                 }
+            }
+            if willShowBack {
+                AnalyticsManager.shared.trackJournalEntryViewed()
             }
         }
         .onLongPressGesture(minimumDuration: 0.4) {

@@ -109,6 +109,7 @@ struct WeeklyCheckInView: View {
         .animation(.easeInOut, value: phase)
         .onAppear {
             AnalyticsManager.shared.trackScreen("weekly_checkin")
+            AnalyticsManager.shared.trackAssessmentStarted()
         }
     }
 
@@ -171,6 +172,7 @@ struct WeeklyCheckInView: View {
         await MainActor.run {
             generatedReport = report
             generatedResult = result
+            AnalyticsManager.shared.trackWeeklyCheckInCompleted()
             withAnimation(.easeInOut) { phase = .report }
         }
     }

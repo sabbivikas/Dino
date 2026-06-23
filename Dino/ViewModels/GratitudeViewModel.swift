@@ -35,6 +35,10 @@ class GratitudeViewModel: ObservableObject {
         guard !text.isEmpty else { return }
         dataManager.addGratitudeNote(text, tokenType: tokenType)
         AnalyticsManager.shared.trackGratitudeTokenAdded(type: tokenType)
+        let newTotal = dataManager.gratitudeNotes.count
+        if [3, 10, 25].contains(newTotal) {
+            AnalyticsManager.shared.trackGratitudeMilestone(count: newTotal)
+        }
         newNoteText = ""
         showAddSheet = false
     }

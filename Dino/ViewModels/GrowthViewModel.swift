@@ -182,7 +182,12 @@ final class GrowthViewModel: ObservableObject {
 
     /// Refresh the published streak from SharedDataManager.
     func updateStreak() {
-        currentStreak = dataManager.streakData.currentStreak
+        let previous = currentStreak
+        let updated = dataManager.streakData.currentStreak
+        currentStreak = updated
+        if updated != previous, [7, 14, 30, 60, 100].contains(updated) {
+            AnalyticsManager.shared.trackStreakMilestone(days: updated)
+        }
     }
 
     // MARK: - Weekly Bloom Log
