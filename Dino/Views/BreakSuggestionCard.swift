@@ -16,9 +16,9 @@ struct BreakSuggestionCard: View {
     var initialTargetDay: TargetDay = .today
     let onDismiss: () -> Void
 
-    private enum Stage { case loading, afterSevenChoice, suggestion, confirmed, unavailable }
+    private enum Stage { case intro, loading, afterSevenChoice, suggestion, confirmed, unavailable }
 
-    @State private var stage: Stage = .loading
+    @State private var stage: Stage = .intro
     @State private var suggestion: BreakSuggestion?
     @State private var chosenDay: TargetDay = .today
     @State private var confirmedTime: String = ""
@@ -40,11 +40,13 @@ struct BreakSuggestionCard: View {
                 .padding(.horizontal, 26)
                 .frame(maxWidth: .infinity)
         }
-        .task { await begin() }
+        // No async work on appear — the intro card shows instantly; calendar
+        // access only happens after the user taps "yes, find me some time".
     }
 
     @ViewBuilder private var content: some View {
         switch stage {
+        case .intro:            introView
         case .loading:          loadingView
         case .afterSevenChoice: afterSevenView
         case .suggestion:       suggestionView
@@ -54,6 +56,39 @@ struct BreakSuggestionCard: View {
     }
 
     // MARK: - States
+
+    /// Warm intro — shown instantly after a low mood is logged. NO calendar
+    /// access yet. Tapping "yes" is what kicks off begin().
+    private var introView: some View {
+        VStack(spacing: 16) {
+            Image("DinoMascot")
+                .resizable().scaledToFit()
+                .frame(width: 76, height: 76)
+            Text(introHeadline)
+                .font(DinoTheme.dinoFont(size: 22)).foregroundColor(ink)
+                .multilineTextAlignment(.center)
+            Text("want me to find you a quiet moment to breathe?")
+                .font(DinoTheme.dinoFont(size: 15)).foregroundColor(ink2)
+                .multilineTextAlignment(.center).lineSpacing(3)
+            Button { Task { await begin() } } label: {
+                Text("yes, find me some time")
+                    .font(DinoTheme.dinoFont(size: 17)).foregroundColor(.white)
+                    .frame(maxWidth: .infinity).padding(.vertical, 16)
+                    .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(sage))
+            }
+            .buttonStyle(ScaleButtonStyle())
+            .padding(.top, 4)
+            maybeLater
+        }
+    }
+
+    private var introHeadline: String {
+        switch mood {
+        case .drained:     return "today sounds heavy 🌧️"
+        case .overwhelmed: return "sounds like a lot today 🌿"
+        default:           return "today sounds like a lot 🌿"
+        }
+    }
 
     private var loadingView: some View {
         VStack(spacing: 18) {
@@ -168,6 +203,7 @@ struct BreakSuggestionCard: View {
     // MARK: - Flow
 
     private func begin() async {
+        stage = .loading   // show "checking your calendar…" while access + lookup run
         chosenDay = initialTargetDay
         let date = initialTargetDay == .tomorrow ? tomorrow() : Date()
         guard let s = await BreakSchedulerService.shared.suggestBreak(
