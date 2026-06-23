@@ -92,6 +92,10 @@ struct ContentView: View {
             // The night-before rhythms letter opens the envelope UI over
             // whatever tab is active.
             dataManager.showRhythmsLetterFromDeepLink = true
+        case "meditation":
+            // Break-finder reminder opens meditation over the home tab.
+            dataManager.deepLinkTab = 0
+            dataManager.showMeditationFromDeepLink = true
         default:
             break
         }

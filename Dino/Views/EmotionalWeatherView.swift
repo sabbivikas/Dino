@@ -10,6 +10,8 @@ struct EmotionalWeatherView: View {
 
     @EnvironmentObject var dataManager: SharedDataManager
     @StateObject private var viewModel: MoodViewModel = MoodViewModel(dataManager: SharedDataManager.shared)
+    @State private var showBreakCard = false
+    @State private var breakMood: EmotionalWeather = .drained
 
     var body: some View {
         NavigationStack {
@@ -85,7 +87,15 @@ struct EmotionalWeatherView: View {
                     // Save button
                     Button(action: {
                         HapticManager.shared.success()
+                        let logged = viewModel.selectedWeather
                         viewModel.saveMood()
+                        // Break-finder hook: only for low moods, once per day.
+                        if let w = logged, w == .overwhelmed || w == .drained,
+                           dataManager.shouldSuggestBreakToday {
+                            breakMood = w
+                            dataManager.markBreakSuggested()
+                            showBreakCard = true
+                        }
                     }) {
                         HStack(spacing: 10) {
                             if viewModel.saved {
@@ -131,6 +141,9 @@ struct EmotionalWeatherView: View {
             .onAppear {
                 AnalyticsManager.shared.trackMoodScreenOpened()
                 AnalyticsManager.shared.trackScreen("mood")
+            }
+            .sheet(isPresented: $showBreakCard) {
+                BreakSuggestionCard(mood: breakMood, onDismiss: { showBreakCard = false })
             }
         }
     }

@@ -291,6 +291,137 @@ export const generateRhythmsLetter = onCall(
   }
 );
 
+// Break-finder — suggest the best free calendar slot for a meditation break
+// after a low mood. PRIVACY: receives ONLY anonymized, structured fields:
+// free-slot TIME LABELS (never event titles), enum mood/time/day strings, and
+// an optional minimal rhythms context. No calendar titles, journal, mood notes,
+// or any free text. Unknown keys are rejected (defense in depth).
+const BREAK_SLOT_DAILY_LIMIT = 2;
+
+export const suggestBreakSlot = onCall(
+  { secrets: [OPENAI_API_KEY], timeoutSeconds: 30, memory: "256MiB" },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "sign in required");
+    }
+    const uid = request.auth.uid;
+
+    const d = (request.data ?? {}) as Record<string, unknown>;
+    const ALLOWED_KEYS = [
+      "freeSlots", "currentMood", "timeOfDay", "dayOfWeek", "isAfter7pm", "targetDay", "rhythmsContext",
+    ];
+    for (const k of Object.keys(d)) {
+      if (!ALLOWED_KEYS.includes(k)) {
+        throw new HttpsError("invalid-argument", `unexpected field: ${k}`);
+      }
+    }
+
+    // freeSlots: short time-range labels ONLY (e.g. "2:30pm-3:00pm"). Anything
+    // not matching a tight time pattern is dropped, so a title can never slip in.
+    const SLOT_RE = /^[0-9:\sapm\-–]{1,40}$/i;
+    const rawSlots = Array.isArray(d.freeSlots) ? d.freeSlots : [];
+    const freeSlots = rawSlots
+      .map((s) => String(s).trim())
+      .filter((s) => s.length > 0 && s.length <= 40 && SLOT_RE.test(s))
+      .slice(0, 12);
+    if (freeSlots.length === 0) {
+      throw new HttpsError("invalid-argument", "freeSlots required");
+    }
+
+    const MOODS = ["drained", "overwhelmed", "partlyCloudy", "clear"];
+    const TIMES = ["morning", "afternoon", "evening", "night"];
+    const DAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
+    const TARGETS = ["today", "tonight", "tomorrow"];
+    const currentMood = MOODS.includes(String(d.currentMood)) ? String(d.currentMood) : "drained";
+    const timeOfDay = TIMES.includes(String(d.timeOfDay)) ? String(d.timeOfDay) : "afternoon";
+    const dayOfWeek = DAYS.includes(String(d.dayOfWeek)) ? String(d.dayOfWeek) : "";
+    const targetDay = TARGETS.includes(String(d.targetDay)) ? String(d.targetDay) : "today";
+
+    const rc = (d.rhythmsContext ?? {}) as Record<string, unknown>;
+    const TRENDS = ["down", "flat", "up"];
+    const PRACTICES = ["journaling", "breathing", "gratitude", "movement", "rest", "none"];
+    const rhythmsAvailable = rc.available === true;
+    const hardWeekday = DAYS.includes(String(rc.hardWeekday)) ? String(rc.hardWeekday) : "";
+    const recentTrend = TRENDS.includes(String(rc.recentTrend)) ? String(rc.recentTrend) : "flat";
+    const helpfulPractice = PRACTICES.includes(String(rc.helpfulPractice)) ? String(rc.helpfulPractice) : "none";
+
+    // Rate limit: max BREAK_SLOT_DAILY_LIMIT per uid per UTC day. Increment now,
+    // refund on OpenAI failure so a server error never burns the cap.
+    const db = admin.firestore();
+    const dayKey = new Date().toISOString().slice(0, 10);
+    const counterRef = db.collection("breakSlotLimits").doc(uid);
+    await db.runTransaction(async (tx) => {
+      const snap = await tx.get(counterRef);
+      const data = snap.data() ?? {};
+      const current = (data[dayKey] as number | undefined) ?? 0;
+      if (current >= BREAK_SLOT_DAILY_LIMIT) {
+        throw new HttpsError("resource-exhausted", "daily break suggestion limit reached");
+      }
+      tx.set(
+        counterRef,
+        { [dayKey]: current + 1, updatedAt: admin.firestore.FieldValue.serverTimestamp() },
+        { merge: true }
+      );
+    });
+
+    const systemPrompt =
+      "you are dino, a gentle wellness companion. " +
+      `a user just logged that they're feeling ${currentMood} on a ${dayOfWeek || "weekday"} ${timeOfDay}. ` +
+      "pick the single best free slot from the list for a 15-20 minute meditation break. " +
+      'respond ONLY with valid JSON of the form {"slot":"2:30pm","duration":20,"reason":"..."}. ' +
+      "rules: lowercase, warm, under 20 words for the reason, no clinical language, no mention of data or ai, " +
+      "pick the slot that gives the most buffer before the next commitment. " +
+      (rhythmsAvailable
+        ? `gently reference their pattern in the reason (a ${recentTrend} stretch lately` +
+          `${helpfulPractice !== "none" ? `, ${helpfulPractice} tends to steady them` : ""}` +
+          `${hardWeekday ? `, ${hardWeekday}s tend to be heavy` : ""}).`
+        : "do not reference any patterns or history.");
+
+    const userPrompt = `free slots: ${freeSlots.join(", ")}. target: ${targetDay}. choose one and write the reason.`;
+
+    // Earliest slot's start time — the safe fallback if the model misbehaves.
+    const fallbackSlot = freeSlots[0].split(/[-–]/)[0].trim();
+
+    try {
+      const openai = new OpenAI({ apiKey: OPENAI_API_KEY.value() });
+      const resp = await openai.chat.completions.create({
+        model: "gpt-4o",
+        max_tokens: 150,
+        temperature: 0.7,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+      });
+      const content = resp.choices?.[0]?.message?.content ?? "";
+      let parsed: { slot?: string; duration?: number; reason?: string } = {};
+      try {
+        parsed = JSON.parse(content);
+      } catch {
+        parsed = {};
+      }
+      const slot = typeof parsed.slot === "string" && parsed.slot.trim().length > 0 && parsed.slot.length <= 20
+        ? parsed.slot.trim()
+        : fallbackSlot;
+      let duration = Number(parsed.duration);
+      if (!Number.isFinite(duration) || duration < 5 || duration > 30) duration = 20;
+      duration = Math.round(duration);
+      const reason = typeof parsed.reason === "string" && parsed.reason.trim().length > 0 && parsed.reason.length <= 200
+        ? parsed.reason.trim()
+        : "you have a quiet pocket coming up — a good moment to breathe 🌿";
+      return { slot, duration, reason };
+    } catch (err) {
+      await counterRef.set(
+        { [dayKey]: admin.firestore.FieldValue.increment(-1) },
+        { merge: true }
+      );
+      if (err instanceof HttpsError) throw err;
+      const message = err instanceof Error ? err.message : "OpenAI request failed";
+      throw new HttpsError("internal", message);
+    }
+  }
+);
+
 function isoWeekKey(date: Date): string {
   // ISO 8601 week date — the Thursday of the current week defines the year.
   const d = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
