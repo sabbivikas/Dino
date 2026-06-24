@@ -510,6 +510,7 @@ struct ProfileView: View {
         // show again on the next low mood. No visual feedback — invisible.
         .onTapGesture(count: 3) {
             SharedDataManager.shared.lastBreakSuggestionDate = nil
+            HapticManager.shared.success()   // subtle confirmation the reset fired
         }
     }
 
