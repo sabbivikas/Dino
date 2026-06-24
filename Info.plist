@@ -16,6 +16,8 @@
 	<string>Dino saves your finished mirror photo to your camera roll so you can keep the memory.</string>
 	<key>NSCalendarsUsageDescription</key>
 	<string>dino uses your calendar to find free moments for you to breathe and recharge.</string>
+	<key>NSCalendarsFullAccessUsageDescription</key>
+	<string>dino uses your calendar to find free moments for you to breathe and recharge.</string>
 	<key>NSCalendarsWriteOnlyAccessUsageDescription</key>
 	<string>dino adds a gentle break to your calendar when you want one.</string>
 	<key>UIAppFonts</key>
