@@ -35,6 +35,17 @@ final class CalendarService {
         }
     }
 
+    /// Coarse calendar access state for UI display (reads status, never requests).
+    enum CalendarAccess { case connected, notDetermined, denied }
+
+    var access: CalendarAccess {
+        switch EKEventStore.authorizationStatus(for: .event) {
+        case .fullAccess:    return .connected
+        case .notDetermined: return .notDetermined
+        default:             return .denied   // denied / restricted / write-only
+        }
+    }
+
     /// Free gaps (no events) of at least `minimumDuration`, in LOCAL time, from
     /// the later of 8am / now (for today) until 10pm. Empty if access denied or
     /// none qualify. Never throws.

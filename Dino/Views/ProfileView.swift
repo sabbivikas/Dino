@@ -5,6 +5,7 @@
 
 import SwiftUI
 import StoreKit
+import UIKit
 
 // MARK: - Local Tokens (scrapbook palette)
 
@@ -135,6 +136,8 @@ struct ProfileView: View {
     @Environment(\.requestReview) private var requestReview
 
     @State private var activeSheet: ProfileSheet?
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var calendarAccess: CalendarService.CalendarAccess = .notDetermined
     @State private var showAmbientSounds: Bool = false
     @State private var showForestLetter: Bool = false
     @State private var showRateAlert: Bool = false
@@ -262,6 +265,11 @@ struct ProfileView: View {
             }
             AnalyticsManager.shared.trackProfileOpened()
             AnalyticsManager.shared.trackScreen("profile")
+            refreshCalendarAccess()
+        }
+        .onChange(of: scenePhase) { _, phase in
+            // Refresh when returning from iPhone Settings (e.g. after granting).
+            if phase == .active { refreshCalendarAccess() }
         }
         .sheet(item: $activeSheet, onDismiss: {
             savedProfilePhoto = PhotoStore.load()
@@ -455,6 +463,41 @@ struct ProfileView: View {
     }
 
     // MARK: - Header Row
+
+    // MARK: - Calendar permission row
+
+    @ViewBuilder private var calendarRow: some View {
+        switch calendarAccess {
+        case .connected:
+            SBRow(icon: "calendar",
+                  iconColor: SB.sage,
+                  title: "calendar connected 🗓️",
+                  subtitle: "dino can find quiet moments for you") { }
+        case .notDetermined:
+            SBRow(icon: "calendar.badge.plus",
+                  iconColor: SB.sage,
+                  title: "connect your calendar",
+                  subtitle: "for gentle break suggestions") {
+                Task {
+                    _ = await CalendarService.shared.ensureAccess()
+                    refreshCalendarAccess()
+                }
+            }
+        case .denied:
+            SBRow(icon: "calendar.badge.exclamationmark",
+                  iconColor: SB.rose,
+                  title: "calendar access needed",
+                  subtitle: "tap to open settings") {
+                if let url = URL(string: UIApplication.openSettingsURLString) {
+                    UIApplication.shared.open(url)
+                }
+            }
+        }
+    }
+
+    private func refreshCalendarAccess() {
+        calendarAccess = CalendarService.shared.access
+    }
 
     private var headerRow: some View {
         HStack(alignment: .top) {
@@ -745,6 +788,7 @@ struct ProfileView: View {
             ) {
                 activeSheet = .gentleReminders
             }
+            calendarRow
             AmbientSoundsRow {
                 showAmbientSounds = true
             }
