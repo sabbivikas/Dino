@@ -70,7 +70,11 @@ struct BreakSuggestionCard: View {
             Text("want me to find you a quiet moment to breathe?")
                 .font(DinoTheme.dinoFont(size: 15)).foregroundColor(ink2)
                 .multilineTextAlignment(.center).lineSpacing(3)
-            Button { Task { await begin() } } label: {
+            Button {
+                // Mark the day's gate used ONLY now that the user engaged.
+                SharedDataManager.shared.markBreakSuggested()
+                Task { await begin() }
+            } label: {
                 Text("yes, find me some time")
                     .font(DinoTheme.dinoFont(size: 17)).foregroundColor(.white)
                     .frame(maxWidth: .infinity).padding(.vertical, 16)
