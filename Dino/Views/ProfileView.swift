@@ -548,13 +548,6 @@ struct ProfileView: View {
             }
             Spacer(minLength: 0)
         }
-        // Hidden QA gesture: triple-tap the profile header (avatar + name) to
-        // reset the break-finder once-per-day gate, so the suggestion card can
-        // show again on the next low mood. No visual feedback — invisible.
-        .onTapGesture(count: 3) {
-            SharedDataManager.shared.lastBreakSuggestionDate = nil
-            HapticManager.shared.success()   // subtle confirmation the reset fired
-        }
     }
 
     // MARK: - Stats stickers row

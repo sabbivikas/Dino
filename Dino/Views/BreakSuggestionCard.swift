@@ -71,8 +71,6 @@ struct BreakSuggestionCard: View {
                 .font(DinoTheme.dinoFont(size: 15)).foregroundColor(ink2)
                 .multilineTextAlignment(.center).lineSpacing(3)
             Button {
-                // Mark the day's gate used ONLY now that the user engaged.
-                SharedDataManager.shared.markBreakSuggested()
                 Task { await begin() }
             } label: {
                 Text("yes, find me some time")

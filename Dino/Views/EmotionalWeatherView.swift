@@ -89,21 +89,10 @@ struct EmotionalWeatherView: View {
                         HapticManager.shared.success()
                         let logged = viewModel.selectedWeather
                         viewModel.saveMood()
-                        // TEMP debug logging for TestFlight diagnosis (plain
-                        // print so it shows in Release/device console).
+                        // Break-finder hook: show the card on every low mood.
                         if let w = logged, w == .overwhelmed || w == .drained {
-                            print("🦕 BREAK-FINDER: low mood logged: \(w)")
-                            print("🦕 BREAK-FINDER: shouldSuggestBreakToday = \(dataManager.shouldSuggestBreakToday)")
-                            print("🦕 BREAK-FINDER: lastBreakSuggestionDate = \(String(describing: dataManager.lastBreakSuggestionDate))")
-                            if dataManager.shouldSuggestBreakToday {
-                                print("🦕 BREAK-FINDER: showing card")
-                                breakMood = w
-                                showBreakCard = true
-                            } else {
-                                print("🦕 BREAK-FINDER: gate closed, not showing")
-                            }
-                        } else {
-                            print("🦕 BREAK-FINDER: mood \(String(describing: logged)) — not a low mood, skipping")
+                            breakMood = w
+                            showBreakCard = true
                         }
                     }) {
                         HStack(spacing: 10) {
