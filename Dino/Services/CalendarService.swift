@@ -69,6 +69,13 @@ final class CalendarService {
             .filter { !$0.isAllDay }
             .sorted { ($0.startDate ?? .distantPast) < ($1.startDate ?? .distantPast) }
 
+        // TEMP debug logging (plain print → shows in Release/device console).
+        print("🗓️ CALENDAR: searching \(windowStart) to \(windowEnd)")
+        print("🗓️ CALENDAR: found \(events.count) events")
+        for event in events {
+            print("🗓️ CALENDAR: event '\(event.title ?? "untitled")' \(String(describing: event.startDate)) → \(String(describing: event.endDate))")
+        }
+
         var slots: [DateInterval] = []
         var cursor = windowStart
         for event in events {
@@ -85,7 +92,12 @@ final class CalendarService {
             let tail = DateInterval(start: cursor, end: windowEnd)
             if tail.duration >= minimumDuration { slots.append(tail) }
         }
-        return slots.sorted { $0.start < $1.start }
+        let result = slots.sorted { $0.start < $1.start }
+        print("🗓️ CALENDAR: free slots found: \(result.count)")
+        for slot in result {
+            print("🗓️ CALENDAR: slot \(slot.start) → \(slot.end) (\(Int(slot.duration / 60)) min)")
+        }
+        return result
     }
 
     /// Create a break event in the default calendar. Returns true on success,
