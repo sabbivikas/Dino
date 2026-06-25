@@ -308,7 +308,7 @@ export const suggestBreakSlot = onCall(
 
     const d = (request.data ?? {}) as Record<string, unknown>;
     const ALLOWED_KEYS = [
-      "freeSlots", "currentMood", "timeOfDay", "dayOfWeek", "isAfter7pm", "targetDay", "rhythmsContext",
+      "userMessage", "currentMood", "freeSlots", "timeOfDay", "dayOfWeek", "isAfter7pm", "rhythmsContext",
     ];
     for (const k of Object.keys(d)) {
       if (!ALLOWED_KEYS.includes(k)) {
@@ -316,34 +316,40 @@ export const suggestBreakSlot = onCall(
       }
     }
 
-    // freeSlots: short time-range labels ONLY (e.g. "2:30pm-3:00pm"). Anything
-    // not matching a tight time pattern is dropped, so a title can never slip in.
+    // freeSlots: short time-range labels ONLY (e.g. "7:30pm-8:00pm"). May be
+    // empty (calendar full) — that is handled, not an error.
     const SLOT_RE = /^[0-9:\sapm\-–]{1,40}$/i;
     const rawSlots = Array.isArray(d.freeSlots) ? d.freeSlots : [];
     const freeSlots = rawSlots
       .map((s) => String(s).trim())
       .filter((s) => s.length > 0 && s.length <= 40 && SLOT_RE.test(s))
       .slice(0, 12);
-    if (freeSlots.length === 0) {
-      throw new HttpsError("invalid-argument", "freeSlots required");
-    }
+
+    // userMessage: the user's own free text. Capped + trimmed. Sent to the
+    // model ONLY — never logged, never stored. Empty string == skipped.
+    const userMessage = String(d.userMessage ?? "").slice(0, 300).trim();
 
     const MOODS = ["drained", "overwhelmed", "partlyCloudy", "clear"];
     const TIMES = ["morning", "afternoon", "evening", "night"];
     const DAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
-    const TARGETS = ["today", "tonight", "tomorrow"];
+    const ACTIVITIES = ["breathing", "meditation", "journaling"];
     const currentMood = MOODS.includes(String(d.currentMood)) ? String(d.currentMood) : "drained";
     const timeOfDay = TIMES.includes(String(d.timeOfDay)) ? String(d.timeOfDay) : "afternoon";
     const dayOfWeek = DAYS.includes(String(d.dayOfWeek)) ? String(d.dayOfWeek) : "";
-    const targetDay = TARGETS.includes(String(d.targetDay)) ? String(d.targetDay) : "today";
 
     const rc = (d.rhythmsContext ?? {}) as Record<string, unknown>;
-    const TRENDS = ["down", "flat", "up"];
     const PRACTICES = ["journaling", "breathing", "gratitude", "movement", "rest", "none"];
     const rhythmsAvailable = rc.available === true;
-    const hardWeekday = DAYS.includes(String(rc.hardWeekday)) ? String(rc.hardWeekday) : "";
-    const recentTrend = TRENDS.includes(String(rc.recentTrend)) ? String(rc.recentTrend) : "flat";
     const helpfulPractice = PRACTICES.includes(String(rc.helpfulPractice)) ? String(rc.helpfulPractice) : "none";
+
+    // Safe fallback — also used on any JSON parse failure.
+    const fallbackTime = freeSlots.length > 0 ? freeSlots[0].split(/[-–]/)[0].trim() : "";
+    const FALLBACK = {
+      acknowledgment: "today sounds heavy",
+      suggestedActivity: "breathing",
+      reason: "a quiet moment to breathe 🌿",
+      slots: fallbackTime ? [{ time: fallbackTime, duration: 20 }] : [],
+    };
 
     // Rate limit: max BREAK_SLOT_DAILY_LIMIT per uid per UTC day. Increment now,
     // refund on OpenAI failure so a server error never burns the cap.
@@ -364,52 +370,73 @@ export const suggestBreakSlot = onCall(
       );
     });
 
+    const slotList = freeSlots.length > 0 ? freeSlots.join(", ") : "(none available)";
     const systemPrompt =
       "you are dino, a gentle wellness companion. " +
-      `a user just logged that they're feeling ${currentMood} on a ${dayOfWeek || "weekday"} ${timeOfDay}. ` +
-      "pick the single best free slot from the list for a 15-20 minute meditation break. " +
-      'respond ONLY with valid JSON of the form {"slot":"2:30pm","duration":20,"reason":"..."}. ' +
-      "rules: lowercase, warm, under 20 words for the reason, no clinical language, no mention of data or ai, " +
-      "pick the slot that gives the most buffer before the next commitment. " +
-      (rhythmsAvailable
-        ? `gently reference their pattern in the reason (a ${recentTrend} stretch lately` +
-          `${helpfulPractice !== "none" ? `, ${helpfulPractice} tends to steady them` : ""}` +
-          `${hardWeekday ? `, ${hardWeekday}s tend to be heavy` : ""}).`
-        : "do not reference any patterns or history.");
+      `a user just logged that they're feeling ${currentMood}. ` +
+      (userMessage ? `they wrote: "${userMessage}". ` : "they did not write anything; respond based on mood alone. ") +
+      `you found these free slots in their calendar: ${slotList}. ` +
+      "respond ONLY with valid JSON, no markdown, of the form " +
+      '{"acknowledgment":"...","suggestedActivity":"breathing","reason":"...","slots":[{"time":"7:30pm","duration":20}]}. ' +
+      "acknowledgment: one warm sentence acknowledging what they wrote, lowercase, under 15 words, no clinical language. " +
+      "suggestedActivity: exactly one of breathing, meditation, journaling. " +
+      "reason: one sentence why that activity fits, lowercase, under 15 words. " +
+      "slots: choose 2-3 of the provided free slots that fit best, each {time, duration in minutes}; if none provided return []. " +
+      "activity rules: overwhelmed or overthinking -> breathing; low energy or exhausted -> meditation; emotional, sad, or hard day -> journaling. " +
+      (userMessage ? "" : "with no message: overwhelmed -> breathing, drained -> meditation. ") +
+      (rhythmsAvailable && helpfulPractice !== "none" ? `if it fits, prefer ${helpfulPractice}. ` : "") +
+      "never mention data, tracking, ai, or apps.";
 
-    const userPrompt = `free slots: ${freeSlots.join(", ")}. target: ${targetDay}. choose one and write the reason.`;
-
-    // Earliest slot's start time — the safe fallback if the model misbehaves.
-    const fallbackSlot = freeSlots[0].split(/[-–]/)[0].trim();
+    const userPrompt = userMessage
+      ? `mood: ${currentMood}. message: "${userMessage}". day: ${dayOfWeek || "today"} ${timeOfDay}.`
+      : `mood: ${currentMood}. (no message). day: ${dayOfWeek || "today"} ${timeOfDay}.`;
 
     try {
       const openai = new OpenAI({ apiKey: OPENAI_API_KEY.value() });
       const resp = await openai.chat.completions.create({
         model: "gpt-4o",
-        max_tokens: 150,
-        temperature: 0.7,
+        max_tokens: 200,
+        temperature: 0.85,
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
         ],
       });
       const content = resp.choices?.[0]?.message?.content ?? "";
-      let parsed: { slot?: string; duration?: number; reason?: string } = {};
-      try {
-        parsed = JSON.parse(content);
-      } catch {
-        parsed = {};
-      }
-      const slot = typeof parsed.slot === "string" && parsed.slot.trim().length > 0 && parsed.slot.length <= 20
-        ? parsed.slot.trim()
-        : fallbackSlot;
-      let duration = Number(parsed.duration);
-      if (!Number.isFinite(duration) || duration < 5 || duration > 30) duration = 20;
-      duration = Math.round(duration);
-      const reason = typeof parsed.reason === "string" && parsed.reason.trim().length > 0 && parsed.reason.length <= 200
-        ? parsed.reason.trim()
-        : "you have a quiet pocket coming up — a good moment to breathe 🌿";
-      return { slot, duration, reason };
+      let parsed: any = {};
+      try { parsed = JSON.parse(content); } catch { parsed = {}; }
+
+      const acknowledgment =
+        typeof parsed.acknowledgment === "string" && parsed.acknowledgment.trim().length > 0 && parsed.acknowledgment.length <= 200
+          ? parsed.acknowledgment.trim()
+          : (userMessage ? FALLBACK.acknowledgment : "today sounds heavy — let's find you a moment");
+      const suggestedActivity = ACTIVITIES.includes(String(parsed.suggestedActivity))
+        ? String(parsed.suggestedActivity)
+        : FALLBACK.suggestedActivity;
+      const reason =
+        typeof parsed.reason === "string" && parsed.reason.trim().length > 0 && parsed.reason.length <= 200
+          ? parsed.reason.trim()
+          : FALLBACK.reason;
+
+      // Keep only model slots whose time matches a real provided slot.
+      const provided = new Set(freeSlots.map((s) => s.split(/[-–]/)[0].trim().toLowerCase()));
+      const rawOut: any[] = Array.isArray(parsed.slots) ? parsed.slots : [];
+      const slots = rawOut
+        .map((s) => {
+          const time = String(s?.time ?? "").trim();
+          let dur = Number(s?.duration);
+          if (!Number.isFinite(dur) || dur < 5 || dur > 60) dur = 20;
+          return { time, duration: Math.round(dur) };
+        })
+        .filter((s) => provided.has(s.time.toLowerCase()))
+        .slice(0, 3);
+
+      return {
+        acknowledgment,
+        suggestedActivity,
+        reason,
+        slots: slots.length > 0 ? slots : FALLBACK.slots,
+      };
     } catch (err) {
       await counterRef.set(
         { [dayKey]: admin.firestore.FieldValue.increment(-1) },
