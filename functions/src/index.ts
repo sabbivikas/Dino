@@ -343,12 +343,12 @@ export const suggestBreakSlot = onCall(
     const helpfulPractice = PRACTICES.includes(String(rc.helpfulPractice)) ? String(rc.helpfulPractice) : "none";
 
     // Safe fallback — also used on any JSON parse failure.
-    const fallbackTime = freeSlots.length > 0 ? freeSlots[0].split(/[-–]/)[0].trim() : "";
+    const fallbackTime = freeSlots.length > 0 ? freeSlots[0] : "";
     const FALLBACK = {
       acknowledgment: "today sounds heavy",
       suggestedActivity: "breathing",
       reason: "a quiet moment to breathe 🌿",
-      slots: fallbackTime ? [{ time: fallbackTime, duration: 20 }] : [],
+      recommendedTime: fallbackTime,
     };
 
     // Rate limit: max BREAK_SLOT_DAILY_LIMIT per uid per UTC day. Increment now,
@@ -375,13 +375,13 @@ export const suggestBreakSlot = onCall(
       "you are dino, a gentle wellness companion. " +
       `a user just logged that they're feeling ${currentMood}. ` +
       (userMessage ? `they wrote: "${userMessage}". ` : "they did not write anything; respond based on mood alone. ") +
-      `you found these free slots in their calendar: ${slotList}. ` +
+      `from these free slots: ${slotList}, pick the ONE best time for a ${currentMood} person on a ${dayOfWeek || "weekday"} ${timeOfDay}. ` +
       "respond ONLY with valid JSON, no markdown, of the form " +
-      '{"acknowledgment":"...","suggestedActivity":"breathing","reason":"...","slots":[{"time":"7:30pm","duration":20}]}. ' +
+      '{"acknowledgment":"...","suggestedActivity":"breathing","reason":"...","recommendedTime":"9:00am"}. ' +
       "acknowledgment: one warm sentence acknowledging what they wrote, lowercase, under 15 words, no clinical language. " +
       "suggestedActivity: exactly one of breathing, meditation, journaling. " +
       "reason: one sentence why that activity fits, lowercase, under 15 words. " +
-      "slots: choose 2-3 of the provided free slots that fit best, each {time, duration in minutes}; if none provided return []. " +
+      "recommendedTime: return ONLY one of the exact times from the list above — the single best one. " +
       "activity rules: overwhelmed or overthinking -> breathing; low energy or exhausted -> meditation; emotional, sad, or hard day -> journaling. " +
       (userMessage ? "" : "with no message: overwhelmed -> breathing, drained -> meditation. ") +
       (rhythmsAvailable && helpfulPractice !== "none" ? `if it fits, prefer ${helpfulPractice}. ` : "") +
@@ -419,24 +419,13 @@ export const suggestBreakSlot = onCall(
           : FALLBACK.reason;
 
       // Keep only model slots whose time matches a real provided slot.
-      const provided = new Set(freeSlots.map((s) => s.split(/[-–]/)[0].trim().toLowerCase()));
-      const rawOut: any[] = Array.isArray(parsed.slots) ? parsed.slots : [];
-      const slots = rawOut
-        .map((s) => {
-          const time = String(s?.time ?? "").trim();
-          let dur = Number(s?.duration);
-          if (!Number.isFinite(dur) || dur < 5 || dur > 60) dur = 20;
-          return { time, duration: Math.round(dur) };
-        })
-        .filter((s) => provided.has(s.time.toLowerCase()))
-        .slice(0, 3);
+      const provided = new Set(freeSlots.map((s) => s.trim().toLowerCase()));
+      const recommendedTime =
+        typeof parsed.recommendedTime === "string" && provided.has(parsed.recommendedTime.trim().toLowerCase())
+          ? parsed.recommendedTime.trim()
+          : FALLBACK.recommendedTime;
 
-      return {
-        acknowledgment,
-        suggestedActivity,
-        reason,
-        slots: slots.length > 0 ? slots : FALLBACK.slots,
-      };
+      return { acknowledgment, suggestedActivity, reason, recommendedTime };
     } catch (err) {
       await counterRef.set(
         { [dayKey]: admin.firestore.FieldValue.increment(-1) },

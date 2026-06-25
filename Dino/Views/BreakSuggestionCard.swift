@@ -2,12 +2,10 @@
 //  BreakSuggestionCard.swift
 //  Dino
 //
-//  Break-finder v2 — conversational. Shown as a sheet after a low mood is logged.
-//  Four states: intro (free-text “what's going on?”) → loading → suggestion
-//  (acknowledgment + suggested activity + slot picker) → confirmed.
-//  Cream background, sage/peach accents, lowercase. The text field is optional
-//  — skip is always one tap away. The user's text is sent to the cloud function
-//  only (never logged, never stored).
+//  Break-finder v3 — conversational + cal.com style slot picker. Shown as a
+//  sheet after a low mood is logged. States: intro (free-text) → loading →
+//  suggestion (acknowledgment + activity + a grid of ALL available times, with
+//  the AI's pick highlighted and pre-selected) → confirmed.
 //
 
 import SwiftUI
@@ -20,11 +18,9 @@ struct BreakSuggestionCard: View {
 
     @State private var stage: Stage = .intro
     @State private var userText: String = ""
-    @State private var lastMessage: String = ""
     @State private var suggestion: BreakSuggestion?
     @State private var selectedSlotID: UUID?
     @State private var confirmedTime: String = ""
-    @State private var triedTomorrow = false
     @State private var pulse = false
     @FocusState private var textFocused: Bool
 
@@ -34,6 +30,7 @@ struct BreakSuggestionCard: View {
     private let ink2 = Color(hex: "#7A7266")
     private let ink3 = Color(hex: "#A8A29A")
     private let sage = Color(hex: "#7BA872")
+    private let sageDark = Color(hex: "#5E8A56")
     private let peach = Color(hex: "#F5C6AA")
 
     var body: some View {
@@ -41,14 +38,14 @@ struct BreakSuggestionCard: View {
             cream.ignoresSafeArea()
             ScrollView {
                 content
-                    .padding(.horizontal, 26)
-                    .padding(.vertical, 30)
+                    .padding(.horizontal, 22)
+                    .padding(.vertical, 28)
                     .frame(maxWidth: .infinity)
             }
             .scrollDismissesKeyboard(.interactively)
         }
         .contentShape(Rectangle())
-        .onTapGesture { textFocused = false }   // tap outside → dismiss keyboard
+        .onTapGesture { textFocused = false }
     }
 
     @ViewBuilder private var content: some View {
@@ -60,7 +57,7 @@ struct BreakSuggestionCard: View {
         }
     }
 
-    // MARK: - State 1: intro (free text)
+    // MARK: - State 1: intro
 
     private var introView: some View {
         VStack(spacing: 16) {
@@ -89,7 +86,6 @@ struct BreakSuggestionCard: View {
             .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(sage.opacity(0.25), lineWidth: 1))
 
             primaryButton("send →") { Task { await begin(userText) } }
-
             Button { Task { await begin("") } } label: {
                 Text("skip →").font(DinoTheme.dinoFont(size: 14)).foregroundColor(ink2)
             }
@@ -116,7 +112,7 @@ struct BreakSuggestionCard: View {
         .onAppear { pulse = true }
     }
 
-    // MARK: - State 3: suggestion
+    // MARK: - State 3: suggestion (cal.com grid)
 
     private var suggestionView: some View {
         VStack(spacing: 16) {
@@ -135,12 +131,13 @@ struct BreakSuggestionCard: View {
                         .font(DinoTheme.dinoFont(size: 15)).foregroundColor(ink2)
                         .multilineTextAlignment(.center).lineSpacing(3)
 
-                    Text("here are some quiet moments:")
+                    Text("pick a time:")
                         .font(DinoTheme.dinoFont(size: 13)).foregroundColor(ink3)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.top, 4)
 
-                    VStack(spacing: 10) {
-                        ForEach(s.slots) { slot in slotRow(slot) }
+                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 3), spacing: 10) {
+                        ForEach(s.slots) { slotPill($0) }
                     }
 
                     primaryButton("yes, hold that time 🌿", enabled: selectedSlotID != nil) {
@@ -155,44 +152,44 @@ struct BreakSuggestionCard: View {
         }
     }
 
+    private func slotPill(_ slot: SlotOption) -> some View {
+        let selected = selectedSlotID == slot.id
+        let rec = slot.isRecommended
+        return VStack(spacing: 3) {
+            Button {
+                selectedSlotID = selected ? nil : slot.id   // tap again to deselect
+            } label: {
+                Text(slot.displayTime)
+                    .font(DinoTheme.dinoFont(size: 15))
+                    .foregroundColor(rec ? .white : ink)
+                    .frame(maxWidth: .infinity, minHeight: 44)
+                    .background(RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(rec ? sage : Color.white.opacity(0.6)))
+                    .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .stroke(selected ? sageDark : (rec ? Color.clear : sage.opacity(0.3)),
+                                lineWidth: selected ? 2.5 : 1))
+                    .scaleEffect(selected ? 1.04 : 1.0)
+            }
+            .buttonStyle(.plain)
+            Text(rec ? "✦ suggested" : "")
+                .font(DinoTheme.dinoFont(size: 10)).foregroundColor(sage)
+                .frame(height: 12)
+        }
+        .animation(.easeInOut(duration: 0.15), value: selected)
+    }
+
     private var emptySlotsView: some View {
         VStack(spacing: 14) {
-            Text("your calendar looks full today.")
+            Text("your calendar looks full for now.")
                 .font(DinoTheme.dinoFont(size: 15)).foregroundColor(ink2)
                 .multilineTextAlignment(.center)
-            if !triedTomorrow {
-                Text("want me to find time tomorrow instead?")
-                    .font(DinoTheme.dinoFont(size: 15)).foregroundColor(ink2)
-                    .multilineTextAlignment(.center)
-                primaryButton("find tomorrow") { Task { await beginTomorrow() } }
-            }
+            Text("try again a little later 🌿")
+                .font(DinoTheme.dinoFont(size: 15)).foregroundColor(ink2)
+                .multilineTextAlignment(.center)
             Button { onDismiss() } label: {
                 Text("maybe later").font(DinoTheme.dinoFont(size: 13)).foregroundColor(ink3)
             }
         }
-    }
-
-    private func slotRow(_ slot: SlotOption) -> some View {
-        let selected = selectedSlotID == slot.id
-        return Button {
-            selectedSlotID = slot.id
-        } label: {
-            HStack(spacing: 12) {
-                Image(systemName: selected ? "largecircle.fill.circle" : "circle")
-                    .font(.system(size: 18)).foregroundColor(selected ? sage : ink3)
-                Text(slot.displayTime)
-                    .font(DinoTheme.dinoFont(size: 16)).foregroundColor(ink)
-                Text("· \(slot.duration) min")
-                    .font(DinoTheme.dinoFont(size: 14)).foregroundColor(ink2)
-                Spacer(minLength: 0)
-            }
-            .padding(.vertical, 12).padding(.horizontal, 14)
-            .background(RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(selected ? sage.opacity(0.14) : Color.white.opacity(0.5)))
-            .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .stroke(selected ? sage.opacity(0.6) : sage.opacity(0.18), lineWidth: 1))
-        }
-        .buttonStyle(.plain)
     }
 
     // MARK: - State 4: confirmed
@@ -236,7 +233,6 @@ struct BreakSuggestionCard: View {
 
     private func begin(_ message: String) async {
         textFocused = false
-        lastMessage = message
         stage = .loading
         let analysis = RhythmsDataAdapter.currentAnalysis()
         guard let s = await BreakSchedulerService.shared.suggestBreak(
@@ -244,21 +240,7 @@ struct BreakSuggestionCard: View {
             onDismiss(); return
         }
         suggestion = s
-        selectedSlotID = nil
-        stage = .suggestion
-    }
-
-    private func beginTomorrow() async {
-        triedTomorrow = true
-        stage = .loading
-        let analysis = RhythmsDataAdapter.currentAnalysis()
-        let tomorrow = Calendar.current.date(byAdding: .day, value: 1, to: Date()) ?? Date()
-        guard let s = await BreakSchedulerService.shared.suggestBreak(
-            mood: mood, userMessage: lastMessage, analysis: analysis, forDate: tomorrow) else {
-            onDismiss(); return
-        }
-        suggestion = s
-        selectedSlotID = nil
+        selectedSlotID = s.recommendedSlot?.id   // pre-select the AI's pick
         stage = .suggestion
     }
 
