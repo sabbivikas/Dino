@@ -260,14 +260,14 @@ class FirestoreSyncService: ObservableObject {
             // Streak data
             let streakDoc = try await userRef.collection("meta").document("streakData").getDocument()
             if let data = streakDoc.data(), let streak: StreakData = decodeFromDictionary(data) {
-                // Merge: keep higher values
-                if streak.currentStreak > dm.streakData.currentStreak {
-                    dm.streakData.currentStreak = streak.currentStreak
-                }
-                if streak.longestStreak > dm.streakData.longestStreak {
-                    dm.streakData.longestStreak = streak.longestStreak
-                }
-                dm.streakData.activeDates = dm.streakData.activeDates.union(streak.activeDates)
+                // activeDates is the source of truth: union the sets, then derive
+                // both counters from the merged set. (The old max-merge left stale
+                // low streak values after reinstall / device switch.)
+                var merged = dm.streakData
+                merged.activeDates = merged.activeDates.union(streak.activeDates)
+                merged.currentStreak = merged.computedCurrentStreak()
+                merged.longestStreak = merged.computedLongestStreak()
+                dm.streakData = merged
                 #if DEBUG
                 print("[Firestore] streak data synced")
                 #endif

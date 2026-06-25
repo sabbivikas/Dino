@@ -398,36 +398,15 @@ final class SharedDataManager: ObservableObject {
     }
 
     private func updateStreak() {
-        let calendar = Calendar.current
-        let today = calendar.startOfDay(for: Date())
-        let lastActive = calendar.startOfDay(for: streakData.lastActiveDate)
-
-        // Always record today as active
-        let todayKey = StreakData.dateKey(for: today)
-        if !streakData.activeDates.contains(todayKey) {
-            streakData.activeDates.insert(todayKey)
-        }
-
-        if calendar.isDate(today, inSameDayAs: lastActive) {
-            return
-        }
-
-        guard let yesterday = calendar.date(byAdding: .day, value: -1, to: today) else {
-            streakData.currentStreak = 1
-            return
-        }
-
-        if calendar.isDate(lastActive, inSameDayAs: yesterday) {
-            streakData.currentStreak += 1
-        } else {
-            streakData.currentStreak = 1
-        }
-
-        if streakData.currentStreak > streakData.longestStreak {
-            streakData.longestStreak = streakData.currentStreak
-        }
-
-        streakData.lastActiveDate = Date()
+        let today = Calendar.current.startOfDay(for: Date())
+        // Record today as active, then derive BOTH counters from activeDates (the
+        // single source of truth) so they never drift after sync / reinstall.
+        var sd = streakData
+        sd.activeDates.insert(StreakData.dateKey(for: today))
+        sd.currentStreak = sd.computedCurrentStreak()
+        sd.longestStreak = max(sd.longestStreak, sd.computedCurrentStreak())
+        sd.lastActiveDate = Date()
+        streakData = sd   // single assignment → one didSet / save
     }
 
     // MARK: - XP System
