@@ -2,28 +2,34 @@
 //  BreakSchedulerService.swift
 //  Dino
 //
-//  Orchestrates the break-finder flow: read free calendar slots → ask the
-//  suggestBreakSlot cloud function for the best one (anonymized input only) →
-//  on confirm, write the calendar event + schedule a meditation reminder.
+//  Break-finder v2 — conversational. Reads free calendar slots, sends an
+//  anonymized summary PLUS the user's own free-text message to the
+//  suggestBreakSlot cloud function, and returns an acknowledgment + suggested
+//  activity (breathing / meditation / journaling) + 2-3 slot options. On confirm,
+//  writes the calendar event and schedules a reminder that deep-links to the
+//  suggested activity.
 //
-//  PRIVACY: the payload contains ONLY anonymized, structured fields — free-slot
-//  TIME LABELS (never event titles), enum mood/time/day strings, and an optional
-//  minimal rhythms context. No calendar titles, journal, or mood notes.
+//  PRIVACY: the only free text that leaves the device is the user's own message,
+//  sent to the cloud function (→ OpenAI) ONLY. It is never logged on-device and
+//  never written to Firestore. Calendar event titles are never read or sent.
 //
 
 import Foundation
 import FirebaseFunctions
 
-enum TargetDay: String {
-    case today, tonight, tomorrow
+struct SlotOption: Identifiable {
+    let id = UUID()
+    let startDate: Date
+    let duration: Int        // minutes
+    let displayTime: String  // "7:30pm"
 }
 
 struct BreakSuggestion {
-    let slotStart: Date
-    let duration: Int        // minutes
+    let acknowledgment: String
+    let suggestedActivity: String   // "breathing" | "meditation" | "journaling"
     let reason: String
-    let isAfter7pm: Bool
-    let targetDay: TargetDay
+    let slots: [SlotOption]
+    let deepLinkAction: String      // notification action: "breathe" | "meditation" | "journal"
 }
 
 @MainActor
@@ -31,98 +37,125 @@ final class BreakSchedulerService {
     static let shared = BreakSchedulerService()
     private init() {}
 
-    private static let staticFallbackReason =
-        "you have some quiet time coming up — a good moment to breathe 🌿"
+    /// The earliest suggested slot must start at least this far out.
+    private static let minimumBuffer: TimeInterval = 20 * 60
+
+    private static let fbAck = "today sounds heavy"
+    private static let fbActivity = "breathing"
+    private static let fbReason = "a quiet moment to breathe 🌿"
 
     // MARK: - Suggest
 
-    /// Finds free slots for `forDate`, asks the cloud function to pick the best
-    /// one, and returns a suggestion. Returns nil if there are no free slots
-    /// (the card then never shows). Falls back to the earliest slot if the
-    /// function fails.
+    /// Finds free slots (≥ 20 min from now), then asks the cloud function for an
+    /// acknowledgment + activity + slot options. `userMessage` is the user's free
+    /// text (empty string if skipped) — sent to the function only. Always returns
+    /// a suggestion (the card decides what to show, incl. an empty-slots state).
     func suggestBreak(mood: EmotionalWeather,
+                      userMessage: String,
+                      analysis: RhythmsAnalysis?,
                       forDate: Date = Date(),
                       calendar: Calendar = .current) async -> BreakSuggestion? {
-        let slots = await CalendarService.shared.findFreeSlots(for: forDate, calendar: calendar)
-        guard let firstSlot = slots.first else { return nil }   // no slots → card doesn't show
+        let earliest = Date().addingTimeInterval(Self.minimumBuffer)
+        let intervals = await CalendarService.shared.findFreeSlots(for: forDate, calendar: calendar)
+            .filter { $0.start >= earliest }
 
-        let now = Date()
-        let isAfter7pm = calendar.isDate(forDate, inSameDayAs: now)
-            && calendar.component(.hour, from: now) >= 19
-        let targetDay: TargetDay = calendar.isDate(forDate, inSameDayAs: now) ? .today : .tomorrow
-
-        let payload = buildPayload(mood: mood, slots: slots,
-                                   forDate: forDate, isAfter7pm: isAfter7pm,
-                                   targetDay: targetDay, calendar: calendar)
+        let payload = buildPayload(mood: mood, userMessage: userMessage, analysis: analysis,
+                                   intervals: intervals, forDate: forDate, calendar: calendar)
 
         do {
             let functions = Functions.functions(region: "us-central1")
             let result = try await functions.httpsCallable("suggestBreakSlot").call(payload)
-            guard let data = result.data as? [String: Any],
-                  let slotLabel = data["slot"] as? String else {
-                return fallback(firstSlot, isAfter7pm: isAfter7pm, targetDay: targetDay)
+            guard let data = result.data as? [String: Any] else {
+                return fallback(intervals: intervals, calendar: calendar)
             }
-            let duration = (data["duration"] as? Int) ?? 20
-            let reason = (data["reason"] as? String).flatMap { $0.isEmpty ? nil : $0 }
-                ?? Self.staticFallbackReason
-            // Resolve the model's slot label back to a real start Date (match by
-            // start-time label); fall back to the earliest slot if no match.
-            let start = matchSlotStart(label: slotLabel, slots: slots, calendar: calendar)
-                ?? firstSlot.start
-            return BreakSuggestion(slotStart: start, duration: duration, reason: reason,
-                                   isAfter7pm: isAfter7pm, targetDay: targetDay)
+            let ack = (data["acknowledgment"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? Self.fbAck
+            let activity = (data["suggestedActivity"] as? String)
+                .flatMap { ["breathing", "meditation", "journaling"].contains($0) ? $0 : nil } ?? Self.fbActivity
+            let reason = (data["reason"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? Self.fbReason
+            let slotDicts = (data["slots"] as? [[String: Any]]) ?? []
+            let slots: [SlotOption] = slotDicts.compactMap { dict in
+                guard let time = dict["time"] as? String,
+                      let interval = intervals.first(where: { timeLabel($0.start, calendar) == time.lowercased() })
+                else { return nil }
+                let dur = (dict["duration"] as? Int) ?? 20
+                return SlotOption(startDate: interval.start, duration: dur, displayTime: time.lowercased())
+            }
+            return BreakSuggestion(acknowledgment: ack, suggestedActivity: activity, reason: reason,
+                                   slots: slots, deepLinkAction: Self.action(for: activity))
         } catch {
             #if DEBUG
             print("🌿 break suggestion error: \(error)")
             #endif
-            return fallback(firstSlot, isAfter7pm: isAfter7pm, targetDay: targetDay)
+            return fallback(intervals: intervals, calendar: calendar)
         }
     }
 
-    private func fallback(_ slot: DateInterval, isAfter7pm: Bool, targetDay: TargetDay) -> BreakSuggestion {
-        BreakSuggestion(slotStart: slot.start, duration: 20,
-                        reason: Self.staticFallbackReason,
-                        isAfter7pm: isAfter7pm, targetDay: targetDay)
+    private func fallback(intervals: [DateInterval], calendar: Calendar) -> BreakSuggestion {
+        let slots: [SlotOption] = intervals.first.map {
+            [SlotOption(startDate: $0.start, duration: 20, displayTime: timeLabel($0.start, calendar))]
+        } ?? []
+        return BreakSuggestion(acknowledgment: Self.fbAck, suggestedActivity: Self.fbActivity,
+                               reason: Self.fbReason, slots: slots,
+                               deepLinkAction: Self.action(for: Self.fbActivity))
     }
 
     // MARK: - Confirm
 
-    /// Creates the calendar event and schedules a meditation reminder 5 minutes
-    /// before the slot. Returns true on success.
-    func confirmBreak(_ suggestion: BreakSuggestion, targetDay: TargetDay) async -> Bool {
+    /// Creates the calendar event for the chosen slot and schedules a reminder
+    /// 5 min before that deep-links to the suggested activity. True on success.
+    func confirmBreak(slot: SlotOption, suggestion: BreakSuggestion) async -> Bool {
         let created = CalendarService.shared.createBreakEvent(
-            title: "🌿 dino break",
-            start: suggestion.slotStart,
-            duration: TimeInterval(suggestion.duration * 60),
+            title: "🌿 dino break — \(suggestion.suggestedActivity)",
+            start: slot.startDate,
+            duration: TimeInterval(slot.duration * 60),
             notes: suggestion.reason
         )
         guard created else { return false }
-
-        // Remind 5 min before — but never in the past.
-        let fireDate = max(suggestion.slotStart.addingTimeInterval(-300), Date().addingTimeInterval(5))
-        NotificationManager.shared.scheduleBreakReminder(at: fireDate)
+        let fireDate = max(slot.startDate.addingTimeInterval(-300), Date().addingTimeInterval(5))
+        NotificationManager.shared.scheduleBreakReminder(at: fireDate, action: suggestion.deepLinkAction)
         return true
     }
 
-    // MARK: - Payload (anonymized)
+    // MARK: - Activity → deep-link action
+
+    /// Maps the AI activity to the notification action string DinoApp routes
+    /// (breathing → "breathe" → dino://breathe, etc.).
+    static func action(for activity: String) -> String {
+        switch activity {
+        case "meditation": return "meditation"
+        case "journaling": return "journal"
+        default:           return "breathe"   // breathing
+        }
+    }
+
+    // MARK: - Payload (anonymized, plus the user's own message)
 
     private func buildPayload(mood: EmotionalWeather,
-                             slots: [DateInterval],
+                             userMessage: String,
+                             analysis: RhythmsAnalysis?,
+                             intervals: [DateInterval],
                              forDate: Date,
-                             isAfter7pm: Bool,
-                             targetDay: TargetDay,
                              calendar: Calendar) -> [String: Any] {
         let now = Date()
-        // Tier 1: no rhythms data on this branch — always minimal/unavailable.
-        // When the rhythms feature merges, populate this from RhythmsAnalysis.
+        let isAfter7pm = calendar.isDate(forDate, inSameDayAs: now) && calendar.component(.hour, from: now) >= 19
+        var rhythmsContext: [String: Any] = ["available": false]
+        if let a = analysis, a.hasEnoughData {
+            let slope = a.trajectory.slope
+            let practiceHelps = (a.practiceCorrelation?.liftRatio ?? 0) > 1.05
+            rhythmsContext = [
+                "available": true,
+                "recentTrend": slope < -0.05 ? "down" : (slope > 0.05 ? "up" : "flat"),
+                "helpfulPractice": practiceHelps ? "journaling" : "none",
+            ]
+        }
         return [
-            "freeSlots": slots.prefix(8).map { slotLabel($0, calendar) },
+            "userMessage": String(userMessage.prefix(200)),
             "currentMood": mood.rawValue,
+            "freeSlots": intervals.prefix(8).map { slotLabel($0, calendar) },
             "timeOfDay": timeOfDay(now, calendar),
             "dayOfWeek": weekdayName(forDate, calendar),
             "isAfter7pm": isAfter7pm,
-            "targetDay": targetDay.rawValue,
-            "rhythmsContext": ["available": false],
+            "rhythmsContext": rhythmsContext,
         ]
     }
 
@@ -132,7 +165,7 @@ final class BreakSchedulerService {
         "\(timeLabel(interval.start, calendar))-\(timeLabel(interval.end, calendar))"
     }
 
-    /// "2:30pm" — lowercase, local, matches what the function returns.
+    /// "7:30pm" — lowercase, local, matches what the function returns.
     func timeLabel(_ date: Date, _ calendar: Calendar) -> String {
         let df = DateFormatter()
         df.locale = Locale(identifier: "en_US_POSIX")
@@ -140,11 +173,6 @@ final class BreakSchedulerService {
         df.timeZone = calendar.timeZone
         df.dateFormat = "h:mma"
         return df.string(from: date).lowercased()
-    }
-
-    private func matchSlotStart(label: String, slots: [DateInterval], calendar: Calendar) -> Date? {
-        let target = label.trimmingCharacters(in: .whitespaces).lowercased()
-        return slots.first { timeLabel($0.start, calendar) == target }?.start
     }
 
     private func weekdayName(_ date: Date, _ calendar: Calendar) -> String {

@@ -525,7 +525,7 @@ class NotificationManager: ObservableObject {
     /// Schedules the break-finder reminder for a specific time (5 min before a
     /// confirmed calendar break). Tapping it opens meditation via the
     /// "meditation" deep-link action.
-    func scheduleBreakReminder(at fireDate: Date) {
+    func scheduleBreakReminder(at fireDate: Date, action: String = "meditation") {
         guard notificationsEnabled else { return }
         let center = UNUserNotificationCenter.current()
         center.getNotificationSettings { settings in
@@ -533,9 +533,9 @@ class NotificationManager: ObservableObject {
                 guard Self.isPermissionGranted(settings.authorizationStatus) else { return }
                 let content = UNMutableNotificationContent()
                 content.title = "your dino break 🌿"
-                content.body = "a quiet moment is coming up. tap to meditate."
+                content.body = "a quiet moment is coming up. tap to begin."
                 content.sound = .default
-                content.userInfo = ["action": "meditation"]
+                content.userInfo = ["action": action]
                 let comps = Calendar.current.dateComponents(
                     [.year, .month, .day, .hour, .minute], from: fireDate)
                 let trigger = UNCalendarNotificationTrigger(dateMatching: comps, repeats: false)

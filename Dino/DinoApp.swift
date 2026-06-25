@@ -99,6 +99,7 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
                 case "gratitude":     path = "dino://gratitude"
                 case "rhythmsletter": path = "dino://rhythmsletter"
                 case "meditation":    path = "dino://meditation"
+                case "breathe":       path = "dino://breathe"
                 default:              path = nil
                 }
             }
