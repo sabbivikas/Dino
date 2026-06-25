@@ -55,18 +55,25 @@ final class BreakSchedulerService {
                       analysis: RhythmsAnalysis?,
                       forDate: Date = Date(),
                       calendar: Calendar = .current) async -> BreakSuggestion? {
+        // raw free blocks → trim each to ≥ 20 min from now (buffer) → subdivide
+        // into discrete candidate start times the AI can choose 2-3 from.
         let earliest = Date().addingTimeInterval(Self.minimumBuffer)
-        let intervals = await CalendarService.shared.findFreeSlots(for: forDate, calendar: calendar)
-            .filter { $0.start >= earliest }
+        let blocks = await CalendarService.shared.findFreeSlots(for: forDate, calendar: calendar)
+        let buffered = blocks.compactMap { block -> DateInterval? in
+            let start = max(block.start, earliest)
+            guard start < block.end else { return nil }
+            return DateInterval(start: start, end: block.end)
+        }
+        let candidates = CalendarService.shared.subdivideFreeBlocks(buffered)
 
         let payload = buildPayload(mood: mood, userMessage: userMessage, analysis: analysis,
-                                   intervals: intervals, forDate: forDate, calendar: calendar)
+                                   candidates: candidates, forDate: forDate, calendar: calendar)
 
         do {
             let functions = Functions.functions(region: "us-central1")
             let result = try await functions.httpsCallable("suggestBreakSlot").call(payload)
             guard let data = result.data as? [String: Any] else {
-                return fallback(intervals: intervals, calendar: calendar)
+                return fallback(candidates: candidates, calendar: calendar)
             }
             let ack = (data["acknowledgment"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? Self.fbAck
             let activity = (data["suggestedActivity"] as? String)
@@ -75,10 +82,10 @@ final class BreakSchedulerService {
             let slotDicts = (data["slots"] as? [[String: Any]]) ?? []
             let slots: [SlotOption] = slotDicts.compactMap { dict in
                 guard let time = dict["time"] as? String,
-                      let interval = intervals.first(where: { timeLabel($0.start, calendar) == time.lowercased() })
+                      let start = candidates.first(where: { timeLabel($0, calendar) == time.lowercased() })
                 else { return nil }
                 let dur = (dict["duration"] as? Int) ?? 20
-                return SlotOption(startDate: interval.start, duration: dur, displayTime: time.lowercased())
+                return SlotOption(startDate: start, duration: dur, displayTime: time.lowercased())
             }
             return BreakSuggestion(acknowledgment: ack, suggestedActivity: activity, reason: reason,
                                    slots: slots, deepLinkAction: Self.action(for: activity))
@@ -86,13 +93,13 @@ final class BreakSchedulerService {
             #if DEBUG
             print("🌿 break suggestion error: \(error)")
             #endif
-            return fallback(intervals: intervals, calendar: calendar)
+            return fallback(candidates: candidates, calendar: calendar)
         }
     }
 
-    private func fallback(intervals: [DateInterval], calendar: Calendar) -> BreakSuggestion {
-        let slots: [SlotOption] = intervals.first.map {
-            [SlotOption(startDate: $0.start, duration: 20, displayTime: timeLabel($0.start, calendar))]
+    private func fallback(candidates: [Date], calendar: Calendar) -> BreakSuggestion {
+        let slots: [SlotOption] = candidates.first.map {
+            [SlotOption(startDate: $0, duration: 20, displayTime: timeLabel($0, calendar))]
         } ?? []
         return BreakSuggestion(acknowledgment: Self.fbAck, suggestedActivity: Self.fbActivity,
                                reason: Self.fbReason, slots: slots,
@@ -133,7 +140,7 @@ final class BreakSchedulerService {
     private func buildPayload(mood: EmotionalWeather,
                              userMessage: String,
                              analysis: RhythmsAnalysis?,
-                             intervals: [DateInterval],
+                             candidates: [Date],
                              forDate: Date,
                              calendar: Calendar) -> [String: Any] {
         let now = Date()
@@ -151,7 +158,7 @@ final class BreakSchedulerService {
         return [
             "userMessage": String(userMessage.prefix(200)),
             "currentMood": mood.rawValue,
-            "freeSlots": intervals.prefix(8).map { slotLabel($0, calendar) },
+            "freeSlots": candidates.prefix(6).map { timeLabel($0, calendar) },
             "timeOfDay": timeOfDay(now, calendar),
             "dayOfWeek": weekdayName(forDate, calendar),
             "isAfter7pm": isAfter7pm,

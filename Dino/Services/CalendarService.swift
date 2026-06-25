@@ -88,6 +88,27 @@ final class CalendarService {
         return slots.sorted { $0.start < $1.start }
     }
 
+    /// Subdivides raw free blocks into discrete candidate START times so the AI
+    /// has multiple options to choose from. An empty day is one big block, which
+    /// otherwise yields only a single option. For each block, emit a candidate
+    /// every `spacing` for as long as a `duration` slot still fits before the
+    /// block ends. Sorted, de-duplicated, capped at 6 total.
+    func subdivideFreeBlocks(_ blocks: [DateInterval],
+                             duration: TimeInterval = 1200,
+                             spacing: TimeInterval = 3600) -> [Date] {
+        var candidates: [Date] = []
+        for block in blocks {
+            var start = block.start
+            while start.addingTimeInterval(duration) <= block.end {
+                candidates.append(start)
+                start = start.addingTimeInterval(spacing)
+            }
+        }
+        var seen = Set<Date>()
+        let unique = candidates.sorted().filter { seen.insert($0).inserted }
+        return Array(unique.prefix(6))
+    }
+
     /// Create a break event in the default calendar. Returns true on success,
     /// false on any failure. Never crashes.
     func createBreakEvent(title: String, start: Date, duration: TimeInterval, notes: String) -> Bool {
