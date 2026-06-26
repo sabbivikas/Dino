@@ -6,6 +6,7 @@
 import SwiftUI
 import StoreKit
 import UIKit
+import HealthKit
 
 // MARK: - Local Tokens (scrapbook palette)
 
@@ -138,6 +139,7 @@ struct ProfileView: View {
     @State private var activeSheet: ProfileSheet?
     @Environment(\.scenePhase) private var scenePhase
     @State private var calendarAccess: CalendarService.CalendarAccess = .notDetermined
+    @State private var healthAuthStatus: HKAuthorizationStatus = .notDetermined
     @State private var showAmbientSounds: Bool = false
     @State private var showForestLetter: Bool = false
     @State private var showRateAlert: Bool = false
@@ -266,10 +268,14 @@ struct ProfileView: View {
             AnalyticsManager.shared.trackProfileOpened()
             AnalyticsManager.shared.trackScreen("profile")
             refreshCalendarAccess()
+            refreshHealthAccess()
         }
         .onChange(of: scenePhase) { _, phase in
             // Refresh when returning from iPhone Settings (e.g. after granting).
-            if phase == .active { refreshCalendarAccess() }
+            if phase == .active {
+                refreshCalendarAccess()
+                refreshHealthAccess()
+            }
         }
         .sheet(item: $activeSheet, onDismiss: {
             savedProfilePhoto = PhotoStore.load()
@@ -497,6 +503,39 @@ struct ProfileView: View {
 
     private func refreshCalendarAccess() {
         calendarAccess = CalendarService.shared.access
+    }
+
+    @ViewBuilder private var healthRow: some View {
+        switch healthAuthStatus {
+        case .sharingAuthorized:
+            SBRow(icon: "heart.fill",
+                  iconColor: SB.sage,
+                  title: "health connected 🌿",
+                  subtitle: "dino learns from your sleep") { }
+        case .sharingDenied:
+            SBRow(icon: "heart.slash",
+                  iconColor: SB.rose,
+                  title: "health access needed",
+                  subtitle: "tap to open settings") {
+                if let url = URL(string: UIApplication.openSettingsURLString) {
+                    UIApplication.shared.open(url)
+                }
+            }
+        default:   // .notDetermined (and any future case)
+            SBRow(icon: "heart",
+                  iconColor: SB.sage,
+                  title: "connect apple health",
+                  subtitle: "factor sleep into your patterns") {
+                Task {
+                    _ = await HealthService.shared.requestSleepPermission()
+                    refreshHealthAccess()
+                }
+            }
+        }
+    }
+
+    private func refreshHealthAccess() {
+        healthAuthStatus = HealthService.shared.sleepAuthStatus
     }
 
     private var headerRow: some View {
@@ -782,6 +821,7 @@ struct ProfileView: View {
                 activeSheet = .gentleReminders
             }
             calendarRow
+            healthRow
             AmbientSoundsRow {
                 showAmbientSounds = true
             }

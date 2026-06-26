@@ -22,6 +22,7 @@ struct BreakSuggestionCard: View {
     @State private var selectedSlotID: UUID?
     @State private var confirmedTime: String = ""
     @State private var pulse = false
+    @State private var sleepData: HealthService.SleepData?
     @FocusState private var textFocused: Bool
 
     // Palette
@@ -46,6 +47,17 @@ struct BreakSuggestionCard: View {
         }
         .contentShape(Rectangle())
         .onTapGesture { textFocused = false }
+        .task {
+            if let s = await HealthService.shared.lastNightSleep() { sleepData = s }
+        }
+    }
+
+    private var introHeadline: String {
+        if let s = sleepData {
+            if s.isVeryShort { return "you slept \(s.displayString) last night and today sounds heavy 🌧️" }
+            if s.isShort { return "today sounds heavy — a lighter night doesn't help 🌧️" }
+        }
+        return "want to tell me what's going on?"
     }
 
     @ViewBuilder private var content: some View {
@@ -62,7 +74,7 @@ struct BreakSuggestionCard: View {
     private var introView: some View {
         VStack(spacing: 16) {
             Text("🌿").font(.system(size: 38))
-            Text("want to tell me what's going on?")
+            Text(introHeadline)
                 .font(DinoTheme.dinoFont(size: 22)).foregroundColor(ink)
                 .multilineTextAlignment(.center)
 

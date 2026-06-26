@@ -368,6 +368,18 @@ final class AnalyticsManager {
         capture("forest_letter_saved_to_jar")
     }
 
+    func trackHealthPermissionGranted() {
+        capture("health_permission_granted")
+    }
+
+    func trackHealthPermissionDenied() {
+        capture("health_permission_denied")
+    }
+
+    func trackHealthPermissionSkipped() {
+        capture("health_permission_skipped")
+    }
+
     // MARK: - Account
 
     func trackAccountDeleted() {

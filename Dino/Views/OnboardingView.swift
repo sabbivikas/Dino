@@ -77,7 +77,7 @@ struct OnboardingView: View {
     @State private var dinoNameInput: String = ""
     @State private var showSettingsAlert: Bool = false
 
-    private var totalSteps: Int { 12 }
+    private var totalSteps: Int { 13 }
 
     var body: some View {
         ZStack {
@@ -109,8 +109,8 @@ struct OnboardingView: View {
                     .padding(.bottom, 40)
             }
 
-            // Step 8 confetti sits above the content
-            if currentStep == 10 {
+            // Step 11 confetti sits above the content
+            if currentStep == 11 {
                 Confetti()
                     .allowsHitTesting(false)
             }
@@ -193,11 +193,12 @@ struct OnboardingView: View {
         case 4: StepNavyQuotePage()
         case 5: StepReferralPage(selectedReferral: $selectedReferral)
         case 6: StepNotificationsPage()
-        case 7: StepNamePage(userName: $dinoNameInput)
-        case 8: StepAnxietyUseCasePage()
-        case 9: StepRoughDayUseCasePage()
-        case 10: StepDisclaimerPage()
-        case 11: StepRatingPage(onFinish: finish)
+        case 7: StepHealthPage()
+        case 8: StepNamePage(userName: $dinoNameInput)
+        case 9: StepAnxietyUseCasePage()
+        case 10: StepRoughDayUseCasePage()
+        case 11: StepDisclaimerPage()
+        case 12: StepRatingPage(onFinish: finish)
         default: EmptyView()
         }
     }
@@ -231,6 +232,9 @@ struct OnboardingView: View {
             // Step 6 has inline bell button + "maybe later" — render nothing here
             EmptyView()
         } else if currentStep == 7 {
+            // Step 7 (health) has inline connect button + "maybe later" — render nothing here
+            EmptyView()
+        } else if currentStep == 8 {
             VStack(spacing: 12) {
                 primarySageButton(label: "next") { advance() }
                 Button(action: advance) {
@@ -240,10 +244,10 @@ struct OnboardingView: View {
                 }
                 .buttonStyle(ScaleButtonStyle())
             }
-        } else if currentStep == 10 {
-            primarySageButton(label: "let's begin") { advance() }
         } else if currentStep == 11 {
-            // Step 11 has its own inline buttons inside the rating card
+            primarySageButton(label: "let's begin") { advance() }
+        } else if currentStep == 12 {
+            // Step 12 has its own inline buttons inside the rating card
             EmptyView()
         } else {
             primarySageButton(label: "next") { advance() }
@@ -735,6 +739,100 @@ private struct RadioRow: View {
             .shadow(color: Color.black.opacity(0.04), radius: 4, x: 0, y: 2)
         }
         .buttonStyle(ScaleButtonStyle())
+    }
+}
+
+// MARK: - Step 7: Apple Health
+private struct StepHealthPage: View {
+    @State private var permissionRequested = false
+
+    var body: some View {
+        VStack(spacing: 28) {
+            Spacer(minLength: 12)
+
+            VStack(spacing: 8) {
+                Text("dino can learn from your sleep")
+                    .font(.custom(DinoTheme.customFontName, size: 24))
+                    .foregroundColor(OnboardingColors.textPrimary)
+                    .multilineTextAlignment(.center)
+
+                Text("sleep affects how you feel more than almost anything else. if you share it, dino can factor it into your patterns and give you a heads up before rough days.\n\nyour health data never leaves your device.")
+                    .font(DinoTheme.dinoFont(size: 15))
+                    .foregroundColor(OnboardingColors.textSecondary)
+                    .multilineTextAlignment(.center)
+            }
+            .padding(20)
+            .frame(maxWidth: .infinity)
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(Color(hex: "#F9FAFB"))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(Color(hex: "#D1D5DB"), lineWidth: 1)
+            )
+            .shadow(color: Color.black.opacity(0.04), radius: 4, x: 0, y: 2)
+            .padding(.horizontal, 24)
+
+            if !permissionRequested {
+                VStack(spacing: 12) {
+                    Button(action: connect) {
+                        ZStack {
+                            Circle()
+                                .fill(OnboardingColors.sage)
+                                .frame(width: 64, height: 64)
+                                .shadow(color: OnboardingColors.sage.opacity(0.40), radius: 12, x: 0, y: 4)
+                            Image(systemName: "moon.stars.fill")
+                                .font(.system(size: 26))
+                                .foregroundColor(.white)
+                        }
+                    }
+                    .buttonStyle(ScaleButtonStyle())
+                    Text("connect apple health")
+                        .font(DinoTheme.dinoFont(size: 15))
+                        .foregroundColor(OnboardingColors.sage)
+                }
+            } else {
+                HStack(spacing: 10) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 18, weight: .medium))
+                        .foregroundColor(OnboardingColors.sage)
+                    Text("health connected!")
+                        .font(DinoTheme.dinoFont(size: 17))
+                        .foregroundColor(OnboardingColors.sage)
+                }
+            }
+
+            Button(action: {
+                AnalyticsManager.shared.trackHealthPermissionSkipped()
+                OnboardingMaybeLaterNotifier.fire()
+            }) {
+                Text("maybe later")
+                    .font(DinoTheme.dinoFont(size: 15))
+                    .foregroundColor(OnboardingColors.textSecondary)
+            }
+            .buttonStyle(ScaleButtonStyle())
+
+            Spacer()
+        }
+    }
+
+    private func connect() {
+        Task {
+            let granted = await HealthService.shared.requestSleepPermission()
+            await MainActor.run {
+                permissionRequested = true
+                if granted {
+                    AnalyticsManager.shared.trackHealthPermissionGranted()
+                } else {
+                    AnalyticsManager.shared.trackHealthPermissionDenied()
+                }
+                // Advance regardless, after the "health connected!" state is briefly visible.
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.9) {
+                    OnboardingMaybeLaterNotifier.fire()
+                }
+            }
+        }
     }
 }
 
