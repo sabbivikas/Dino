@@ -68,14 +68,30 @@ final class RhythmsLetterScheduler {
         return "steady"
     }
 
-    #if DEBUG
-    /// Manual test: cache a sample letter and fire the notification in ~5s so
-    /// you can verify the envelope opens with it. Does NOT call the network.
+    /// Manual test: cache a sample fallback letter and fire the notification in
+    /// ~5s. Does NOT call the network. Works in release / TestFlight.
     func scheduleTestLetter() async {
         let key = RhythmsLetterService.dayKey(for: Date(), calendar: .current)
         await RhythmsLetterService.shared.cache(
             RhythmsLetter(dayKey: key, content: RhythmsLetterService.fallbackLetter))
         NotificationManager.shared.scheduleRhythmsLetterTest()
     }
-    #endif
+
+    /// Manual test that exercises the REAL pipeline: builds a sample anonymized
+    /// summary, calls the live generateRhythmsLetter cloud function, caches the
+    /// result, and fires the notification in ~5s. Works in release / TestFlight.
+    func scheduleRealTestLetter() async {
+        let summary = RhythmsLetterService.AnonymizedSummary(
+            hardWeekday: "monday",
+            recentTrend: "down",
+            recoveryDays: 2,
+            helpfulPractice: "journaling",
+            streakState: "steady"
+        )
+        let letter = await RhythmsLetterService.shared.generateLetter(summary: summary)
+        let key = RhythmsLetterService.dayKey(for: Date(), calendar: .current)
+        await RhythmsLetterService.shared.cache(
+            RhythmsLetter(dayKey: key, content: letter))
+        NotificationManager.shared.scheduleRhythmsLetterTest()
+    }
 }

@@ -576,9 +576,9 @@ class NotificationManager: ObservableObject {
         }
     }
 
-    #if DEBUG
-    /// Manual QA helper: fire the rhythms letter notification in ~5s (no
-    /// network). Pair with RhythmsLetterScheduler.scheduleTestLetter().
+    /// Manual QA helper: fire the rhythms letter notification in ~5s. Pairs
+    /// with RhythmsLetterScheduler.scheduleTestLetter() / scheduleRealTestLetter().
+    /// Not #if DEBUG-gated so the in-app test button works on TestFlight.
     func scheduleRhythmsLetterTest() {
         let content = UNMutableNotificationContent()
         content.title = "a letter from the forest 🌲"
@@ -590,7 +590,6 @@ class NotificationManager: ObservableObject {
             identifier: "rhythms_letter_test", content: content, trigger: trigger)
         UNUserNotificationCenter.current().add(request, withCompletionHandler: nil)
     }
-    #endif
 
     func sendTestNotification() {
         let content = UNMutableNotificationContent()

@@ -785,6 +785,13 @@ struct ProfileView: View {
             AmbientSoundsRow {
                 showAmbientSounds = true
             }
+            Button("test forest letter 🌿") {
+                Task {
+                    await RhythmsLetterScheduler.shared.scheduleRealTestLetter()
+                }
+            }
+            .foregroundColor(.gray)
+            .font(.caption)
             SBRow(
                 icon: "moon.stars.fill",
                 iconColor: SB.lavender,
