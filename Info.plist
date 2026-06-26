@@ -20,6 +20,8 @@
 	<string>dino uses your calendar to find free moments for you to breathe and recharge.</string>
 	<key>NSCalendarsWriteOnlyAccessUsageDescription</key>
 	<string>dino adds a gentle break to your calendar when you want one.</string>
+	<key>NSHealthShareUsageDescription</key>
+	<string>dino reads your sleep to understand how rest affects your emotional patterns — helping predict and prepare for harder days.</string>
 	<key>UIAppFonts</key>
 	<array>
 		<string>DinoInitiativeFont-Regular.ttf</string>

@@ -386,6 +386,7 @@ private struct ForecastTile: View {
 
 private struct AboutTomorrowCard: View {
     let weekday: Int
+    @State private var sleepShort = false
     var body: some View {
         ZStack(alignment: .topLeading) {
             RoundedRectangle(cornerRadius: 22, style: .continuous)
@@ -394,9 +395,17 @@ private struct AboutTomorrowCard: View {
             VStack(alignment: .leading, spacing: 8) {
                 Text("about tomorrow — \(weekdayName(weekday))")
                     .font(DinoTheme.dinoFont(size: 13)).foregroundColor(Color.white.opacity(0.55))
+                    .task {
+                        if let s = await HealthService.shared.lastNightSleep() { sleepShort = s.isShort }
+                    }
                 Text("tomorrow might ask a lot of you. \(weekdayName(weekday))s often do.")
                     .font(DinoTheme.dinoFont(size: 21)).foregroundColor(Color(hex: "#F4F1E8"))
                     .lineSpacing(3)
+                if sleepShort {
+                    Text("lighter sleep lately tends to make \(weekdayName(weekday))s feel heavier.")
+                        .font(DinoTheme.dinoFont(size: 14.5)).foregroundColor(Color(hex: "#EAF0E8").opacity(0.72))
+                        .lineSpacing(4).padding(.top, 2)
+                }
                 Text("i’ll be here before it starts. you don’t have to do anything tonight. \u{1F319}")
                     .font(DinoTheme.dinoFont(size: 14.5)).foregroundColor(Color(hex: "#EAF0E8").opacity(0.72))
                     .lineSpacing(4).padding(.top, 2)

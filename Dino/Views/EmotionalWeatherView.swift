@@ -12,6 +12,7 @@ struct EmotionalWeatherView: View {
     @StateObject private var viewModel: MoodViewModel = MoodViewModel(dataManager: SharedDataManager.shared)
     @State private var showBreakCard = false
     @State private var breakMood: EmotionalWeather = .drained
+    @State private var sleepData: HealthService.SleepData?
 
     var body: some View {
         NavigationStack {
@@ -27,6 +28,20 @@ struct EmotionalWeatherView: View {
                     }
                     .padding(.top, 12)
                     .padding(.horizontal, DinoTheme.padding)
+
+                    // Last night's sleep — only when Health is authorized + data exists.
+                    if let sleep = sleepData {
+                        VStack(spacing: 2) {
+                            Text(sleep.displayString)
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            Text(sleep.dinoObservation)
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                                .multilineTextAlignment(.center)
+                        }
+                        .padding(.horizontal, DinoTheme.padding)
+                    }
 
                     // Weather cards
                     LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)], spacing: 12) {
@@ -136,6 +151,9 @@ struct EmotionalWeatherView: View {
             .background(DinoTheme.background.ignoresSafeArea())
             .navigationTitle("")
             .navigationBarHidden(true)
+            .task {
+                if let s = await HealthService.shared.lastNightSleep() { sleepData = s }
+            }
             .onAppear {
                 AnalyticsManager.shared.trackMoodScreenOpened()
                 AnalyticsManager.shared.trackScreen("mood")

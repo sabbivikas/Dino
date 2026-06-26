@@ -39,15 +39,17 @@ enum CameraJourney {
         CameraPose(position: SCNVector3(3.0, 3.0, -12.5), lookAt: SCNVector3(4.5, 1.6, -18.5), region: .grove,   orthoScale: 9.0),
         // 6 — notifications: deeper grove
         CameraPose(position: SCNVector3(4.8, 3.0, -14.5), lookAt: SCNVector3(4.2, 1.7, -20), region: .grove,     orthoScale: 9.0),
-        // 7 — name: back past the pond
+        // 7 — health: a gentle step further into the grove
+        CameraPose(position: SCNVector3(5.2, 2.9, -15.5), lookAt: SCNVector3(4.6, 1.7, -21), region: .grove,     orthoScale: 9.0),
+        // 8 — name: back past the pond
         CameraPose(position: SCNVector3(-2.5, 3.0, -5.0), lookAt: SCNVector3(-5, 1.6, -9.5), region: .pond,      orthoScale: 8.5),
-        // 8 — breathing: still water
+        // 9 — breathing: still water
         CameraPose(position: SCNVector3(-4.8, 2.6, -6.0), lookAt: SCNVector3(-5.4, 1.4, -10), region: .pond,     orthoScale: 8.5),
-        // 9 — rough day: dawn light coming home
+        // 10 — rough day: dawn light coming home
         CameraPose(position: SCNVector3(-1.0, 3.0, 7.0), lookAt: SCNVector3(0.3, 1.6, -0.5), region: .returnDawn, orthoScale: 10.0),
-        // 10 — disclaimer + confetti: golden celebration
+        // 11 — disclaimer + confetti: golden celebration
         CameraPose(position: SCNVector3(0, 3.2, 8.5),   lookAt: SCNVector3(0, 1.7, -0.5),    region: .returnDawn, orthoScale: 10.0),
-        // 11 — rating: gentle pull back, warm send-off
+        // 12 — rating: gentle pull back, warm send-off
         CameraPose(position: SCNVector3(0.4, 3.4, 9.5), lookAt: SCNVector3(0, 1.8, 0),       region: .returnDawn, orthoScale: 10.0)
     ]
 
