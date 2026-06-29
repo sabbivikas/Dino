@@ -104,7 +104,7 @@ private struct RhythmsLearningView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             VStack(alignment: .leading, spacing: 2) {
-                Text("your rhythms")
+                Text("your rhythms".localized)
                     .font(DinoTheme.dinoFont(size: 13)).foregroundColor(RH.ink2)
                 Text("dino is learning\nyour rhythms")
                     .font(DinoTheme.dinoFont(size: 26)).foregroundColor(RH.ink)
@@ -230,7 +230,7 @@ private struct RhythmsForecastView: View {
             VStack(alignment: .leading, spacing: 0) {
                 // HERO: the emotional-DNA helix, morphing between formations.
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("your rhythms")
+                    Text("your rhythms".localized)
                         .font(DinoTheme.dinoFont(size: 13)).foregroundColor(RH.ink2)
                     Text("emotional dna")
                         .font(DinoTheme.dinoFont(size: 28)).foregroundColor(RH.ink)
@@ -251,7 +251,7 @@ private struct RhythmsForecastView: View {
 
                 // FORECAST
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("your inner weather")
+                    Text("your inner weather".localized)
                         .font(DinoTheme.dinoFont(size: 22)).foregroundColor(RH.ink)
                 }
                 .padding(.bottom, 14)

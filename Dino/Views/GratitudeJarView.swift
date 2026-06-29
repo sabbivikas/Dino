@@ -55,7 +55,7 @@ struct GratitudeJarView: View {
                     // Header
                     HStack(alignment: .top) {
                         VStack(alignment: .leading, spacing: 4) {
-                            Text("gratitude jar")
+                            Text("gratitude jar".localized)
                                 .font(.custom(DinoTheme.customFontName, size: 28))
                                 .foregroundColor(DinoTheme.ink)
                                 .shadow(color: .black.opacity(0.15), radius: 2, x: 0, y: 1)
@@ -139,7 +139,7 @@ struct GratitudeJarView: View {
                     Button {
                         viewModel.showAddSheet = true
                     } label: {
-                        Text("+ add a keepsake")
+                        Text("+ add a keepsake".localized)
                             .font(.custom(DinoTheme.customFontName, size: 17))
                             .foregroundColor(.white)
                             .frame(maxWidth: .infinity)
@@ -478,7 +478,7 @@ struct GratitudeNoteDetail: View {
 
             Spacer()
 
-            Button("close") { dismiss() }
+            Button("close".localized) { dismiss() }
                 .font(DinoTheme.bodyFont())
                 .foregroundColor(DinoTheme.textSecondary)
                 .padding(.bottom, 32)

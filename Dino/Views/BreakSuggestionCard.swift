@@ -57,7 +57,7 @@ struct BreakSuggestionCard: View {
             if s.isVeryShort { return "you slept \(s.displayString) last night and today sounds heavy 🌧️" }
             if s.isShort { return "today sounds heavy — a lighter night doesn't help 🌧️" }
         }
-        return "want to tell me what's going on?"
+        return "want to tell me what's going on?".localized
     }
 
     @ViewBuilder private var content: some View {
@@ -80,7 +80,7 @@ struct BreakSuggestionCard: View {
 
             ZStack(alignment: .topLeading) {
                 if userText.isEmpty {
-                    Text("whatever's on your mind…")
+                    Text("whatever's on your mind…".localized)
                         .font(DinoTheme.dinoFont(size: 15)).foregroundColor(ink3)
                         .padding(.top, 12).padding(.leading, 12)
                 }
@@ -97,12 +97,12 @@ struct BreakSuggestionCard: View {
             .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Color.white.opacity(0.6)))
             .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(sage.opacity(0.25), lineWidth: 1))
 
-            primaryButton("send →") { Task { await begin(userText) } }
+            primaryButton("send →".localized) { Task { await begin(userText) } }
             Button { Task { await begin("") } } label: {
-                Text("skip →").font(DinoTheme.dinoFont(size: 14)).foregroundColor(ink2)
+                Text("skip →".localized).font(DinoTheme.dinoFont(size: 14)).foregroundColor(ink2)
             }
             Button { onDismiss() } label: {
-                Text("maybe later").font(DinoTheme.dinoFont(size: 13)).foregroundColor(ink3)
+                Text("maybe later".localized).font(DinoTheme.dinoFont(size: 13)).foregroundColor(ink3)
             }
         }
     }
@@ -117,7 +117,7 @@ struct BreakSuggestionCard: View {
                 .overlay(Image(systemName: "leaf.fill").font(.system(size: 22)).foregroundColor(sage))
                 .scaleEffect(pulse ? 1.08 : 0.92)
                 .animation(.easeInOut(duration: 1.1).repeatForever(autoreverses: true), value: pulse)
-            Text("dino is thinking…")
+            Text("dino is thinking…".localized)
                 .font(DinoTheme.dinoFont(size: 16)).foregroundColor(ink2)
         }
         .padding(.vertical, 30)
@@ -143,7 +143,7 @@ struct BreakSuggestionCard: View {
                         .font(DinoTheme.dinoFont(size: 15)).foregroundColor(ink2)
                         .multilineTextAlignment(.center).lineSpacing(3)
 
-                    Text("pick a time:")
+                    Text("pick a time:".localized)
                         .font(DinoTheme.dinoFont(size: 13)).foregroundColor(ink3)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.top, 4)
@@ -152,11 +152,11 @@ struct BreakSuggestionCard: View {
                         ForEach(s.slots) { slotPill($0) }
                     }
 
-                    primaryButton("yes, hold that time 🌿", enabled: selectedSlotID != nil) {
+                    primaryButton("yes, hold that time 🌿".localized, enabled: selectedSlotID != nil) {
                         Task { await confirm() }
                     }
                     Button { onDismiss() } label: {
-                        Text("maybe later").font(DinoTheme.dinoFont(size: 13)).foregroundColor(ink3)
+                        Text("maybe later".localized).font(DinoTheme.dinoFont(size: 13)).foregroundColor(ink3)
                     }
                     privacyNote
                 }
@@ -183,7 +183,7 @@ struct BreakSuggestionCard: View {
                     .scaleEffect(selected ? 1.04 : 1.0)
             }
             .buttonStyle(.plain)
-            Text(rec ? "✦ suggested" : "")
+            Text(rec ? "✦ suggested".localized : "")
                 .font(DinoTheme.dinoFont(size: 10)).foregroundColor(sage)
                 .frame(height: 12)
         }
@@ -192,14 +192,14 @@ struct BreakSuggestionCard: View {
 
     private var emptySlotsView: some View {
         VStack(spacing: 14) {
-            Text("your calendar looks full for now.")
+            Text("your calendar looks full for now.".localized)
                 .font(DinoTheme.dinoFont(size: 15)).foregroundColor(ink2)
                 .multilineTextAlignment(.center)
-            Text("try again a little later 🌿")
+            Text("try again a little later 🌿".localized)
                 .font(DinoTheme.dinoFont(size: 15)).foregroundColor(ink2)
                 .multilineTextAlignment(.center)
             Button { onDismiss() } label: {
-                Text("maybe later").font(DinoTheme.dinoFont(size: 13)).foregroundColor(ink3)
+                Text("maybe later".localized).font(DinoTheme.dinoFont(size: 13)).foregroundColor(ink3)
             }
         }
     }
@@ -236,7 +236,7 @@ struct BreakSuggestionCard: View {
     private var privacyNote: some View {
         HStack(spacing: 6) {
             Image(systemName: "lock.fill").font(.system(size: 10)).foregroundColor(ink3)
-            Text("only you see this").font(DinoTheme.dinoFont(size: 12)).foregroundColor(ink3)
+            Text("only you see this".localized).font(DinoTheme.dinoFont(size: 12)).foregroundColor(ink3)
         }
         .padding(.top, 2)
     }

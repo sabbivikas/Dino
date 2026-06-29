@@ -196,6 +196,7 @@ final class BreakSchedulerService {
             "dayOfWeek": weekdayName(now, calendar),
             "isAfter7pm": isAfter7pm,
             "rhythmsContext": rhythmsContext,
+            "userLocale": Locale.current.language.languageCode?.identifier ?? "en",
         ]
     }
 

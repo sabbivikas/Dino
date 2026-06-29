@@ -97,7 +97,9 @@ actor RhythmsLetterService {
         do {
             let functions = Functions.functions(region: "us-central1")
             let callable = functions.httpsCallable("generateRhythmsLetter")
-            let result = try await callable.call(summary.payload)
+            var payload = summary.payload
+            payload["userLocale"] = Locale.current.language.languageCode?.identifier ?? "en"
+            let result = try await callable.call(payload)
             if let data = result.data as? [String: Any],
                let content = data["content"] as? String,
                !content.isEmpty {
