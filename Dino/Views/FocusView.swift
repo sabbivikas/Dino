@@ -170,6 +170,9 @@ struct FocusView: View {
             viewModel.stop()
             AudioManager.shared.stop()
         }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
+            if viewModel.isRunning { viewModel.recalculateFromTimestamp() }
+        }
         .onChange(of: viewModel.isRunning) { running in
             if running {
                 AudioManager.shared.play(track: "focus_ambient")
@@ -316,6 +319,9 @@ class FocusViewModel: ObservableObject {
     private var mainTimer: Timer?
     private var messageTimer: Timer?
     private var messageIndex: Int = 0
+    private var sessionStartDate: Date?
+    private var pauseAccumulated: TimeInterval = 0
+    private var lastPauseDate: Date?
 
     let durationOptions: [(label: String, seconds: Int)] = [
         ("15 min", 900),
@@ -358,6 +364,9 @@ class FocusViewModel: ObservableObject {
         isPaused = false
         isDone = false
         isRunning = true
+        sessionStartDate = Date()
+        pauseAccumulated = 0
+        lastPauseDate = nil
         AnalyticsManager.shared.trackFocusSessionStarted(duration: selectedDuration)
         startLiveActivity()
         startMainTimer()
@@ -379,15 +388,32 @@ class FocusViewModel: ObservableObject {
     func pause() {
         guard isRunning && !isPaused else { return }
         isPaused = true
+        lastPauseDate = Date()
         stopTimers()
         updateLiveActivity()
     }
 
     func resume() {
         guard isRunning && isPaused else { return }
+        if let pauseStart = lastPauseDate {
+            pauseAccumulated += Date().timeIntervalSince(pauseStart)
+        }
+        lastPauseDate = nil
         isPaused = false
         startMainTimer()
         startMessageTimer()
+    }
+
+    /// Recompute the countdown from the start timestamp — call on foreground resume.
+    func recalculateFromTimestamp() {
+        guard let start = sessionStartDate, !isPaused else { return }
+        let elapsed = Date().timeIntervalSince(start) - pauseAccumulated
+        totalElapsed = min(Int(elapsed), selectedDuration)
+        timeRemaining = max(0, selectedDuration - totalElapsed)
+        updateLiveActivity()
+        if timeRemaining <= 0 {
+            finish()
+        }
     }
 
     func reset() {
@@ -398,21 +424,28 @@ class FocusViewModel: ObservableObject {
     }
 
     private func startMainTimer() {
-        mainTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
+        // Timestamp-based + .common run-loop mode so the countdown stays accurate
+        // across scroll/gesture tracking and backgrounding (iPad multitasking).
+        let timer = Timer(timeInterval: 1, repeats: true) { [weak self] _ in
             Task { @MainActor [weak self] in
                 guard let self = self, !self.isPaused else { return }
-                self.timeRemaining -= 1
-                self.totalElapsed += 1
+                if let start = self.sessionStartDate {
+                    let elapsed = Date().timeIntervalSince(start) - self.pauseAccumulated
+                    self.totalElapsed = min(Int(elapsed), self.selectedDuration)
+                    self.timeRemaining = max(0, self.selectedDuration - self.totalElapsed)
+                }
                 self.updateLiveActivity()
                 if self.timeRemaining <= 0 {
                     self.finish()
                 }
             }
         }
+        RunLoop.main.add(timer, forMode: .common)
+        mainTimer = timer
     }
 
     private func startMessageTimer() {
-        messageTimer = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] _ in
+        let timer = Timer(timeInterval: 30, repeats: true) { [weak self] _ in
             Task { @MainActor [weak self] in
                 guard let self = self, !self.isPaused else { return }
                 self.messageIndex = (self.messageIndex + 1) % self.messages.count
@@ -421,6 +454,8 @@ class FocusViewModel: ObservableObject {
                 }
             }
         }
+        RunLoop.main.add(timer, forMode: .common)
+        messageTimer = timer
     }
 
     private func stopTimers() {
