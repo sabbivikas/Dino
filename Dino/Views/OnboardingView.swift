@@ -227,7 +227,7 @@ struct OnboardingView: View {
             // Step 0 has its own inline "begin" button — render nothing here
             EmptyView()
         } else if currentStep == 4 {
-            outlinedButton(label: "continue") { advance() }
+            outlinedButton(label: "continue".localized) { advance() }
         } else if currentStep == 6 {
             // Step 6 has inline bell button + "maybe later" — render nothing here
             EmptyView()
@@ -236,21 +236,21 @@ struct OnboardingView: View {
             EmptyView()
         } else if currentStep == 8 {
             VStack(spacing: 12) {
-                primarySageButton(label: "next") { advance() }
+                primarySageButton(label: "next".localized) { advance() }
                 Button(action: advance) {
-                    Text("skip")
+                    Text("skip".localized)
                         .font(DinoTheme.dinoFont(size: 15))
                         .foregroundColor(OnboardingColors.textSecondary)
                 }
                 .buttonStyle(ScaleButtonStyle())
             }
         } else if currentStep == 11 {
-            primarySageButton(label: "let's begin") { advance() }
+            primarySageButton(label: "let's begin".localized) { advance() }
         } else if currentStep == 12 {
             // Step 12 has its own inline buttons inside the rating card
             EmptyView()
         } else {
-            primarySageButton(label: "next") { advance() }
+            primarySageButton(label: "next".localized) { advance() }
         }
     }
 
@@ -352,7 +352,7 @@ private struct StepWelcomePage: View {
                 // is overkill — instead, use a custom preference/coordinator.
                 OnboardingBeginNotifier.fire()
             }) {
-                Text("begin")
+                Text("begin".localized)
                     .font(.custom(DinoTheme.customFontName, size: 18))
                     .foregroundColor(.white)
                     .padding(.vertical, 14)
@@ -387,7 +387,7 @@ private struct StepFeelingPage: View {
         VStack(spacing: 28) {
             Spacer(minLength: 12)
 
-            Text("how are you feeling lately?")
+            Text("how are you feeling lately?".localized)
                 .font(.custom(DinoTheme.customFontName, size: 26))
                 .foregroundColor(OnboardingColors.textPrimary)
                 .multilineTextAlignment(.center)
@@ -602,7 +602,7 @@ private struct StepEncouragementPage: View {
                 }
             }
 
-            Text("you're not alone")
+            Text("you're not alone".localized)
                 .font(.custom(DinoTheme.customFontName, size: 26))
                 .foregroundColor(OnboardingColors.textPrimary)
 
@@ -682,7 +682,7 @@ private struct StepReferralPage: View {
         VStack(spacing: 24) {
             Spacer(minLength: 8)
 
-            Text("how did you hear about us?")
+            Text("how did you hear about us?".localized)
                 .font(.custom(DinoTheme.customFontName, size: 24))
                 .foregroundColor(OnboardingColors.textPrimary)
                 .multilineTextAlignment(.center)
@@ -751,7 +751,7 @@ private struct StepHealthPage: View {
             Spacer(minLength: 12)
 
             VStack(spacing: 8) {
-                Text("dino can learn from your sleep")
+                Text("dino can learn from your sleep".localized)
                     .font(.custom(DinoTheme.customFontName, size: 24))
                     .foregroundColor(OnboardingColors.textPrimary)
                     .multilineTextAlignment(.center)
@@ -788,7 +788,7 @@ private struct StepHealthPage: View {
                         }
                     }
                     .buttonStyle(ScaleButtonStyle())
-                    Text("connect apple health")
+                    Text("connect apple health".localized)
                         .font(DinoTheme.dinoFont(size: 15))
                         .foregroundColor(OnboardingColors.sage)
                 }
@@ -797,7 +797,7 @@ private struct StepHealthPage: View {
                     Image(systemName: "checkmark.circle.fill")
                         .font(.system(size: 18, weight: .medium))
                         .foregroundColor(OnboardingColors.sage)
-                    Text("health connected!")
+                    Text("health connected!".localized)
                         .font(DinoTheme.dinoFont(size: 17))
                         .foregroundColor(OnboardingColors.sage)
                 }
@@ -807,7 +807,7 @@ private struct StepHealthPage: View {
                 AnalyticsManager.shared.trackHealthPermissionSkipped()
                 OnboardingMaybeLaterNotifier.fire()
             }) {
-                Text("maybe later")
+                Text("maybe later".localized)
                     .font(DinoTheme.dinoFont(size: 15))
                     .foregroundColor(OnboardingColors.textSecondary)
             }
@@ -845,12 +845,12 @@ private struct StepNotificationsPage: View {
             Spacer(minLength: 12)
 
             VStack(spacing: 8) {
-                Text("gentle reminders?")
+                Text("gentle reminders?".localized)
                     .font(.custom(DinoTheme.customFontName, size: 24))
                     .foregroundColor(OnboardingColors.textPrimary)
                     .multilineTextAlignment(.center)
 
-                Text("dino will help you stay on top of your tasks.")
+                Text("dino will help you stay on top of your tasks.".localized)
                     .font(DinoTheme.dinoFont(size: 15))
                     .foregroundColor(OnboardingColors.textSecondary)
                     .multilineTextAlignment(.center)
@@ -886,7 +886,7 @@ private struct StepNotificationsPage: View {
                     Image(systemName: "checkmark.circle.fill")
                         .font(.system(size: 18, weight: .medium))
                         .foregroundColor(OnboardingColors.sage)
-                    Text("reminders enabled!")
+                    Text("reminders enabled!".localized)
                         .font(DinoTheme.dinoFont(size: 17))
                         .foregroundColor(OnboardingColors.sage)
                 }
@@ -895,7 +895,7 @@ private struct StepNotificationsPage: View {
             Button(action: {
                 OnboardingMaybeLaterNotifier.fire()
             }) {
-                Text("maybe later")
+                Text("maybe later".localized)
                     .font(DinoTheme.dinoFont(size: 15))
                     .foregroundColor(OnboardingColors.textSecondary)
             }
@@ -956,7 +956,7 @@ private struct StepNamePage: View {
         VStack(spacing: 28) {
             Spacer(minLength: 12)
 
-            Text("what should we call you?")
+            Text("what should we call you?".localized)
                 .font(.custom(DinoTheme.customFontName, size: 26))
                 .foregroundColor(OnboardingColors.textPrimary)
                 .multilineTextAlignment(.center)
@@ -964,7 +964,7 @@ private struct StepNamePage: View {
 
             ZStack(alignment: .leading) {
                 if userName.isEmpty {
-                    Text("your name")
+                    Text("your name".localized)
                         .font(DinoTheme.dinoFont(size: 17))
                         .foregroundColor(OnboardingColors.placeholder)
                         .padding(.horizontal, 16)

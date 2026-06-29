@@ -168,6 +168,15 @@ const WEEKLY_LIMIT = 2;
 // the client is tampered with.
 const RHYTHMS_LETTER_WEEKLY_LIMIT = 3;
 
+function getLanguageInstruction(locale: string): string {
+  const names: Record<string, string> = {
+    es: "Spanish", ja: "Japanese", ko: "Korean", vi: "Vietnamese",
+  };
+  const name = names[locale];
+  if (!name) return "";
+  return ` Respond in ${name}. Keep the same warm, gentle, lowercase tone. Use informal/casual register (반말 for Korean, casual for Japanese, tú for Spanish).`;
+}
+
 export const generateRhythmsLetter = onCall(
   { secrets: [OPENAI_API_KEY], timeoutSeconds: 30, memory: "256MiB" },
   async (request) => {
@@ -179,8 +188,9 @@ export const generateRhythmsLetter = onCall(
     // ---- Validate + sanitize the anonymized summary (allowlist only) ----
     const d = (request.data ?? {}) as Record<string, unknown>;
     const ALLOWED_KEYS = [
-      "hardWeekday", "recentTrend", "recoveryDays", "helpfulPractice", "streakState",
+      "hardWeekday", "recentTrend", "recoveryDays", "helpfulPractice", "streakState", "userLocale",
     ];
+    const userLocale = typeof d.userLocale === "string" ? d.userLocale : "en";
     for (const k of Object.keys(d)) {
       if (!ALLOWED_KEYS.includes(k)) {
         // Reject unknown fields outright — prevents any free-text smuggling.
@@ -233,7 +243,8 @@ export const generateRhythmsLetter = onCall(
       "acknowledge the coming day softly, without alarm. gently name what tends to help them, and remind them they have moved through days like this before. " +
       "voice: warm, lowercase, plain, like a kind old tree, not a doctor. " +
       "never use clinical or diagnostic language. never mention data, tracking, apps, scores, or percentages. " +
-      "no greeting line. never use dashes. keep it under 90 words. end with the signature on its own final line: the forest";
+      "no greeting line. never use dashes. keep it under 90 words. end with the signature on its own final line: the forest" +
+      getLanguageInstruction(userLocale);
 
     const trendPhrase =
       recentTrend === "down" ? "the last few days have asked more of them" :
@@ -308,8 +319,9 @@ export const suggestBreakSlot = onCall(
 
     const d = (request.data ?? {}) as Record<string, unknown>;
     const ALLOWED_KEYS = [
-      "userMessage", "currentMood", "freeSlots", "timeOfDay", "dayOfWeek", "isAfter7pm", "rhythmsContext",
+      "userMessage", "currentMood", "freeSlots", "timeOfDay", "dayOfWeek", "isAfter7pm", "rhythmsContext", "userLocale",
     ];
+    const userLocale = typeof d.userLocale === "string" ? d.userLocale : "en";
     for (const k of Object.keys(d)) {
       if (!ALLOWED_KEYS.includes(k)) {
         throw new HttpsError("invalid-argument", `unexpected field: ${k}`);
@@ -385,7 +397,8 @@ export const suggestBreakSlot = onCall(
       "activity rules: overwhelmed or overthinking -> breathing; low energy or exhausted -> meditation; emotional, sad, or hard day -> journaling. " +
       (userMessage ? "" : "with no message: overwhelmed -> breathing, drained -> meditation. ") +
       (rhythmsAvailable && helpfulPractice !== "none" ? `if it fits, prefer ${helpfulPractice}. ` : "") +
-      "never mention data, tracking, ai, or apps.";
+      "never mention data, tracking, ai, or apps." +
+      getLanguageInstruction(userLocale);
 
     const userPrompt = userMessage
       ? `mood: ${currentMood}. message: "${userMessage}". day: ${dayOfWeek || "today"} ${timeOfDay}.`

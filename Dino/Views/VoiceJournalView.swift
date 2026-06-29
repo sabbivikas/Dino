@@ -31,7 +31,7 @@ struct VoiceJournalView: View {
                 ScrollView {
                     VStack(spacing: 24) {
                         // Header
-                        Text("journal")
+                        Text("journal".localized)
                             .font(.custom(DinoTheme.customFontName, size: 30))
                             .foregroundColor(DinoTheme.ink)
                             .frame(maxWidth: .infinity, alignment: .center)
@@ -51,11 +51,11 @@ struct VoiceJournalView: View {
 
                         // Timeline header
                         HStack {
-                            Text("recent memories")
+                            Text("recent memories".localized)
                                 .font(.custom(DinoTheme.customFontName, size: 14))
                                 .foregroundColor(Color(hex: "#7A7266"))
                             Spacer()
-                            Text("tap a card to flip")
+                            Text("tap a card to flip".localized)
                                 .font(.system(size: 11))
                                 .italic()
                                 .foregroundColor(Color(hex: "#A8A29A"))
@@ -202,7 +202,7 @@ struct VoiceJournalView: View {
                         HapticManager.shared.light()
                         dismiss()
                     } label: {
-                        Text("done")
+                        Text("done".localized)
                             .font(.custom(DinoTheme.customFontName, size: 16))
                             .foregroundColor(.white)
                             .frame(maxWidth: .infinity)
@@ -424,7 +424,7 @@ private struct JournalComposerCard: View {
                 // Text editor
                 ZStack(alignment: .topLeading) {
                     if composerText.isEmpty {
-                        Text("today I...")
+                        Text("today I...".localized)
                             .font(.system(size: 17))
                             .foregroundColor(Color(hex: "#A8A29A"))
                             .padding(.top, 8)
@@ -547,7 +547,7 @@ private struct JournalComposerCard: View {
                         selectedImage = nil
                     }) {
                         HStack(spacing: 6) {
-                            Text("develop")
+                            Text("develop".localized)
                                 .font(.system(size: 14, weight: .semibold))
                             Image(systemName: "arrow.down")
                                 .font(.system(size: 12, weight: .semibold))
@@ -593,9 +593,9 @@ private struct JournalComposerCard: View {
             isPresented: $showCameraDialog,
             titleVisibility: .visible
         ) {
-            Button("take photo") { showCamera = true }
-            Button("choose from library") { showPhotoPicker = true }
-            Button("cancel", role: .cancel) { }
+            Button("take photo".localized) { showCamera = true }
+            Button("choose from library".localized) { showPhotoPicker = true }
+            Button("cancel".localized, role: .cancel) { }
         }
         .sheet(isPresented: $showPhotoPicker) {
             PhotoPicker(image: $selectedImage)
@@ -736,7 +736,7 @@ private struct JournalTimelineStrip: View {
 private struct EmptyMemoriesCard: View {
     var body: some View {
         VStack(spacing: 8) {
-            Text("no memories yet")
+            Text("no memories yet".localized)
                 .font(.custom(DinoTheme.customFontName, size: 18))
                 .foregroundColor(DinoTheme.ink)
             Text("tap the mic to record your first")
@@ -1491,7 +1491,7 @@ private struct MoodSheet: View {
 
     var body: some View {
         VStack(spacing: 18) {
-            Text("how are you feeling?")
+            Text("how are you feeling?".localized)
                 .font(.custom(DinoTheme.customFontName, size: 20))
                 .foregroundColor(DinoTheme.ink)
                 .padding(.top, 28)

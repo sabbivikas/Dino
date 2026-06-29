@@ -477,12 +477,12 @@ struct ProfileView: View {
         case .connected:
             SBRow(icon: "calendar",
                   iconColor: SB.sage,
-                  title: "calendar connected 🗓️",
+                  title: "calendar connected 🗓️".localized,
                   subtitle: "dino can find quiet moments for you") { }
         case .notDetermined:
             SBRow(icon: "calendar.badge.plus",
                   iconColor: SB.sage,
-                  title: "connect your calendar",
+                  title: "connect your calendar".localized,
                   subtitle: "for gentle break suggestions") {
                 Task {
                     _ = await CalendarService.shared.ensureAccess()
@@ -492,7 +492,7 @@ struct ProfileView: View {
         case .denied:
             SBRow(icon: "calendar.badge.exclamationmark",
                   iconColor: SB.rose,
-                  title: "calendar access needed",
+                  title: "calendar access needed".localized,
                   subtitle: "tap to open settings") {
                 if let url = URL(string: UIApplication.openSettingsURLString) {
                     UIApplication.shared.open(url)
@@ -510,12 +510,12 @@ struct ProfileView: View {
         case .sharingAuthorized:
             SBRow(icon: "heart.fill",
                   iconColor: SB.sage,
-                  title: "health connected 🌿",
+                  title: "health connected 🌿".localized,
                   subtitle: "dino learns from your sleep") { }
         case .sharingDenied:
             SBRow(icon: "heart.slash",
                   iconColor: SB.rose,
-                  title: "health access needed",
+                  title: "health access needed".localized,
                   subtitle: "tap to open settings") {
                 if let url = URL(string: UIApplication.openSettingsURLString) {
                     UIApplication.shared.open(url)
@@ -524,7 +524,7 @@ struct ProfileView: View {
         default:   // .notDetermined (and any future case)
             SBRow(icon: "heart",
                   iconColor: SB.sage,
-                  title: "connect apple health",
+                  title: "connect apple health".localized,
                   subtitle: "factor sleep into your patterns") {
                 Task {
                     _ = await HealthService.shared.requestSleepPermission()
@@ -815,7 +815,7 @@ struct ProfileView: View {
             SBRow(
                 icon: "bell.fill",
                 iconColor: SB.sage,
-                title: "gentle reminders",
+                title: "gentle reminders".localized,
                 subtitle: "nudges from your dino"
             ) {
                 activeSheet = .gentleReminders

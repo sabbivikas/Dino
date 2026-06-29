@@ -302,7 +302,7 @@ struct HomeView: View {
                     .font(DinoTheme.dinoLabelFont(size: 14))
                     .foregroundColor(DinoTheme.textSecondary)
 
-                Text("how are you\nfeeling today?")
+                Text("how are you\nfeeling today?".localized)
                     .font(DinoTheme.dinoDisplayFont(size: 30))
                     .foregroundColor(DinoTheme.textPrimary)
                     .lineSpacing(2)
@@ -330,7 +330,7 @@ struct HomeView: View {
 
             // Content section
             VStack(alignment: .leading, spacing: 12) {
-                Text("today's focus")
+                Text("today's focus".localized)
                     .font(DinoTheme.dinoLabelFont(size: 15))
                     .foregroundColor(DinoTheme.textSecondary)
                     .tracking(0.3)
@@ -490,11 +490,11 @@ struct HomeView: View {
 
     private var gentleNoteCard: some View {
         VStack(alignment: .leading, spacing: DinoDesignSystem.space2) {
-            Text("a gentle note")
+            Text("a gentle note".localized)
                 .font(DinoTheme.dinoLabelFont(size: 13))
                 .foregroundColor(DinoTheme.textSecondary)
 
-            Text("you showed up today — and that's already something. 🌱")
+            Text("you showed up today — and that's already something. 🌱".localized)
                 .font(DinoTheme.dinoFont(size: 18))
                 .foregroundColor(DinoTheme.textPrimary)
                 .lineSpacing(4)

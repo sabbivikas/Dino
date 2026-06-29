@@ -147,13 +147,13 @@ final class HealthService: ObservableObject {
         var dinoObservation: String {
             switch durationHours {
             case ..<5:
-                return "that's a short night — be gentle with yourself today 🌿"
+                return "that's a short night — be gentle with yourself today 🌿".localized
             case 5..<6:
-                return "lighter sleep than usual — today might feel a little heavier"
+                return "lighter sleep than usual — today might feel a little heavier".localized
             case 6..<7:
-                return "decent rest last night 🌿"
+                return "decent rest last night 🌿".localized
             default:
-                return "you slept well — good foundation for today 🌱"
+                return "you slept well — good foundation for today 🌱".localized
             }
         }
     }

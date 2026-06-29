@@ -20,7 +20,7 @@ struct EmotionalWeatherView: View {
                 VStack(spacing: 22) {
                     // Header
                     VStack(spacing: 6) {
-                        Text("how's your\ninner weather?")
+                        Text("how's your\ninner weather?".localized)
                             .font(DinoTheme.dinoDisplayFont(size: 28))
                             .foregroundColor(DinoTheme.textPrimary)
                             .multilineTextAlignment(.center)
