@@ -196,6 +196,9 @@ struct BreathingView: View {
             viewModel.stop()
             AudioManager.shared.stop()
         }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
+            if viewModel.isRunning { viewModel.recalculateFromTimestamp() }
+        }
         .onChange(of: viewModel.phase) { _, newPhase in
             guard newPhase != .idle && newPhase != .done else { return }
             haptic.impactOccurred()

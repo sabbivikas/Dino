@@ -1668,7 +1668,20 @@ struct JournalCardPreviewOverlay: View {
 private struct ShareSheet: UIViewControllerRepresentable {
     let items: [Any]
     func makeUIViewController(context: Context) -> UIActivityViewController {
-        UIActivityViewController(activityItems: items, applicationActivities: nil)
+        let controller = UIActivityViewController(activityItems: items, applicationActivities: nil)
+        // iPad presents this as a popover and crashes without a non-nil anchor.
+        if let popover = controller.popoverPresentationController {
+            let window = UIApplication.shared.connectedScenes
+                .compactMap { $0 as? UIWindowScene }
+                .flatMap { $0.windows }
+                .first(where: { $0.isKeyWindow })
+            popover.sourceView = window
+            popover.sourceRect = CGRect(x: window?.bounds.midX ?? UIScreen.main.bounds.midX,
+                                        y: window?.bounds.midY ?? UIScreen.main.bounds.midY,
+                                        width: 0, height: 0)
+            popover.permittedArrowDirections = []
+        }
+        return controller
     }
     func updateUIViewController(_ vc: UIActivityViewController, context: Context) {}
 }

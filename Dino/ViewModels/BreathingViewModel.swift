@@ -50,6 +50,9 @@ class BreathingViewModel: ObservableObject {
 
     private var mainTimer: Timer?
     private var phaseTimer: Timer?
+    private var sessionStartDate: Date?
+    private var pauseAccumulated: TimeInterval = 0
+    private var lastPauseDate: Date?
 
     let durationOptions: [(label: String, seconds: Int)] = [
         ("2 min", 120),
@@ -77,6 +80,9 @@ class BreathingViewModel: ObservableObject {
         currentCycle = 1
         isPaused = false
         isRunning = true
+        sessionStartDate = Date()
+        pauseAccumulated = 0
+        lastPauseDate = nil
         AnalyticsManager.shared.trackBreathingSessionStarted(
             duration: selectedDuration,
             pattern: "\(inhaleSeconds)-\(holdSeconds)-\(exhaleSeconds)"
@@ -109,6 +115,7 @@ class BreathingViewModel: ObservableObject {
     func pause() {
         guard isRunning && !isPaused else { return }
         isPaused = true
+        lastPauseDate = Date()
         mainTimer?.invalidate()
         phaseTimer?.invalidate()
         mainTimer = nil
@@ -118,6 +125,10 @@ class BreathingViewModel: ObservableObject {
 
     func resume() {
         guard isRunning && isPaused else { return }
+        if let pauseStart = lastPauseDate {
+            pauseAccumulated += Date().timeIntervalSince(pauseStart)
+        }
+        lastPauseDate = nil
         isPaused = false
         startMainTimer()
         // Resume from current phase
@@ -137,16 +148,35 @@ class BreathingViewModel: ObservableObject {
     }
 
     private func startMainTimer() {
-        mainTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
+        // Timestamp-based so the countdown stays accurate across scroll/gesture
+        // tracking and backgrounding (especially on iPad multitasking).
+        let timer = Timer(timeInterval: 1, repeats: true) { [weak self] _ in
             Task { @MainActor [weak self] in
                 guard let self = self, !self.isPaused else { return }
-                self.timeRemaining -= 1
-                self.totalElapsed += 1
+                if let start = self.sessionStartDate {
+                    let elapsed = Date().timeIntervalSince(start) - self.pauseAccumulated
+                    self.totalElapsed = min(Int(elapsed), self.selectedDuration)
+                    self.timeRemaining = max(0, self.selectedDuration - self.totalElapsed)
+                }
                 self.updateLiveActivity()
                 if self.timeRemaining <= 0 {
                     self.finish()
                 }
             }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        mainTimer = timer
+    }
+
+    /// Recompute the countdown from the start timestamp — call on foreground resume.
+    func recalculateFromTimestamp() {
+        guard let start = sessionStartDate, !isPaused else { return }
+        let elapsed = Date().timeIntervalSince(start) - pauseAccumulated
+        totalElapsed = min(Int(elapsed), selectedDuration)
+        timeRemaining = max(0, selectedDuration - totalElapsed)
+        updateLiveActivity()
+        if timeRemaining <= 0 {
+            finish()
         }
     }
 
@@ -196,7 +226,7 @@ class BreathingViewModel: ObservableObject {
         phaseTimer?.invalidate()
         phaseCountdown = duration
         let startTime = Date()
-        phaseTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] timer in
+        let timer = Timer(timeInterval: 1, repeats: true) { [weak self] timer in
             Task { @MainActor [weak self] in
                 guard let self = self else { timer.invalidate(); return }
                 guard !self.isPaused else { return }
@@ -208,6 +238,8 @@ class BreathingViewModel: ObservableObject {
                 }
             }
         }
+        RunLoop.main.add(timer, forMode: .common)
+        phaseTimer = timer
     }
 
     private func finish() {
