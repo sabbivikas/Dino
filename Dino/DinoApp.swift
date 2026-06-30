@@ -192,7 +192,7 @@ struct DinoApp: App {
 
                     notificationManager.debugNotificationStatus()
 
-                    AnalyticsManager.shared.trackAppOpened()
+                    await IdentityLifecycleManager.shared.handleColdStart()
                     ImageCache.shared.preload(["DinoMascot", "dino-meditation", "DinoFlower-cut", "cut-DinoChecklist", "dino-only"])
                 }
                 .onChange(of: scenePhase) { _, newPhase in
@@ -200,6 +200,10 @@ struct DinoApp: App {
                     case .active:
                         sessionStartTime = Date()
                         AnalyticsManager.shared.trackSessionStarted()
+                        // Foreground return → app_opened(open_type: foreground).
+                        // (onChange does not fire for the initial active at mount,
+                        // so the cold-launch active is never misclassified here.)
+                        IdentityLifecycleManager.shared.handleForegroundReturn()
                         // Evening check: schedule a night-before rhythms letter
                         // if tomorrow is confidently predicted to be hard.
                         Task { await RhythmsLetterScheduler.shared.evaluateAndScheduleIfNeeded() }
