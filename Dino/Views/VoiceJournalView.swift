@@ -70,10 +70,7 @@ struct VoiceJournalView: View {
                                 AnalyticsManager.shared.trackSeeAllMemoriesTapped(count: dataManager.journalEntries.count)
                                 showAllMemories = true
                             },
-                            onLongPress: { entry in
-                                #if DEBUG
-                                print("[Journal] previewEntry set to \(entry.id)")
-                                #endif
+                            onTap: { entry in
                                 previewEntry = entry
                             }
                         )
@@ -125,8 +122,9 @@ struct VoiceJournalView: View {
                 JournalAllEntriesView(viewModel: viewModel)
                     .environmentObject(dataManager)
             }
-            .fullScreenCover(item: $previewEntry) { entry in
-                JournalCardPreviewOverlay(entry: entry, viewModel: viewModel)
+            .sheet(item: $previewEntry) { entry in
+                JournalEntryDetailView(entry: entry, viewModel: viewModel)
+                    .environmentObject(dataManager)
             }
             .sheet(isPresented: $showDatePicker) {
                 DatePickerSheet(date: $entryDate)
@@ -681,7 +679,7 @@ private struct JournalTimelineStrip: View {
     let entries: [JournalEntry]
     @ObservedObject var viewModel: JournalViewModel
     let onSeeAll: () -> Void
-    var onLongPress: ((JournalEntry) -> Void)? = nil
+    var onTap: ((JournalEntry) -> Void)? = nil
 
     var body: some View {
         if entries.isEmpty {
@@ -715,7 +713,7 @@ private struct JournalTimelineStrip: View {
                                 entry: entry,
                                 index: i,
                                 viewModel: viewModel,
-                                onLongPress: onLongPress
+                                onTap: onTap
                             )
                         }
 
@@ -785,7 +783,7 @@ struct JournalPolaroidCard: View {
     let entry: JournalEntry
     let index: Int
     @ObservedObject var viewModel: JournalViewModel
-    var onLongPress: ((JournalEntry) -> Void)? = nil
+    var onTap: ((JournalEntry) -> Void)? = nil
     var preloadedPhoto: UIImage? = nil
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -869,25 +867,8 @@ struct JournalPolaroidCard: View {
             }
         }
         .onTapGesture {
-            AnalyticsManager.shared.trackJournalFlipped()
-            let willShowBack = !flipped
-            if reduceMotion {
-                flipped.toggle()
-            } else {
-                withAnimation(.timingCurve(0.34, 1.1, 0.4, 1, duration: 0.8)) {
-                    flipped.toggle()
-                }
-            }
-            if willShowBack {
-                AnalyticsManager.shared.trackJournalEntryViewed()
-            }
-        }
-        .onLongPressGesture(minimumDuration: 0.4) {
-            HapticManager.shared.medium()
-            #if DEBUG
-            print("[Journal] long press fired for entry \(entry.id)")
-            #endif
-            onLongPress?(entry)
+            HapticManager.shared.light()
+            onTap?(entry)
         }
         .contextMenu {
             Button {
