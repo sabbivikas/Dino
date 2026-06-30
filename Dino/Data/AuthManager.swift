@@ -430,9 +430,9 @@ class AuthManager: ObservableObject {
             // Capture the sign_out event while still identified, then clear the
             // PostHog identity BEFORE Firebase signOut so any subsequent
             // background events route to a fresh anonymous distinct id.
-            AnalyticsManager.shared.trackSignOut()
-            AnalyticsManager.shared.reset()
+            IdentityLifecycleManager.shared.handleLogout()
             try Auth.auth().signOut()
+            identityLifecycleLog("Firebase sign-out completed")
             GIDSignIn.sharedInstance.signOut()
             Task { try? await GIDSignIn.sharedInstance.disconnect() }
             isSignedIn = false
