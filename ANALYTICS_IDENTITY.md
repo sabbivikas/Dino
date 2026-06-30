@@ -22,7 +22,7 @@ wired into [`Dino/DinoApp.swift`](Dino/DinoApp.swift) and
 ## Cold-start flow (`handleColdStart`, runs once per process)
 
 1. `session restoration started`
-2. `resolveAuthenticatedUser()` waits up to **5s** for the first Firebase auth
+2. `TimeoutAuthResolver.resolve()` waits up to **5s** for the first Firebase auth
    callback (`addStateDidChangeListener`), settling exactly once:
    - returns the UID if present,
    - returns `nil` on timeout or signed-out,
@@ -91,12 +91,14 @@ Run on a real iPhone with the **Xcode console** attached and **PostHog →
 Activity / Live Events** open. DEBUG logs are prefixed `[Identity]` (and `[Auth]`
 for sign-in). The UID in logs is redacted to the last 4 chars (`uid:…XXXX`).
 
-> **Verification status — 2026-06-30: T1–T8 all PASSED on a physical iPhone.**
-> Observed PostHog ingestion lag: Live Events trailed the `[Identity]` console
-> logs by roughly 10–30s (normal SDK batching). All sequences, `open_type`
-> values, and distinct ids matched expectations once events arrived.
+> **Verification status — T1–T8 verified by maintainer on a physical device on 2026-06-30.**
+> This was a manual verification performed by the maintainer; it was not
+> automated and not independently reproduced. Observed PostHog ingestion lag:
+> Live Events trailed the `[Identity]` console logs by roughly 10–30s (normal
+> SDK batching). All sequences, `open_type` values, and distinct ids matched
+> expectations once events arrived.
 
-### ☑ T1 — Logged-in cold launch — PASS (2026-06-30)
+### ☑ T1 — Logged-in cold launch — verified by maintainer (2026-06-30)
 - **Action:** While signed in, force-quit the app, then relaunch.
 - **Console:** `session restoration started` → `authenticated user found` →
   `identify called (uid:…XXXX)` → `PostHog identify completed` →
@@ -106,7 +108,7 @@ for sign-in). The UID in logs is redacted to the last 4 chars (`uid:…XXXX`).
 - **Pass/Fail:** PASS if identify precedes `app_opened`, distinct id is the UID,
   and exactly one `app_opened`. FAIL on anonymous id, wrong order, or duplicates.
 
-### ☑ T2 — Signup (new account) — PASS (2026-06-30)
+### ☑ T2 — Signup (new account) — verified by maintainer (2026-06-30)
 - **Action:** Fresh signup (email/Google/Apple) from a signed-out state.
 - **Console:** `[Auth] … sign-up succeeded` and an `$identify` to PostHog. No
   `[Identity] app_opened captured` line is expected from signup itself.
@@ -114,7 +116,7 @@ for sign-in). The UID in logs is redacted to the last 4 chars (`uid:…XXXX`).
 - **Pass/Fail:** PASS if signup creates exactly one identified person (UID) with
   no duplicate `app_opened`. FAIL if a second `app_opened` or an anonymous id.
 
-### ☑ T3 — Returning login — PASS (2026-06-30)
+### ☑ T3 — Returning login — verified by maintainer (2026-06-30)
 - **Action:** Sign out, then sign back in as the same user.
 - **Console:** `[Auth] … sign-in succeeded` + `$identify`.
 - **PostHog:** `$identify` resolves to the **same** distinct id (UID) as before;
@@ -122,7 +124,7 @@ for sign-in). The UID in logs is redacted to the last 4 chars (`uid:…XXXX`).
 - **Pass/Fail:** PASS if the same UID person is reused (no new id per session).
   FAIL if a new authenticated id appears.
 
-### ☑ T4 — Logout — PASS (2026-06-30)
+### ☑ T4 — Logout — verified by maintainer (2026-06-30)
 - **Action:** From signed-in, tap sign out.
 - **Console:** `user_signed_out captured` → `PostHog reset completed` →
   `Firebase sign-out completed`.
@@ -131,14 +133,14 @@ for sign-in). The UID in logs is redacted to the last 4 chars (`uid:…XXXX`).
 - **Pass/Fail:** PASS if `user_signed_out` is attributed to the UID and the next
   events are anonymous. FAIL if reset precedes the capture.
 
-### ☑ T5 — Second account on the same device — PASS (2026-06-30)
+### ☑ T5 — Second account on the same device — verified by maintainer (2026-06-30)
 - **Action:** After T4, sign in as a **different** user B on the same device.
 - **Console:** `[Auth] … succeeded` + `$identify` for B.
 - **PostHog:** B's events are under **B's** UID.
 - **Pass/Fail:** PASS if B is **not** aliased/merged into A (reset in T4
   separated them). FAIL if B's events attach to A's person.
 
-### ☑ T6 — Background and foreground — PASS (2026-06-30)
+### ☑ T6 — Background and foreground — verified by maintainer (2026-06-30)
 - **Action:** With the app open, background it ~10s, then reopen (no relaunch).
 - **Console:** `app_opened captured: foreground` (and no `[Identity] identify`
   line).
@@ -147,7 +149,7 @@ for sign-in). The UID in logs is redacted to the last 4 chars (`uid:…XXXX`).
 - **Pass/Fail:** PASS if exactly one foreground `app_opened` and no re-identify.
   FAIL on a `cold_start` event or a second identify.
 
-### ☑ T7 — Reinstall and login — PASS (2026-06-30)
+### ☑ T7 — Reinstall and login — verified by maintainer (2026-06-30)
 - **Action:** Delete the app, reinstall, launch (cold launch, signed out), then
   sign in.
 - **Console:** cold launch: `no authenticated user found, starting late identity
@@ -157,7 +159,7 @@ for sign-in). The UID in logs is redacted to the last 4 chars (`uid:…XXXX`).
 - **Pass/Fail:** PASS if post-login the UID person contains the pre-login
   anonymous `app_opened`. FAIL if events are split across two persons.
 
-### ☑ T8 — Offline / delayed Firebase restoration — PASS (2026-06-30)
+### ☑ T8 — Offline / delayed Firebase restoration — verified by maintainer (2026-06-30)
 - **Action:** Signed in, enable Airplane Mode (or heavy network throttling),
   force-quit, relaunch; after `app_opened` appears, restore connectivity.
 - **Console:** `session restoration started` → (if restore is slow)
