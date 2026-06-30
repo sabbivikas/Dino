@@ -32,10 +32,7 @@ struct JournalAllEntriesView: View {
                                     entry: entry,
                                     index: i,
                                     viewModel: viewModel,
-                                    onLongPress: { entry in
-                                        #if DEBUG
-                                        print("[Journal][All] previewEntry set to \(entry.id)")
-                                        #endif
+                                    onTap: { entry in
                                         previewEntry = entry
                                     }
                                 )
@@ -51,8 +48,9 @@ struct JournalAllEntriesView: View {
             }
         }
         .onAppear { AnalyticsManager.shared.trackScreenViewed("all_memories") }
-        .fullScreenCover(item: $previewEntry) { entry in
-            JournalCardPreviewOverlay(entry: entry, viewModel: viewModel)
+        .sheet(item: $previewEntry) { entry in
+            JournalEntryDetailView(entry: entry, viewModel: viewModel)
+                .environmentObject(dataManager)
         }
     }
 
