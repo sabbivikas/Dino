@@ -319,7 +319,7 @@ export const suggestBreakSlot = onCall(
 
     const d = (request.data ?? {}) as Record<string, unknown>;
     const ALLOWED_KEYS = [
-      "userMessage", "currentMood", "freeSlots", "timeOfDay", "dayOfWeek", "isAfter7pm", "rhythmsContext", "userLocale",
+      "userMessage", "currentMood", "freeSlots", "timeOfDay", "dayOfWeek", "isAfter7pm", "rhythmsContext", "userLocale", "nowTime",
     ];
     const userLocale = typeof d.userLocale === "string" ? d.userLocale : "en";
     for (const k of Object.keys(d)) {
@@ -348,6 +348,7 @@ export const suggestBreakSlot = onCall(
     const currentMood = MOODS.includes(String(d.currentMood)) ? String(d.currentMood) : "drained";
     const timeOfDay = TIMES.includes(String(d.timeOfDay)) ? String(d.timeOfDay) : "afternoon";
     const dayOfWeek = DAYS.includes(String(d.dayOfWeek)) ? String(d.dayOfWeek) : "";
+    const nowTime = String(d.nowTime ?? "").trim();
 
     const rc = (d.rhythmsContext ?? {}) as Record<string, unknown>;
     const PRACTICES = ["journaling", "breathing", "gratitude", "movement", "rest", "none"];
@@ -387,13 +388,18 @@ export const suggestBreakSlot = onCall(
       "you are dino, a gentle wellness companion. " +
       `a user just logged that they're feeling ${currentMood}. ` +
       (userMessage ? `they wrote: "${userMessage}". ` : "they did not write anything; respond based on mood alone. ") +
-      `from these free slots: ${slotList}, pick the ONE best time for a ${currentMood} person on a ${dayOfWeek || "weekday"} ${timeOfDay}. ` +
+      `it is currently around ${nowTime || timeOfDay} on a ${dayOfWeek || "weekday"} ${timeOfDay}. ` +
+      `these are their free slots, earliest first: ${slotList}. ` +
+      "choose the ONE slot that best fits BOTH their words and their calendar: " +
+      "if they sound exhausted, urgent, or overwhelmed, prefer the soonest slot; " +
+      "if they mention a specific commitment or time (e.g. a meeting at 2), pick a slot comfortably after it; " +
+      "if their message mentions no timing constraints, prefer sooner over later. " +
       "respond ONLY with valid JSON, no markdown, of the form " +
       '{"acknowledgment":"...","suggestedActivity":"breathing","reason":"...","recommendedTime":"9:00am"}. ' +
-      "acknowledgment: one warm sentence acknowledging what they wrote, lowercase, under 15 words, no clinical language. " +
+      "acknowledgment: one short warm sentence acknowledging what they wrote, lowercase, no clinical language. " +
       "suggestedActivity: exactly one of breathing, meditation, journaling. " +
-      "reason: one sentence why that activity fits, lowercase, under 15 words. " +
-      "recommendedTime: return ONLY one of the exact times from the list above — the single best one. " +
+      "reason: one short warm sentence on why this activity and this time fit what they shared, lowercase. " +
+      "recommendedTime: copy ONE of the listed times EXACTLY as written. " +
       "activity rules: overwhelmed or overthinking -> breathing; low energy or exhausted -> meditation; emotional, sad, or hard day -> journaling. " +
       (userMessage ? "" : "with no message: overwhelmed -> breathing, drained -> meditation. ") +
       (rhythmsAvailable && helpfulPractice !== "none" ? `if it fits, prefer ${helpfulPractice}. ` : "") +
@@ -401,8 +407,8 @@ export const suggestBreakSlot = onCall(
       getLanguageInstruction(userLocale);
 
     const userPrompt = userMessage
-      ? `mood: ${currentMood}. message: "${userMessage}". day: ${dayOfWeek || "today"} ${timeOfDay}.`
-      : `mood: ${currentMood}. (no message). day: ${dayOfWeek || "today"} ${timeOfDay}.`;
+      ? `now: ${nowTime || timeOfDay}. mood: ${currentMood}. message: "${userMessage}". day: ${dayOfWeek || "today"} ${timeOfDay}. free slots (earliest first): ${slotList}.`
+      : `now: ${nowTime || timeOfDay}. mood: ${currentMood}. (no message). day: ${dayOfWeek || "today"} ${timeOfDay}. free slots (earliest first): ${slotList}.`;
 
     try {
       const openai = new OpenAI({ apiKey: OPENAI_API_KEY.value() });
@@ -432,11 +438,11 @@ export const suggestBreakSlot = onCall(
           : FALLBACK.reason;
 
       // Keep only model slots whose time matches a real provided slot.
-      const provided = new Set(freeSlots.map((s) => s.trim().toLowerCase()));
+      const norm = (s: string) => s.trim().toLowerCase().replace(/\s+/g, "");
+      const byNorm = new Map(freeSlots.map((s) => [norm(s), s]));
       const recommendedTime =
-        typeof parsed.recommendedTime === "string" && provided.has(parsed.recommendedTime.trim().toLowerCase())
-          ? parsed.recommendedTime.trim()
-          : FALLBACK.recommendedTime;
+        (typeof parsed.recommendedTime === "string" ? byNorm.get(norm(parsed.recommendedTime)) : undefined)
+          ?? FALLBACK.recommendedTime;
 
       return { acknowledgment, suggestedActivity, reason, recommendedTime };
     } catch (err) {

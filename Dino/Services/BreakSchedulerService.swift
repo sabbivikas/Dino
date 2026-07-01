@@ -152,7 +152,7 @@ final class BreakSchedulerService {
     /// 5 min before that deep-links to the suggested activity. True on success.
     func confirmBreak(slot: SlotOption, suggestion: BreakSuggestion) async -> Bool {
         let created = CalendarService.shared.createBreakEvent(
-            title: "🌿 dino break — \(suggestion.suggestedActivity)",
+            title: "\(suggestion.suggestedActivity) break with dino 🌿",
             start: slot.startDate,
             duration: TimeInterval(slot.duration * 60),
             notes: suggestion.reason
@@ -200,6 +200,7 @@ final class BreakSchedulerService {
             "dayOfWeek": weekdayName(now, calendar),
             "isAfter7pm": isAfter7pm,
             "rhythmsContext": rhythmsContext,
+            "nowTime": timeLabel(now, calendar),
             "userLocale": Locale.current.language.languageCode?.identifier ?? "en",
         ]
     }
