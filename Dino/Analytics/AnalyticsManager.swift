@@ -369,6 +369,12 @@ final class AnalyticsManager {
         capture("health_permission_skipped")
     }
 
+    /// Break-finder AI call failed (e.g. bad OpenAI key, rate limit, timeout).
+    /// No PII — only the error domain + code so silent fallbacks are visible.
+    func trackBreakFinderAIFailed(domain: String, code: Int) {
+        capture("break_finder_ai_failed", properties: ["error_domain": domain, "error_code": code])
+    }
+
     // MARK: - Account
 
     func trackAccountDeleted() {
