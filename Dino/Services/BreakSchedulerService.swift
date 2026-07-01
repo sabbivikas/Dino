@@ -82,6 +82,10 @@ final class BreakSchedulerService {
             #if DEBUG
             print("🌿 break suggestion error: \(error)")
             #endif
+            // Surface AI failures in production (no PII — domain + code only) so a
+            // bad key / rate limit doesn't silently degrade to the fallback ack.
+            let ns = error as NSError
+            AnalyticsManager.shared.trackBreakFinderAIFailed(domain: ns.domain, code: ns.code)
         }
 
         // Recommended = the AI's time if it matches a candidate, else the first slot.

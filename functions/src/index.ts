@@ -307,7 +307,7 @@ export const generateRhythmsLetter = onCall(
 // free-slot TIME LABELS (never event titles), enum mood/time/day strings, and
 // an optional minimal rhythms context. No calendar titles, journal, mood notes,
 // or any free text. Unknown keys are rejected (defense in depth).
-const BREAK_SLOT_DAILY_LIMIT = 2;
+const BREAK_SLOT_DAILY_LIMIT = 5;
 
 export const suggestBreakSlot = onCall(
   { secrets: [OPENAI_API_KEY], timeoutSeconds: 30, memory: "256MiB" },
