@@ -128,7 +128,15 @@ class AuthManager: ObservableObject {
             let result = try await Auth.auth().signIn(with: firebaseCredential)
             let uid = result.user.uid
             AnalyticsManager.shared.identify(uid: uid)
-            AnalyticsManager.shared.trackSignIn(method: "apple")
+            // First-ever auth with this provider account = a REGISTRATION, not a
+            // returning login. Without this, every new Apple user was recorded
+            // as user_signed_in and never counted as a signup.
+            if result.additionalUserInfo?.isNewUser == true {
+                AnalyticsManager.shared.trackSignUp(method: "apple")
+            } else {
+                AnalyticsManager.shared.trackSignIn(method: "apple")
+            }
+            AnalyticsManager.shared.flush()
             #if DEBUG
             print("[Auth] Apple Sign-In succeeded")
             #endif
@@ -205,7 +213,12 @@ class AuthManager: ObservableObject {
             let appleResult = try await Auth.auth().signIn(with: credential)
             let uid = appleResult.user.uid
             AnalyticsManager.shared.identify(uid: uid)
-            AnalyticsManager.shared.trackSignIn(method: "google")
+            if appleResult.additionalUserInfo?.isNewUser == true {
+                AnalyticsManager.shared.trackSignUp(method: "google")
+            } else {
+                AnalyticsManager.shared.trackSignIn(method: "google")
+            }
+            AnalyticsManager.shared.flush()
             #if DEBUG
             print("[Auth] Google Sign-In succeeded")
             #endif
@@ -234,6 +247,7 @@ class AuthManager: ObservableObject {
             let uid = result.user.uid
             AnalyticsManager.shared.identify(uid: uid)
             AnalyticsManager.shared.trackSignUp(method: "email")
+            AnalyticsManager.shared.flush()
             #if DEBUG
             print("[Auth] email sign-up succeeded")
             #endif
@@ -260,7 +274,14 @@ class AuthManager: ObservableObject {
             let result = try await Auth.auth().signIn(withEmail: email, password: password)
             let uid = result.user.uid
             AnalyticsManager.shared.identify(uid: uid)
-            AnalyticsManager.shared.trackSignIn(method: "email")
+            // signIn(withEmail:) can't create accounts today, but guard on
+            // isNewUser anyway so a future sign-in-or-create flow attributes right.
+            if result.additionalUserInfo?.isNewUser == true {
+                AnalyticsManager.shared.trackSignUp(method: "email")
+            } else {
+                AnalyticsManager.shared.trackSignIn(method: "email")
+            }
+            AnalyticsManager.shared.flush()
             #if DEBUG
             print("[Auth] email sign-in succeeded")
             #endif
@@ -391,7 +412,13 @@ class AuthManager: ObservableObject {
         }
         do {
             try await user.delete()
+            // Capture while still identified, ship it, THEN reset — otherwise the
+            // SDK stays identified as the deleted user and a follow-up re-signup's
+            // identify() is silently dropped (posthog-ios ignores identify when
+            // already identified with a different id).
             AnalyticsManager.shared.trackAccountDeleted()
+            AnalyticsManager.shared.flush()
+            AnalyticsManager.shared.reset()
             #if DEBUG
             print("[Auth] auth account deleted")
             #endif
