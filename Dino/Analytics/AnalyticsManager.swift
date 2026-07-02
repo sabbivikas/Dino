@@ -420,4 +420,11 @@ final class AnalyticsManager {
     func reset() {
         PostHogSDK.shared.reset()
     }
+
+    /// Force-send the queued events now. Used right after auth-moment events
+    /// (identify + signed_up/in) so they ship immediately instead of waiting
+    /// for the 30s timer / 20-event batch / backgrounding.
+    func flush() {
+        PostHogSDK.shared.flush()
+    }
 }
