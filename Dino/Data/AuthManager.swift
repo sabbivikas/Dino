@@ -274,7 +274,13 @@ class AuthManager: ObservableObject {
             let result = try await Auth.auth().signIn(withEmail: email, password: password)
             let uid = result.user.uid
             AnalyticsManager.shared.identify(uid: uid)
-            AnalyticsManager.shared.trackSignIn(method: "email")
+            // signIn(withEmail:) can't create accounts today, but guard on
+            // isNewUser anyway so a future sign-in-or-create flow attributes right.
+            if result.additionalUserInfo?.isNewUser == true {
+                AnalyticsManager.shared.trackSignUp(method: "email")
+            } else {
+                AnalyticsManager.shared.trackSignIn(method: "email")
+            }
             AnalyticsManager.shared.flush()
             #if DEBUG
             print("[Auth] email sign-in succeeded")
