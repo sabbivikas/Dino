@@ -375,6 +375,14 @@ final class AnalyticsManager {
         capture("break_finder_ai_failed", properties: ["error_domain": domain, "error_code": code])
     }
 
+    func trackThemeExtractionFailed(domain: String, code: Int) {
+        capture("theme_extraction_failed", properties: ["error_domain": domain, "error_code": code])
+    }
+
+    func trackDailyNudgeFailed(domain: String, code: Int) {
+        capture("daily_nudge_failed", properties: ["error_domain": domain, "error_code": code])
+    }
+
     // MARK: - Account
 
     func trackAccountDeleted() {

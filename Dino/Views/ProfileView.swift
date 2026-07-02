@@ -144,6 +144,7 @@ struct ProfileView: View {
     @State private var showForestLetter: Bool = false
     @State private var showRateAlert: Bool = false
     @AppStorage("dino.showStreak") private var showStreak: Bool = true
+    @AppStorage("dino.journalThemeLearningEnabled") private var journalThemeLearning: Bool = false
     @AppStorage("dino.streakHintSeen") private var streakHintSeen: Bool = false
     @State private var streakBurst: Bool = false
     @State private var resumeBurst: Bool = false
@@ -822,6 +823,22 @@ struct ProfileView: View {
             }
             calendarRow
             healthRow
+            HStack(spacing: 12) {
+                ZStack {
+                    Circle().fill(SB.sage).frame(width: 36, height: 36)
+                    Image(systemName: "brain.head.profile")
+                        .font(.system(size: 15, weight: .medium)).foregroundColor(.white)
+                }
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("let dino learn from your journal")
+                        .font(DinoTheme.dinoFont(size: 16)).foregroundColor(SB.nearBlack)
+                    Text("finds gentle patterns · off by default")
+                        .font(DinoTheme.dinoFont(size: 12)).foregroundColor(SB.sage)
+                }
+                Spacer(minLength: 0)
+                Toggle("", isOn: $journalThemeLearning).labelsHidden().tint(SB.sage)
+            }
+            .padding(.vertical, 6)
             AmbientSoundsRow {
                 showAmbientSounds = true
             }

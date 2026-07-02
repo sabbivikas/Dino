@@ -31,6 +31,7 @@ struct BreakSuggestion {
     let slots: [SlotOption]          // ALL available slots
     let recommendedSlot: SlotOption? // the AI's pick
     let deepLinkAction: String       // "breathe" | "meditation" | "journal"
+    let theme: String                // DinoMind: work|sleep|relationships|health|money|self|none
 }
 
 @MainActor
@@ -68,6 +69,7 @@ final class BreakSchedulerService {
 
         var ack = Self.fbAck, activity = Self.fbActivity, reason = Self.fbReason
         var recommendedTime: String?
+        var theme = "none"
         do {
             let functions = Functions.functions(region: "us-central1")
             let result = try await functions.httpsCallable("suggestBreakSlot").call(payload)
@@ -77,6 +79,7 @@ final class BreakSchedulerService {
                     .flatMap { ["breathing", "meditation", "journaling"].contains($0) ? $0 : nil } ?? Self.fbActivity
                 reason = (data["reason"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? Self.fbReason
                 recommendedTime = (data["recommendedTime"] as? String)?.lowercased()
+                theme = (data["theme"] as? String) ?? "none"
             }
         } catch {
             #if DEBUG
@@ -97,7 +100,7 @@ final class BreakSchedulerService {
         let recommendedSlot = slots.first(where: { $0.isRecommended })
         return BreakSuggestion(acknowledgment: ack, suggestedActivity: activity, reason: reason,
                                slots: slots, recommendedSlot: recommendedSlot,
-                               deepLinkAction: Self.action(for: activity))
+                               deepLinkAction: Self.action(for: activity), theme: theme)
     }
 
     // MARK: - Candidate generation

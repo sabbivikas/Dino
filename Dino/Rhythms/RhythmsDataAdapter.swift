@@ -28,9 +28,13 @@ enum RhythmsDataAdapter {
             MoodSample(date: $0.date, weather: $0.weatherType)
         }
         let practiceDates = data.journalEntries.map { $0.date }
+        let themeSamples = data.themeTags.map {
+            ThemeSample(date: $0.date, theme: $0.theme)
+        }
         return PatternEngine(
             moodSamples: moodSamples,
             practiceDates: practiceDates,
+            themeSamples: themeSamples,
             now: now,
             calendar: calendar,
             windowDays: windowDays

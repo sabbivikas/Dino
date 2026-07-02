@@ -155,6 +155,19 @@ struct VoiceJournalView: View {
         dataManager.addJournalEntry(entry)
         AnalyticsManager.shared.trackJournalEntryCreated(type: "text")
 
+        // DinoMind (opt-in): extract a coarse theme from the entry text. Text is
+        // sent for classification only — never stored; only the enum is kept.
+        if dataManager.journalThemeLearningEnabled {
+            let moodSnapshot = dataManager.moodEntries
+                .first(where: { Calendar.current.isDateInToday($0.date) })?
+                .weatherType.rawValue ?? ""
+            Task {
+                if let theme = await ThemeExtractionService.extractTheme(from: trimmed) {
+                    dataManager.recordThemeTag(theme: theme, mood: moodSnapshot, source: ThemeTag.sourceJournal)
+                }
+            }
+        }
+
         // Reset entry date to today so the next entry defaults to today again
         entryDate = Date()
 

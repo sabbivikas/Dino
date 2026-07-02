@@ -354,7 +354,10 @@ class NotificationManager: ObservableObject {
             trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: true)
         }
 
-        let body = NudgeLibrary.random(from: NudgeLibrary.dailyCheckIn)
+        // DinoMind: use today's generated nudge if available, else static copy.
+        let dayKey = DailyNudgeService.todayKey()
+        let body = DailyNudgeService.cachedNudge(for: dayKey)
+            ?? NudgeLibrary.random(from: NudgeLibrary.dailyCheckIn)
         scheduleNotification(id: "daily_checkin", body: body, trigger: trigger)
     }
 
