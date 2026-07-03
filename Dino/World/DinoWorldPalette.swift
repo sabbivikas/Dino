@@ -51,13 +51,19 @@ enum DinoWorldPalette {
 }
 
 extension DinoWorldPalette {
-    private static var cachedEarthTexture: UIImage?
+    private static var cachedToyTextures: (diffuse: UIImage, normal: UIImage)?
 
-    /// The NASA land_ocean_ice map run through the pure sepia-cream treatment
-    /// (WorldEarthToning.warmed) — our world, not google earth. One-time CPU
-    /// pass over the bundled 1024×512 image, cached for the app's lifetime.
-    static func warmedEarthTexture() -> UIImage? {
-        if let cached = cachedEarthTexture { return cached }
+    // Toy planet palette — designer-vinyl flats.
+    static let toyOcean = UIColor(red: 0.290, green: 0.624, blue: 0.847, alpha: 1)  // friendly saturated blue
+    static let toyLandSage = UIColor(red: 0.482, green: 0.659, blue: 0.447, alpha: 1) // sage #7BA872
+    static let toyLandSand = UIColor(red: 0.910, green: 0.780, blue: 0.490, alpha: 1) // warm sand/gold
+
+    /// The TOY planet textures: the NASA land mask blurred + thresholded into
+    /// chunky rounded continents (sage, with warm sand through the tropics) on
+    /// one friendly blue ocean, plus a normal map from the blurred mask so the
+    /// land reads slightly raised and squishy. One-time CPU pass, cached.
+    static func toyPlanetTextures() -> (diffuse: UIImage, normal: UIImage)? {
+        if let cached = cachedToyTextures { return cached }
         guard let url = Bundle.main.url(forResource: "earth_land_mask", withExtension: "jpg"),
               let cg = UIImage(contentsOfFile: url.path)?.cgImage else { return nil }
         let w = cg.width, h = cg.height
@@ -67,18 +73,59 @@ extension DinoWorldPalette {
                                   space: CGColorSpaceCreateDeviceRGB(),
                                   bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return nil }
         ctx.draw(cg, in: CGRect(x: 0, y: 0, width: w, height: h))
-        for i in stride(from: 0, to: buf.count, by: 4) {
-            let t = WorldEarthToning.warmed(r: Float(buf[i]) / 255,
-                                            g: Float(buf[i + 1]) / 255,
-                                            b: Float(buf[i + 2]) / 255)
-            buf[i] = UInt8(max(0, min(255, t.r * 255)))
-            buf[i + 1] = UInt8(max(0, min(255, t.g * 255)))
-            buf[i + 2] = UInt8(max(0, min(255, t.b * 255)))
+
+        // 1) land field from the NASA map (pure water test)
+        var land = [Float](repeating: 0, count: w * h)
+        for p in 0..<(w * h) {
+            let i = p * 4
+            land[p] = LandMask.isWaterPixel(r: buf[i], g: buf[i + 1], b: buf[i + 2]) ? 0 : 1
         }
-        guard let out = ctx.makeImage() else { return nil }
-        let img = UIImage(cgImage: out)
-        cachedEarthTexture = img
-        return img
+        // 2) blur → threshold: rounded, chunky, toylike coastlines
+        let softened = WorldToyMask.boxBlur(land, width: w, height: h, radius: 6)
+        let blobs = WorldToyMask.threshold(softened, cutoff: 0.42)
+        // 3) puffy heights + tangent normals
+        let heights = WorldToyMask.boxBlur(blobs, width: w, height: h, radius: 5)
+        let normals = WorldToyMask.normalMap(heights: heights, width: w, height: h, strength: 4.5)
+
+        // 4) paint the diffuse: sage land, sand through the tropics, blue ocean
+        var ocean: (r: CGFloat, g: CGFloat, b: CGFloat) = (0, 0, 0)
+        var sage = ocean, sand = ocean
+        var a: CGFloat = 0
+        toyOcean.getRed(&ocean.r, green: &ocean.g, blue: &ocean.b, alpha: &a)
+        toyLandSage.getRed(&sage.r, green: &sage.g, blue: &sage.b, alpha: &a)
+        toyLandSand.getRed(&sand.r, green: &sand.g, blue: &sand.b, alpha: &a)
+
+        var diffuse = [UInt8](repeating: 255, count: w * h * 4)
+        var normalBytes = [UInt8](repeating: 255, count: w * h * 4)
+        for y in 0..<h {
+            let lat = 90.0 - (Double(y) + 0.5) / Double(h) * 180.0
+            let isTropics = abs(lat) < 23.5
+            for x in 0..<w {
+                let p = y * w + x
+                let i = p * 4
+                let c: (r: CGFloat, g: CGFloat, b: CGFloat) = blobs[p] >= 0.5 ? (isTropics ? sand : sage) : ocean
+                diffuse[i] = UInt8(c.r * 255)
+                diffuse[i + 1] = UInt8(c.g * 255)
+                diffuse[i + 2] = UInt8(c.b * 255)
+                let n = normals[p]
+                normalBytes[i] = UInt8((n.x * 0.5 + 0.5) * 255)
+                normalBytes[i + 1] = UInt8((n.y * 0.5 + 0.5) * 255)
+                normalBytes[i + 2] = UInt8((n.z * 0.5 + 0.5) * 255)
+            }
+        }
+
+        func image(from bytes: [UInt8]) -> UIImage? {
+            var copy = bytes
+            guard let c = CGContext(data: &copy, width: w, height: h,
+                                    bitsPerComponent: 8, bytesPerRow: w * 4,
+                                    space: CGColorSpaceCreateDeviceRGB(),
+                                    bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue),
+                  let out = c.makeImage() else { return nil }
+            return UIImage(cgImage: out)
+        }
+        guard let d = image(from: diffuse), let n = image(from: normalBytes) else { return nil }
+        cachedToyTextures = (d, n)
+        return (d, n)
     }
 }
 

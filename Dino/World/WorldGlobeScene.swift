@@ -30,6 +30,7 @@ final class WorldGlobeScene {
     private var anchors: [String: [(lat: Double, lon: Double)]] = [:]
     private var brightnessTimer: Timer?
     private var localEcho: (mood: EmotionalWeather, countryCode: String)?
+    private var didOrientToEcho = false
 
     /// Fixed world-space sun — also drives the directional light, so the lit
     /// hemisphere, shading falloff, and firefly night-boost all agree.
@@ -53,41 +54,65 @@ final class WorldGlobeScene {
         cameraNode.position = SCNVector3(0, 0, 3.4)
         scene.rootNode.addChildNode(cameraNode)
 
-        // Sun: a real directional light — the terminator comes from shading.
-        let sun = SCNLight()
-        sun.type = .directional
-        sun.intensity = 950
-        sun.color = UIColor(red: 1.0, green: 0.96, blue: 0.88, alpha: 1)
-        let sunNode = SCNNode()
-        sunNode.light = sun
+        // Studio lighting for a lit toy: bright warm key + gentle cool fill.
+        // The terminator still comes from shading, just softer.
+        let key = SCNLight()
+        key.type = .directional
+        key.intensity = 900
+        key.color = UIColor(red: 1.0, green: 0.97, blue: 0.90, alpha: 1)
+        let keyNode = SCNNode()
+        keyNode.light = key
         let s = Self.sunDirection
-        sunNode.look(at: SCNVector3(-s.x, -s.y, -s.z))   // directional lights shine along -Z
-        scene.rootNode.addChildNode(sunNode)
+        keyNode.look(at: SCNVector3(-s.x, -s.y, -s.z))   // directional lights shine along -Z
+        scene.rootNode.addChildNode(keyNode)
 
-        // Soft ambient — keeps the night side cozy, tinted by the mood.
+        let fill = SCNLight()
+        fill.type = .directional
+        fill.intensity = 260
+        fill.color = UIColor(red: 0.88, green: 0.92, blue: 1.0, alpha: 1)
+        let fillNode = SCNNode()
+        fillNode.light = fill
+        fillNode.look(at: SCNVector3(s.x, -s.y * 0.4, s.z))   // opposite-ish, softens the night side
+        scene.rootNode.addChildNode(fillNode)
+
+        // Soft ambient — keeps the dark limb cozy, tinted by the mood.
         let ambient = SCNLight()
         ambient.type = .ambient
-        ambient.intensity = 320
+        ambient.intensity = 380
         ambient.color = DinoWorldPalette.cream
         let ambientNode = SCNNode()
         ambientNode.light = ambient
         scene.rootNode.addChildNode(ambientNode)
         ambientLight = ambient
 
-        // The earth: warmed NASA diffuse on a single sphere.
+        // The TOY planet: chunky rounded continents on a friendly blue ocean,
+        // soft matte vinyl finish, puffy land via a generated normal map.
         let sphere = SCNSphere(radius: CGFloat(Self.globeRadius))
         sphere.segmentCount = 72
-        let earth = SCNMaterial()
-        earth.lightingModel = .lambert
-        let texture = DinoWorldPalette.warmedEarthTexture()
-        earth.diffuse.contents = texture ?? DinoWorldPalette.card
+        let toy = SCNMaterial()
+        toy.lightingModel = .blinn
+        let textures = DinoWorldPalette.toyPlanetTextures()
+        toy.diffuse.contents = textures?.diffuse ?? DinoWorldPalette.toyOcean
+        if let normal = textures?.normal {
+            toy.normal.contents = normal
+            toy.normal.intensity = 0.9
+        }
+        // soft vinyl sheen — a designer toy, not plastic wrap
+        toy.specular.contents = UIColor(white: 0.30, alpha: 1)
+        toy.shininess = 0.25
         // faint self-glow so the night side never goes pitch black
-        earth.emission.contents = texture ?? DinoWorldPalette.card
-        earth.emission.intensity = 0.14
-        earth.specular.contents = UIColor(white: 0.12, alpha: 1)
-        sphere.firstMaterial = earth
+        toy.emission.contents = textures?.diffuse ?? DinoWorldPalette.toyOcean
+        toy.emission.intensity = 0.10
+        sphere.firstMaterial = toy
         globeNode.geometry = sphere
         scene.rootNode.addChildNode(globeNode)
+
+        // Face layer placeholder — a decision for later: a smiley reads adorable
+        // but rotates away during spins/find-my-light. Anchored at lat 8, lon 15
+        // so adding it later is one child node here.
+        let faceContainer = SCNNode()
+        faceContainer.name = "faceContainer"
+        globeNode.addChildNode(faceContainer)
 
         // Fresnel atmosphere rim — a slightly larger back-face shell whose
         // emission carries the mood tint; alpha rises toward the silhouette.
@@ -198,11 +223,22 @@ final class WorldGlobeScene {
     /// the aggregate and the 5-log privacy floor. Local only; writes nothing.
     func setLocalEcho(mood: EmotionalWeather, countryCode: String) {
         localEcho = (mood, countryCode)
+        // First echo orients the planet so the user's country faces the camera
+        // before the first frame — the world opens with your light greeting you
+        // instead of hiding on the far side (auto-rotate continues from here).
+        if !didOrientToEcho, let spot = anchors[countryCode]?.first {
+            didOrientToEcho = true
+            globeNode.eulerAngles = SCNVector3(Float(spot.lat * .pi / 180 * 0.5),
+                                               Float(-spot.lon * .pi / 180), 0)
+        }
         reapplyLocalEcho()
     }
 
     private func reapplyLocalEcho() {
-        fireflyContainer.childNode(withName: Self.localEchoName, recursively: false)?.removeFromParentNode()
+        if let old = fireflyContainer.childNode(withName: Self.localEchoName, recursively: false) {
+            old.removeFromParentNode()
+            fireflies.removeAll { $0.node === old }
+        }
         guard let echo = localEcho, let spot = anchors[echo.countryCode]?.first else { return }
         let node = makeFirefly(color: DinoWorldPalette.moodColor(echo.mood), size: 0.085)
         position(node, lat: spot.lat + 1.5, lon: spot.lon + 1.5, altitude: 1.055)  // beside the country light

@@ -96,12 +96,18 @@ struct WorldGlobeView: UIViewRepresentable {
         }
 
         func findMyLight(onFound: ((Bool) -> Void)?) {
-            guard let globe else { onFound?(false); return }
+            // Defer every callback out of the current SwiftUI update — this is
+            // reached from updateUIView, and a synchronous @State write here is
+            // "Modifying state during view update" (undefined behavior).
+            func report(_ found: Bool) {
+                DispatchQueue.main.async { onFound?(found) }
+            }
+            guard let globe else { report(false); return }
             globe.globeNode.removeAction(forKey: "autorotate")
             resumeWorkItem?.cancel()
             let code = WorldMoodService.countryCode(from: Locale.current.region?.identifier)
             guard code != "elsewhere", let firefly = globe.focus(on: code) else {
-                onFound?(false)
+                report(false)
                 startAutoRotateLater()
                 return
             }
@@ -111,7 +117,7 @@ struct WorldGlobeView: UIViewRepresentable {
             let pulseDown = SCNAction.scale(to: 1.0, duration: 0.4)
             pulseDown.timingMode = .easeInEaseOut
             firefly.runAction(.sequence([.wait(duration: 1.4), .repeat(.sequence([pulseUp, pulseDown]), count: 3)]))
-            onFound?(true)
+            report(true)
             startAutoRotateLater(delay: 6)
         }
 
