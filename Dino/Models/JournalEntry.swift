@@ -21,11 +21,16 @@ struct JournalEntry: Codable, Identifiable {
     var effectiveCreatedAt: Date { createdAt ?? date }
 
     /// Display order everywhere: the user's chosen date, newest first;
-    /// same-day ties broken by when they were actually written.
+    /// same-moment ties broken by write time, then by id — a TOTAL order, so
+    /// the list can never flip between launches or after a sync shuffles the
+    /// underlying array (Swift's sort is not stable for equal keys).
     static func sortedForDisplay(_ entries: [JournalEntry]) -> [JournalEntry] {
         entries.sorted {
             if $0.date != $1.date { return $0.date > $1.date }
-            return $0.effectiveCreatedAt > $1.effectiveCreatedAt
+            if $0.effectiveCreatedAt != $1.effectiveCreatedAt {
+                return $0.effectiveCreatedAt > $1.effectiveCreatedAt
+            }
+            return $0.id.uuidString > $1.id.uuidString
         }
     }
 

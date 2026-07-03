@@ -54,6 +54,59 @@ final class JournalEntryTests: XCTestCase {
         XCTAssertEqual(sorted.map(\.id), [todays.id, yesterdays.id, backdated.id])
     }
 
+    // 3a) Cross-year ordering — no same-year assumption anywhere.
+    func testSortedAcrossYearBoundary() {
+        var c = DateComponents(); c.year = 2025; c.month = 12; c.day = 31; c.hour = 12
+        let cal = Calendar(identifier: .gregorian)
+        let dec2025 = cal.date(from: c)!
+        c.year = 2026; c.month = 1; c.day = 1
+        let jan2026 = cal.date(from: c)!
+        let older = entry(date: dec2025, createdAt: dec2025)
+        let newer = entry(date: jan2026, createdAt: jan2026)
+        let sorted = JournalEntry.sortedForDisplay([older, newer])
+        XCTAssertEqual(sorted.map(\.id), [newer.id, older.id])
+    }
+
+    // 3b) Midnight boundary: 11:50pm sorts below the next day's 12:10am —
+    //     pure Date comparison, no day-string involvement.
+    func testSortedAcrossMidnightBoundary() {
+        let base = Date(timeIntervalSince1970: 1_700_000_000)
+        let lateNight = base                                     // 23:50 conceptually
+        let earlyNext = base.addingTimeInterval(20 * 60)         // 00:10 next local day
+        let a = entry(date: lateNight, createdAt: lateNight)
+        let b = entry(date: earlyNext, createdAt: earlyNext)
+        XCTAssertEqual(JournalEntry.sortedForDisplay([a, b]).first?.id, b.id)
+    }
+
+    // 3c) Sync-shuffle regression: any permutation of the input yields the
+    //     IDENTICAL display order — including equal-key legacy entries.
+    func testSortIsPermutationInvariantAndTotal() {
+        let day = Date(timeIntervalSince1970: 1_700_000_000)
+        // two legacy entries with IDENTICAL date + nil createdAt → only the id
+        // tie-break keeps them deterministic
+        let twinA = entry(date: day, createdAt: nil)
+        let twinB = entry(date: day, createdAt: nil)
+        let others = (1...5).map { i in
+            entry(date: day.addingTimeInterval(Double(i) * 3_600), createdAt: day)
+        }
+        let original = others + [twinA, twinB]
+        let sortedOnce = JournalEntry.sortedForDisplay(original)
+        XCTAssertEqual(JournalEntry.sortedForDisplay(original.reversed()).map(\.id), sortedOnce.map(\.id))
+        XCTAssertEqual(JournalEntry.sortedForDisplay(original.shuffled()).map(\.id), sortedOnce.map(\.id))
+        XCTAssertEqual(JournalEntry.sortedForDisplay(sortedOnce).map(\.id), sortedOnce.map(\.id))   // idempotent
+    }
+
+    // 3d) A (legacy/synced) future-dated entry must not crash and sorts first
+    //     honestly until its date passes — the pickers block creating new ones.
+    func testFutureDatedEntryDoesNotCrash() {
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
+        let future = entry(date: now.addingTimeInterval(30 * 86_400), createdAt: now)
+        let normal = entry(date: now, createdAt: now)
+        let sorted = JournalEntry.sortedForDisplay([normal, future])
+        XCTAssertEqual(sorted.first?.id, future.id)
+        XCTAssertEqual(sorted.count, 2)
+    }
+
     // 4) Same-day ties break by actual write time (newest written first).
     func testSortedForDisplaySameDayTieBreak() {
         let day = Date(timeIntervalSince1970: 1_700_000_000)
@@ -61,10 +114,12 @@ final class JournalEntryTests: XCTestCase {
         let evening = entry(date: day, createdAt: day)
         let legacy = entry(date: day, createdAt: nil)   // effectiveCreatedAt == day
         let sorted = JournalEntry.sortedForDisplay([morning, legacy, evening])
-        // morning (written earliest) must sort last; evening and legacy have
-        // EQUAL keys (legacy falls back to its date == evening's write time),
-        // so only their membership up front is guaranteed, not their order.
+        // morning (written earliest) must sort last; evening and legacy tie on
+        // both keys and fall to the deterministic id tie-break.
         XCTAssertEqual(sorted.last?.id, morning.id)
         XCTAssertEqual(Set(sorted.prefix(2).map(\.id)), Set([evening.id, legacy.id]))
+        // and that tie is STABLE across permutations (no launch-to-launch flip)
+        let reversed = JournalEntry.sortedForDisplay([evening, legacy, morning])
+        XCTAssertEqual(reversed.map(\.id), sorted.map(\.id))
     }
 }
