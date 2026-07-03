@@ -165,4 +165,24 @@ enum WorldMoodService {
     static var cachedTodayBucket: WorldDayBucket? {
         cachedAggregate?.bucket(for: todayKey())
     }
+
+    // MARK: - Post-log world moment copy (pure → testable)
+
+    /// One soft line connecting the user's log to the world. Nil when the
+    /// aggregate is missing or too quiet — callers show nothing, never block.
+    static func worldMomentLine(mood: EmotionalWeather, bucket: WorldDayBucket?) -> String? {
+        guard let bucket, bucket.global.total >= 5 else { return nil }
+        let pct = Int((bucket.global.share(of: mood) * 100).rounded())
+        guard pct > 0 else { return nil }
+        switch mood {
+        case .clear:
+            return "you and \(pct)% of dinos are clear today ✨"
+        case .partlyCloudy:
+            return "you and \(pct)% of dinos are under soft clouds today"
+        case .overwhelmed:
+            return "you're not alone. \(pct)% of dinos are under clouds today"
+        case .drained:
+            return "you're not alone. \(pct)% of dinos are running low today"
+        }
+    }
 }

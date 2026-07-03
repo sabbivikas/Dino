@@ -70,6 +70,26 @@ final class WorldMoodTests: XCTestCase {
         XCTAssertEqual(WorldMoodService.countryCode(from: ""), "elsewhere")
     }
 
+    // 6a) Post-log moment line: percentages, warm copy, quiet-world nil.
+    @MainActor func testWorldMomentLine() {
+        let bucket = WorldDayBucket.parse([
+            "global": ["clear": 58, "partlyCloudy": 20, "overwhelmed": 12, "drained": 10, "total": 100],
+            "countries": [:],
+        ])
+        XCTAssertEqual(WorldMoodService.worldMomentLine(mood: .clear, bucket: bucket),
+                       "you and 58% of dinos are clear today ✨")
+        XCTAssertEqual(WorldMoodService.worldMomentLine(mood: .overwhelmed, bucket: bucket),
+                       "you're not alone. 12% of dinos are under clouds today")
+        // no aggregate → nothing (never blocks logging)
+        XCTAssertNil(WorldMoodService.worldMomentLine(mood: .clear, bucket: nil))
+        // too quiet (< 5 logs) → nothing
+        let quiet = WorldDayBucket.parse(["global": ["clear": 2, "total": 2], "countries": [:]])
+        XCTAssertNil(WorldMoodService.worldMomentLine(mood: .clear, bucket: quiet))
+        // 0% of the logged mood → nothing rather than "0%"
+        let none = WorldDayBucket.parse(["global": ["clear": 10, "total": 10], "countries": [:]])
+        XCTAssertNil(WorldMoodService.worldMomentLine(mood: .drained, bucket: none))
+    }
+
     // 6) Local-day key formatting.
     @MainActor func testTodayKey() {
         var cal = Calendar(identifier: .gregorian)

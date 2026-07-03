@@ -32,6 +32,8 @@ enum DinoWorldPalette {
 
     static func moodSwiftUIColor(_ mood: EmotionalWeather) -> Color { Color(moodColor(mood)) }
 
+    // MARK: - SwiftUI helpers
+
     /// Soft radial glow sprite used for fireflies (generated, no asset).
     static func glowImage(color: UIColor, diameter: CGFloat = 64) -> UIImage {
         let renderer = UIGraphicsImageRenderer(size: CGSize(width: diameter, height: diameter))
@@ -45,5 +47,23 @@ enum DinoWorldPalette {
             ctx.cgContext.drawRadialGradient(gradient, startCenter: c, startRadius: 0,
                                              endCenter: c, endRadius: diameter / 2, options: [])
         }
+    }
+}
+
+extension Color {
+    /// Gentle 65/35 blend toward `tint` — used for the home tile's subtle
+    /// dominant-mood coloring.
+    func blendedWorldTint(_ tint: Color) -> Color {
+        let a = UIColor(self)
+        let b = UIColor(tint)
+        var (r1, g1, b1, o1): (CGFloat, CGFloat, CGFloat, CGFloat) = (0, 0, 0, 0)
+        var (r2, g2, b2, o2): (CGFloat, CGFloat, CGFloat, CGFloat) = (0, 0, 0, 0)
+        a.getRed(&r1, green: &g1, blue: &b1, alpha: &o1)
+        b.getRed(&r2, green: &g2, blue: &b2, alpha: &o2)
+        let t: CGFloat = 0.35
+        return Color(red: Double(r1 + (r2 - r1) * t),
+                     green: Double(g1 + (g2 - g1) * t),
+                     blue: Double(b1 + (b2 - b1) * t))
+            .opacity(Double(max(o1, 0.9)))
     }
 }
