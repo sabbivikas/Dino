@@ -50,6 +50,50 @@ enum DinoWorldPalette {
     }
 }
 
+extension DinoWorldPalette {
+    private static var cachedEarthTexture: UIImage?
+
+    /// The NASA land_ocean_ice map run through the pure sepia-cream treatment
+    /// (WorldEarthToning.warmed) — our world, not google earth. One-time CPU
+    /// pass over the bundled 1024×512 image, cached for the app's lifetime.
+    static func warmedEarthTexture() -> UIImage? {
+        if let cached = cachedEarthTexture { return cached }
+        guard let url = Bundle.main.url(forResource: "earth_land_mask", withExtension: "jpg"),
+              let cg = UIImage(contentsOfFile: url.path)?.cgImage else { return nil }
+        let w = cg.width, h = cg.height
+        var buf = [UInt8](repeating: 0, count: w * h * 4)
+        guard let ctx = CGContext(data: &buf, width: w, height: h,
+                                  bitsPerComponent: 8, bytesPerRow: w * 4,
+                                  space: CGColorSpaceCreateDeviceRGB(),
+                                  bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return nil }
+        ctx.draw(cg, in: CGRect(x: 0, y: 0, width: w, height: h))
+        for i in stride(from: 0, to: buf.count, by: 4) {
+            let t = WorldEarthToning.warmed(r: Float(buf[i]) / 255,
+                                            g: Float(buf[i + 1]) / 255,
+                                            b: Float(buf[i + 2]) / 255)
+            buf[i] = UInt8(max(0, min(255, t.r * 255)))
+            buf[i + 1] = UInt8(max(0, min(255, t.g * 255)))
+            buf[i + 2] = UInt8(max(0, min(255, t.b * 255)))
+        }
+        guard let out = ctx.makeImage() else { return nil }
+        let img = UIImage(cgImage: out)
+        cachedEarthTexture = img
+        return img
+    }
+}
+
+extension UIColor {
+    /// Linear blend helper for the ambient mood wash.
+    static func blendWorld(_ a: UIColor, _ b: UIColor, t: CGFloat) -> UIColor {
+        var (r1, g1, b1, a1): (CGFloat, CGFloat, CGFloat, CGFloat) = (0, 0, 0, 0)
+        var (r2, g2, b2, a2): (CGFloat, CGFloat, CGFloat, CGFloat) = (0, 0, 0, 0)
+        a.getRed(&r1, green: &g1, blue: &b1, alpha: &a1)
+        b.getRed(&r2, green: &g2, blue: &b2, alpha: &a2)
+        return UIColor(red: r1 + (r2 - r1) * t, green: g1 + (g2 - g1) * t,
+                       blue: b1 + (b2 - b1) * t, alpha: 1)
+    }
+}
+
 extension Color {
     /// Gentle 65/35 blend toward `tint` — used for the home tile's subtle
     /// dominant-mood coloring.

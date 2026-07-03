@@ -27,6 +27,14 @@ struct WorldView: View {
     private let peach = Color(hex: "#F5C6AA")
 
     private var todayKey: String { WorldMoodService.todayKey() }
+
+    /// The user's own mood logged today — powers the local echo firefly so the
+    /// world never feels empty to someone who just joined it.
+    private var todaysOwnMood: EmotionalWeather? {
+        SharedDataManager.shared.moodEntries
+            .first(where: { Calendar.current.isDateInToday($0.date) })?
+            .weatherType
+    }
     private var selectedBucket: WorldDayBucket? { aggregate?.bucket(for: selectedDayKey) }
 
     var body: some View {
@@ -101,6 +109,8 @@ struct WorldView: View {
                            center: .center, startRadius: 30, endRadius: 200)
                 .frame(height: 360)
             WorldGlobeView(bucket: selectedBucket,
+                           localEchoMood: todaysOwnMood,
+                           localEchoCountry: WorldMoodService.countryCode(from: Locale.current.region?.identifier),
                            findMyLightTrigger: $findTrigger,
                            onFoundLight: { found in
                 showToast(found ? "that's you 🦕" : "your light is glowing with the world 🌱")

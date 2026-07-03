@@ -11,6 +11,8 @@ import SceneKit
 
 struct WorldGlobeView: UIViewRepresentable {
     let bucket: WorldDayBucket?
+    var localEchoMood: EmotionalWeather? = nil   // the user's own light (today's log)
+    var localEchoCountry: String = "elsewhere"
     @Binding var findMyLightTrigger: Int      // increment to fire the animation
     var onFoundLight: ((Bool) -> Void)? = nil // true when the country was found
 
@@ -37,6 +39,11 @@ struct WorldGlobeView: UIViewRepresentable {
 
     func updateUIView(_ view: SCNView, context: Context) {
         let coordinator = context.coordinator
+        if let mood = localEchoMood, coordinator.appliedEchoMood != mood || coordinator.appliedEchoCountry != localEchoCountry {
+            coordinator.appliedEchoMood = mood
+            coordinator.appliedEchoCountry = localEchoCountry
+            coordinator.globe?.setLocalEcho(mood: mood, countryCode: localEchoCountry)
+        }
         if coordinator.appliedBucket != bucket {
             coordinator.appliedBucket = bucket
             coordinator.globe?.apply(bucket: bucket)
@@ -55,6 +62,8 @@ struct WorldGlobeView: UIViewRepresentable {
     final class Coordinator: NSObject {
         var globe: WorldGlobeScene?
         var appliedBucket: WorldDayBucket?
+        var appliedEchoMood: EmotionalWeather?
+        var appliedEchoCountry: String = ""
         var lastFindTrigger = 0
         private var resumeWorkItem: DispatchWorkItem?
 

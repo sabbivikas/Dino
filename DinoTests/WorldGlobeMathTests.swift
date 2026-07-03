@@ -73,6 +73,50 @@ final class WorldGlobeMathTests: XCTestCase {
         }
     }
 
+    // 6a) Mood tint: snap when one mood clearly leads.
+    func testMoodTintSnapsToDominant() {
+        // 60/20/10/10 — lead margin 0.40 ≥ 0.15 → pure gold
+        let t = WorldMoodTint.tint(clear: 60, partlyCloudy: 20, overwhelmed: 10, drained: 10)
+        XCTAssertEqual(t, WorldMoodTint.gold)
+    }
+
+    // 6b) Mood tint: proportional blend when moods are close.
+    func testMoodTintBlendsWhenClose() {
+        // 40/35/25 — lead margin 0.05 < 0.15 → weighted blend, not any pure color
+        let t = WorldMoodTint.tint(clear: 40, partlyCloudy: 35, overwhelmed: 25, drained: 0)
+        XCTAssertNotEqual(t, WorldMoodTint.gold)
+        XCTAssertNotEqual(t, WorldMoodTint.sage)
+        let expected = WorldMoodTint.gold * 0.40 + WorldMoodTint.sage * 0.35 + WorldMoodTint.lavender * 0.25
+        XCTAssertEqual(Double(t.x), Double(expected.x), accuracy: 1e-5)
+        XCTAssertEqual(Double(t.y), Double(expected.y), accuracy: 1e-5)
+        XCTAssertEqual(Double(t.z), Double(expected.z), accuracy: 1e-5)
+    }
+
+    // 6c) Mood tint: quiet world → neutral peach; exact boundary snaps.
+    func testMoodTintNeutralAndBoundary() {
+        XCTAssertEqual(WorldMoodTint.tint(clear: 0, partlyCloudy: 0, overwhelmed: 0, drained: 0),
+                       WorldMoodTint.neutral)
+        // 50/35/15/0: margin exactly 0.15 → snaps
+        let t = WorldMoodTint.tint(clear: 50, partlyCloudy: 35, overwhelmed: 15, drained: 0)
+        XCTAssertEqual(t, WorldMoodTint.gold)
+    }
+
+    // 6d) Earth warming: desaturates, lifts toward cream, stays in range.
+    func testEarthWarming() {
+        // deep ocean blue → warmer, less saturated, channels in 0...1
+        let ocean = WorldEarthToning.warmed(r: 0.08, g: 0.16, b: 0.45)
+        XCTAssertLessThan(ocean.b - ocean.r, 0.45 - 0.08)      // blue dominance reduced
+        for v in [ocean.r, ocean.g, ocean.b] {
+            XCTAssertGreaterThanOrEqual(v, 0); XCTAssertLessThanOrEqual(v, 1)
+        }
+        // pure white stays near-white (never blows out or inverts)
+        let white = WorldEarthToning.warmed(r: 1, g: 1, b: 1)
+        XCTAssertGreaterThan(white.r, 0.95)
+        XCTAssertGreaterThan(white.g, 0.9)
+        // warm cast: red channel ≥ blue channel for neutral input
+        XCTAssertGreaterThanOrEqual(white.r, white.b)
+    }
+
     // 6) Water-pixel classification (ocean blue vs land vs ice).
     func testWaterPixelClassification() {
         XCTAssertTrue(LandMask.isWaterPixel(r: 20, g: 40, b: 110))    // deep ocean
