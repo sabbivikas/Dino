@@ -85,7 +85,7 @@ struct JournalAllEntriesView: View {
         VStack(spacing: 8) {
             Spacer()
             Text("no memories yet")
-                .font(.custom(DinoTheme.customFontName, size: 20))
+                .font(DinoTheme.dinoFont(size: 20))
                 .foregroundColor(DinoTheme.muted)
             Text("your journal entries will live here once you start writing.")
                 .font(.system(size: 13))

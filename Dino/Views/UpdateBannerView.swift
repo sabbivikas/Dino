@@ -19,7 +19,7 @@ struct UpdateBannerView: View {
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text("dino got an update")
-                        .font(.custom(DinoTheme.customFontName, size: 14))
+                        .font(DinoTheme.dinoFont(size: 14))
                         .foregroundColor(Color(hex: "#2E2A24"))
                     Text("new features waiting for you")
                         .font(.system(size: 12))
@@ -36,7 +36,7 @@ struct UpdateBannerView: View {
                     }
                 } label: {
                     Text("update")
-                        .font(.custom(DinoTheme.customFontName, size: 13))
+                        .font(DinoTheme.dinoFont(size: 13))
                         .foregroundColor(.white)
                         .padding(.horizontal, 14)
                         .padding(.vertical, 8)

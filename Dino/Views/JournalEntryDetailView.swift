@@ -117,6 +117,7 @@ struct JournalEntryDetailView: View {
             JournalDetailShareSheet(items: shareItems)
         }
         .sheet(isPresented: $showDateEdit) {
+            ScrollView {
             VStack(spacing: 14) {
                 Text("move this memory")
                     .font(DinoTheme.dinoHeaderFont(size: 22))
@@ -144,7 +145,8 @@ struct JournalEntryDetailView: View {
                 .padding(.horizontal, 22)
                 .padding(.bottom, 20)
             }
-            .presentationDetents([.height(520)])
+            }
+            .presentationDetents([.medium, .large])
             .background(cream)
         }
         .confirmationDialog("delete this entry?", isPresented: $showDeleteConfirm, titleVisibility: .visible) {

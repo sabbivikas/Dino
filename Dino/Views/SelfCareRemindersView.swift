@@ -66,7 +66,7 @@ struct SelfCareRemindersView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
                 Text("a few gentle nudges")
-                    .font(.custom(DinoTheme.customFontName, size: 13))
+                    .font(DinoTheme.dinoFont(size: 13))
                     .foregroundColor(DinoTheme.textSecondary)
                     .padding(.horizontal, 4)
 
@@ -95,7 +95,7 @@ struct SelfCareRemindersView: View {
                     HStack {
                         Image(systemName: "bell.badge")
                         Text("test notifications")
-                            .font(.custom(DinoTheme.customFontName, size: 14))
+                            .font(DinoTheme.dinoFont(size: 14))
                     }
                     .foregroundColor(DinoTheme.textPrimary)
                     .frame(maxWidth: .infinity)
@@ -155,15 +155,15 @@ private struct SelfCareReminderRow: View {
                     .frame(width: 38)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(reminder.name)
-                        .font(.custom(DinoTheme.customFontName, size: 16))
+                        .font(DinoTheme.dinoFont(size: 16))
                         .foregroundColor(DinoTheme.textPrimary)
                     if enabled {
                         Text(timeString)
-                            .font(.custom(DinoTheme.customFontName, size: 11))
+                            .font(DinoTheme.dinoFont(size: 11))
                             .foregroundColor(DinoTheme.textSecondary)
                     } else {
                         Text("off")
-                            .font(.custom(DinoTheme.customFontName, size: 11))
+                            .font(DinoTheme.dinoFont(size: 11))
                             .foregroundColor(DinoTheme.textSecondary.opacity(0.7))
                     }
                 }

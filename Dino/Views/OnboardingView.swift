@@ -340,7 +340,7 @@ private struct StepWelcomePage: View {
 
             WordRevealText(
                 welcomeQuote,
-                font: .custom(DinoTheme.customFontName, size: 22),
+                font: DinoTheme.dinoFont(size: 22),
                 color: OnboardingColors.textPrimary
             )
             .multilineTextAlignment(.center)
@@ -353,7 +353,7 @@ private struct StepWelcomePage: View {
                 OnboardingBeginNotifier.fire()
             }) {
                 Text("begin".localized)
-                    .font(.custom(DinoTheme.customFontName, size: 18))
+                    .font(DinoTheme.dinoFont(size: 18))
                     .foregroundColor(.white)
                     .padding(.vertical, 14)
                     .padding(.horizontal, 36)
@@ -388,7 +388,7 @@ private struct StepFeelingPage: View {
             Spacer(minLength: 12)
 
             Text("how are you feeling lately?".localized)
-                .font(.custom(DinoTheme.customFontName, size: 26))
+                .font(DinoTheme.dinoFont(size: 26))
                 .foregroundColor(OnboardingColors.textPrimary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 24)
@@ -603,7 +603,7 @@ private struct StepEncouragementPage: View {
             }
 
             Text("you're not alone".localized)
-                .font(.custom(DinoTheme.customFontName, size: 26))
+                .font(DinoTheme.dinoFont(size: 26))
                 .foregroundColor(OnboardingColors.textPrimary)
 
             Text("while receiving professional care is important, small habits and lifestyle changes can make a stark difference.")
@@ -683,7 +683,7 @@ private struct StepReferralPage: View {
             Spacer(minLength: 8)
 
             Text("how did you hear about us?".localized)
-                .font(.custom(DinoTheme.customFontName, size: 24))
+                .font(DinoTheme.dinoFont(size: 24))
                 .foregroundColor(OnboardingColors.textPrimary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 24)
@@ -752,7 +752,7 @@ private struct StepHealthPage: View {
 
             VStack(spacing: 8) {
                 Text("dino can learn from your sleep".localized)
-                    .font(.custom(DinoTheme.customFontName, size: 24))
+                    .font(DinoTheme.dinoFont(size: 24))
                     .foregroundColor(OnboardingColors.textPrimary)
                     .multilineTextAlignment(.center)
 
@@ -846,7 +846,7 @@ private struct StepNotificationsPage: View {
 
             VStack(spacing: 8) {
                 Text("gentle reminders?".localized)
-                    .font(.custom(DinoTheme.customFontName, size: 24))
+                    .font(DinoTheme.dinoFont(size: 24))
                     .foregroundColor(OnboardingColors.textPrimary)
                     .multilineTextAlignment(.center)
 
@@ -957,7 +957,7 @@ private struct StepNamePage: View {
             Spacer(minLength: 12)
 
             Text("what should we call you?".localized)
-                .font(.custom(DinoTheme.customFontName, size: 26))
+                .font(DinoTheme.dinoFont(size: 26))
                 .foregroundColor(OnboardingColors.textPrimary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 24)
@@ -1068,7 +1068,7 @@ private struct StepAnxietyUseCasePage: View {
                 .transition(.opacity.animation(.easeInOut(duration: 0.4)))
 
             Text("when anxiety hits")
-                .font(.custom(DinoTheme.customFontName, size: 28))
+                .font(DinoTheme.dinoFont(size: 28))
                 .foregroundColor(OnboardingColors.textPrimary)
                 .multilineTextAlignment(.center)
 
@@ -1151,7 +1151,7 @@ private struct StepRoughDayUseCasePage: View {
                 .padding(.horizontal, 24)
 
             Text("one small good thing")
-                .font(.custom(DinoTheme.customFontName, size: 28))
+                .font(DinoTheme.dinoFont(size: 28))
                 .foregroundColor(OnboardingColors.textPrimary)
                 .multilineTextAlignment(.center)
 

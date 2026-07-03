@@ -56,12 +56,12 @@ struct GratitudeJarView: View {
                     HStack(alignment: .top) {
                         VStack(alignment: .leading, spacing: 4) {
                             Text("gratitude jar".localized)
-                                .font(.custom(DinoTheme.customFontName, size: 28))
+                                .font(DinoTheme.dinoFont(size: 28))
                                 .foregroundColor(DinoTheme.ink)
                                 .shadow(color: .black.opacity(0.15), radius: 2, x: 0, y: 1)
 
                             Text(subNote)
-                                .font(.custom(DinoTheme.customFontName, size: 13))
+                                .font(DinoTheme.dinoFont(size: 13))
                                 .italic()
                                 .foregroundColor(DinoTheme.jarMuted)
                         }
@@ -112,7 +112,7 @@ struct GratitudeJarView: View {
                     // Count caption under jar
                     if viewModel.totalCount > 0 {
                         Text("\(viewModel.totalCount) keepsakes · this year")
-                            .font(.custom(DinoTheme.customFontName, size: 13))
+                            .font(DinoTheme.dinoFont(size: 13))
                             .foregroundColor(DinoTheme.jarMuted)
                             .padding(.top, -8)
                     }
@@ -122,7 +122,7 @@ struct GratitudeJarView: View {
                         HStack(spacing: 8) {
                             Text("🎉")
                             Text("30 notes milestone!")
-                                .font(.custom(DinoTheme.customFontName, size: 14))
+                                .font(DinoTheme.dinoFont(size: 14))
                                 .foregroundColor(DinoTheme.ink)
                         }
                         .padding(.vertical, 10)
@@ -140,7 +140,7 @@ struct GratitudeJarView: View {
                         viewModel.showAddSheet = true
                     } label: {
                         Text("+ add a keepsake".localized)
-                            .font(.custom(DinoTheme.customFontName, size: 17))
+                            .font(DinoTheme.dinoFont(size: 17))
                             .foregroundColor(.white)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 16)
@@ -211,7 +211,7 @@ private struct StreakChip: View {
             Text("🔥")
                 .font(.system(size: 13))
             Text("\(days) day")
-                .font(.custom(DinoTheme.customFontName, size: 13))
+                .font(DinoTheme.dinoFont(size: 13))
                 .foregroundColor(DinoTheme.ink)
         }
         .padding(.horizontal, 12)

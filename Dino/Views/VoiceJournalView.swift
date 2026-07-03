@@ -52,7 +52,7 @@ struct VoiceJournalView: View {
                         // Timeline header
                         HStack {
                             Text("recent memories".localized)
-                                .font(.custom(DinoTheme.customFontName, size: 14))
+                                .font(DinoTheme.dinoFont(size: 14))
                                 .foregroundColor(Color(hex: "#7A7266"))
                             Spacer()
                             Text("tap a card to flip".localized)
@@ -211,7 +211,7 @@ struct VoiceJournalView: View {
                         dismiss()
                     } label: {
                         Text("done".localized)
-                            .font(.custom(DinoTheme.customFontName, size: 16))
+                            .font(DinoTheme.dinoFont(size: 16))
                             .foregroundColor(.white)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 14)
@@ -433,14 +433,14 @@ private struct JournalComposerCard: View {
                 ZStack(alignment: .topLeading) {
                     if composerText.isEmpty {
                         Text("today I...".localized)
-                            .font(.system(size: 17))
+                            .font(DinoTheme.inputFont(size: 17))
                             .foregroundColor(Color(hex: "#A8A29A"))
                             .padding(.top, 8)
                             .padding(.leading, 4)
                             .allowsHitTesting(false)
                     }
                     TextEditor(text: $composerText)
-                        .font(.system(size: 17))
+                        .font(DinoTheme.inputFont(size: 17))
                         .foregroundColor(Color(hex: "#3D3A35"))
                         .scrollContentBackground(.hidden)
                         .background(Color.clear)
@@ -913,7 +913,7 @@ struct JournalPolaroidCard: View {
 
                 // Caption — friendly lowercase title with floral accent
                 Text(friendlyCaption)
-                    .font(.custom(DinoTheme.customFontName, size: 14))
+                    .font(DinoTheme.dinoFont(size: 14))
                     .foregroundColor(Color(hex: "#3D3A35"))
                     .lineLimit(loadedPhoto == nil ? 2 : 1)
                     .multilineTextAlignment(.center)
@@ -983,7 +983,7 @@ struct JournalPolaroidCard: View {
                         VStack {
                             Spacer()
                             Text(snippetText)
-                                .font(.custom(DinoTheme.customFontName, size: 11))
+                                .font(DinoTheme.dinoFont(size: 11))
                                 .foregroundColor(Color(hex: "#2E2A24"))
                                 .lineLimit(2)
                                 .multilineTextAlignment(.leading)
@@ -1139,7 +1139,7 @@ private struct JournalPolaroidBack: View {
                 Spacer().frame(height: 4)
 
                 Text(dateString)
-                    .font(.custom(DinoTheme.customFontName, size: 13))
+                    .font(DinoTheme.dinoFont(size: 13))
                     .foregroundColor(Color(hex: "#3D3A35"))
 
                 HStack(spacing: 8) {
@@ -1608,7 +1608,7 @@ struct JournalCardPreviewOverlay: View {
             action()
         } label: {
             Text(label)
-                .font(.custom(DinoTheme.customFontName, size: 15))
+                .font(DinoTheme.dinoFont(size: 15))
                 .foregroundColor(.white)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 16)

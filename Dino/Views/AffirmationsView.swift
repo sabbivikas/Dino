@@ -256,7 +256,7 @@ struct AffirmationsView: View {
                     VStack {
                         Spacer()
                         Text("saved to camera roll ✨")
-                            .font(.custom(DinoTheme.customFontName, size: 14))
+                            .font(DinoTheme.dinoFont(size: 14))
                             .foregroundColor(Color(hex: "#3D2B18"))
                             .padding(.horizontal, 18).padding(.vertical, 10)
                             .background(Capsule().fill(Color(hex: "#FEFBF3")))
@@ -414,14 +414,14 @@ private struct PastNoteCard: View {
         ZStack(alignment: .topTrailing) {
             VStack(spacing: 2) {
                 Text(text)
-                    .font(.custom(DinoTheme.customFontName, size: 9))
+                    .font(DinoTheme.dinoFont(size: 9))
                     .foregroundColor(Color(hex: "#3D3530"))
                     .multilineTextAlignment(.center)
                     .lineLimit(5)
                     .minimumScaleFactor(0.8)
                 Spacer(minLength: 0)
                 Text(date)
-                    .font(.custom(DinoTheme.customFontName, size: 7))
+                    .font(DinoTheme.dinoFont(size: 7))
                     .foregroundColor(Color(hex: "#9B8B7A"))
             }
             .padding(6)
@@ -455,12 +455,12 @@ private struct TodayNoteCard: View {
         ZStack(alignment: .topTrailing) {
             VStack(spacing: 8) {
                 Text(dateLabel)
-                    .font(.custom(DinoTheme.customFontName, size: 9))
+                    .font(DinoTheme.dinoFont(size: 9))
                     .foregroundColor(Color(hex: "#9B8B7A"))
                     .padding(.top, 8)
                 Spacer(minLength: 0)
                 Text(text)
-                    .font(.custom(DinoTheme.customFontName, size: 17))
+                    .font(DinoTheme.dinoFont(size: 17))
                     .foregroundColor(Color(hex: "#3D3530"))
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 10)
@@ -506,11 +506,11 @@ private struct BottomStrip: View {
 
             HStack {
                 Text("your mirror")
-                    .font(.custom(DinoTheme.customFontName, size: 12))
+                    .font(DinoTheme.dinoFont(size: 12))
                     .foregroundColor(Color(hex: "#8B7A6A"))
                 Spacer()
                 Text("\(count) of \(total)")
-                    .font(.custom(DinoTheme.customFontName, size: 10))
+                    .font(DinoTheme.dinoFont(size: 10))
                     .foregroundColor(Color(hex: "#8B7A6A"))
                     .padding(.horizontal, 10)
                     .padding(.vertical, 4)
@@ -518,7 +518,7 @@ private struct BottomStrip: View {
                 Spacer()
                 Button(action: { AnalyticsManager.shared.trackAffirmationWriteBackTapped(); onWriteBack() }) {
                     Text("write back →")
-                        .font(.custom(DinoTheme.customFontName, size: 12))
+                        .font(DinoTheme.dinoFont(size: 12))
                         .foregroundColor(Color(hex: "#8B7A6A"))
                 }
                 .buttonStyle(.plain)
@@ -540,7 +540,7 @@ private struct NoteOverlay: View {
                 .ignoresSafeArea()
                 .onTapGesture(perform: onDismiss)
             Text(text)
-                .font(.custom(DinoTheme.customFontName, size: 22))
+                .font(DinoTheme.dinoFont(size: 22))
                 .foregroundColor(Color(hex: "#3D3530"))
                 .multilineTextAlignment(.center)
                 .padding(28)
@@ -564,12 +564,12 @@ private struct CelebrationOverlay: View {
             Color(hex: "#1A0E0A").opacity(0.85).ignoresSafeArea()
             VStack(spacing: 18) {
                 Text("your mirror is full ✨")
-                    .font(.custom(DinoTheme.customFontName, size: 22))
+                    .font(DinoTheme.dinoFont(size: 22))
                     .foregroundColor(Color(hex: "#3D2B18"))
                     .multilineTextAlignment(.center)
                     .onAppear { AnalyticsManager.shared.trackAffirmationMirrorFull() }
                 Text("you showed up every single day.\nnow go stick your notes on your real mirror\nand take a picture 🪞")
-                    .font(.custom(DinoTheme.customFontName, size: 13))
+                    .font(DinoTheme.dinoFont(size: 13))
                     .foregroundColor(Color(hex: "#6B5040"))
                     .multilineTextAlignment(.center)
                 HStack(spacing: 12) {
@@ -577,7 +577,7 @@ private struct CelebrationOverlay: View {
                     CelebrationButton(title: "selfie 🤳", action: onSelfie)
                 }
                 Button("maybe later", action: onClose)
-                    .font(.custom(DinoTheme.customFontName, size: 12))
+                    .font(DinoTheme.dinoFont(size: 12))
                     .foregroundColor(Color(hex: "#8B7A6A"))
             }
             .padding(28)
@@ -593,7 +593,7 @@ private struct CelebrationButton: View {
     var body: some View {
         Button(action: action) {
             Text(title)
-                .font(.custom(DinoTheme.customFontName, size: 14))
+                .font(DinoTheme.dinoFont(size: 14))
                 .foregroundColor(Color(hex: "#3D2B18"))
                 .padding(.horizontal, 18)
                 .padding(.vertical, 12)

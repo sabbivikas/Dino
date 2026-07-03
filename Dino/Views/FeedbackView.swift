@@ -74,7 +74,7 @@ struct FeedbackView: View {
             ScrollView(showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 16) {
                     Text("send us a note 🦕")
-                        .font(.custom(DinoTheme.customFontName, size: 24))
+                        .font(DinoTheme.dinoFont(size: 24))
                         .foregroundColor(ink)
 
                     Text("we read every message")
@@ -199,7 +199,7 @@ struct FeedbackView: View {
                         .tint(.white)
                 } else {
                     Text("send it →")
-                        .font(.custom(DinoTheme.customFontName, size: 16))
+                        .font(DinoTheme.dinoFont(size: 16))
                         .foregroundColor(.white)
                 }
             }
@@ -240,7 +240,7 @@ struct FeedbackView: View {
         VStack(spacing: 16) {
             Spacer()
             Text("got it! we'll be in touch 🌿")
-                .font(.custom(DinoTheme.customFontName, size: 22))
+                .font(DinoTheme.dinoFont(size: 22))
                 .foregroundColor(ink)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 32)
@@ -267,7 +267,7 @@ private struct CategoryPill: View {
     var body: some View {
         Button(action: action) {
             Text(label)
-                .font(.custom(DinoTheme.customFontName, size: 14))
+                .font(DinoTheme.dinoFont(size: 14))
                 .tracking(0.14)
                 .foregroundColor(active ? bg : inactiveText)
                 .padding(.horizontal, 14)

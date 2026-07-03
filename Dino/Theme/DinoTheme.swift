@@ -136,33 +136,39 @@ struct DinoTheme {
     // Note: font has no digits, so numericFont() uses system rounded for numbers only
     static let customFontName = "DinoInitiativeFont-Regular"
 
-    // MARK: - Typography (all Dino custom font)
+    // MARK: - Typography (all Dino custom font; all apply the combined scale)
     static func largeFont() -> Font {
-        .custom(customFontName, size: 34)
+        .custom(customFontName, size: 34 * textSizeScale)
     }
 
     static func titleFont() -> Font {
-        .custom(customFontName, size: 22)
+        .custom(customFontName, size: 22 * textSizeScale)
     }
 
     static func headlineFont() -> Font {
-        .custom(customFontName, size: 17)
+        .custom(customFontName, size: 17 * textSizeScale)
     }
 
     static func bodyFont() -> Font {
-        .custom(customFontName, size: 17)
+        .custom(customFontName, size: 17 * textSizeScale)
     }
 
     static func subheadlineFont() -> Font {
-        .custom(customFontName, size: 15)
+        .custom(customFontName, size: 15 * textSizeScale)
     }
 
     static func captionFont() -> Font {
-        .custom(customFontName, size: 12)
+        .custom(customFontName, size: 12 * textSizeScale)
     }
 
     static func caption2Font() -> Font {
-        .custom(customFontName, size: 11)
+        .custom(customFontName, size: 11 * textSizeScale)
+    }
+
+    /// Text INPUT surfaces (TextEditor/TextField) — system sans for legibility
+    /// while typing, scaled like everything else. people read what they type.
+    static func inputFont(size: CGFloat = 17) -> Font {
+        .system(size: size * textSizeScale)
     }
 
     /// Combined text scale: the in-app setting (`text_size_scale`, 0.8...1.4)

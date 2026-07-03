@@ -46,7 +46,7 @@ struct BreathingCircle: View {
             // Phase label & countdown
             VStack(spacing: 6) {
                 Text(phase.label)
-                    .font(.custom(DinoTheme.customFontName, size: 19))
+                    .font(DinoTheme.dinoFont(size: 19))
                     .foregroundColor(.white)
 
                 Text("\(countdown)")

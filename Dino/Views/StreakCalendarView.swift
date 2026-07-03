@@ -115,7 +115,7 @@ private struct HeroHeader: View {
                 .allowsHitTesting(false)
 
             Text(monthYearLabel)
-                .font(.custom(DinoTheme.customFontName, size: 13))
+                .font(DinoTheme.dinoFont(size: 13))
                 .tracking(0.5)
                 .foregroundColor(Color(hex: "#8A5A28"))
                 .padding(.top, 24)
@@ -124,10 +124,10 @@ private struct HeroHeader: View {
             VStack(alignment: .leading, spacing: 4) {
                 Spacer()
                 Text("your streaks")
-                    .font(.custom(DinoTheme.customFontName, size: 32))
+                    .font(DinoTheme.dinoFont(size: 32))
                     .foregroundColor(StreakCalendarView.INK)
                 Text("a gentle nudge, not a scoreboard")
-                    .font(.custom(DinoTheme.customFontName, size: 13))
+                    .font(DinoTheme.dinoFont(size: 13))
                     .foregroundColor(StreakCalendarView.INK2)
                     .padding(.bottom, 24)
             }
@@ -278,12 +278,12 @@ private struct StatCard: View {
                 .font(.system(size: 20, weight: .semibold))
                 .foregroundColor(iconColor)
             Text("\(value)")
-                .font(.custom(DinoTheme.customFontName, size: 32))
+                .font(DinoTheme.dinoFont(size: 32))
                 .foregroundColor(Color(hex: "#2E2A24"))
                 .lineLimit(1)
                 .minimumScaleFactor(0.6)
             Text(label)
-                .font(.custom(DinoTheme.customFontName, size: 10))
+                .font(DinoTheme.dinoFont(size: 10))
                 .foregroundColor(Color(hex: "#7A7266"))
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
@@ -322,7 +322,7 @@ private struct CalendarCard: View {
                 HStack(spacing: 0) {
                     ForEach(Array(dayLabels.enumerated()), id: \.offset) { idx, d in
                         Text(d)
-                            .font(.custom(DinoTheme.customFontName, size: 13))
+                            .font(DinoTheme.dinoFont(size: 13))
                             .foregroundColor((idx == 0 || idx == 6) ? StreakCalendarView.PEACH_D : StreakCalendarView.INK2)
                             .frame(maxWidth: .infinity)
                     }
@@ -369,7 +369,7 @@ private struct CalendarCard: View {
 
             VStack(spacing: 2) {
                 Text(monthName(displayedMonth))
-                    .font(.custom(DinoTheme.customFontName, size: 22))
+                    .font(DinoTheme.dinoFont(size: 22))
                     .foregroundColor(StreakCalendarView.INK)
                 Text(yearString(displayedMonth))
                     .font(.system(size: 12, weight: .regular, design: .rounded))
@@ -598,11 +598,11 @@ private struct ClosingNote: View {
                     + Text(".")
                         .foregroundColor(StreakCalendarView.INK)
                 )
-                .font(.custom(DinoTheme.customFontName, size: 14))
+                .font(DinoTheme.dinoFont(size: 14))
                 .lineSpacing(2)
 
                 Text("if you miss tomorrow, it's okay. dino will wait. \u{1F331}")
-                    .font(.custom(DinoTheme.customFontName, size: 13))
+                    .font(DinoTheme.dinoFont(size: 13))
                     .foregroundColor(StreakCalendarView.INK2)
                     .lineSpacing(2)
             }

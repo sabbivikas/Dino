@@ -89,10 +89,10 @@ struct MoodPaintingGalleryView: View {
     private var header: some View {
         VStack(spacing: 4) {
             Text("your emotional gallery")
-                .font(.custom(DinoTheme.customFontName, size: 22))
+                .font(DinoTheme.dinoFont(size: 22))
                 .foregroundColor(GalleryPalette.cream)
             Text("each painting is a month of your inner world")
-                .font(.custom(DinoTheme.customFontName, size: 12))
+                .font(DinoTheme.dinoFont(size: 12))
                 .foregroundColor(GalleryPalette.cream.opacity(0.6))
         }
         .padding(.top, 64)
@@ -104,7 +104,7 @@ struct MoodPaintingGalleryView: View {
             Text("\u{1F995}")
                 .font(.system(size: 64))
             Text("your first painting generates at the end of this month \u{1F3A8}")
-                .font(.custom(DinoTheme.customFontName, size: 16))
+                .font(DinoTheme.dinoFont(size: 16))
                 .foregroundColor(GalleryPalette.cream.opacity(0.7))
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 40)
@@ -130,7 +130,7 @@ struct MoodPaintingGalleryView: View {
 
             HStack(alignment: .bottom) {
                 Text(caption(for: item.date))
-                    .font(.custom(DinoTheme.customFontName, size: 14))
+                    .font(DinoTheme.dinoFont(size: 14))
                     .foregroundColor(GalleryPalette.cream)
                 Spacer()
             }
@@ -209,7 +209,7 @@ private struct PaintingZoomView: View {
                 }
                 Spacer()
                 Text(caption)
-                    .font(.custom(DinoTheme.customFontName, size: 14))
+                    .font(DinoTheme.dinoFont(size: 14))
                     .foregroundColor(GalleryPalette.cream)
                     .padding(.bottom, 32)
             }

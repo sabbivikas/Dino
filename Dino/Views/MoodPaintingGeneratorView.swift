@@ -87,11 +87,11 @@ struct MoodPaintingGeneratorView: View {
                 .frame(width: 200, height: 120)
 
             Text("dino is painting your month...")
-                .font(.custom(DinoTheme.customFontName, size: 18))
+                .font(DinoTheme.dinoFont(size: 18))
                 .foregroundColor(GeneratorPalette.cream)
 
             Text(stages[stageIndex])
-                .font(.custom(DinoTheme.customFontName, size: 14))
+                .font(DinoTheme.dinoFont(size: 14))
                 .foregroundColor(GeneratorPalette.cream.opacity(0.7))
                 .id(stageIndex)
                 .transition(.opacity)
@@ -113,13 +113,13 @@ struct MoodPaintingGeneratorView: View {
                 .transition(.opacity)
 
             Text("your \(monthLabel) painting is ready \u{2728}")
-                .font(.custom(DinoTheme.customFontName, size: 16))
+                .font(DinoTheme.dinoFont(size: 16))
                 .foregroundColor(GeneratorPalette.cream)
 
             HStack(spacing: 14) {
                 Button(action: { dismiss() }) {
                     Text("done")
-                        .font(.custom(DinoTheme.customFontName, size: 15))
+                        .font(DinoTheme.dinoFont(size: 15))
                         .foregroundColor(GeneratorPalette.bg)
                         .padding(.horizontal, 22)
                         .padding(.vertical, 10)
@@ -132,7 +132,7 @@ struct MoodPaintingGeneratorView: View {
                         Image(systemName: "square.and.arrow.up")
                             .font(.system(size: 13, weight: .medium))
                         Text("share")
-                            .font(.custom(DinoTheme.customFontName, size: 15))
+                            .font(DinoTheme.dinoFont(size: 15))
                     }
                     .foregroundColor(GeneratorPalette.cream)
                     .padding(.horizontal, 22)
@@ -149,7 +149,7 @@ struct MoodPaintingGeneratorView: View {
 
     private func errorView(_ message: String) -> some View {
         Text("painting will be ready soon 🎨")
-            .font(.custom(DinoTheme.customFontName, size: 18))
+            .font(DinoTheme.dinoFont(size: 18))
             .foregroundColor(GeneratorPalette.cream)
             .multilineTextAlignment(.center)
             .padding(.horizontal, 40)
