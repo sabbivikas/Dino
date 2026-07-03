@@ -423,6 +423,8 @@ final class SharedDataManager: ObservableObject {
         moodEntries.insert(entry, at: 0)
         addXP(10)
         recordActivity()
+        // DINO WORLD: anonymous {mood, country, day} — fire-and-forget, never blocks.
+        Task { await WorldMoodService.logWorldMood(entry.weatherType) }
         NotificationManager.shared.userDidLogMood()
         scheduleWidgetReload()
     }

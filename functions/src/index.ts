@@ -610,6 +610,79 @@ function buildWeeklyPrompt(
   return lines.join("\n");
 }
 
+// ---------------------------------------------------------------------------
+// DINO WORLD — hourly aggregation of anonymous worldMoods into ONE summary doc.
+// Raw docs: {mood, countryCode, dayKey, createdAt, expiresAt(TTL ~48h)}.
+// Output worldAggregate/current: { updatedAt, days: { dayKey: { global, countries } } }
+// • countries with fewer than WORLD_PRIVACY_FLOOR logs that day fold into
+//   "elsewhere" (privacy floor — small countries never singled out)
+// • only the newest 7 dayKeys are retained (week rewind)
+// • idempotent: days still inside the 48h raw window are rebuilt from scratch
+//   each run; older retained days keep their final values.
+// ---------------------------------------------------------------------------
+const WORLD_PRIVACY_FLOOR = 5;
+const WORLD_MOODS = ["clear", "partlyCloudy", "overwhelmed", "drained"] as const;
+
+export const aggregateWorldMoods = onSchedule("every 60 minutes", async () => {
+  const db = admin.firestore();
+  const cutoff = admin.firestore.Timestamp.fromMillis(Date.now() - 48 * 3600 * 1000);
+  const snap = await db.collection("worldMoods").where("createdAt", ">", cutoff).get();
+
+  // dayKey -> countryCode -> mood -> count
+  const grouped: Record<string, Record<string, Record<string, number>>> = {};
+  snap.forEach((doc) => {
+    const d = doc.data();
+    const mood = String(d.mood ?? "");
+    if (!(WORLD_MOODS as readonly string[]).includes(mood)) return;
+    const dayKey = String(d.dayKey ?? "");
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dayKey)) return;
+    const rawCountry = String(d.countryCode ?? "").toUpperCase();
+    const country = /^[A-Z]{2}$/.test(rawCountry) ? rawCountry : "elsewhere";
+    grouped[dayKey] ??= {};
+    grouped[dayKey][country] ??= {};
+    grouped[dayKey][country][mood] = (grouped[dayKey][country][mood] ?? 0) + 1;
+  });
+
+  const aggRef = db.collection("worldAggregate").doc("current");
+  const existing = (await aggRef.get()).data() ?? {};
+  const outDays: Record<string, unknown> = { ...((existing.days ?? {}) as Record<string, unknown>) };
+
+  for (const [dayKey, countries] of Object.entries(grouped)) {
+    const global: Record<string, number> = { clear: 0, partlyCloudy: 0, overwhelmed: 0, drained: 0, total: 0 };
+    const elsewhere: Record<string, number> = { clear: 0, partlyCloudy: 0, overwhelmed: 0, drained: 0, total: 0 };
+    const outCountries: Record<string, Record<string, number>> = {};
+
+    for (const [country, moods] of Object.entries(countries)) {
+      const counts: Record<string, number> = { clear: 0, partlyCloudy: 0, overwhelmed: 0, drained: 0, total: 0 };
+      for (const m of WORLD_MOODS) {
+        const n = moods[m] ?? 0;
+        counts[m] = n;
+        counts.total += n;
+        global[m] += n;
+        global.total += n;
+      }
+      if (country === "elsewhere" || counts.total < WORLD_PRIVACY_FLOOR) {
+        for (const m of WORLD_MOODS) elsewhere[m] += counts[m];
+        elsewhere.total += counts.total;
+      } else {
+        outCountries[country] = counts;
+      }
+    }
+    if (elsewhere.total > 0) outCountries["elsewhere"] = elsewhere;
+    outDays[dayKey] = { global, countries: outCountries };
+  }
+
+  // Retain only the newest 7 dayKeys (lexicographic == chronological for yyyy-MM-dd).
+  const keep = Object.keys(outDays).sort().slice(-7);
+  const trimmed: Record<string, unknown> = {};
+  for (const k of keep) trimmed[k] = outDays[k];
+
+  await aggRef.set({
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    days: trimmed,
+  });
+});
+
 export const sendWelcomeEmailAfterTwoDays = functions.auth.user().onCreate(async (user) => {
   const email = (user.email || "").trim();
   const uid = user.uid;
