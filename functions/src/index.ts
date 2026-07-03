@@ -683,6 +683,141 @@ export const aggregateWorldMoods = onSchedule("every 60 minutes", async () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// DINO WORLD PHASE 2 — LANTERNS.
+// moderateLantern: strict gpt-4o-mini gate; ONLY approved lanterns enter the
+// pool, written SERVER-SIDE with no uid in the doc (sender anonymity). The
+// user's words are never rewritten — approved verbatim or rejected.
+// claimLantern: transactional oldest-undelivered pick; receiver capped at one
+// per day via lanternClaims/{uid} (receiver identity known, sender's never).
+// ---------------------------------------------------------------------------
+const LANTERN_DAILY_SEND_LIMIT = 3;
+const LANTERN_MAX_CHARS = 140;
+
+export const moderateLantern = onCall(
+  { secrets: [OPENAI_API_KEY], timeoutSeconds: 30, memory: "256MiB" },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "sign in required");
+    }
+    const uid = request.auth.uid;
+    const d = (request.data ?? {}) as Record<string, unknown>;
+    for (const k of Object.keys(d)) {
+      if (k !== "text" && k !== "countryCode") {
+        throw new HttpsError("invalid-argument", `unexpected field: ${k}`);
+      }
+    }
+    const text = String(d.text ?? "").trim();
+    if (text.length === 0 || text.length > LANTERN_MAX_CHARS) {
+      throw new HttpsError("invalid-argument", `text must be 1-${LANTERN_MAX_CHARS} chars`);
+    }
+    const rawCountry = String(d.countryCode ?? "").toUpperCase();
+    const countryCode = /^[A-Z]{2}$/.test(rawCountry) ? rawCountry : "elsewhere";
+
+    // Rate limit: LANTERN_DAILY_SEND_LIMIT sends per uid per UTC day.
+    // Rejections COUNT toward the cap (prevents brute-forcing the moderator);
+    // only server-side failures are refunded.
+    const db = admin.firestore();
+    const dayKey = new Date().toISOString().slice(0, 10);
+    const counterRef = db.collection("lanternLimits").doc(uid);
+    await db.runTransaction(async (tx) => {
+      const snap = await tx.get(counterRef);
+      const current = ((snap.data() ?? {})[dayKey] as number | undefined) ?? 0;
+      if (current >= LANTERN_DAILY_SEND_LIMIT) {
+        throw new HttpsError("resource-exhausted", "daily lantern limit reached");
+      }
+      tx.set(counterRef, { [dayKey]: current + 1, updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
+    });
+
+    const systemPrompt =
+      "you are a strict content gate for lanterns: tiny anonymous kindness notes sent between strangers " +
+      "in a mental wellness app. many receivers are having a hard day and may be fragile. " +
+      "approve ONLY messages that are warm, kind, gentle, and safe for anyone to read. " +
+      "reject if the message contains ANY of: a person's name or signature; contact info, usernames, or social handles; " +
+      "urls, apps, or promotion of anything; negativity, criticism, sarcasm, or dark humor; " +
+      "anything sexual, violent, or about self harm, even supportive mentions; " +
+      "medical, financial, legal, or life advice; religious or political content; " +
+      "requests to meet, reply, or connect; anything that could identify the sender or the receiver. " +
+      "when unsure, reject. " +
+       'respond ONLY with valid JSON, no markdown: {"approved": true, "reason": "one short lowercase phrase"}. ' +
+      "never rewrite, correct, or quote the message.";
+
+    try {
+      const openai = new OpenAI({ apiKey: OPENAI_API_KEY.value() });
+      const resp = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        max_tokens: 60,
+        temperature: 0,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: `lantern: "${text}"` },
+        ],
+      });
+      const content = resp.choices[0]?.message?.content ?? "";
+      let parsed: any = {};
+      try { parsed = JSON.parse(content); } catch { parsed = {}; }
+      const approved = parsed.approved === true;
+
+      if (approved) {
+        // Server-side pool write — the delivered doc carries NO uid, ever.
+        await db.collection("lanterns").add({
+          text,
+          countryCode,
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          delivered: false,
+        });
+      }
+      return { approved };
+    } catch (err) {
+      await counterRef.set({ [dayKey]: admin.firestore.FieldValue.increment(-1) }, { merge: true });
+      if (err instanceof HttpsError) throw err;
+      const message = err instanceof Error ? err.message : "moderation failed";
+      throw new HttpsError("internal", message);
+    }
+  }
+);
+
+export const claimLantern = onCall(
+  { timeoutSeconds: 20, memory: "256MiB" },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "sign in required");
+    }
+    const uid = request.auth.uid;
+    const db = admin.firestore();
+    const dayKey = new Date().toISOString().slice(0, 10);
+    const claimRef = db.collection("lanternClaims").doc(uid);
+
+    const result = await db.runTransaction(async (tx) => {
+      const claimSnap = await tx.get(claimRef);
+      const lastDay = (claimSnap.data() ?? {}).lastClaimDayKey as string | undefined;
+      if (lastDay === dayKey) {
+        return null;   // max one received lantern per day
+      }
+      const poolQuery = db.collection("lanterns")
+        .where("delivered", "==", false)
+        .orderBy("createdAt", "asc")
+        .limit(1);
+      const pool = await tx.get(poolQuery);
+      if (pool.empty) {
+        return null;   // empty pool → nothing shows client-side
+      }
+      const doc = pool.docs[0];
+      const data = doc.data();
+      tx.update(doc.ref, { delivered: true, deliveredDayKey: dayKey });
+      tx.set(claimRef, { lastClaimDayKey: dayKey, updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
+      // Payload exposes only what the card shows — never any sender identity.
+      return {
+        text: String(data.text ?? ""),
+        countryCode: String(data.countryCode ?? "elsewhere"),
+        createdAt: (data.createdAt?.toMillis?.() as number | undefined) ?? Date.now(),
+      };
+    });
+
+    return { lantern: result };
+  }
+);
+
 export const sendWelcomeEmailAfterTwoDays = functions.auth.user().onCreate(async (user) => {
   const email = (user.email || "").trim();
   const uid = user.uid;

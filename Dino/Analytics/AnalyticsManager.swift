@@ -397,6 +397,28 @@ final class AnalyticsManager {
         capture("world_rewind_used")
     }
 
+    // MARK: - Lanterns (no lantern text in event properties, ever)
+
+    func trackLanternComposed() {
+        capture("lantern_composed")
+    }
+
+    func trackLanternSent() {
+        capture("lantern_sent")
+    }
+
+    func trackLanternRejected() {
+        capture("lantern_rejected")
+    }
+
+    func trackLanternReceived() {
+        capture("lantern_received")
+    }
+
+    func trackLanternReported() {
+        capture("lantern_reported")
+    }
+
     // MARK: - Account
 
     func trackAccountDeleted() {

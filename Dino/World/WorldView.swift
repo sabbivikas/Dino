@@ -40,6 +40,7 @@ struct WorldView: View {
                     dayChips
                     percentageSection
                     countryList
+                    lanternSection
                     footer
                 }
                 .padding(.bottom, 28)
@@ -261,6 +262,44 @@ struct WorldView: View {
     private func countryName(_ code: String) -> String {
         if code == "elsewhere" { return "elsewhere 🌎" }
         return (Locale.current.localizedString(forRegionCode: code) ?? code).lowercased()
+    }
+
+    // MARK: - Your lanterns 🏮
+
+    @ViewBuilder private var lanternSection: some View {
+        let dm = SharedDataManager.shared
+        if !dm.receivedLanterns.isEmpty || dm.sentLanternCount > 0 {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("your lanterns 🏮")
+                    .font(DinoTheme.dinoFont(size: 13))
+                    .foregroundColor(ink2)
+
+                ForEach(dm.receivedLanterns.prefix(20)) { lantern in
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("\u{201C}\(lantern.text)\u{201D}")
+                            .font(DinoTheme.dinoFont(size: 14))
+                            .foregroundColor(ink)
+                            .lineSpacing(3)
+                        Text("from \(LanternService.countryName(lantern.countryCode)) · \(lantern.receivedAt.formatted(.dateTime.month(.abbreviated).day()).lowercased())")
+                            .font(DinoTheme.dinoFont(size: 11))
+                            .foregroundColor(ink3)
+                    }
+                    .padding(12)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Color.white.opacity(0.55)))
+                }
+
+                if dm.sentLanternCount > 0 {
+                    Text("you've sent \(dm.sentLanternCount) lantern\(dm.sentLanternCount == 1 ? "" : "s") into the world")
+                        .font(DinoTheme.dinoFont(size: 12))
+                        .foregroundColor(ink2)
+                        .padding(.top, 2)
+                }
+            }
+            .padding(16)
+            .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Color.white.opacity(0.35)))
+            .padding(.horizontal, 16)
+        }
     }
 
     private var footer: some View {

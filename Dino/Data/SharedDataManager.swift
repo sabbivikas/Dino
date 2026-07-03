@@ -66,6 +66,9 @@ final class SharedDataManager: ObservableObject {
             scheduleWidgetReload()
         }
     }
+    @Published var receivedLanterns: [ReceivedLantern] {
+        didSet { save(receivedLanterns, forKey: userKey("receivedLanterns")) }
+    }
     @Published var journalEntries: [JournalEntry] {
         didSet {
             save(journalEntries, forKey: userKey("journalEntries"))
@@ -194,6 +197,7 @@ final class SharedDataManager: ObservableObject {
         self.referralSource = ud.string(forKey: Self.staticUserKey(uid, "referralSource")) ?? ""
         self.userIntentions = Self.load([String].self, from: ud, key: Self.staticUserKey(uid, "userIntentions")) ?? []
         self.moodEntries = Self.load([MoodEntry].self, from: ud, key: Self.staticUserKey(uid, "moodEntries")) ?? []
+        self.receivedLanterns = Self.load([ReceivedLantern].self, from: ud, key: Self.staticUserKey(uid, "receivedLanterns")) ?? []
         self.journalEntries = Self.load([JournalEntry].self, from: ud, key: Self.staticUserKey(uid, "journalEntries")) ?? []
         self.gratitudeNotes = Self.load([GratitudeNote].self, from: ud, key: Self.staticUserKey(uid, "gratitudeNotes")) ?? []
         self.savedAffirmations = Self.load([SavedAffirmation].self, from: ud, key: Self.staticUserKey(uid, "savedAffirmations")) ?? []
@@ -319,6 +323,7 @@ final class SharedDataManager: ObservableObject {
 
         userIntentions = Self.load([String].self, from: ud, key: userKey("userIntentions")) ?? []
         moodEntries = Self.load([MoodEntry].self, from: ud, key: userKey("moodEntries")) ?? []
+        receivedLanterns = Self.load([ReceivedLantern].self, from: ud, key: userKey("receivedLanterns")) ?? []
         journalEntries = Self.load([JournalEntry].self, from: ud, key: userKey("journalEntries")) ?? []
         gratitudeNotes = Self.load([GratitudeNote].self, from: ud, key: userKey("gratitudeNotes")) ?? []
         savedAffirmations = Self.load([SavedAffirmation].self, from: ud, key: userKey("savedAffirmations")) ?? []
@@ -342,6 +347,7 @@ final class SharedDataManager: ObservableObject {
         userTimezone = TimeZone.current.identifier
         userIntentions = []
         moodEntries = []
+        receivedLanterns = []
         journalEntries = []
         gratitudeNotes = []
         savedAffirmations = []
@@ -416,6 +422,23 @@ final class SharedDataManager: ObservableObject {
         if newLevel > growthStats.level {
             growthStats.level = newLevel
         }
+    }
+
+    // MARK: - Lanterns
+
+    func addReceivedLantern(_ lantern: ReceivedLantern) {
+        receivedLanterns.insert(lantern, at: 0)
+        FirestoreSyncService.shared.scheduleSyncToCloud()
+    }
+
+    /// Sent lanterns are untracked except this count ("you've sent N lanterns").
+    var sentLanternCount: Int {
+        UserDefaults.standard.integer(forKey: userKey("sentLanternCount"))
+    }
+
+    func incrementSentLanternCount() {
+        UserDefaults.standard.set(sentLanternCount + 1, forKey: userKey("sentLanternCount"))
+        objectWillChange.send()
     }
 
     // MARK: - Mood
