@@ -428,6 +428,15 @@ final class SharedDataManager: ObservableObject {
     }
 
     // MARK: - Journal
+
+    /// Move a memory to a different user-chosen date. createdAt is untouched
+    /// (sync integrity); streaks were already stamped at log time.
+    func updateJournalEntryDate(_ entry: JournalEntry, to newDate: Date) {
+        guard let idx = journalEntries.firstIndex(where: { $0.id == entry.id }) else { return }
+        journalEntries[idx].date = newDate
+        FirestoreSyncService.shared.scheduleSyncToCloud()
+    }
+
     func addJournalEntry(_ entry: JournalEntry) {
         journalEntries.insert(entry, at: 0)
         addXP(15)
