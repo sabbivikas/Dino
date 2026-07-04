@@ -90,6 +90,12 @@ class FirestoreSyncService: ObservableObject {
                 items: dm.moodEntries
             )
 
+            // Received lanterns
+            try await syncCollection(
+                parentRef: userRef, name: "receivedLanterns",
+                items: dm.receivedLanterns
+            )
+
             // Journal entries
             try await syncCollection(
                 parentRef: userRef, name: "journals",
@@ -192,6 +198,12 @@ class FirestoreSyncService: ObservableObject {
                 #if DEBUG
                 print("[Firestore] moods synced: \(dm.moodEntries.count) entries")
                 #endif
+            }
+
+            // Received lanterns
+            let lanterns: [ReceivedLantern] = try await fetchCollection(parentRef: userRef, name: "receivedLanterns")
+            if !lanterns.isEmpty {
+                dm.receivedLanterns = mergeById(local: dm.receivedLanterns, cloud: lanterns)
             }
 
             // Journal entries
@@ -316,7 +328,8 @@ class FirestoreSyncService: ObservableObject {
         do {
             // Delete subcollections
             let subcollections = ["moods", "journals", "gratitude", "affirmations",
-                                  "breathing", "focus", "meditation", "assessments", "meta"]
+                                  "breathing", "focus", "meditation", "assessments",
+                                  "receivedLanterns", "meta"]
             for name in subcollections {
                 let snapshot = try await userRef.collection(name).getDocuments()
                 for doc in snapshot.documents {

@@ -7,6 +7,14 @@
         { "fieldPath": "sent", "order": "ASCENDING" },
         { "fieldPath": "scheduledFor", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "lanterns",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "delivered", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

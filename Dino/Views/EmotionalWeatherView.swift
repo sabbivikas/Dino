@@ -13,6 +13,17 @@ struct EmotionalWeatherView: View {
     @State private var showBreakCard = false
     @State private var breakMood: EmotionalWeather = .drained
     @State private var sleepData: HealthService.SleepData?
+    // Dino World: the post-log moment (always the final beat) + world card.
+    @State private var worldBucket: WorldDayBucket?
+    @State private var worldMomentLine: String?
+    @State private var worldMomentMood: EmotionalWeather = .clear
+    @State private var worldMomentPending: (line: String, mood: EmotionalWeather)?
+    @State private var showWorld = false
+    // Lanterns: invite after bright logs, one received after heavy ones.
+    @State private var showLanternInvite = false
+    @State private var showLanternCompose = false
+    @State private var pendingLantern: ReceivedLantern?
+    @State private var shownLantern: ReceivedLantern?
 
     var body: some View {
         NavigationStack {
@@ -108,6 +119,22 @@ struct EmotionalWeatherView: View {
                         if let w = logged, w == .overwhelmed || w == .drained {
                             breakMood = w
                             showBreakCard = true
+                            // World moment waits for the break card to finish —
+                            // it is always the final beat, never an interruption.
+                            if let line = WorldMoodService.worldMomentLine(mood: w, bucket: worldBucket ?? WorldMoodService.cachedTodayBucket) {
+                                worldMomentPending = (line, w)
+                            }
+                            // Quietly ask the pool for today's lantern so it's
+                            // ready when the break card closes. Nil = nothing shows.
+                            Task { pendingLantern = await LanternService.claimLantern() }
+                        } else if let w = logged {
+                            // clear / partlyCloudy → the moment shows right away,
+                            // plus a gentle invitation to send a lantern onward.
+                            if let line = WorldMoodService.worldMomentLine(mood: w, bucket: worldBucket ?? WorldMoodService.cachedTodayBucket) {
+                                worldMomentMood = w
+                                withAnimation(.easeInOut(duration: 0.35)) { worldMomentLine = line }
+                            }
+                            withAnimation(.easeInOut(duration: 0.35)) { showLanternInvite = true }
                         }
                     }) {
                         HStack(spacing: 10) {
@@ -141,10 +168,75 @@ struct EmotionalWeatherView: View {
                     .disabled(viewModel.selectedWeather == nil)
                     .padding(.horizontal, DinoTheme.padding)
 
+                    // Dino World post-log moment — one soft line, tap to visit.
+                    if let line = worldMomentLine {
+                        Button {
+                            AnalyticsManager.shared.trackWorldPostLogTapped()
+                            showWorld = true
+                        } label: {
+                            HStack(spacing: 10) {
+                                Circle()
+                                    .fill(DinoWorldPalette.moodSwiftUIColor(worldMomentMood))
+                                    .frame(width: 10, height: 10)
+                                    .shadow(color: DinoWorldPalette.moodSwiftUIColor(worldMomentMood).opacity(0.8), radius: 5)
+                                Text(line)
+                                    .font(DinoTheme.dinoFont(size: 14))
+                                    .foregroundColor(DinoWorldPalette.moodSwiftUIColor(worldMomentMood))
+                                    .multilineTextAlignment(.leading)
+                                Spacer(minLength: 0)
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 11, weight: .semibold))
+                                    .foregroundColor(DinoTheme.textSecondary.opacity(0.6))
+                            }
+                            .padding(14)
+                            .background(
+                                RoundedRectangle(cornerRadius: DinoDesignSystem.radiusMD, style: .continuous)
+                                    .fill(DinoWorldPalette.moodSwiftUIColor(worldMomentMood).opacity(0.12))
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .padding(.horizontal, DinoTheme.padding)
+                        .transition(.opacity.combined(with: .move(edge: .bottom)))
+                    }
+
+                    // Lantern invite — after a bright log, pass the light on.
+                    if showLanternInvite {
+                        Button {
+                            showLanternCompose = true
+                        } label: {
+                            HStack(spacing: 10) {
+                                Text("🏮")
+                                Text("send a lantern to someone having a hard day")
+                                    .font(DinoTheme.dinoFont(size: 14))
+                                    .foregroundColor(DinoTheme.textPrimary)
+                                    .multilineTextAlignment(.leading)
+                                Spacer(minLength: 0)
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 11, weight: .semibold))
+                                    .foregroundColor(DinoTheme.textSecondary.opacity(0.6))
+                            }
+                            .padding(14)
+                            .background(
+                                RoundedRectangle(cornerRadius: DinoDesignSystem.radiusMD, style: .continuous)
+                                    .fill(Color(hex: "#F5C6AA").opacity(0.22))
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .padding(.horizontal, DinoTheme.padding)
+                        .transition(.opacity.combined(with: .move(edge: .bottom)))
+                    }
+
                     // Weekly trend
                     WeeklyMoodTrend(viewModel: viewModel)
                         .padding(.horizontal, DinoTheme.padding)
-                        .padding(.bottom, 20)
+
+                    // Dino World card — a glowing glimpse of everyone's weather.
+                    WorldMoodCard(bucket: worldBucket) {
+                        AnalyticsManager.shared.trackWorldCardTapped()
+                        showWorld = true
+                    }
+                    .padding(.horizontal, DinoTheme.padding)
+                    .padding(.bottom, 20)
                 }
             }
             .scrollIndicators(.hidden)
@@ -153,13 +245,40 @@ struct EmotionalWeatherView: View {
             .navigationBarHidden(true)
             .task {
                 if let s = await HealthService.shared.lastNightSleep() { sleepData = s }
+                if let agg = await WorldMoodService.fetchAggregate() {
+                    worldBucket = agg.bucket(for: WorldMoodService.todayKey())
+                }
             }
             .onAppear {
                 AnalyticsManager.shared.trackMoodScreenOpened()
                 AnalyticsManager.shared.trackScreen("mood")
             }
-            .sheet(isPresented: $showBreakCard) {
+            .sheet(isPresented: $showBreakCard, onDismiss: {
+                // The break card finished (confirmed or dismissed). First the
+                // received lantern drifts down (if one was claimed), then the
+                // world moment line appears as the final beat below.
+                if let lantern = pendingLantern {
+                    pendingLantern = nil
+                    shownLantern = lantern
+                }
+                if let pending = worldMomentPending {
+                    worldMomentPending = nil
+                    worldMomentMood = pending.mood
+                    withAnimation(.easeInOut(duration: 0.35)) { worldMomentLine = pending.line }
+                }
+            }) {
                 BreakSuggestionCard(mood: breakMood, onDismiss: { showBreakCard = false })
+            }
+            .fullScreenCover(isPresented: $showWorld) {
+                WorldView()
+            }
+            .fullScreenCover(isPresented: $showLanternCompose) {
+                LanternComposeView(onDismiss: { showLanternCompose = false })
+            }
+            .overlay {
+                if let lantern = shownLantern {
+                    LanternReceivedCard(lantern: lantern, onClose: { shownLantern = nil })
+                }
             }
         }
     }

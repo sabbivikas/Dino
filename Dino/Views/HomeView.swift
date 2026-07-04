@@ -38,6 +38,7 @@ struct HomeView: View {
     @State private var resumeBurst: Bool = false
     @State private var pulseScale: CGFloat = 1.0
     @State private var navigateToStreak: Bool = false
+    @State private var showWorld: Bool = false
 
     var body: some View {
         NavigationStack {
@@ -114,6 +115,18 @@ struct HomeView: View {
             }
             .sheet(isPresented: $showNotificationCenter) {
                 NotificationCenterView()
+            }
+            .fullScreenCover(isPresented: $showWorld) {
+                WorldView()
+            }
+            .onAppear {
+                #if DEBUG
+                // Dev shortcut: jump straight to the world when verifying with
+                // the -worldTestAggregate fixture on the simulator.
+                if ProcessInfo.processInfo.arguments.contains("-worldTestAggregate") {
+                    showWorld = true
+                }
+                #endif
             }
             .sheet(isPresented: $showWhatsNew, onDismiss: {
                 lastSeenWhatsNewVersion = currentAppVersion()
@@ -424,7 +437,10 @@ struct HomeView: View {
             [
                 ActionItem(id: "rhythms", title: "rhythms", icon: "waveform.path", color: DinoTheme.lavender, tab: nil),
                 ActionItem(id: "growth", title: "Growth", icon: "tree.fill", color: DinoTheme.sageGreen, tab: nil),
-                ActionItem(id: "resources", title: "Help", icon: "heart.fill", color: DinoTheme.warmRose.opacity(0.8), tab: nil),
+                // world replaced the Help tile (slot 9); Help lives on in
+                // Profile → resources. Circle tints toward today's dominant
+                // world mood when the aggregate is cached.
+                ActionItem(id: "world", title: "world", icon: "globe.americas.fill", color: worldTileColor, tab: nil),
             ]
         ]
 
@@ -526,6 +542,8 @@ struct HomeView: View {
                     viewModel.showRhythms = true
                 case "resources":
                     viewModel.showResources = true
+                case "world":
+                    showWorld = true
                 default:
                     break
                 }
@@ -534,6 +552,13 @@ struct HomeView: View {
     }
 
     // MARK: - Helpers
+
+    /// Subtle lerp from sage toward today's dominant world mood (cached only).
+    private var worldTileColor: Color {
+        let base = DinoTheme.sageGreen
+        guard let mood = WorldMoodService.cachedTodayBucket?.global.dominantMood else { return base }
+        return base.opacity(0.65).blendedWorldTint(DinoWorldPalette.moodSwiftUIColor(mood))
+    }
 
     private var displayName: String {
         let name = dataManager.userName

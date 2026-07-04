@@ -378,6 +378,50 @@ final class AnalyticsManager {
         capture("break_finder_ai_failed", properties: ["error_domain": domain, "error_code": code])
     }
 
+    // MARK: - Dino World (no country codes in event properties)
+
+    func trackWorldViewed() {
+        capture("world_viewed")
+    }
+
+    func trackWorldCardTapped() {
+        capture("world_card_tapped")
+    }
+
+    func trackWorldPostLogTapped() {
+        capture("world_post_log_tapped")
+    }
+
+    func trackWorldFindMyLight() {
+        capture("world_find_my_light")
+    }
+
+    func trackWorldRewindUsed() {
+        capture("world_rewind_used")
+    }
+
+    // MARK: - Lanterns (no lantern text in event properties, ever)
+
+    func trackLanternComposed() {
+        capture("lantern_composed")
+    }
+
+    func trackLanternSent() {
+        capture("lantern_sent")
+    }
+
+    func trackLanternRejected() {
+        capture("lantern_rejected")
+    }
+
+    func trackLanternReceived() {
+        capture("lantern_received")
+    }
+
+    func trackLanternReported() {
+        capture("lantern_reported")
+    }
+
     // MARK: - Account
 
     func trackAccountDeleted() {
