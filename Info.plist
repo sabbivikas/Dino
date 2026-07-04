@@ -3,17 +3,17 @@
 <plist version="1.0">
 <dict>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Allow location to match Dino's theme to the weather around you and show local support resources.</string>
+	<string>dino uses your location to match the sky to the weather around you and show support resources nearby.</string>
 	<key>NSMotionUsageDescription</key>
-	<string>Dino uses motion to create a gentle parallax effect in the ambient background.</string>
+	<string>dino uses motion for a gentle parallax in the ambient background.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Dino uses the microphone to record your voice journal entries and transcribe them to text.</string>
+	<string>dino uses the microphone to record your voice journal and turn it into words.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
-	<string>Dino transcribes your spoken journal entries into text so you can save them as written reflections.</string>
+	<string>dino transcribes your spoken journal into text so you can keep it as a written reflection.</string>
 	<key>NSCameraUsageDescription</key>
-	<string>Dino uses the camera so you can capture a photo of your finished month-long mirror of affirmations.</string>
+	<string>dino uses the camera so you can capture your finished mirror of affirmations.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>Dino saves your finished mirror photo to your camera roll so you can keep the memory.</string>
+	<string>dino saves your mirror photo to your camera roll so you can keep the memory.</string>
 	<key>NSCalendarsUsageDescription</key>
 	<string>dino uses your calendar to find free moments for you to breathe and recharge.</string>
 	<key>NSCalendarsFullAccessUsageDescription</key>
@@ -21,9 +21,9 @@
 	<key>NSCalendarsWriteOnlyAccessUsageDescription</key>
 	<string>dino adds a gentle break to your calendar when you want one.</string>
 	<key>NSHealthShareUsageDescription</key>
-	<string>dino reads your sleep to understand how rest affects your emotional patterns — helping predict and prepare for harder days.</string>
+	<string>dino reads your sleep to understand how rest affects your emotional patterns, so it can help you prepare for harder days.</string>
 	<key>NSHealthUpdateUsageDescription</key>
-	<string>dino does not write any health data — this is required by Apple when an app has HealthKit access.</string>
+	<string>dino never writes health data. apple requires this description for any app with healthkit access.</string>
 	<key>UIAppFonts</key>
 	<array>
 		<string>DinoInitiativeFont-Regular.ttf</string>
