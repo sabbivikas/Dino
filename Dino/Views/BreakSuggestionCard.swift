@@ -14,7 +14,7 @@ struct BreakSuggestionCard: View {
     let mood: EmotionalWeather
     let onDismiss: () -> Void
 
-    private enum Stage { case intro, loading, suggestion, confirmed }
+    private enum Stage { case intro, loading, suggestion, confirmed, alreadyToday }
 
     @State private var stage: Stage = .intro
     @State private var userText: String = ""
@@ -48,6 +48,8 @@ struct BreakSuggestionCard: View {
         .contentShape(Rectangle())
         .onTapGesture { textFocused = false }
         .task {
+            // once per local day on the client — the server's 5/day stays as backstop
+            if BreakSchedulerService.shared.usedToday { stage = .alreadyToday }
             if let s = await HealthService.shared.lastNightSleep() { sleepData = s }
         }
     }
@@ -62,10 +64,32 @@ struct BreakSuggestionCard: View {
 
     @ViewBuilder private var content: some View {
         switch stage {
-        case .intro:      introView
-        case .loading:    loadingView
-        case .suggestion: suggestionView
-        case .confirmed:  confirmedView
+        case .intro:        introView
+        case .loading:      loadingView
+        case .suggestion:   suggestionView
+        case .confirmed:    confirmedView
+        case .alreadyToday: alreadyTodayView
+        }
+    }
+
+    // MARK: - Already used today
+
+    private var alreadyTodayView: some View {
+        VStack(spacing: 16) {
+            Text("🌿").font(.system(size: 38))
+            Text("dino already helped you find a break today")
+                .font(DinoTheme.dinoFont(size: 20)).foregroundColor(ink)
+                .multilineTextAlignment(.center)
+            Text("tomorrow brings fresh time. your calendar break is still there 🌱")
+                .font(DinoTheme.dinoFont(size: 14)).foregroundColor(ink2)
+                .multilineTextAlignment(.center)
+            Button { onDismiss() } label: {
+                Text("okay")
+                    .font(DinoTheme.dinoFont(size: 15)).foregroundColor(.white)
+                    .padding(.horizontal, 28).padding(.vertical, 12)
+                    .background(Capsule().fill(sage))
+            }
+            .padding(.top, 4)
         }
     }
 

@@ -45,19 +45,8 @@ enum GardenParticles {
         return p
     }
 
-    /// Night: ~10 warm yellow fireflies pulsing — round, additive glow.
-    static func fireflies() -> SCNParticleSystem {
-        let p = base()
-        p.birthRate = 1.3
-        p.particleLifeSpan = 7.5
-        p.particleSize = 0.06
-        p.particleImage = circleParticle()
-        p.particleColor = GardenPalette.firefly
-        p.particleVelocity = 0.2
-        p.blendMode = .additive
-        p.emitterShape = SCNBox(width: 6.5, height: 3, length: 5.5, chamferRadius: 0)
-        return p
-    }
+    // (Night fireflies moved to GardenCreatureController — individual blink
+    //  rhythms per firefly instead of one particle system.)
 
     /// Soft round white dot — a radial-gradient sprite so motes read as
     /// circles, not squares. Cached.

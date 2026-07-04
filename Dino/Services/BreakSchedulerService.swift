@@ -46,6 +46,27 @@ final class BreakSchedulerService {
     private static let fbActivity = "breathing"
     private static let fbReason = "a quiet moment to breathe 🌿"
 
+    // MARK: - Once-per-day client gate (server keeps its 5/day backstop)
+
+    private static let usedDayKey = "dino.breakFinder.lastUsedDayKey"
+
+    var usedToday: Bool {
+        UserDefaults.standard.string(forKey: Self.usedDayKey) == Self.todayKey()
+    }
+
+    private func markUsedToday() {
+        UserDefaults.standard.set(Self.todayKey(), forKey: Self.usedDayKey)
+    }
+
+    private static func todayKey(now: Date = Date(), calendar: Calendar = .current) -> String {
+        let df = DateFormatter()
+        df.locale = Locale(identifier: "en_US_POSIX")
+        df.calendar = calendar
+        df.timeZone = calendar.timeZone
+        df.dateFormat = "yyyy-MM-dd"
+        return df.string(from: now)
+    }
+
     // MARK: - Suggest
 
     /// Builds all candidate slots, asks the function for one recommended time,
@@ -87,6 +108,8 @@ final class BreakSchedulerService {
             let ns = error as NSError
             AnalyticsManager.shared.trackBreakFinderAIFailed(domain: ns.domain, code: ns.code)
         }
+
+        markUsedToday()   // one break-finder run per local day, client-side
 
         // Recommended = the AI's time if it matches a candidate, else the first slot.
         let recLabel = recommendedTime ?? candidates.first.map { timeLabel($0, calendar) }

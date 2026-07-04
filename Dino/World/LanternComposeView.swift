@@ -61,7 +61,7 @@ struct LanternComposeView: View {
                                 .padding(.top, 12).padding(.leading, 12)
                         }
                         TextEditor(text: $text)
-                            .font(DinoTheme.dinoFont(size: 15)).foregroundColor(ink)
+                            .font(DinoTheme.inputFont(size: 15)).foregroundColor(ink)
                             .focused($focused)
                             .frame(height: 96)
                             .scrollContentBackground(.hidden)

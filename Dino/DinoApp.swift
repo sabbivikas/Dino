@@ -190,7 +190,9 @@ struct DinoApp: App {
                         notificationManager.rescheduleAll()
                     }
 
+                    #if DEBUG
                     notificationManager.debugNotificationStatus()
+                    #endif
 
                     await IdentityLifecycleManager.shared.handleColdStart()
                     ImageCache.shared.preload(["DinoMascot", "dino-meditation", "DinoFlower-cut", "cut-DinoChecklist", "dino-only"])
