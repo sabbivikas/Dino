@@ -77,14 +77,28 @@ struct GrowthView: View {
     @ObservedObject private var shared = SharedDataManager.shared
     @ObservedObject private var themeManager = ThemeManager.shared
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    // initialized at struct init so the very first scene configure already
+    // knows she carries a letter — otherwise she starts ordinary garden life
+    // and the delivery never begins
+    @State private var letterUnread = GardenLetterStore.isUnreadToday()
+    @State private var letterLeftForLater = false
+
+    /// Night + unread → she waits for first light; the status line says so.
+    private var letterWaitsForMorning: Bool {
+        let hour = GardenDebug.forcedHour ?? Calendar.current.component(.hour, from: Date())
+        return letterUnread && GardenCreatureRegime.from(hour: hour) != .day
+    }
 
     var body: some View {
         ScrollView {
             VStack(spacing: 20) {
                 GrowthHeader()
                 ProgressCard(vm: vm)
-                Garden3DPanel(vm: vm, reduceMotion: reduceMotion)
-                StatusLine(vm: vm)
+                Garden3DPanel(vm: vm, reduceMotion: reduceMotion,
+                              letterUnread: $letterUnread,
+                              letterLeftForLater: $letterLeftForLater)
+                StatusLine(vm: vm, letterWaiting: letterWaitsForMorning,
+                           letterLeftForLater: letterLeftForLater)
                 PracticePillsRow(vm: vm)
                 WeeklyBloomLog(blooms: vm.weeklyBlooms)
                 XPCard(vm: vm)
@@ -93,6 +107,10 @@ struct GrowthView: View {
             .padding(.vertical, 16)
         }
         .background(DinoTheme.background.ignoresSafeArea())
+        .onAppear { letterUnread = GardenLetterStore.isUnreadToday() }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
+            letterUnread = GardenLetterStore.isUnreadToday()
+        }
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -403,15 +421,31 @@ private struct GardenPanel: View {
 private struct Garden3DPanel: View {
     @ObservedObject var vm: GrowthViewModel
     let reduceMotion: Bool
+    @Binding var letterUnread: Bool
+    @Binding var letterLeftForLater: Bool
+    @State private var showLetter = false
 
     var body: some View {
         GardenSceneView(
-            stage: vm.growthStage,
+            stage: GardenDebug.forceBloomed ? .bloomed : vm.growthStage,
             careState: vm.careState,
-            reduceMotion: reduceMotion
+            reduceMotion: reduceMotion,
+            letterPending: letterUnread,
+            onLetterOpen: {
+                GardenLetterStore.markReadToday()
+                letterUnread = false
+                letterLeftForLater = false
+                showLetter = true
+            },
+            onLetterTucked: {
+                letterLeftForLater = true
+            }
         )
         .frame(height: 360)
         .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .fullScreenCover(isPresented: $showLetter) {
+            GardenLetterView(onDismiss: { showLetter = false })
+        }
         .onAppear {
             AnalyticsManager.shared.trackGrowthGardenOpened()
         }
@@ -1314,6 +1348,8 @@ private func drawCloud(
 
 private struct StatusLine: View {
     @ObservedObject var vm: GrowthViewModel
+    var letterWaiting: Bool = false
+    var letterLeftForLater: Bool = false
 
     var body: some View {
         let isHealthy = vm.careState == .healthy
@@ -1330,6 +1366,17 @@ private struct StatusLine: View {
                 .font(DinoTheme.dinoFont(size: 10))
                 .tracking(1)
                 .foregroundColor(Color(hex: "#6B7280"))
+            if letterWaiting {
+                Text("your letter arrives with the morning 🌅")
+                    .font(DinoTheme.dinoFont(size: 12))
+                    .foregroundColor(Color(hex: "#6B7280"))
+                    .padding(.top, 2)
+            } else if letterLeftForLater {
+                Text("she left your letter for later 🌿")
+                    .font(DinoTheme.dinoFont(size: 12))
+                    .foregroundColor(Color(hex: "#6B7280"))
+                    .padding(.top, 2)
+            }
         }
         .frame(maxWidth: .infinity)
     }
