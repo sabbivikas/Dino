@@ -448,6 +448,12 @@ private struct Garden3DPanel: View {
         }
         .onAppear {
             AnalyticsManager.shared.trackGrowthGardenOpened()
+            #if DEBUG
+            // Dev shortcut: present the letter immediately for layout QA.
+            if ProcessInfo.processInfo.arguments.contains("-gardenLetterOpen") {
+                showLetter = true
+            }
+            #endif
         }
     }
 }
