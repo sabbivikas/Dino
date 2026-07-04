@@ -36,11 +36,13 @@ final class GardenSceneHandle {
     let cloudGroup: SCNNode
     let cloudMaterials: [SCNMaterial]   // tinted per time period
     let birdGroup: SCNNode              // day/dawn only
+    let creatures: GardenCreatureController   // hummingbird + bees + fireflies
     let builtForReduceMotion: Bool
 
     init(scene: SCNScene, sunflower: SunflowerNode, rig: GardenLighting.Rig,
          particleAnchor: SCNNode, cloudGroup: SCNNode,
          cloudMaterials: [SCNMaterial], birdGroup: SCNNode,
+         creatures: GardenCreatureController,
          builtForReduceMotion: Bool) {
         self.scene = scene
         self.sunflower = sunflower
@@ -49,12 +51,14 @@ final class GardenSceneHandle {
         self.cloudGroup = cloudGroup
         self.cloudMaterials = cloudMaterials
         self.birdGroup = birdGroup
+        self.creatures = creatures
         self.builtForReduceMotion = builtForReduceMotion
     }
 }
 
 enum GardenSceneBuilder {
 
+    @MainActor
     static func build(reduceMotion: Bool) -> GardenSceneHandle {
         let scene = SCNScene()
 
@@ -162,11 +166,17 @@ enum GardenSceneBuilder {
         particleAnchor.position = SCNVector3(0, 1.2, 0)
         scene.rootNode.addChildNode(particleAnchor)
 
+        // ── The living layer: hummingbird courier, bees, night fireflies.
+        let creatures = GardenCreatureController(textures: PaintedCreatureTextures(),
+                                                 reduceMotion: reduceMotion)
+        scene.rootNode.addChildNode(creatures.root)
+
         return GardenSceneHandle(
             scene: scene, sunflower: sunflower, rig: rig,
             particleAnchor: particleAnchor,
             cloudGroup: cloudGroup, cloudMaterials: cloudMaterials,
             birdGroup: birdGroup,
+            creatures: creatures,
             builtForReduceMotion: reduceMotion
         )
     }

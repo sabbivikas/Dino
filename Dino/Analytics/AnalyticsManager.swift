@@ -108,6 +108,20 @@ final class AnalyticsManager {
         capture("breathing_session_abandoned", properties: ["at_second": atSecond])
     }
 
+    // MARK: - Garden ecosystem
+
+    func trackLetterDeliveredByBird() {
+        capture("letter_delivered_by_bird")
+    }
+
+    func trackBirdLetterOpened() {
+        capture("bird_letter_opened")
+    }
+
+    func trackGardenCreatureTapped(creature: String) {
+        capture("garden_creature_tapped", properties: ["creature": creature])
+    }
+
     // MARK: - Meditation
 
     func trackMeditationSessionStarted(scene: String, duration: Int) {

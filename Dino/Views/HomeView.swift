@@ -97,6 +97,10 @@ struct HomeView: View {
             .navigationDestination(isPresented: $viewModel.showResources) {
                 ResourcesView().environmentObject(dataManager)
             }
+            .onAppear {
+                // Dev shortcut for garden-ecosystem simulator verification.
+                if GardenDebug.autoOpen { viewModel.showGrowth = true }
+            }
             .onReceive(dataManager.$showBreathingFromDeepLink) { shouldShow in
                 guard shouldShow else { return }
                 viewModel.showBreathing = true

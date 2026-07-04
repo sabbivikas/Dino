@@ -33,6 +33,8 @@ struct GardenSceneView: View {
     let stage: GrowthStage
     let careState: CareState
     let reduceMotion: Bool
+    var letterPending: Bool = false          // the hummingbird carries today's letter
+    var onLetterOpen: (() -> Void)? = nil    // tap on her (or the envelope)
 
     @State private var isActive: Bool = false
 
@@ -41,7 +43,9 @@ struct GardenSceneView: View {
             stage: stage,
             careState: careState,
             reduceMotion: reduceMotion,
-            isActive: isActive
+            isActive: isActive,
+            letterPending: letterPending,
+            onLetterOpen: onLetterOpen
         )
         .onAppear { isActive = true }
         .onDisappear { isActive = false }
@@ -124,6 +128,8 @@ private struct GardenSceneRepresentable: UIViewRepresentable {
     let careState: CareState
     let reduceMotion: Bool
     let isActive: Bool
+    let letterPending: Bool
+    let onLetterOpen: (() -> Void)?
 
     func makeCoordinator() -> Coordinator {
         Coordinator()
@@ -140,7 +146,13 @@ private struct GardenSceneRepresentable: UIViewRepresentable {
         view.rendersContinuously = false
         view.allowsCameraControl = false
         view.backgroundColor = .clear
-        view.isUserInteractionEnabled = false
+        view.isUserInteractionEnabled = true   // creature taps
+        view.showsStatistics = GardenDebug.showPerfHUD
+
+        let tap = UITapGestureRecognizer(target: context.coordinator,
+                                         action: #selector(Coordinator.handleTap(_:)))
+        view.addGestureRecognizer(tap)
+        context.coordinator.view = view
 
         context.coordinator.handle = handle
         applyState(view: view, coordinator: context.coordinator, animatedCare: false)
@@ -159,6 +171,7 @@ private struct GardenSceneRepresentable: UIViewRepresentable {
 
     static func dismantleUIView(_ view: SCNView, coordinator: Coordinator) {
         view.isPlaying = false
+        coordinator.handle?.creatures.setActive(false)
     }
 
     private func applyState(view: SCNView, coordinator: Coordinator, animatedCare: Bool) {
@@ -170,7 +183,7 @@ private struct GardenSceneRepresentable: UIViewRepresentable {
         let period: GardenLighting.Period = reduceMotion
             ? .day
             : GardenLighting.Period.current(
-                hour: Calendar.current.component(.hour, from: Date())
+                hour: GardenDebug.forcedHour ?? Calendar.current.component(.hour, from: Date())
               )
         let sway = !reduceMotion && (careState == .healthy || careState == .tired)
 
@@ -231,6 +244,8 @@ private struct GardenSceneRepresentable: UIViewRepresentable {
         coordinator.lastPeriod = period
 
         // Period particles in the 3D layer (none under reduce-motion).
+        // Dusk/night fireflies are creature nodes now (individual blink
+        // rhythms) — the old particle system is retired, not layered.
         if coordinator.lastParticlePeriod != period || reduceMotion {
             handle.particleAnchor.removeAllParticleSystems()
             if !reduceMotion {
@@ -239,22 +254,40 @@ private struct GardenSceneRepresentable: UIViewRepresentable {
                     handle.particleAnchor.addParticleSystem(GardenParticles.pollen())
                 case .sunset:
                     handle.particleAnchor.addParticleSystem(GardenParticles.petals())
-                case .dusk, .night:
-                    handle.particleAnchor.addParticleSystem(GardenParticles.fireflies())
-                case .lateAfternoon:
+                case .dusk, .night, .lateAfternoon:
                     break
                 }
             }
             coordinator.lastParticlePeriod = period
         }
 
+        // The living layer: blooms + care earn the visitors; the letter is
+        // never gated — the courier arrives even to a young garden.
+        let earned = (stage == .bloomed || stage == .thriving)
+            && careState != .dying && careState != .dead
+        handle.creatures.configure(earned: earned,
+                                   letterPending: letterPending,
+                                   onLetterTapped: onLetterOpen)
+        handle.creatures.setActive(isActive)
+
         view.isPlaying = isActive && !reduceMotion
     }
 
-    final class Coordinator {
+    @MainActor
+    final class Coordinator: NSObject {
         var handle: GardenSceneHandle?
+        weak var view: SCNView?
         var lastCareState: CareState?
         var lastPeriod: GardenLighting.Period?
         var lastParticlePeriod: GardenLighting.Period?
+
+        @objc func handleTap(_ gesture: UITapGestureRecognizer) {
+            guard let view, let handle else { return }
+            let point = gesture.location(in: view)
+            let options: [SCNHitTestOption: Any] = [
+                .searchMode: NSNumber(value: SCNHitTestSearchMode.all.rawValue)
+            ]
+            handle.creatures.handleTap(view.hitTest(point, options: options))
+        }
     }
 }
