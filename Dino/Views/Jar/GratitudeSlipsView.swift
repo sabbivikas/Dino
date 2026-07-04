@@ -95,10 +95,10 @@ struct GratitudeSlipsView: View {
     private var titleBlock: some View {
         VStack(alignment: .leading, spacing: 2) {
             Text("your keepsakes")
-                .font(.custom(DinoTheme.customFontName, size: 22))
+                .font(DinoTheme.dinoFont(size: 22))
                 .foregroundColor(Color(hex: "#4A3520"))
             Text("\(notes.count) notes")
-                .font(.custom(DinoTheme.customFontName, size: 12))
+                .font(DinoTheme.dinoFont(size: 12))
                 .italic()
                 .foregroundColor(Color(hex: "#7A6F5F"))
         }
@@ -121,10 +121,10 @@ struct GratitudeSlipsView: View {
     private var emptyState: some View {
         VStack(spacing: 12) {
             Text("your jar is empty 🫙")
-                .font(.custom(DinoTheme.customFontName, size: 24))
+                .font(DinoTheme.dinoFont(size: 24))
                 .foregroundColor(Color(hex: "#7A6F5F"))
             Text("add your first little joy")
-                .font(.custom(DinoTheme.customFontName, size: 14))
+                .font(DinoTheme.dinoFont(size: 14))
                 .italic()
                 .foregroundColor(Color(hex: "#A89F90"))
         }
@@ -175,7 +175,7 @@ private struct SlipView: View {
                     .font(.system(size: 18))
             }
             Text(note.text)
-                .font(.custom(DinoTheme.customFontName, size: 16))
+                .font(DinoTheme.dinoFont(size: 16))
                 .foregroundColor(Color(hex: "#2E2A24"))
                 .multilineTextAlignment(.leading)
                 .lineLimit(isSelected ? nil : 6)
@@ -184,7 +184,7 @@ private struct SlipView: View {
             HStack {
                 Spacer()
                 Text(dateText)
-                    .font(.custom(DinoTheme.customFontName, size: 11))
+                    .font(DinoTheme.dinoFont(size: 11))
                     .italic()
                     .foregroundColor(Color(hex: "#2E2A24").opacity(0.55))
             }

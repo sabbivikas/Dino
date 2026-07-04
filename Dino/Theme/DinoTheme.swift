@@ -4,6 +4,7 @@
 //
 
 import SwiftUI
+import UIKit
 
 @MainActor
 struct DinoTheme {
@@ -135,65 +136,91 @@ struct DinoTheme {
     // Note: font has no digits, so numericFont() uses system rounded for numbers only
     static let customFontName = "DinoInitiativeFont-Regular"
 
-    // MARK: - Typography (all Dino custom font)
+    // MARK: - Typography (all Dino custom font; all apply the combined scale)
     static func largeFont() -> Font {
-        .custom(customFontName, size: 34)
+        .custom(customFontName, size: 34 * textSizeScale)
     }
 
     static func titleFont() -> Font {
-        .custom(customFontName, size: 22)
+        .custom(customFontName, size: 22 * textSizeScale)
     }
 
     static func headlineFont() -> Font {
-        .custom(customFontName, size: 17)
+        .custom(customFontName, size: 17 * textSizeScale)
     }
 
     static func bodyFont() -> Font {
-        .custom(customFontName, size: 17)
+        .custom(customFontName, size: 17 * textSizeScale)
     }
 
     static func subheadlineFont() -> Font {
-        .custom(customFontName, size: 15)
+        .custom(customFontName, size: 15 * textSizeScale)
     }
 
     static func captionFont() -> Font {
-        .custom(customFontName, size: 12)
+        .custom(customFontName, size: 12 * textSizeScale)
     }
 
     static func caption2Font() -> Font {
-        .custom(customFontName, size: 11)
+        .custom(customFontName, size: 11 * textSizeScale)
     }
 
-    /// User text-size scale multiplier, driven by the `text_size_scale` @AppStorage key.
-    /// Clamped to 0.8...1.4; a missing (0) value falls back to 1.0.
+    /// Text INPUT surfaces (TextEditor/TextField) — system sans for legibility
+    /// while typing, scaled like everything else. people read what they type.
+    static func inputFont(size: CGFloat = 17) -> Font {
+        .system(size: size * textSizeScale)
+    }
+
+    /// Combined text scale: the in-app setting (`text_size_scale`, 0.8...1.4)
+    /// multiplied by the iOS Dynamic Type category factor, capped at 1.75× —
+    /// the handwriting font stays legible beyond that only in scrolling
+    /// surfaces. Pure → unit-testable.
+    nonisolated static func combinedScale(userScale: Double, category: UIContentSizeCategory) -> CGFloat {
+        let user = CGFloat(min(max(userScale == 0 ? 1.0 : userScale, 0.8), 1.4))
+        let dt: CGFloat
+        switch category {
+        case .extraSmall: dt = 0.86
+        case .small: dt = 0.92
+        case .medium: dt = 0.96
+        case .large: dt = 1.0            // iOS default
+        case .extraLarge: dt = 1.08
+        case .extraExtraLarge: dt = 1.16
+        case .extraExtraExtraLarge: dt = 1.24
+        case .accessibilityMedium: dt = 1.40
+        case .accessibilityLarge: dt = 1.55
+        default: dt = category.isAccessibilityCategory ? 1.75 : 1.0
+        }
+        return min(max(user * dt, 0.8), 1.75)
+    }
+
+    /// The live combined scale (in-app setting × the device's Dynamic Type).
     private static var textSizeScale: CGFloat {
-        let raw = UserDefaults.standard.double(forKey: "text_size_scale")
-        let resolved = raw == 0 ? 1.0 : raw
-        return CGFloat(min(max(resolved, 0.8), 1.4))
+        combinedScale(userScale: UserDefaults.standard.double(forKey: "text_size_scale"),
+                      category: UITraitCollection.current.preferredContentSizeCategory)
     }
 
-    /// Convenience for arbitrary sizes — multiplies by user text-size scale.
+    /// Convenience for arbitrary sizes — applies the combined text scale.
     static func dinoFont(size: CGFloat) -> Font {
         .custom(customFontName, size: size * textSizeScale)
     }
 
     /// Display titles (large)
     static func dinoDisplayFont(size: CGFloat = 28) -> Font {
-        .custom(customFontName, size: size)
+        .custom(customFontName, size: size * textSizeScale)
     }
 
     /// Section headers
     static func dinoHeaderFont(size: CGFloat = 22) -> Font {
-        .custom(customFontName, size: size)
+        .custom(customFontName, size: size * textSizeScale)
     }
 
     /// Labels
     static func dinoLabelFont(size: CGFloat = 16) -> Font {
-        .custom(customFontName, size: size)
+        .custom(customFontName, size: size * textSizeScale)
     }
 
     /// For numeric-only content (digits, sliders, counts) — system rounded since custom font lacks digits.
-    /// Multiplies by user text-size scale.
+    /// Applies the combined text scale.
     static func numericFont(size: CGFloat = 17) -> Font {
         .system(size: size * textSizeScale, weight: .semibold, design: .rounded)
     }

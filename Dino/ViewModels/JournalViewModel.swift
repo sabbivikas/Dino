@@ -15,6 +15,9 @@ class JournalViewModel: NSObject, ObservableObject {
     @Published var playingEntryId: UUID? = nil
     @Published var recordingDuration: TimeInterval = 0
     @Published var permissionDenied: Bool = false
+    /// The user-chosen entry date (kept in sync with the composer's backdate
+    /// picker) so voice notes land on the same day as text entries.
+    var entryDate: Date = Date()
 
     private var audioRecorder: AVAudioRecorder?
     private var audioPlayer: AVAudioPlayer?
@@ -113,6 +116,7 @@ class JournalViewModel: NSObject, ObservableObject {
         let title = "journal entry — \(dateStr)"
 
         let entry = JournalEntry(
+            date: entryDate,
             audioFileName: fileName,
             title: title,
             summary: "voice note recorded",

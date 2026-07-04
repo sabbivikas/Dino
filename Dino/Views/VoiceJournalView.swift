@@ -32,7 +32,7 @@ struct VoiceJournalView: View {
                     VStack(spacing: 24) {
                         // Header
                         Text("journal".localized)
-                            .font(.custom(DinoTheme.customFontName, size: 30))
+                            .font(DinoTheme.dinoDisplayFont(size: 30))
                             .foregroundColor(DinoTheme.ink)
                             .frame(maxWidth: .infinity, alignment: .center)
                             .padding(.top, 4)
@@ -52,7 +52,7 @@ struct VoiceJournalView: View {
                         // Timeline header
                         HStack {
                             Text("recent memories".localized)
-                                .font(.custom(DinoTheme.customFontName, size: 14))
+                                .font(DinoTheme.dinoFont(size: 14))
                                 .foregroundColor(Color(hex: "#7A7266"))
                             Spacer()
                             Text("tap a card to flip".localized)
@@ -63,7 +63,7 @@ struct VoiceJournalView: View {
                         .padding(.top, 4)
 
                         JournalTimelineStrip(
-                            entries: dataManager.journalEntries,
+                            entries: JournalEntry.sortedForDisplay(dataManager.journalEntries),
                             viewModel: viewModel,
                             onSeeAll: {
                                 HapticManager.shared.light()
@@ -129,6 +129,14 @@ struct VoiceJournalView: View {
             .sheet(isPresented: $showDatePicker) {
                 DatePickerSheet(date: $entryDate)
             }
+            .onChange(of: entryDate) { _, newDate in
+                viewModel.entryDate = newDate   // voice notes share the chosen day
+            }
+            .task {
+                // Cloud durability: upload any local photos the cloud doesn't
+                // have yet (covers photos that predate storage sync).
+                JournalPhotoStore.backfillUploads(entries: dataManager.journalEntries)
+            }
         }
     }
 
@@ -154,6 +162,8 @@ struct VoiceJournalView: View {
         )
         dataManager.addJournalEntry(entry)
         AnalyticsManager.shared.trackJournalEntryCreated(type: "text")
+        // Fully async cloud copy — never blocks or delays the save.
+        JournalPhotoStore.uploadIfNeeded(photoFileName)
 
         // Reset entry date to today so the next entry defaults to today again
         entryDate = Date()
@@ -174,7 +184,7 @@ struct VoiceJournalView: View {
                 Color(hex: "#FAF6EC").ignoresSafeArea()
                 VStack(spacing: 16) {
                     Text("backdate entry")
-                        .font(.custom(DinoTheme.customFontName, size: 22))
+                        .font(DinoTheme.dinoHeaderFont(size: 22))
                         .foregroundColor(DinoTheme.ink)
                         .padding(.top, 24)
 
@@ -201,7 +211,7 @@ struct VoiceJournalView: View {
                         dismiss()
                     } label: {
                         Text("done".localized)
-                            .font(.custom(DinoTheme.customFontName, size: 16))
+                            .font(DinoTheme.dinoFont(size: 16))
                             .foregroundColor(.white)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 14)
@@ -423,14 +433,14 @@ private struct JournalComposerCard: View {
                 ZStack(alignment: .topLeading) {
                     if composerText.isEmpty {
                         Text("today I...".localized)
-                            .font(.system(size: 17))
+                            .font(DinoTheme.inputFont(size: 17))
                             .foregroundColor(Color(hex: "#A8A29A"))
                             .padding(.top, 8)
                             .padding(.leading, 4)
                             .allowsHitTesting(false)
                     }
                     TextEditor(text: $composerText)
-                        .font(.system(size: 17))
+                        .font(DinoTheme.inputFont(size: 17))
                         .foregroundColor(Color(hex: "#3D3A35"))
                         .scrollContentBackground(.hidden)
                         .background(Color.clear)
@@ -735,7 +745,7 @@ private struct EmptyMemoriesCard: View {
     var body: some View {
         VStack(spacing: 8) {
             Text("no memories yet".localized)
-                .font(.custom(DinoTheme.customFontName, size: 18))
+                .font(DinoTheme.dinoHeaderFont(size: 18))
                 .foregroundColor(DinoTheme.ink)
             Text("tap the mic to record your first")
                 .font(.system(size: 13))
@@ -903,7 +913,7 @@ struct JournalPolaroidCard: View {
 
                 // Caption — friendly lowercase title with floral accent
                 Text(friendlyCaption)
-                    .font(.custom(DinoTheme.customFontName, size: 14))
+                    .font(DinoTheme.dinoFont(size: 14))
                     .foregroundColor(Color(hex: "#3D3A35"))
                     .lineLimit(loadedPhoto == nil ? 2 : 1)
                     .multilineTextAlignment(.center)
@@ -973,7 +983,7 @@ struct JournalPolaroidCard: View {
                         VStack {
                             Spacer()
                             Text(snippetText)
-                                .font(.custom(DinoTheme.customFontName, size: 11))
+                                .font(DinoTheme.dinoFont(size: 11))
                                 .foregroundColor(Color(hex: "#2E2A24"))
                                 .lineLimit(2)
                                 .multilineTextAlignment(.leading)
@@ -1042,11 +1052,11 @@ struct JournalPolaroidCard: View {
 
     private func loadPhotoIfNeeded() {
         guard loadedPhoto == nil, let name = entry.photoFileName else { return }
-        let url = FileManager.default
-            .urls(for: .documentDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent(name)
-        if let img = UIImage(contentsOfFile: url.path) {
-            loadedPhoto = img
+        // Local first, then cloud — old photos reappear once storage sync has them.
+        Task {
+            if case .loaded(let img) = await JournalPhotoStore.fetchPhoto(name) {
+                loadedPhoto = img
+            }
         }
     }
 }
@@ -1129,7 +1139,7 @@ private struct JournalPolaroidBack: View {
                 Spacer().frame(height: 4)
 
                 Text(dateString)
-                    .font(.custom(DinoTheme.customFontName, size: 13))
+                    .font(DinoTheme.dinoFont(size: 13))
                     .foregroundColor(Color(hex: "#3D3A35"))
 
                 HStack(spacing: 8) {
@@ -1473,7 +1483,7 @@ private struct MoodSheet: View {
     var body: some View {
         VStack(spacing: 18) {
             Text("how are you feeling?".localized)
-                .font(.custom(DinoTheme.customFontName, size: 20))
+                .font(DinoTheme.dinoHeaderFont(size: 20))
                 .foregroundColor(DinoTheme.ink)
                 .padding(.top, 28)
 
@@ -1598,7 +1608,7 @@ struct JournalCardPreviewOverlay: View {
             action()
         } label: {
             Text(label)
-                .font(.custom(DinoTheme.customFontName, size: 15))
+                .font(DinoTheme.dinoFont(size: 15))
                 .foregroundColor(.white)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 16)

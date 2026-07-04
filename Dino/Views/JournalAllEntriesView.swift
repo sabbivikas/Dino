@@ -12,7 +12,7 @@ struct JournalAllEntriesView: View {
     @State private var previewEntry: JournalEntry? = nil
 
     private var entries: [JournalEntry] {
-        dataManager.journalEntries.sorted { $0.date > $1.date }
+        JournalEntry.sortedForDisplay(dataManager.journalEntries)
     }
 
     var body: some View {
@@ -69,7 +69,7 @@ struct JournalAllEntriesView: View {
             Spacer()
 
             Text("\(entries.count) memories")
-                .font(.custom(DinoTheme.customFontName, size: 22))
+                .font(DinoTheme.dinoHeaderFont(size: 22))
                 .foregroundColor(DinoTheme.ink)
 
             Spacer()
@@ -85,7 +85,7 @@ struct JournalAllEntriesView: View {
         VStack(spacing: 8) {
             Spacer()
             Text("no memories yet")
-                .font(.custom(DinoTheme.customFontName, size: 20))
+                .font(DinoTheme.dinoFont(size: 20))
                 .foregroundColor(DinoTheme.muted)
             Text("your journal entries will live here once you start writing.")
                 .font(.system(size: 13))

@@ -47,7 +47,7 @@ struct WellnessProgressView: View {
     private var header: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text("your wellness journey")
-                .font(.custom(DinoTheme.customFontName, size: 22))
+                .font(DinoTheme.dinoFont(size: 22))
                 .foregroundColor(DinoTheme.textPrimary)
             Text("how you've been feeling over time")
                 .font(.system(size: 12, design: .serif).italic())
@@ -70,7 +70,7 @@ struct WellnessProgressView: View {
                 HStack {
                     ForEach(points) { p in
                         Text(p.label)
-                            .font(.custom(DinoTheme.customFontName, size: 9))
+                            .font(DinoTheme.dinoFont(size: 9))
                             .foregroundColor(DinoTheme.textSecondary)
                             .frame(maxWidth: .infinity)
                     }
@@ -95,7 +95,7 @@ struct WellnessProgressView: View {
             Text("🌱")
                 .font(.system(size: 36))
             Text("start logging your mood to see your journey")
-                .font(.custom(DinoTheme.customFontName, size: 14))
+                .font(DinoTheme.dinoFont(size: 14))
                 .foregroundColor(DinoTheme.textSecondary)
                 .multilineTextAlignment(.center)
         }
@@ -109,7 +109,7 @@ struct WellnessProgressView: View {
         let summary = thisWeekSummary()
         return VStack(alignment: .leading, spacing: 12) {
             Text("this week")
-                .font(.custom(DinoTheme.customFontName, size: 14))
+                .font(DinoTheme.dinoFont(size: 14))
                 .foregroundColor(DinoTheme.textSecondary)
 
             HStack(alignment: .center, spacing: 16) {
@@ -117,10 +117,10 @@ struct WellnessProgressView: View {
                     .font(.system(size: 36))
                 VStack(alignment: .leading, spacing: 2) {
                     Text(summary.moodLabel)
-                        .font(.custom(DinoTheme.customFontName, size: 18))
+                        .font(DinoTheme.dinoFont(size: 18))
                         .foregroundColor(DinoTheme.textPrimary)
                     Text("\(summary.activeDays) days active")
-                        .font(.custom(DinoTheme.customFontName, size: 11))
+                        .font(DinoTheme.dinoFont(size: 11))
                         .foregroundColor(DinoTheme.textSecondary)
                 }
                 Spacer()
@@ -128,7 +128,7 @@ struct WellnessProgressView: View {
 
             VStack(alignment: .leading, spacing: 4) {
                 Text("avg energy")
-                    .font(.custom(DinoTheme.customFontName, size: 11))
+                    .font(DinoTheme.dinoFont(size: 11))
                     .foregroundColor(DinoTheme.textSecondary)
                 EnergyBar(level: summary.avgEnergy)
                     .frame(height: 8)

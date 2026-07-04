@@ -7,7 +7,7 @@ import Foundation
 
 struct JournalEntry: Codable, Identifiable {
     var id: UUID
-    var date: Date
+    var date: Date               // the USER-FACING entry date (backdatable)
     var audioFileName: String
     var title: String
     var summary: String
@@ -15,6 +15,24 @@ struct JournalEntry: Codable, Identifiable {
     var isFavorite: Bool
     var durationSeconds: Double
     var photoFileName: String?
+    var createdAt: Date?         // when it was actually written; nil on legacy docs
+
+    /// Legacy entries (pre-createdAt) fall back to their entry date.
+    var effectiveCreatedAt: Date { createdAt ?? date }
+
+    /// Display order everywhere: the user's chosen date, newest first;
+    /// same-moment ties broken by write time, then by id — a TOTAL order, so
+    /// the list can never flip between launches or after a sync shuffles the
+    /// underlying array (Swift's sort is not stable for equal keys).
+    static func sortedForDisplay(_ entries: [JournalEntry]) -> [JournalEntry] {
+        entries.sorted {
+            if $0.date != $1.date { return $0.date > $1.date }
+            if $0.effectiveCreatedAt != $1.effectiveCreatedAt {
+                return $0.effectiveCreatedAt > $1.effectiveCreatedAt
+            }
+            return $0.id.uuidString > $1.id.uuidString
+        }
+    }
 
     init(
         id: UUID = UUID(),
@@ -25,7 +43,8 @@ struct JournalEntry: Codable, Identifiable {
         moodTag: String = "reflective",
         isFavorite: Bool = false,
         durationSeconds: Double = 0,
-        photoFileName: String? = nil
+        photoFileName: String? = nil,
+        createdAt: Date? = Date()
     ) {
         self.id = id
         self.date = date
@@ -36,10 +55,11 @@ struct JournalEntry: Codable, Identifiable {
         self.isFavorite = isFavorite
         self.durationSeconds = durationSeconds
         self.photoFileName = photoFileName
+        self.createdAt = createdAt
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, date, audioFileName, title, summary, moodTag, isFavorite, durationSeconds, photoFileName
+        case id, date, audioFileName, title, summary, moodTag, isFavorite, durationSeconds, photoFileName, createdAt
     }
 
     init(from decoder: Decoder) throws {
@@ -53,6 +73,7 @@ struct JournalEntry: Codable, Identifiable {
         self.isFavorite = try c.decode(Bool.self, forKey: .isFavorite)
         self.durationSeconds = try c.decode(Double.self, forKey: .durationSeconds)
         self.photoFileName = try c.decodeIfPresent(String.self, forKey: .photoFileName)
+        self.createdAt = try c.decodeIfPresent(Date.self, forKey: .createdAt)
     }
 
     var formattedDuration: String {

@@ -54,7 +54,7 @@ struct AddGratitudeSheet: View {
 
             // Title
             Text("what made you smile?")
-                .font(.custom(DinoTheme.customFontName, size: 18))
+                .font(DinoTheme.dinoFont(size: 18))
                 .foregroundColor(DinoTheme.ink)
                 .padding(.top, 8)
 
@@ -69,7 +69,7 @@ struct AddGratitudeSheet: View {
 
                 if viewModel.newNoteText.isEmpty {
                     Text("today I'm grateful for…")
-                        .font(.custom(DinoTheme.customFontName, size: 16))
+                        .font(DinoTheme.dinoFont(size: 16))
                         .italic()
                         .foregroundColor(DinoTheme.obPlaceholder)
                         .padding(.horizontal, 20)
@@ -78,7 +78,7 @@ struct AddGratitudeSheet: View {
                 }
 
                 TextEditor(text: $viewModel.newNoteText)
-                    .font(.custom(DinoTheme.customFontName, size: 16))
+                    .font(DinoTheme.dinoFont(size: 16))
                     .foregroundColor(DinoTheme.ink)
                     .scrollContentBackground(.hidden)
                     .focused($focused)
@@ -102,7 +102,7 @@ struct AddGratitudeSheet: View {
             // Submit button
             Button(action: submit) {
                 Text("drop it in ↓")
-                    .font(.custom(DinoTheme.customFontName, size: 17))
+                    .font(DinoTheme.dinoFont(size: 17))
                     .foregroundColor(.white)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 16)
@@ -137,7 +137,7 @@ struct AddGratitudeSheet: View {
                     .scaledToFit()
                     .frame(width: 24, height: 24)
                 Text(kind.label)
-                    .font(.custom(DinoTheme.customFontName, size: 13))
+                    .font(DinoTheme.dinoFont(size: 13))
                     .foregroundColor(DinoTheme.ink)
             }
             .frame(maxWidth: .infinity)

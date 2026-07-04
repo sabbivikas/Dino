@@ -12,6 +12,9 @@ struct ContentView: View {
 
     @AppStorage("hasSeenLetter") private var hasSeenLetter = false
     @AppStorage("hasPassedAuth") private var hasPassedAuth = false
+    // Observed so the whole tree re-renders when the user changes the iOS text
+    // size — DinoTheme's fonts read the Dynamic Type category on each render.
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
         ZStack {

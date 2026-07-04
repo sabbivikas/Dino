@@ -228,7 +228,7 @@ private struct EntryView: View {
                     .frame(width: 140, height: 140)
 
                 Text("weekly check-in")
-                    .font(.custom(DinoTheme.customFontName, size: 28))
+                    .font(DinoTheme.dinoFont(size: 28))
                     .foregroundColor(darkInk)
 
                 Text("a few questions to understand how you've been")
@@ -244,11 +244,11 @@ private struct EntryView: View {
                 if alreadyCompleted, let existing = existingResult {
                     VStack(spacing: 12) {
                         Text("you completed this week \u{2713}")
-                            .font(.custom(DinoTheme.customFontName, size: 16))
+                            .font(DinoTheme.dinoFont(size: 16))
                             .foregroundColor(sage)
                         Button(action: { onViewExisting(existing) }) {
                             Text("view report")
-                                .font(.custom(DinoTheme.customFontName, size: 16))
+                                .font(DinoTheme.dinoFont(size: 16))
                                 .foregroundColor(.white)
                                 .padding(.horizontal, 28)
                                 .padding(.vertical, 14)
@@ -259,7 +259,7 @@ private struct EntryView: View {
                 } else {
                     Button(action: onBegin) {
                         Text("begin check-in \u{2192}")
-                            .font(.custom(DinoTheme.customFontName, size: 17))
+                            .font(DinoTheme.dinoFont(size: 17))
                             .foregroundColor(.white)
                             .padding(.horizontal, 36)
                             .padding(.vertical, 16)
@@ -333,7 +333,7 @@ private struct QuestionView: View {
                 Spacer().frame(height: 8)
 
                 Text(safeQuestion)
-                    .font(.custom(DinoTheme.customFontName, size: 22))
+                    .font(DinoTheme.dinoFont(size: 22))
                     .foregroundColor(darkInk)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 28)
@@ -372,7 +372,7 @@ private struct QuestionView: View {
                     onAdvance()
                 }) {
                     Text(currentQuestion == questions.count - 1 ? "finish \u{2192}" : "next \u{2192}")
-                        .font(.custom(DinoTheme.customFontName, size: 17))
+                        .font(DinoTheme.dinoFont(size: 17))
                         .foregroundColor(.white)
                         .padding(.horizontal, 36)
                         .padding(.vertical, 16)
@@ -415,7 +415,7 @@ private struct OptionCard: View {
         Button(action: onTap) {
             HStack {
                 Text(label)
-                    .font(.custom(DinoTheme.customFontName, size: 16))
+                    .font(DinoTheme.dinoFont(size: 16))
                     .foregroundColor(isSelected ? .white : darkInk)
                 Spacer()
             }
@@ -461,7 +461,7 @@ private struct GeneratingView: View {
                     .frame(width: 140, height: 140)
 
                 Text(safeMessage)
-                    .font(.custom(DinoTheme.customFontName, size: 18))
+                    .font(DinoTheme.dinoFont(size: 18))
                     .foregroundColor(.white)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 32)
@@ -537,7 +537,7 @@ private struct ReportView: View {
                     Spacer().frame(height: 48)
 
                     Text("your week \(weekNumber) report")
-                        .font(.custom(DinoTheme.customFontName, size: 24))
+                        .font(DinoTheme.dinoFont(size: 24))
                         .foregroundColor(darkInk)
 
                     Text(dateRange)
@@ -591,7 +591,7 @@ private struct ReportView: View {
                     // Reflection
                     VStack(alignment: .leading, spacing: 8) {
                         Text("this week's reflection")
-                            .font(.custom(DinoTheme.customFontName, size: 17))
+                            .font(DinoTheme.dinoFont(size: 17))
                             .foregroundColor(darkInk)
                         Text(report.weeklyReflection)
                             .font(.system(size: 14))
@@ -609,7 +609,7 @@ private struct ReportView: View {
                     // Trend
                     HStack(spacing: 8) {
                         Text(report.trendNote)
-                            .font(.custom(DinoTheme.customFontName, size: 14))
+                            .font(DinoTheme.dinoFont(size: 14))
                             .foregroundColor(darkInk)
                     }
                     .padding(.horizontal, 16)
@@ -620,7 +620,7 @@ private struct ReportView: View {
 
                     Button(action: onSave) {
                         Text("save")
-                            .font(.custom(DinoTheme.customFontName, size: 17))
+                            .font(DinoTheme.dinoFont(size: 17))
                             .foregroundColor(.white)
                             .padding(.horizontal, 56)
                             .padding(.vertical, 16)
@@ -675,7 +675,7 @@ private struct OverallGauge: View {
                     .rotationEffect(.degrees(-90))
                 VStack(spacing: 2) {
                     Text("\(score)")
-                        .font(.custom(DinoTheme.customFontName, size: 44))
+                        .font(DinoTheme.dinoFont(size: 44))
                         .foregroundColor(darkInk)
                     Text("out of 100")
                         .font(.system(size: 11))
@@ -685,7 +685,7 @@ private struct OverallGauge: View {
             HStack(spacing: 6) {
                 Text(emoji).font(.system(size: 18))
                 Text(label)
-                    .font(.custom(DinoTheme.customFontName, size: 15))
+                    .font(DinoTheme.dinoFont(size: 15))
                     .foregroundColor(darkInk)
             }
         }
@@ -722,12 +722,12 @@ private struct ScoreCard: View {
                     .frame(width: 54, height: 54)
                     .rotationEffect(.degrees(-90))
                 Text("\(score)")
-                    .font(.custom(DinoTheme.customFontName, size: 16))
+                    .font(DinoTheme.dinoFont(size: 16))
                     .foregroundColor(darkInk)
             }
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
-                    .font(.custom(DinoTheme.customFontName, size: 15))
+                    .font(DinoTheme.dinoFont(size: 15))
                     .foregroundColor(darkInk)
                 Text(insight)
                     .font(.system(size: 13))

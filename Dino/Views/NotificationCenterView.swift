@@ -93,7 +93,7 @@ struct NotificationCenterView: View {
         HStack(alignment: .bottom) {
             VStack(alignment: .leading, spacing: 4) {
                 Text("from dino")
-                    .font(.custom(DinoTheme.customFontName, size: 28))
+                    .font(DinoTheme.dinoFont(size: 28))
                     .foregroundColor(titleInk)
                     .lineSpacing(0)
                 Text(formattedDate())
@@ -174,7 +174,7 @@ struct NotificationCenterView: View {
             withAnimation(.easeInOut(duration: 0.18)) { filter = opt }
         } label: {
             Text(opt.label)
-                .font(.custom(DinoTheme.customFontName, size: 14))
+                .font(DinoTheme.dinoFont(size: 14))
                 .tracking(0.14)
                 .foregroundColor(active ? pageBG : pillInactiveText)
                 .padding(.horizontal, 14)
@@ -247,7 +247,7 @@ struct NotificationCenterView: View {
         VStack(spacing: 10) {
             Spacer()
             Text("all quiet here")
-                .font(.custom(DinoTheme.customFontName, size: 22))
+                .font(DinoTheme.dinoFont(size: 22))
                 .foregroundColor(emptyTitle)
             Text("dino will write when something's worth saying.")
                 .font(.system(size: 13, design: .serif).italic())
@@ -306,7 +306,7 @@ private struct LetterCard: View {
                 .opacity((dx + dragX) < -10 ? 1 : 0)
                 .overlay(alignment: .trailing) {
                     Text("remove")
-                        .font(.custom(DinoTheme.customFontName, size: 14))
+                        .font(DinoTheme.dinoFont(size: 14))
                         .foregroundColor(.white)
                         .padding(.trailing, 22)
                 }
@@ -320,7 +320,7 @@ private struct LetterCard: View {
 
                     // title
                     Text(stripEmoji(note.title))
-                        .font(.custom(DinoTheme.customFontName, size: 17))
+                        .font(DinoTheme.dinoFont(size: 17))
                         .lineSpacing(17 * 0.25)
                         .foregroundColor(titleColor)
                         .padding(.top, 2)
@@ -408,7 +408,7 @@ private struct LetterCard: View {
             Text("dino")
                 .foregroundColor(cat.deep)
         }
-        .font(.custom(DinoTheme.customFontName, size: 10))
+        .font(DinoTheme.dinoFont(size: 10))
         .tracking(0.4) // 0.04em
     }
 

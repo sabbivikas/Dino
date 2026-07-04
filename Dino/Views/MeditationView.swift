@@ -52,7 +52,7 @@ struct MeditationView: View {
                         // Timer display
                         if viewModel.isRunning {
                             Text(viewModel.formattedTimeRemaining)
-                                .font(.custom(DinoTheme.customFontName, size: 36))
+                                .font(DinoTheme.dinoFont(size: 36))
                                 .foregroundColor(.white)
                                 .transition(.opacity)
                         }

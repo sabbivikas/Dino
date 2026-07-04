@@ -18,8 +18,11 @@ struct JournalEntryDetailView: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var loadedPhoto: UIImage?
+    @State private var photoMissing = false
     @State private var showShare = false
     @State private var showDeleteConfirm = false
+    @State private var showDateEdit = false
+    @State private var editedDate = Date()
     @State private var elapsed: Double = 0
 
     private let ticker = Timer.publish(every: 0.1, on: .main, in: .common).autoconnect()
@@ -47,7 +50,7 @@ struct JournalEntryDetailView: View {
         let df = DateFormatter()
         df.locale = Locale(identifier: "en_US")
         df.dateFormat = "EEEE, MMMM d"
-        return df.string(from: entry.date).lowercased()
+        return df.string(from: current.date).lowercased()   // live — reflects date edits
     }
 
     var body: some View {
@@ -65,6 +68,21 @@ struct JournalEntryDetailView: View {
                                 .frame(height: 240)
                                 .clipped()
                                 .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                        } else if entry.photoFileName != nil {
+                            // fetching vs permanently missing — honest, never broken
+                            VStack(spacing: 8) {
+                                Text(photoMissing ? "🌫️" : "🌤️")
+                                    .font(.system(size: 30))
+                                Text(photoMissing
+                                     ? "this photo stayed on an old device"
+                                     : "finding this photo…")
+                                    .font(DinoTheme.dinoFont(size: 13))
+                                    .foregroundColor(ink3)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 120)
+                            .background(RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                .fill(Color.white.opacity(0.5)))
                         }
                         if hasAudio { audioPlayer }
                         Text(bodyText)
@@ -97,6 +115,39 @@ struct JournalEntryDetailView: View {
         }
         .sheet(isPresented: $showShare) {
             JournalDetailShareSheet(items: shareItems)
+        }
+        .sheet(isPresented: $showDateEdit) {
+            ScrollView {
+            VStack(spacing: 14) {
+                Text("move this memory")
+                    .font(DinoTheme.dinoHeaderFont(size: 22))
+                    .foregroundColor(ink)
+                    .padding(.top, 22)
+                Text("pick the day it belongs to")
+                    .font(DinoTheme.dinoFont(size: 13))
+                    .foregroundColor(ink3)
+                DatePicker("", selection: $editedDate, in: ...Date(), displayedComponents: .date)
+                    .datePickerStyle(.graphical)
+                    .tint(sage)
+                    .padding(.horizontal, 16)
+                Button {
+                    dataManager.updateJournalEntryDate(current, to: editedDate)
+                    showDateEdit = false
+                } label: {
+                    Text("done")
+                        .font(DinoTheme.dinoFont(size: 16))
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .background(Capsule().fill(sage))
+                }
+                .buttonStyle(.plain)
+                .padding(.horizontal, 22)
+                .padding(.bottom, 20)
+            }
+            }
+            .presentationDetents([.medium, .large])
+            .background(cream)
         }
         .confirmationDialog("delete this entry?", isPresented: $showDeleteConfirm, titleVisibility: .visible) {
             Button("delete", role: .destructive) {
@@ -136,9 +187,20 @@ struct JournalEntryDetailView: View {
                 .buttonStyle(.plain)
             }
 
-            Text(warmDate)
-                .font(.custom(DinoTheme.customFontName, size: 24))
-                .foregroundColor(ink)
+            HStack(spacing: 8) {
+                Text(warmDate)
+                    .font(DinoTheme.dinoHeaderFont(size: 24))
+                    .foregroundColor(ink)
+                Button {
+                    editedDate = current.date
+                    showDateEdit = true
+                } label: {
+                    Image(systemName: "calendar")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(ink3)
+                }
+                .buttonStyle(.plain)
+            }
 
             Text(entry.moodTag.lowercased())
                 .font(DinoTheme.dinoFont(size: 13))
@@ -235,10 +297,13 @@ struct JournalEntryDetailView: View {
 
     private func loadPhoto() {
         guard loadedPhoto == nil, let name = entry.photoFileName else { return }
-        let url = FileManager.default
-            .urls(for: .documentDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent(name)
-        if let img = UIImage(contentsOfFile: url.path) { loadedPhoto = img }
+        Task {
+            switch await JournalPhotoStore.fetchPhoto(name) {
+            case .loaded(let img): loadedPhoto = img
+            case .missing: photoMissing = true
+            case .fetching: break
+            }
+        }
     }
 
     private func timeLabel(_ seconds: Double) -> String {
