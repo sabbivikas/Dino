@@ -87,13 +87,27 @@ final class GardenCreatureLogicTests: XCTestCase {
         XCTAssertFalse(bird.consumePresentingEvent(), "presenting event fires exactly once")
     }
 
-    func testPresentingHoldsUntilDelivery() {
+    func testPresentingHoldsThroughTheTimeoutWindow() {
         var bird = makeBird()
         bird.beginArrival(now: 0)
-        _ = bird.tick(now: 3)
-        _ = bird.tick(now: 60)
+        _ = bird.tick(now: 3)   // presenting begins ~2.4s
+        _ = bird.tick(now: 40)
         guard case .presenting = bird.mode else {
-            return XCTFail("she waits with the letter until tapped")
+            return XCTFail("she waits with the letter inside the window")
+        }
+        XCTAssertFalse(bird.consumePresentingTimeout(), "no timeout before 45s of presenting")
+    }
+
+    func testPresentingTimesOutAfter45sUnacknowledged() {
+        var bird = makeBird()
+        bird.beginArrival(now: 0)
+        _ = bird.tick(now: 3)                    // presenting since ~2.4–3
+        _ = bird.tick(now: 3 + HummingbirdBrain.presentTimeout + 0.1)
+        XCTAssertTrue(bird.consumePresentingTimeout(), "unacknowledged → tuck event")
+        XCTAssertFalse(bird.consumePresentingTimeout(), "tuck event fires once per consume")
+        // the brain stays presenting — the controller decides stay vs depart
+        guard case .presenting = bird.mode else {
+            return XCTFail("transition ownership belongs to the controller")
         }
     }
 

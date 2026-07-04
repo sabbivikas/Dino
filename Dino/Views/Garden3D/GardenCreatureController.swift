@@ -39,6 +39,10 @@ final class GardenCreatureController: NSObject {
     private var configured = false
     private var regime: GardenCreatureRegime = .day
     private var onLetterTapped: (() -> Void)?
+    private var onLetterTucked: (() -> Void)?
+    /// She offers the letter once per garden open; after the presenting
+    /// timeout she tucks it away until the next open (letter stays unread).
+    private var tuckedAwayThisOpen = false
 
     // display link + fades
     private var displayLink: CADisplayLink?
@@ -117,8 +121,10 @@ final class GardenCreatureController: NSObject {
 
     // MARK: - Configuration (called from GardenSceneView.applyState)
 
-    func configure(earned: Bool, letterPending pending: Bool, onLetterTapped: (() -> Void)?) {
+    func configure(earned: Bool, letterPending pending: Bool,
+                   onLetterTapped: (() -> Void)?, onLetterTucked: (() -> Void)? = nil) {
         self.onLetterTapped = onLetterTapped
+        self.onLetterTucked = onLetterTucked
         let changed = earned != creaturesEarned || pending != letterPending
         creaturesEarned = earned
         letterPending = pending
@@ -132,6 +138,7 @@ final class GardenCreatureController: NSObject {
         guard isActive != active else { return }
         active = isActive
         if isActive {
+            tuckedAwayThisOpen = false   // each garden open, she offers again
             let link = CADisplayLink(target: self, selector: #selector(step))
             link.preferredFramesPerSecond = reduceMotion ? 15 : 30
             link.add(to: .main, forMode: .common)
@@ -157,7 +164,7 @@ final class GardenCreatureController: NSObject {
         regime = new
         switch new {
         case .day:
-            if letterPending {
+            if letterPending && !tuckedAwayThisOpen {
                 // the courier arrives even to a young garden — the letter is not gated
                 switch bird.mode {
                 case .arriving, .presenting:
@@ -210,6 +217,15 @@ final class GardenCreatureController: NSObject {
             HapticManager.shared.light()   // soft tick: she's here with your letter
             AnalyticsManager.shared.trackLetterDeliveredByBird()
         }
+        if bird.consumePresentingTimeout() {
+            // unacknowledged — she tucks the envelope and lives her day;
+            // the letter stays unread and she carries it again next open
+            tuckedAwayThisOpen = true
+            envelopeNode.isHidden = true
+            bird.deliverComplete(now: now, stayForFlowers: creaturesEarned)
+            let callback = onLetterTucked
+            DispatchQueue.main.async { callback?() }
+        }
         // a bird with nothing to do in an unearned garden stays gone
         if !letterPending && !creaturesEarned, case .gone = bird.mode {
             pose.visible = false
@@ -228,8 +244,9 @@ final class GardenCreatureController: NSObject {
             birdNode.geometry?.firstMaterial?.diffuse.contents = textures.frame(named: key)
         }
 
-        envelopeNode.isHidden = !letterPending
-        if letterPending {
+        let carrying = letterPending && !tuckedAwayThisOpen
+        envelopeNode.isHidden = !carrying
+        if carrying {
             envelopeNode.eulerAngles.z = Float(sin(now * 1.3)) * 0.12   // gentle sway
         }
     }
@@ -320,7 +337,7 @@ final class GardenCreatureController: NSObject {
     private func handleTapped(nodeName name: String) -> Bool {
         let now = CACurrentMediaTime()
         if name == "tap-bird" || name == "creature-bird" || name == "creature-envelope" {
-            if letterPending, case .presenting = bird.mode {
+            if letterPending, !tuckedAwayThisOpen, case .presenting = bird.mode {
                 letterPending = false
                 envelopeNode.isHidden = true
                 HapticManager.shared.success()

@@ -35,6 +35,7 @@ struct GardenSceneView: View {
     let reduceMotion: Bool
     var letterPending: Bool = false          // the hummingbird carries today's letter
     var onLetterOpen: (() -> Void)? = nil    // tap on her (or the envelope)
+    var onLetterTucked: (() -> Void)? = nil  // presenting timed out unacknowledged
 
     @State private var isActive: Bool = false
 
@@ -45,7 +46,8 @@ struct GardenSceneView: View {
             reduceMotion: reduceMotion,
             isActive: isActive,
             letterPending: letterPending,
-            onLetterOpen: onLetterOpen
+            onLetterOpen: onLetterOpen,
+            onLetterTucked: onLetterTucked
         )
         .onAppear { isActive = true }
         .onDisappear { isActive = false }
@@ -130,6 +132,7 @@ private struct GardenSceneRepresentable: UIViewRepresentable {
     let isActive: Bool
     let letterPending: Bool
     let onLetterOpen: (() -> Void)?
+    let onLetterTucked: (() -> Void)?
 
     func makeCoordinator() -> Coordinator {
         Coordinator()
@@ -267,7 +270,8 @@ private struct GardenSceneRepresentable: UIViewRepresentable {
             && careState != .dying && careState != .dead
         handle.creatures.configure(earned: earned,
                                    letterPending: letterPending,
-                                   onLetterTapped: onLetterOpen)
+                                   onLetterTapped: onLetterOpen,
+                                   onLetterTucked: onLetterTucked)
         handle.creatures.setActive(isActive)
 
         view.isPlaying = isActive && !reduceMotion

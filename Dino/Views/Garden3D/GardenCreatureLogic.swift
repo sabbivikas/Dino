@@ -152,11 +152,14 @@ struct HummingbirdBrain {
 
     private var lastFacing: Float = 1
     private var reachedPresenting = false
+    private var presentingTimedOut = false
     private var currentHoverIndex = 0
 
     static let arriveDuration = 2.4
     static let departDuration = 1.1
     static let sipDuration = 1.2
+    /// Unacknowledged this long → she tucks the envelope and lives her day.
+    static let presentTimeout = 45.0
 
     init(rng: GardenSeededRandom, points: HummingbirdWaypoints = .garden) {
         self.rng = rng
@@ -168,6 +171,14 @@ struct HummingbirdBrain {
     mutating func consumePresentingEvent() -> Bool {
         defer { reachedPresenting = false }
         return reachedPresenting
+    }
+
+    /// True exactly once when presenting goes unacknowledged past the timeout.
+    /// The controller tucks the envelope and sends her to the flowers — the
+    /// letter itself stays unread and rides with her again next open.
+    mutating func consumePresentingTimeout() -> Bool {
+        defer { presentingTimedOut = false }
+        return presentingTimedOut
     }
 
     // MARK: External events
@@ -244,7 +255,10 @@ struct HummingbirdBrain {
             return HummingbirdPose(position: pos, scale: fromScale + (1 - fromScale) * e,
                                    bank: 0, lean: 0, view: .front, facing: 1, visible: true)
 
-        case .presenting:
+        case .presenting(let since):
+            if now - since >= Self.presentTimeout {
+                presentingTimedOut = true   // controller decides stay vs depart
+            }
             let bob = SIMD3<Float>(Float(sin(now * 1.7)) * 0.03,
                                    Float(sin(now * 2.2)) * 0.045,
                                    Float(sin(now * 3.2)) * 0.02)

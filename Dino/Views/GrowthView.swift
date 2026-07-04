@@ -81,6 +81,7 @@ struct GrowthView: View {
     // knows she carries a letter — otherwise she starts ordinary garden life
     // and the delivery never begins
     @State private var letterUnread = GardenLetterStore.isUnreadToday()
+    @State private var letterLeftForLater = false
 
     /// Night + unread → she waits for first light; the status line says so.
     private var letterWaitsForMorning: Bool {
@@ -93,8 +94,11 @@ struct GrowthView: View {
             VStack(spacing: 20) {
                 GrowthHeader()
                 ProgressCard(vm: vm)
-                Garden3DPanel(vm: vm, reduceMotion: reduceMotion, letterUnread: $letterUnread)
-                StatusLine(vm: vm, letterWaiting: letterWaitsForMorning)
+                Garden3DPanel(vm: vm, reduceMotion: reduceMotion,
+                              letterUnread: $letterUnread,
+                              letterLeftForLater: $letterLeftForLater)
+                StatusLine(vm: vm, letterWaiting: letterWaitsForMorning,
+                           letterLeftForLater: letterLeftForLater)
                 PracticePillsRow(vm: vm)
                 WeeklyBloomLog(blooms: vm.weeklyBlooms)
                 XPCard(vm: vm)
@@ -418,6 +422,7 @@ private struct Garden3DPanel: View {
     @ObservedObject var vm: GrowthViewModel
     let reduceMotion: Bool
     @Binding var letterUnread: Bool
+    @Binding var letterLeftForLater: Bool
     @State private var showLetter = false
 
     var body: some View {
@@ -429,7 +434,11 @@ private struct Garden3DPanel: View {
             onLetterOpen: {
                 GardenLetterStore.markReadToday()
                 letterUnread = false
+                letterLeftForLater = false
                 showLetter = true
+            },
+            onLetterTucked: {
+                letterLeftForLater = true
             }
         )
         .frame(height: 360)
@@ -1340,6 +1349,7 @@ private func drawCloud(
 private struct StatusLine: View {
     @ObservedObject var vm: GrowthViewModel
     var letterWaiting: Bool = false
+    var letterLeftForLater: Bool = false
 
     var body: some View {
         let isHealthy = vm.careState == .healthy
@@ -1358,6 +1368,11 @@ private struct StatusLine: View {
                 .foregroundColor(Color(hex: "#6B7280"))
             if letterWaiting {
                 Text("your letter arrives with the morning 🌅")
+                    .font(DinoTheme.dinoFont(size: 12))
+                    .foregroundColor(Color(hex: "#6B7280"))
+                    .padding(.top, 2)
+            } else if letterLeftForLater {
+                Text("she left your letter for later 🌿")
                     .font(DinoTheme.dinoFont(size: 12))
                     .foregroundColor(Color(hex: "#6B7280"))
                     .padding(.top, 2)
