@@ -5,6 +5,7 @@
 
 import SwiftUI
 import Combine
+import UIKit
 import PostHog
 
 enum BreathingPhase: String {
@@ -13,6 +14,14 @@ enum BreathingPhase: String {
     case hold
     case exhale
     case done
+
+    init(kind: BreathStep.Kind) {
+        switch kind {
+        case .inhale: self = .inhale
+        case .hold:   self = .hold
+        case .exhale: self = .exhale
+        }
+    }
 
     var label: String {
         switch self {
@@ -38,8 +47,9 @@ enum BreathingPhase: String {
 @MainActor
 class BreathingViewModel: ObservableObject {
     @Published var phase: BreathingPhase = .idle
+    @Published var phaseLabel: String = BreathingPhase.idle.label
     @Published var circleScale: CGFloat = 0.6
-    @Published var circleOpacity: Double = 0.6
+    @Published var circleOpacity: Double = 0.85
     @Published var timeRemaining: Int = 0
     @Published var selectedDuration: Int = 120  // 2 min default
     @Published var isRunning: Bool = false
@@ -47,6 +57,18 @@ class BreathingViewModel: ObservableObject {
     @Published var phaseCountdown: Int = 4
     @Published var totalElapsed: Int = 0
     @Published var currentCycle: Int = 1
+    @Published var stepIndex: Int = -1
+    @Published var xpEarned: Int = 0
+
+    @Published var selectedPattern: BreathingPattern {
+        didSet {
+            guard !isRunning else { return }
+            phaseCountdown = selectedPattern.steps.first?.seconds ?? 4
+            UserDefaults.standard.set(selectedPattern.id, forKey: Self.patternDefaultsKey)
+        }
+    }
+
+    private static let patternDefaultsKey = "breathingSelectedPattern"
 
     private var mainTimer: Timer?
     private var phaseTimer: Timer?
@@ -60,24 +82,46 @@ class BreathingViewModel: ObservableObject {
         ("10 min", 600)
     ]
 
-    private let inhaleSeconds = 4
-    private let holdSeconds = 4
-    private let exhaleSeconds = 4
+    var cycleLength: Int { selectedPattern.cycleLength }
+    var totalCycles: Int { selectedPattern.totalCycles(for: selectedDuration) }
+    /// Whole breaths only — the session always ends on a completed cycle.
+    var plannedDuration: Int { selectedPattern.plannedDuration(for: selectedDuration) }
 
-    var cycleLength: Int { inhaleSeconds + holdSeconds + exhaleSeconds }
+    var currentStep: BreathStep? {
+        let steps = selectedPattern.steps
+        guard stepIndex >= 0, stepIndex < steps.count else { return nil }
+        return steps[stepIndex]
+    }
 
-    var totalCycles: Int { selectedDuration / cycleLength }
+    /// the big sigh's second inhale — the view gives it a lighter haptic tick
+    var isTopUpStep: Bool {
+        guard stepIndex > 0, let step = currentStep, step.kind == .inhale else { return false }
+        return selectedPattern.steps[stepIndex - 1].kind == .inhale
+    }
+
+    /// steady square holds: the countdown ring fills one quarter per count
+    var quarterRingProgress: Double? {
+        guard isRunning, selectedPattern.quarterTickHolds,
+              let step = currentStep, step.kind == .hold, step.seconds > 0 else { return nil }
+        return Double(step.seconds - phaseCountdown) / Double(step.seconds)
+    }
 
     private let dataManager: SharedDataManager
 
     init(dataManager: SharedDataManager) {
         self.dataManager = dataManager
+        let saved = UserDefaults.standard.string(forKey: Self.patternDefaultsKey)
+        let pattern = BreathingPattern.library.first { $0.id == saved } ?? .steadySquare
+        self.selectedPattern = pattern
+        self.phaseCountdown = pattern.steps.first?.seconds ?? 4
     }
 
     func start() {
-        timeRemaining = selectedDuration
+        timeRemaining = plannedDuration
         totalElapsed = 0
         currentCycle = 1
+        stepIndex = -1
+        xpEarned = 0
         isPaused = false
         isRunning = true
         sessionStartDate = Date()
@@ -85,11 +129,15 @@ class BreathingViewModel: ObservableObject {
         lastPauseDate = nil
         AnalyticsManager.shared.trackBreathingSessionStarted(
             duration: selectedDuration,
-            pattern: "\(inhaleSeconds)-\(holdSeconds)-\(exhaleSeconds)"
+            pattern: analyticsPattern
         )
         startLiveActivity()
         beginCycle()
         startMainTimer()
+    }
+
+    private var analyticsPattern: String {
+        selectedPattern.id + ":" + selectedPattern.steps.map { String($0.seconds) }.joined(separator: "-")
     }
 
     func stop() {
@@ -103,9 +151,11 @@ class BreathingViewModel: ObservableObject {
         isRunning = false
         isPaused = false
         phase = .idle
+        phaseLabel = BreathingPhase.idle.label
+        stepIndex = -1
         circleScale = 0.6
-        circleOpacity = 0.6
-        phaseCountdown = 4
+        circleOpacity = 0.85
+        phaseCountdown = selectedPattern.steps.first?.seconds ?? 4
         endLiveActivity()
         if wasRunning && !wasFinished && elapsedAtStop > 0 {
             AnalyticsManager.shared.trackBreathingSessionAbandoned(atSecond: elapsedAtStop)
@@ -131,12 +181,13 @@ class BreathingViewModel: ObservableObject {
         lastPauseDate = nil
         isPaused = false
         startMainTimer()
-        // Resume from current phase
-        switch phase {
-        case .inhale: startInhale(skipAnimation: true)
-        case .hold:   startHold()
-        case .exhale: startExhale(skipAnimation: true)
-        default:      beginCycle()
+        if let step = currentStep {
+            // land the circle on this step's target without re-animating
+            circleScale = step.targetScale
+            circleOpacity = step.targetOpacity
+            runStep(at: stepIndex, skipAnimation: true)
+        } else {
+            beginCycle()
         }
     }
 
@@ -153,13 +204,17 @@ class BreathingViewModel: ObservableObject {
         let timer = Timer(timeInterval: 1, repeats: true) { [weak self] _ in
             Task { @MainActor [weak self] in
                 guard let self = self, !self.isPaused else { return }
+                var rawElapsed = 0
                 if let start = self.sessionStartDate {
                     let elapsed = Date().timeIntervalSince(start) - self.pauseAccumulated
-                    self.totalElapsed = min(Int(elapsed), self.selectedDuration)
-                    self.timeRemaining = max(0, self.selectedDuration - self.totalElapsed)
+                    rawElapsed = Int(elapsed)
+                    self.totalElapsed = min(rawElapsed, self.plannedDuration)
+                    self.timeRemaining = max(0, self.plannedDuration - self.totalElapsed)
                 }
                 self.updateLiveActivity()
-                if self.timeRemaining <= 0 {
+                // Cycles complete the session; this only catches a stalled
+                // phase chain (e.g. a long stretch in the background).
+                if rawElapsed >= self.plannedDuration + self.cycleLength {
                     self.finish()
                 }
             }
@@ -170,55 +225,55 @@ class BreathingViewModel: ObservableObject {
 
     /// Recompute the countdown from the start timestamp — call on foreground resume.
     func recalculateFromTimestamp() {
-        guard let start = sessionStartDate, !isPaused else { return }
+        guard let start = sessionStartDate, isRunning, !isPaused else { return }
         let elapsed = Date().timeIntervalSince(start) - pauseAccumulated
-        totalElapsed = min(Int(elapsed), selectedDuration)
-        timeRemaining = max(0, selectedDuration - totalElapsed)
+        totalElapsed = min(Int(elapsed), plannedDuration)
+        timeRemaining = max(0, plannedDuration - totalElapsed)
         updateLiveActivity()
-        if timeRemaining <= 0 {
+        if Int(elapsed) >= plannedDuration {
             finish()
         }
     }
 
     private func beginCycle() {
-        startInhale()
+        runStep(at: 0)
     }
 
-    private func startInhale(skipAnimation: Bool = false) {
-        phase = .inhale
-        phaseCountdown = inhaleSeconds
-        if !skipAnimation {
-            withAnimation(.easeInOut(duration: Double(inhaleSeconds))) {
-                circleScale = 1.1
-                circleOpacity = 1.0
+    private func runStep(at index: Int, skipAnimation: Bool = false) {
+        let steps = selectedPattern.steps
+        if index >= steps.count {
+            // cycle complete
+            if currentCycle >= totalCycles {
+                finish()
+                return
+            }
+            currentCycle += 1
+            runStep(at: 0)
+            return
+        }
+        let step = steps[index]
+        stepIndex = index
+        phase = BreathingPhase(kind: step.kind)
+        phaseLabel = step.label
+        phaseCountdown = step.seconds
+
+        if step.kind == .hold {
+            if selectedPattern.shimmersOnHold && !skipAnimation && !UIAccessibility.isReduceMotionEnabled {
+                // the hold never freezes — light pulses gently behind closed eyes
+                withAnimation(.easeInOut(duration: 1.0).repeatForever(autoreverses: true)) {
+                    circleOpacity = step.targetOpacity - 0.05
+                }
+            }
+        } else if !skipAnimation {
+            withAnimation(step.curve.animation(seconds: step.seconds)) {
+                circleScale = step.targetScale
+                circleOpacity = step.targetOpacity
             }
         }
-        startPhaseTimer(duration: inhaleSeconds) { [weak self] in
-            self?.startHold()
-        }
-    }
 
-    private func startHold() {
-        phase = .hold
-        phaseCountdown = holdSeconds
-        startPhaseTimer(duration: holdSeconds) { [weak self] in
-            self?.startExhale()
-        }
-    }
-
-    private func startExhale(skipAnimation: Bool = false) {
-        phase = .exhale
-        phaseCountdown = exhaleSeconds
-        if !skipAnimation {
-            withAnimation(.easeInOut(duration: Double(exhaleSeconds))) {
-                circleScale = 0.6
-                circleOpacity = 0.6
-            }
-        }
-        startPhaseTimer(duration: exhaleSeconds) { [weak self] in
+        startPhaseTimer(duration: step.seconds) { [weak self] in
             guard let self = self, self.isRunning, !self.isPaused else { return }
-            self.currentCycle += 1
-            self.beginCycle()
+            self.runStep(at: index + 1)
         }
     }
 
@@ -243,6 +298,7 @@ class BreathingViewModel: ObservableObject {
     }
 
     private func finish() {
+        guard phase != .done else { return }
         mainTimer?.invalidate()
         phaseTimer?.invalidate()
         mainTimer = nil
@@ -250,17 +306,21 @@ class BreathingViewModel: ObservableObject {
         isRunning = false
         isPaused = false
         phase = .done
+        phaseLabel = BreathingPhase.done.label
         withAnimation(.easeInOut(duration: 0.5)) {
             circleScale = 0.8
-            circleOpacity = 0.8
+            circleOpacity = 0.9
         }
         endLiveActivity()
         let session = BreathingSession(
             durationSeconds: totalElapsed,
-            type: "\(inhaleSeconds)-\(holdSeconds)-\(exhaleSeconds)"
+            type: selectedPattern.id
         )
-        dataManager.logBreathingSession(session)
-        AnalyticsManager.shared.trackBreathingSessionCompleted(duration: totalElapsed)
+        xpEarned = dataManager.logBreathingSession(session)
+        AnalyticsManager.shared.trackBreathingSessionCompleted(
+            duration: totalElapsed,
+            pattern: analyticsPattern
+        )
         HapticManager.shared.success()
     }
 
@@ -269,8 +329,8 @@ class BreathingViewModel: ObservableObject {
     private func startLiveActivity() {
         if #available(iOS 16.2, *) {
             DinoLiveActivityManager.shared.startBreathingActivity(
-                sessionType: "4-4-4",
-                totalDuration: selectedDuration,
+                sessionType: selectedPattern.name,
+                totalDuration: plannedDuration,
                 totalCycles: totalCycles
             )
         }
@@ -278,9 +338,10 @@ class BreathingViewModel: ObservableObject {
 
     private func updateLiveActivity() {
         if #available(iOS 16.2, *) {
+            let stepSeconds = currentStep?.seconds ?? 4
             let progress: Double
-            if selectedDuration > 0 {
-                progress = Double(phaseCountdown) / Double(currentPhaseDuration)
+            if stepSeconds > 0 {
+                progress = Double(phaseCountdown) / Double(stepSeconds)
             } else {
                 progress = 0
             }
@@ -298,15 +359,6 @@ class BreathingViewModel: ObservableObject {
     private func endLiveActivity() {
         if #available(iOS 16.2, *) {
             DinoLiveActivityManager.shared.endBreathingActivity()
-        }
-    }
-
-    private var currentPhaseDuration: Int {
-        switch phase {
-        case .inhale: return inhaleSeconds
-        case .hold:   return holdSeconds
-        case .exhale: return exhaleSeconds
-        default:      return 4
         }
     }
 

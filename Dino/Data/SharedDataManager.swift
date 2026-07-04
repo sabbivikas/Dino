@@ -504,12 +504,16 @@ final class SharedDataManager: ObservableObject {
     }
 
     // MARK: - Breathing
-    func logBreathingSession(_ session: BreathingSession) {
+    /// Returns the xp granted so the done screen can show the real number.
+    @discardableResult
+    func logBreathingSession(_ session: BreathingSession) -> Int {
+        let xp = 20
         breathingSessions.insert(session, at: 0)
-        addXP(20)
+        addXP(xp)
         recordActivity()
         NotificationManager.shared.userDidLogActivity()
         scheduleWidgetReload()
+        return xp
     }
 
     // MARK: - Focus

@@ -14,7 +14,25 @@ struct BreathingView: View {
     @StateObject private var audio = AudioManager.shared
     @Environment(\.dismiss) private var dismiss
 
-    private let haptic = UIImpactFeedbackGenerator(style: .medium)
+    private let phaseTick = UIImpactFeedbackGenerator(style: .light)
+
+    private var breathingCircle: some View {
+        BreathingCircle(
+            scale: viewModel.circleScale,
+            opacity: viewModel.circleOpacity,
+            label: viewModel.phaseLabel,
+            countdown: viewModel.phaseCountdown,
+            accent: viewModel.selectedPattern.accent,
+            quarterRingProgress: viewModel.quarterRingProgress,
+            emptying: viewModel.selectedPattern.thinsOnExhale && viewModel.phase == .exhale
+        )
+    }
+
+    private var stepsCaption: String {
+        viewModel.selectedPattern.steps
+            .map { "\($0.seconds)s \($0.shortLabel)" }
+            .joined(separator: " · ")
+    }
 
     var body: some View {
         NavigationStack {
@@ -27,7 +45,7 @@ struct BreathingView: View {
                     DoneScreen(viewModel: viewModel, onDismiss: { dismiss() })
                         .transition(.opacity.combined(with: .scale(scale: 0.95)))
                 } else {
-                    VStack(spacing: 28) {
+                    VStack(spacing: 24) {
                         // Header
                         VStack(spacing: 6) {
                             Text("breathe")
@@ -39,83 +57,86 @@ struct BreathingView: View {
                         }
                         .padding(.top, 16)
 
-                        Spacer()
-
-                        // Breathing circle
-                        BreathingCircle(
-                            scale: viewModel.circleScale,
-                            opacity: viewModel.circleOpacity,
-                            phase: viewModel.phase,
-                            countdown: viewModel.phaseCountdown
-                        )
-
-                        // Timer
                         if viewModel.isRunning {
+                            Spacer()
+
+                            breathingCircle
+
+                            // Timer
                             Text(viewModel.formattedTimeRemaining)
                                 .font(DinoTheme.numericFont(size: 22))
                                 .foregroundColor(DinoTheme.textPrimary)
                                 .transition(.opacity)
-                        }
 
-                        // Cycle indicator while running
-                        if viewModel.isRunning {
+                            // Cycle indicator
                             Text("cycle \(viewModel.currentCycle) of \(viewModel.totalCycles)")
                                 .font(DinoTheme.captionFont())
                                 .foregroundColor(DinoTheme.textSecondary)
-                        }
 
-                        // Duration selector (before start)
-                        if !viewModel.isRunning {
-                            VStack(spacing: 12) {
-                                Text("session length")
-                                    .font(DinoTheme.captionFont())
-                                    .foregroundColor(DinoTheme.textSecondary)
+                            // Pattern reminder
+                            HStack(spacing: 8) {
+                                Text(viewModel.selectedPattern.name)
+                                Text("·").foregroundColor(DinoTheme.divider)
+                                Text(stepsCaption)
+                            }
+                            .font(DinoTheme.captionFont())
+                            .foregroundColor(DinoTheme.textSecondary)
 
-                                HStack(spacing: 12) {
-                                    ForEach(viewModel.durationOptions, id: \.seconds) { option in
-                                        Button(action: {
-                                            viewModel.selectedDuration = option.seconds
-                                        }) {
-                                            Text(option.label)
-                                                .font(DinoTheme.captionFont())
-                                                .fontWeight(.semibold)
-                                                .foregroundColor(viewModel.selectedDuration == option.seconds ? .white : DinoTheme.textPrimary)
-                                                .padding(.horizontal, 20)
-                                                .padding(.vertical, 10)
-                                                .background(
-                                                    viewModel.selectedDuration == option.seconds
-                                                        ? DinoTheme.sageGreen
-                                                        : DinoTheme.cardBackground
-                                                )
-                                                .clipShape(RoundedRectangle(cornerRadius: DinoDesignSystem.radiusMD, style: .continuous))
-                                                .overlay(
-                                                    RoundedRectangle(cornerRadius: DinoDesignSystem.radiusMD, style: .continuous)
-                                                        .stroke(
+                            Spacer()
+                        } else {
+                            // Scrolls only where the picker outgrows the screen
+                            // (small devices); sits still everywhere else.
+                            ScrollView(showsIndicators: false) {
+                                VStack(spacing: 24) {
+                                    breathingCircle
+                                        .padding(.top, 4)
+
+                                    BreathingPatternPicker(
+                                        selected: viewModel.selectedPattern,
+                                        onSelect: { viewModel.selectedPattern = $0 }
+                                    )
+                                    .padding(.horizontal, DinoTheme.padding)
+
+                                    VStack(spacing: 12) {
+                                        Text("session length")
+                                            .font(DinoTheme.captionFont())
+                                            .foregroundColor(DinoTheme.textSecondary)
+
+                                        HStack(spacing: 12) {
+                                            ForEach(viewModel.durationOptions, id: \.seconds) { option in
+                                                Button(action: {
+                                                    viewModel.selectedDuration = option.seconds
+                                                }) {
+                                                    Text(option.label)
+                                                        .font(DinoTheme.captionFont())
+                                                        .fontWeight(.semibold)
+                                                        .foregroundColor(viewModel.selectedDuration == option.seconds ? .white : DinoTheme.textPrimary)
+                                                        .padding(.horizontal, 20)
+                                                        .padding(.vertical, 10)
+                                                        .background(
                                                             viewModel.selectedDuration == option.seconds
                                                                 ? DinoTheme.sageGreen
-                                                                : DinoTheme.divider,
-                                                            lineWidth: 1
+                                                                : DinoTheme.cardBackground
                                                         )
-                                                )
+                                                        .clipShape(RoundedRectangle(cornerRadius: DinoDesignSystem.radiusMD, style: .continuous))
+                                                        .overlay(
+                                                            RoundedRectangle(cornerRadius: DinoDesignSystem.radiusMD, style: .continuous)
+                                                                .stroke(
+                                                                    viewModel.selectedDuration == option.seconds
+                                                                        ? DinoTheme.sageGreen
+                                                                        : DinoTheme.divider,
+                                                                    lineWidth: 1
+                                                                )
+                                                        )
+                                                }
+                                                .buttonStyle(ScaleButtonStyle())
+                                            }
                                         }
-                                        .buttonStyle(ScaleButtonStyle())
                                     }
+                                    .padding(.bottom, 8)
                                 }
                             }
                         }
-
-                        // Pattern label
-                        HStack(spacing: 8) {
-                            Text("4s inhale")
-                            Text("·").foregroundColor(DinoTheme.divider)
-                            Text("4s hold")
-                            Text("·").foregroundColor(DinoTheme.divider)
-                            Text("4s exhale")
-                        }
-                        .font(DinoTheme.captionFont())
-                        .foregroundColor(DinoTheme.textSecondary)
-
-                        Spacer()
 
                         // Controls
                         VStack(spacing: 12) {
@@ -199,9 +220,10 @@ struct BreathingView: View {
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
             if viewModel.isRunning { viewModel.recalculateFromTimestamp() }
         }
-        .onChange(of: viewModel.phase) { _, newPhase in
-            guard newPhase != .idle && newPhase != .done else { return }
-            haptic.impactOccurred()
+        .onChange(of: viewModel.stepIndex) { _, idx in
+            guard idx >= 0, viewModel.isRunning else { return }
+            // the top up inhale gets a lighter tick so the double breath is felt
+            phaseTick.impactOccurred(intensity: viewModel.isTopUpStep ? 0.55 : 0.9)
         }
         .onChange(of: viewModel.isRunning) { _, running in
             if running {
@@ -449,9 +471,15 @@ struct DoneScreen: View {
             // Stats
             HStack(spacing: 20) {
                 StatPill(label: "session", value: viewModel.formattedElapsed, color: DinoTheme.sageGreen)
-                StatPill(label: "pattern", value: "4-4-4", color: DinoTheme.skyBlue)
-                StatPill(label: "xp earned", value: "+20", color: DinoTheme.peach)
+                StatPill(label: "pattern", value: viewModel.selectedPattern.shortName, color: DinoTheme.skyBlue)
+                StatPill(label: "xp earned", value: "+\(viewModel.xpEarned)", color: DinoTheme.peach)
             }
+
+            Text(viewModel.selectedPattern.closingLine)
+                .font(DinoTheme.subheadlineFont())
+                .foregroundColor(DinoTheme.textSecondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, DinoTheme.padding)
 
             Spacer()
 

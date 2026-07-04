@@ -100,8 +100,11 @@ final class AnalyticsManager {
         ])
     }
 
-    func trackBreathingSessionCompleted(duration: Int) {
-        capture("breathing_session_completed", properties: ["duration": duration])
+    func trackBreathingSessionCompleted(duration: Int, pattern: String) {
+        capture("breathing_session_completed", properties: [
+            "duration": duration,
+            "pattern": pattern
+        ])
     }
 
     func trackBreathingSessionAbandoned(atSecond: Int) {
