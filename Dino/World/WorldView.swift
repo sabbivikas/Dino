@@ -114,6 +114,14 @@ struct WorldView: View {
                            findMyLightTrigger: $findTrigger,
                            onFoundLight: { found in
                 showToast(found ? "that's you 🦕" : "your light is glowing with the world 🌱")
+            },
+                           onGlowTap: { hit in
+                guard let hit else { toast = nil; return }   // tap elsewhere dismisses
+                if hit.isLocalEcho {
+                    showToast("your light in \(countryName(hit.countryCode)) \(hit.mood.emoji)")
+                } else {
+                    showToast("dinos in \(countryName(hit.countryCode)) \(hit.mood.emoji)")
+                }
             })
             .frame(height: 340)
 
@@ -126,6 +134,7 @@ struct WorldView: View {
                     .shadow(color: .black.opacity(0.08), radius: 6, y: 2)
                     .offset(y: 130)
                     .transition(.opacity.combined(with: .scale(scale: 0.9)))
+                    .allowsHitTesting(false)   // never steal touches from the globe
             }
         }
         .animation(.easeInOut(duration: 0.25), value: toast)

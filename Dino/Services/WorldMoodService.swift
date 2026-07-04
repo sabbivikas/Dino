@@ -141,6 +141,13 @@ enum WorldMoodService {
     /// The shared aggregate, cached for 15 min. Nil when offline with no cache —
     /// callers show nothing rather than blocking.
     static func fetchAggregate(force: Bool = false) async -> WorldAggregate? {
+        #if DEBUG
+        // Simulator/dev verification: launch with -worldTestAggregate to see a
+        // populated globe without touching Firestore.
+        if ProcessInfo.processInfo.arguments.contains("-worldTestAggregate") {
+            return debugTestAggregate()
+        }
+        #endif
         if !force, let cached = cachedAggregate, let at = cacheFetchedAt,
            Date().timeIntervalSince(at) < cacheMaxAge {
             return cached
@@ -165,6 +172,37 @@ enum WorldMoodService {
     static var cachedTodayBucket: WorldDayBucket? {
         cachedAggregate?.bucket(for: todayKey())
     }
+
+    #if DEBUG
+    /// A rich fake day for visual verification on the simulator: several
+    /// countries across all four moods, spread around the planet.
+    static func debugTestAggregate() -> WorldAggregate {
+        func counts(_ clear: Int, _ pc: Int, _ ow: Int, _ dr: Int) -> WorldMoodCounts {
+            var c = WorldMoodCounts()
+            c.clear = clear; c.partlyCloudy = pc; c.overwhelmed = ow; c.drained = dr
+            c.total = clear + pc + ow + dr
+            return c
+        }
+        let countries: [String: WorldMoodCounts] = [
+            "JP": counts(40, 5, 3, 2),    // gold, big
+            "US": counts(4, 6, 8, 30),    // rose
+            "BR": counts(3, 25, 4, 2),    // sage
+            "DE": counts(2, 3, 20, 4),    // lavender
+            "IN": counts(15, 4, 2, 1),    // gold
+            "GB": counts(2, 10, 3, 1),    // sage
+            "AU": counts(8, 1, 1, 0),     // gold, small
+            "FR": counts(1, 2, 7, 3),     // lavender, small
+        ]
+        var global = WorldMoodCounts()
+        for c in countries.values {
+            global.clear += c.clear; global.partlyCloudy += c.partlyCloudy
+            global.overwhelmed += c.overwhelmed; global.drained += c.drained
+            global.total += c.total
+        }
+        let bucket = WorldDayBucket(global: global, countries: countries)
+        return WorldAggregate(days: [todayKey(): bucket])
+    }
+    #endif
 
     // MARK: - Post-log world moment copy (pure → testable)
 

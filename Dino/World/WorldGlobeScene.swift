@@ -27,6 +27,7 @@ final class WorldGlobeScene {
     private var rimMaterial: SCNMaterial?
     private var ambientLight: SCNLight?
     private var fireflies: [(node: SCNNode, base: CGFloat)] = []
+    private var fireflyMoods: [String: EmotionalWeather] = [:]
     private var anchors: [String: [(lat: Double, lon: Double)]] = [:]
     private var brightnessTimer: Timer?
     private var localEcho: (mood: EmotionalWeather, countryCode: String)?
@@ -158,6 +159,7 @@ final class WorldGlobeScene {
         fireflyContainer.childNodes.forEach { $0.removeFromParentNode() }
         weatherContainer.childNodes.forEach { $0.removeFromParentNode() }
         fireflies.removeAll()
+        fireflyMoods.removeAll()
 
         applyMoodTint(bucket?.global)
 
@@ -175,12 +177,16 @@ final class WorldGlobeScene {
                   let spots = anchors[code], !spots.isEmpty,
                   let mood = counts.dominantMood else { continue }
             let share = Double(counts.total) / globalTotal
-            let size = CGFloat(0.05 + min(share, 0.35) * 0.30)
+            let size = CGFloat(0.06 + min(share, 0.35) * 0.30)
+            fireflyMoods[code] = mood
             for spot in spots {
                 guard placed < Self.maxFireflies else { break }
                 let node = makeFirefly(color: DinoWorldPalette.moodColor(mood), size: size)
-                position(node, lat: spot.lat, lon: spot.lon, altitude: 1.05)
+                // lift so the solid core clears the sphere at the limb (the
+                // faint halo may still kiss the surface — invisible in practice)
+                position(node, lat: spot.lat, lon: spot.lon, altitude: 1.03 + Float(size) * 0.4)
                 node.name = "firefly-\(code)"
+                addTapTarget(to: node, size: size, name: "tap-firefly-\(code)")
                 fireflyContainer.addChildNode(node)
                 fireflies.append((node, size))
                 placed += 1
@@ -240,19 +246,35 @@ final class WorldGlobeScene {
             fireflies.removeAll { $0.node === old }
         }
         guard let echo = localEcho, let spot = anchors[echo.countryCode]?.first else { return }
-        let node = makeFirefly(color: DinoWorldPalette.moodColor(echo.mood), size: 0.085)
-        position(node, lat: spot.lat + 1.5, lon: spot.lon + 1.5, altitude: 1.055)  // beside the country light
+        let node = makeFirefly(color: DinoWorldPalette.moodColor(echo.mood), size: 0.095)
+        position(node, lat: spot.lat + 1.5, lon: spot.lon + 1.5, altitude: 1.03 + 0.095 * 0.4)  // beside the country light
         node.name = Self.localEchoName
+        addTapTarget(to: node, size: 0.095, name: "tap-" + Self.localEchoName)
         fireflyContainer.addChildNode(node)
-        fireflies.append((node, 0.085))
+        fireflies.append((node, 0.095))
+    }
+
+    /// Invisible, comfortably oversized hit sphere — the visible sprites are
+    /// ~10pt on screen, too small to tap reliably.
+    private func addTapTarget(to node: SCNNode, size: CGFloat, name: String) {
+        let sphere = SCNSphere(radius: max(size * 0.9, 0.075))
+        let mat = SCNMaterial()
+        mat.colorBufferWriteMask = []      // renders nothing, still hit-testable
+        mat.writesToDepthBuffer = false
+        sphere.firstMaterial = mat
+        let tap = SCNNode(geometry: sphere)
+        tap.name = name
+        node.addChildNode(tap)
     }
 
     private func makeFirefly(color: UIColor, size: CGFloat) -> SCNNode {
         let plane = SCNPlane(width: size, height: size)
         let mat = SCNMaterial()
         mat.lightingModel = .constant
-        mat.diffuse.contents = DinoWorldPalette.glowImage(color: color)
-        mat.blendMode = .add
+        // Alpha-blended bead: additive glows disappear against the bright toy
+        // planet (they were tuned for the old dark dotted globe).
+        mat.diffuse.contents = DinoWorldPalette.fireflySprite(color: color)
+        mat.blendMode = .alpha
         mat.writesToDepthBuffer = false
         plane.firstMaterial = mat
         let node = SCNNode(geometry: plane)
@@ -280,6 +302,9 @@ final class WorldGlobeScene {
         ps.particleColor = kind == .drizzle
             ? DinoWorldPalette.ink.withAlphaComponent(0.4)
             : DinoWorldPalette.gold.withAlphaComponent(0.8)
+        // soft round puff — without an image SceneKit draws hard squares,
+        // which read as dark specks of dirt on the bright toy planet
+        ps.particleImage = DinoWorldPalette.glowImage(color: .white)
         ps.blendMode = kind == .drizzle ? .alpha : .additive
         ps.emitterShape = SCNSphere(radius: 0.06)
         ps.spreadingAngle = 12
@@ -307,8 +332,44 @@ final class WorldGlobeScene {
             let w = node.worldPosition
             let n = simd_normalize(SIMD3<Float>(w.x, w.y, w.z))
             let night = WorldGlobeMath.nightFade(normal: n, sunDirection: Self.sunDirection)
-            node.opacity = CGFloat(0.55 + 0.45 * night)
+            // always clearly visible — just a whisper brighter on the night side
+            node.opacity = CGFloat(0.88 + 0.12 * night)
         }
+    }
+
+    // MARK: - Glow tap lookup
+
+    struct WorldGlowHit {
+        let countryCode: String
+        let mood: EmotionalWeather
+        let isLocalEcho: Bool
+    }
+
+    /// Resolves a hit-tested node (sprite or its invisible tap sphere) to the
+    /// glow it belongs to. Walks up the parent chain so child hits count.
+    func glowHit(for node: SCNNode) -> WorldGlowHit? {
+        var current: SCNNode? = node
+        while let n = current {
+            if let name = n.name {
+                if name == Self.localEchoName || name == "tap-" + Self.localEchoName {
+                    if let echo = localEcho {
+                        return WorldGlowHit(countryCode: echo.countryCode, mood: echo.mood, isLocalEcho: true)
+                    }
+                } else if name.hasPrefix("tap-firefly-") {
+                    let code = String(name.dropFirst("tap-firefly-".count))
+                    if let mood = fireflyMoods[code] {
+                        return WorldGlowHit(countryCode: code, mood: mood, isLocalEcho: false)
+                    }
+                } else if name.hasPrefix("firefly-") {
+                    let code = String(name.dropFirst("firefly-".count))
+                    if let mood = fireflyMoods[code] {
+                        return WorldGlowHit(countryCode: code, mood: mood, isLocalEcho: false)
+                    }
+                }
+            }
+            current = n.parent
+        }
+        return nil
     }
 
     // MARK: - Find my light

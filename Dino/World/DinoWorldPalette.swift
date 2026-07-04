@@ -48,6 +48,50 @@ enum DinoWorldPalette {
                                              endCenter: c, endRadius: diameter / 2, options: [])
         }
     }
+
+    private static var fireflySpriteCache: [String: UIImage] = [:]
+
+    /// Firefly bead for the TOY planet: a solid mood-colored core with a soft
+    /// white heart, a thin darker outline for contrast on any land or ocean,
+    /// and a gentle halo. Alpha-blended — additive glows wash out against the
+    /// bright vinyl planet (they were designed for the old dark dotted globe).
+    static func fireflySprite(color: UIColor, diameter: CGFloat = 64) -> UIImage {
+        var (r, g, b, a): (CGFloat, CGFloat, CGFloat, CGFloat) = (0, 0, 0, 0)
+        color.getRed(&r, green: &g, blue: &b, alpha: &a)
+        let key = String(format: "%.3f-%.3f-%.3f-%.0f", r, g, b, diameter)
+        if let cached = fireflySpriteCache[key] { return cached }
+
+        let outline = UIColor(red: r * 0.55, green: g * 0.55, blue: b * 0.55, alpha: 1)
+        let renderer = UIGraphicsImageRenderer(size: CGSize(width: diameter, height: diameter))
+        let img = renderer.image { ctx in
+            let cg = ctx.cgContext
+            let c = CGPoint(x: diameter / 2, y: diameter / 2)
+            // halo
+            let haloColors = [color.withAlphaComponent(0.55).cgColor,
+                              color.withAlphaComponent(0).cgColor] as CFArray
+            if let halo = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(),
+                                     colors: haloColors, locations: [0.42, 1]) {
+                cg.drawRadialGradient(halo, startCenter: c, startRadius: 0,
+                                      endCenter: c, endRadius: diameter / 2, options: [])
+            }
+            // solid core
+            let coreR = diameter * 0.26
+            let coreRect = CGRect(x: c.x - coreR, y: c.y - coreR, width: coreR * 2, height: coreR * 2)
+            cg.setFillColor(color.cgColor)
+            cg.fillEllipse(in: coreRect)
+            // thin darker outline — keeps the bead readable on sand and sage
+            cg.setStrokeColor(outline.withAlphaComponent(0.85).cgColor)
+            cg.setLineWidth(diameter * 0.035)
+            cg.strokeEllipse(in: coreRect)
+            // white heart — the "lit from inside" read
+            let heartR = diameter * 0.11
+            cg.setFillColor(UIColor.white.withAlphaComponent(0.9).cgColor)
+            cg.fillEllipse(in: CGRect(x: c.x - heartR, y: c.y - heartR,
+                                      width: heartR * 2, height: heartR * 2))
+        }
+        fireflySpriteCache[key] = img
+        return img
+    }
 }
 
 extension DinoWorldPalette {

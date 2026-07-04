@@ -119,6 +119,15 @@ struct HomeView: View {
             .fullScreenCover(isPresented: $showWorld) {
                 WorldView()
             }
+            .onAppear {
+                #if DEBUG
+                // Dev shortcut: jump straight to the world when verifying with
+                // the -worldTestAggregate fixture on the simulator.
+                if ProcessInfo.processInfo.arguments.contains("-worldTestAggregate") {
+                    showWorld = true
+                }
+                #endif
+            }
             .sheet(isPresented: $showWhatsNew, onDismiss: {
                 lastSeenWhatsNewVersion = currentAppVersion()
             }) {
