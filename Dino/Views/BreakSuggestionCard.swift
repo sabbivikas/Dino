@@ -276,6 +276,11 @@ struct BreakSuggestionCard: View {
             onDismiss(); return
         }
         suggestion = s
+        // DinoMind: persist the GPT-extracted theme tag (enum only, no raw text).
+        if ThemeTag.isValid(s.theme) {
+            SharedDataManager.shared.recordThemeTag(
+                theme: s.theme, mood: mood.rawValue, source: ThemeTag.sourceBreakFinder)
+        }
         selectedSlotID = s.recommendedSlot?.id   // pre-select the AI's pick
         stage = .suggestion
     }

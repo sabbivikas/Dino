@@ -69,6 +69,9 @@ final class SharedDataManager: ObservableObject {
     @Published var receivedLanterns: [ReceivedLantern] {
         didSet { save(receivedLanterns, forKey: userKey("receivedLanterns")) }
     }
+    @Published var themeTags: [ThemeTag] {
+        didSet { save(themeTags, forKey: userKey("themeTags")) }
+    }
     @Published var journalEntries: [JournalEntry] {
         didSet {
             save(journalEntries, forKey: userKey("journalEntries"))
@@ -198,6 +201,7 @@ final class SharedDataManager: ObservableObject {
         self.userIntentions = Self.load([String].self, from: ud, key: Self.staticUserKey(uid, "userIntentions")) ?? []
         self.moodEntries = Self.load([MoodEntry].self, from: ud, key: Self.staticUserKey(uid, "moodEntries")) ?? []
         self.receivedLanterns = Self.load([ReceivedLantern].self, from: ud, key: Self.staticUserKey(uid, "receivedLanterns")) ?? []
+        self.themeTags = Self.load([ThemeTag].self, from: ud, key: Self.staticUserKey(uid, "themeTags")) ?? []
         self.journalEntries = Self.load([JournalEntry].self, from: ud, key: Self.staticUserKey(uid, "journalEntries")) ?? []
         self.gratitudeNotes = Self.load([GratitudeNote].self, from: ud, key: Self.staticUserKey(uid, "gratitudeNotes")) ?? []
         self.savedAffirmations = Self.load([SavedAffirmation].self, from: ud, key: Self.staticUserKey(uid, "savedAffirmations")) ?? []
@@ -324,6 +328,7 @@ final class SharedDataManager: ObservableObject {
         userIntentions = Self.load([String].self, from: ud, key: userKey("userIntentions")) ?? []
         moodEntries = Self.load([MoodEntry].self, from: ud, key: userKey("moodEntries")) ?? []
         receivedLanterns = Self.load([ReceivedLantern].self, from: ud, key: userKey("receivedLanterns")) ?? []
+        themeTags = Self.load([ThemeTag].self, from: ud, key: userKey("themeTags")) ?? []
         journalEntries = Self.load([JournalEntry].self, from: ud, key: userKey("journalEntries")) ?? []
         gratitudeNotes = Self.load([GratitudeNote].self, from: ud, key: userKey("gratitudeNotes")) ?? []
         savedAffirmations = Self.load([SavedAffirmation].self, from: ud, key: userKey("savedAffirmations")) ?? []
@@ -348,6 +353,7 @@ final class SharedDataManager: ObservableObject {
         userIntentions = []
         moodEntries = []
         receivedLanterns = []
+        themeTags = []
         journalEntries = []
         gratitudeNotes = []
         savedAffirmations = []
@@ -439,6 +445,21 @@ final class SharedDataManager: ObservableObject {
     func incrementSentLanternCount() {
         UserDefaults.standard.set(sentLanternCount + 1, forKey: userKey("sentLanternCount"))
         objectWillChange.send()
+    }
+
+    // MARK: - Theme tags (DinoMind)
+
+    /// Opt-in flag: only when true do we send journal text off-device for theme
+    /// extraction. Default false. Break-finder tagging is independent of this.
+    var journalThemeLearningEnabled: Bool {
+        get { UserDefaults.standard.bool(forKey: "dino.journalThemeLearningEnabled") }
+        set { UserDefaults.standard.set(newValue, forKey: "dino.journalThemeLearningEnabled") }
+    }
+
+    /// Store a theme tag (only valid themes; "none" is dropped upstream).
+    func recordThemeTag(theme: String, mood: String = "", source: String) {
+        guard ThemeTag.isValid(theme) else { return }
+        themeTags.insert(ThemeTag(theme: theme, mood: mood, source: source), at: 0)
     }
 
     // MARK: - Mood

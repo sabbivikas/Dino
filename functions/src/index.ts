@@ -395,11 +395,12 @@ export const suggestBreakSlot = onCall(
       "if they mention a specific commitment or time (e.g. a meeting at 2), pick a slot comfortably after it; " +
       "if their message mentions no timing constraints, prefer sooner over later. " +
       "respond ONLY with valid JSON, no markdown, of the form " +
-      '{"acknowledgment":"...","suggestedActivity":"breathing","reason":"...","recommendedTime":"9:00am"}. ' +
+      '{"acknowledgment":"...","suggestedActivity":"breathing","reason":"...","recommendedTime":"9:00am","theme":"work"}. ' +
       "acknowledgment: one short warm sentence acknowledging what they wrote, lowercase, no clinical language. " +
       "suggestedActivity: exactly one of breathing, meditation, journaling. " +
       "reason: one short warm sentence on why this activity and this time fit what they shared, lowercase. " +
       "recommendedTime: copy ONE of the listed times EXACTLY as written. " +
+      "theme: the life area their message is mainly about — exactly one of work, sleep, relationships, health, money, self, or none. use none if there is no message or no clear theme. never guess. " +
       "activity rules: overwhelmed or overthinking -> breathing; low energy or exhausted -> meditation; emotional, sad, or hard day -> journaling. " +
       (userMessage ? "" : "with no message: overwhelmed -> breathing, drained -> meditation. ") +
       (rhythmsAvailable && helpfulPractice !== "none" ? `if it fits, prefer ${helpfulPractice}. ` : "") +
@@ -444,7 +445,10 @@ export const suggestBreakSlot = onCall(
         (typeof parsed.recommendedTime === "string" ? byNorm.get(norm(parsed.recommendedTime)) : undefined)
           ?? FALLBACK.recommendedTime;
 
-      return { acknowledgment, suggestedActivity, reason, recommendedTime };
+      const THEMES = ["work", "sleep", "relationships", "health", "money", "self", "none"];
+      const theme = THEMES.includes(String(parsed.theme)) ? String(parsed.theme) : "none";
+
+      return { acknowledgment, suggestedActivity, reason, recommendedTime, theme };
     } catch (err) {
       await counterRef.set(
         { [dayKey]: admin.firestore.FieldValue.increment(-1) },
@@ -467,6 +471,136 @@ function isoWeekKey(date: Date): string {
   );
   return `${d.getUTCFullYear()}-W${String(weekNo).padStart(2, "0")}`;
 }
+
+// Coarse theme classification of a single journal entry (DinoMind, opt-in on
+// the client). Text is used ONLY for the OpenAI call — never logged or stored;
+// only the enum theme is returned.
+export const extractJournalTheme = onCall(
+  { secrets: [OPENAI_API_KEY], timeoutSeconds: 20, memory: "256MiB" },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "sign in required");
+    }
+    const d = (request.data ?? {}) as Record<string, unknown>;
+    for (const k of Object.keys(d)) {
+      if (k !== "text") throw new HttpsError("invalid-argument", `unexpected field: ${k}`);
+    }
+    const text = String(d.text ?? "").slice(0, 1000).trim();
+    if (!text) return { theme: "none" };
+
+    const systemPrompt =
+      "you are a careful classifier. read one private journal entry and label the single life area it is mainly about. " +
+      'respond ONLY with valid JSON, no markdown: {"theme":"work"}. ' +
+      "theme is exactly one of work, sleep, relationships, health, money, self, or none. " +
+      "use none if the entry is empty, ambiguous, or has no clear single theme. never guess. " +
+      "never quote, repeat, or store the entry; output only the JSON.";
+
+    try {
+      const openai = new OpenAI({ apiKey: OPENAI_API_KEY.value() });
+      const resp = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        max_tokens: 20,
+        temperature: 0,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: `entry: "${text}"` },
+        ],
+      });
+      const content = resp.choices[0]?.message?.content ?? "";
+      let parsed: any = {};
+      try { parsed = JSON.parse(content); } catch { parsed = {}; }
+      const THEMES = ["work", "sleep", "relationships", "health", "money", "self", "none"];
+      const theme = THEMES.includes(String(parsed.theme)) ? String(parsed.theme) : "none";
+      return { theme };
+    } catch (err) {
+      if (err instanceof HttpsError) throw err;
+      const message = err instanceof Error ? err.message : "OpenAI request failed";
+      throw new HttpsError("internal", message);
+    }
+  }
+);
+
+// One warm, context-aware daily check-in nudge (DinoMind). Anonymized payload
+// only; the client caches one per local day and falls back to static copy.
+const DAILY_NUDGE_LIMIT = 3;
+
+export const generateDailyNudge = onCall(
+  { secrets: [OPENAI_API_KEY], timeoutSeconds: 20, memory: "256MiB" },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "sign in required");
+    }
+    const uid = request.auth.uid;
+    const d = (request.data ?? {}) as Record<string, unknown>;
+    const ALLOWED_KEYS = ["lastMood", "streakState", "sleepSummary", "weekday", "riskLevel", "topTheme", "userLocale"];
+    for (const k of Object.keys(d)) {
+      if (!ALLOWED_KEYS.includes(k)) throw new HttpsError("invalid-argument", `unexpected field: ${k}`);
+    }
+    const userLocale = typeof d.userLocale === "string" ? d.userLocale : "en";
+    const lastMood = String(d.lastMood ?? "").slice(0, 40);
+    const streakState = String(d.streakState ?? "").slice(0, 40);
+    const sleepSummary = String(d.sleepSummary ?? "").slice(0, 60);
+    const weekday = String(d.weekday ?? "").slice(0, 20);
+    const riskLevel = String(d.riskLevel ?? "").slice(0, 20);
+    const topTheme = String(d.topTheme ?? "").slice(0, 20);
+
+    // Rate limit: DAILY_NUDGE_LIMIT per uid per UTC day (defense in depth; the
+    // client already caches one nudge per local day).
+    const db = admin.firestore();
+    const dayKey = new Date().toISOString().slice(0, 10);
+    const counterRef = db.collection("dailyNudgeLimits").doc(uid);
+    await db.runTransaction(async (tx) => {
+      const snap = await tx.get(counterRef);
+      const data = snap.data() ?? {};
+      const current = (data[dayKey] as number | undefined) ?? 0;
+      if (current >= DAILY_NUDGE_LIMIT) {
+        throw new HttpsError("resource-exhausted", "daily nudge limit reached");
+      }
+      tx.set(counterRef, { [dayKey]: current + 1, updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
+    });
+
+    const systemPrompt =
+      "you are dino, a warm, gentle wellness companion. " +
+      "write ONE short check-in nudge as a single lowercase sentence in dino's voice: warm, no dashes, " +
+      "no clinical language, never pressuring or guilt-inducing. keep it very short, it is a notification. " +
+      "gently invite them to check in when they can. you may lightly reflect their recent context but never " +
+      'mention data, tracking, ai, apps, scores, or numbers. respond ONLY with valid JSON, no markdown: {"nudge":"..."}.' +
+      getLanguageInstruction(userLocale);
+
+    const parts = [`mood lately: ${lastMood || "unknown"}.`, `streak: ${streakState || "unknown"}.`];
+    if (sleepSummary) parts.push(`last night: ${sleepSummary}.`);
+    if (weekday) parts.push(`today is ${weekday}.`);
+    if (riskLevel) parts.push(`tomorrow looks ${riskLevel}.`);
+    if (topTheme) parts.push(`a recurring theme for them is ${topTheme}.`);
+    const userPrompt = parts.join(" ");
+
+    try {
+      const openai = new OpenAI({ apiKey: OPENAI_API_KEY.value() });
+      const resp = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        max_tokens: 60,
+        temperature: 0.8,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+      });
+      const content = resp.choices[0]?.message?.content ?? "";
+      let parsed: any = {};
+      try { parsed = JSON.parse(content); } catch { parsed = {}; }
+      const nudge = typeof parsed.nudge === "string" && parsed.nudge.trim().length > 0 && parsed.nudge.length <= 200
+        ? parsed.nudge.trim()
+        : "";
+      if (!nudge) throw new HttpsError("internal", "empty nudge");
+      return { nudge };
+    } catch (err) {
+      await counterRef.set({ [dayKey]: admin.firestore.FieldValue.increment(-1) }, { merge: true });
+      if (err instanceof HttpsError) throw err;
+      const message = err instanceof Error ? err.message : "OpenAI request failed";
+      throw new HttpsError("internal", message);
+    }
+  }
+);
 
 export const generateWeeklyReport = onCall(
   { secrets: [OPENAI_API_KEY], timeoutSeconds: 60, memory: "512MiB" },

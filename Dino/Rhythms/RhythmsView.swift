@@ -502,7 +502,7 @@ private let learningFixture = RhythmsAnalysis(
     recoveryTimeDays: nil, practiceCorrelation: nil,
     risk: RiskAssessment(score: 0, confident: false, likelyHard: false,
                          factors: RiskFactors(weekdayGap: 0, downwardTrajectory: 0, belowBaseline: 0, noPracticeToday: 0)),
-    daysOfDataAvailable: 12, hasEnoughData: false)
+    daysOfDataAvailable: 12, hasEnoughData: false, themeInsights: nil)
 
 private let calmFixture = RhythmsAnalysis(
     overallBaseline: 3.0,
@@ -513,7 +513,7 @@ private let calmFixture = RhythmsAnalysis(
     practiceCorrelation: PracticeCorrelation(withMoodMean: 3.3, withoutMoodMean: 2.2, liftRatio: 1.5),
     risk: RiskAssessment(score: 0.3, confident: true, likelyHard: false,
                          factors: RiskFactors(weekdayGap: 0.1, downwardTrajectory: 0, belowBaseline: 0, noPracticeToday: 1)),
-    daysOfDataAvailable: 47, hasEnoughData: true)
+    daysOfDataAvailable: 47, hasEnoughData: true, themeInsights: nil)
 
 private let hardFixture = RhythmsAnalysis(
     overallBaseline: 2.9,
@@ -524,7 +524,7 @@ private let hardFixture = RhythmsAnalysis(
     practiceCorrelation: PracticeCorrelation(withMoodMean: 3.4, withoutMoodMean: 1.7, liftRatio: 2.0),
     risk: RiskAssessment(score: 0.72, confident: true, likelyHard: true,
                          factors: RiskFactors(weekdayGap: 0.43, downwardTrajectory: 0.4, belowBaseline: 0.2, noPracticeToday: 1)),
-    daysOfDataAvailable: 63, hasEnoughData: true)
+    daysOfDataAvailable: 63, hasEnoughData: true, themeInsights: nil)
 
 private let sampleMoods: [HelixMood] = (0..<60).map { i in
     // Varied rise/fall (two sines + jitter), banded into the 5 moods; gold rare.

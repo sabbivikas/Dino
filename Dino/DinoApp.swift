@@ -209,6 +209,8 @@ struct DinoApp: App {
                         // Evening check: schedule a night-before rhythms letter
                         // if tomorrow is confidently predicted to be hard.
                         Task { await RhythmsLetterScheduler.shared.evaluateAndScheduleIfNeeded() }
+                        // DinoMind: generate today's smart check-in nudge (once/day).
+                        Task { await DailyNudgeScheduler.generateIfNeeded() }
                     case .inactive, .background:
                         let duration = Date().timeIntervalSince(sessionStartTime)
                         if duration > 0 {

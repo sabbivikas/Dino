@@ -77,6 +77,12 @@ struct MoodSample {
     let weather: EmotionalWeather
 }
 
+/// A GPT-extracted theme tag, fed to the engine as a local statistical input.
+struct ThemeSample {
+    let date: Date
+    let theme: String   // one of ThemeTag.validThemes
+}
+
 // MARK: - Outputs
 
 struct WeekdayStat: Equatable {
@@ -110,6 +116,18 @@ struct RiskAssessment: Equatable {
     let factors: RiskFactors
 }
 
+/// Theme-tag insights — same statistical approach as the mood analysis, over
+/// GPT-extracted theme tags. `confident` gates the whole set (≥ minThemeTags);
+/// each per-theme slice additionally requires ≥ minPerThemeCount tags.
+struct ThemeInsights: Equatable {
+    let totalTags: Int
+    let frequency: [String: Int]                        // theme -> tag count in window
+    let perThemeRecoveryDays: [String: Double]          // theme -> avg dip→baseline days
+    let perThemeWeekday: [String: [Int: Int]]           // theme -> {weekday(1...7) -> count}
+    let perThemePractice: [String: PracticeCorrelation] // theme -> next-day practice lift
+    let confident: Bool                                 // totalTags >= minThemeTags
+}
+
 struct RhythmsAnalysis {
     let overallBaseline: Double
     let weekdayBaseline: [Int: WeekdayStat]
@@ -119,6 +137,7 @@ struct RhythmsAnalysis {
     let risk: RiskAssessment
     let daysOfDataAvailable: Int
     let hasEnoughData: Bool
+    let themeInsights: ThemeInsights?
 }
 
 // MARK: - Engine
@@ -134,20 +153,25 @@ struct PatternEngine {
     static let riskHardThreshold: Double = 0.6  // "likely hard" flag
     static let defaultWindowDays = 90
     static let trajectoryLastN = 3
+    static let minThemeTags = 12               // gate before theme insights "speak"
+    static let minPerThemeCount = 4            // per-theme slice confidence
 
     var calendar: Calendar
     var now: Date
     var windowDays: Int
     var moodSamples: [MoodSample]
     var practiceDates: [Date]
+    var themeSamples: [ThemeSample]
 
     init(moodSamples: [MoodSample],
          practiceDates: [Date] = [],
+         themeSamples: [ThemeSample] = [],
          now: Date = Date(),
          calendar: Calendar = .current,
          windowDays: Int = PatternEngine.defaultWindowDays) {
         self.moodSamples = moodSamples
         self.practiceDates = practiceDates
+        self.themeSamples = themeSamples
         self.now = now
         self.calendar = calendar
         self.windowDays = windowDays
@@ -320,6 +344,83 @@ struct PatternEngine {
         )
     }
 
+    // MARK: 8) Theme insights (GPT-extracted tags, crunched locally)
+
+    private var themesInWindow: [(day: LocalDay, theme: String)] {
+        themeSamples.compactMap { s in
+            let d = LocalDay(date: s.date, calendar: calendar)
+            guard inWindow(d), ThemeTag.isValid(s.theme) else { return nil }
+            return (d, s.theme)
+        }
+    }
+
+    func themeInsights() -> ThemeInsights? {
+        let tags = themesInWindow
+        guard !tags.isEmpty else { return nil }
+
+        var frequency: [String: Int] = [:]
+        var daysByTheme: [String: [LocalDay]] = [:]
+        for t in tags {
+            frequency[t.theme, default: 0] += 1
+            daysByTheme[t.theme, default: []].append(t.day)
+        }
+
+        let scores = dailyMoodScores
+        let baseline = overallBaseline
+        let practiced = practiceDays
+        let sortedDataDays = scores.keys.sorted()
+
+        var perWeekday: [String: [Int: Int]] = [:]
+        var perRecovery: [String: Double] = [:]
+        var perPractice: [String: PracticeCorrelation] = [:]
+
+        for (theme, rawDays) in daysByTheme where rawDays.count >= Self.minPerThemeCount {
+            let days = Set(rawDays)
+
+            // Weekday clustering
+            var wd: [Int: Int] = [:]
+            for d in rawDays { wd[d.weekday(calendar), default: 0] += 1 }
+            perWeekday[theme] = wd
+
+            // Recovery: from a theme-tagged dip day back up to baseline
+            var recoveries: [Int] = []
+            for d in days {
+                guard let s = scores[d], s < baseline - Self.recoveryMargin else { continue }
+                if let back = sortedDataDays.first(where: { $0 > d && (scores[$0] ?? 0) >= baseline }) {
+                    recoveries.append(d.days(until: back, calendar))
+                }
+            }
+            if !recoveries.isEmpty {
+                perRecovery[theme] = Double(recoveries.reduce(0, +)) / Double(recoveries.count)
+            }
+
+            // Practice lift on theme days: next-day mood, practiced vs not
+            var withP: [Double] = []
+            var withoutP: [Double] = []
+            for d in days {
+                let next = d.adding(days: 1, calendar)
+                guard let nextScore = scores[next] else { continue }
+                if practiced.contains(d) { withP.append(nextScore) } else { withoutP.append(nextScore) }
+            }
+            if !withP.isEmpty, !withoutP.isEmpty {
+                let wm = withP.reduce(0, +) / Double(withP.count)
+                let wo = withoutP.reduce(0, +) / Double(withoutP.count)
+                if wo != 0 {
+                    perPractice[theme] = PracticeCorrelation(withMoodMean: wm, withoutMoodMean: wo, liftRatio: wm / wo)
+                }
+            }
+        }
+
+        return ThemeInsights(
+            totalTags: tags.count,
+            frequency: frequency,
+            perThemeRecoveryDays: perRecovery,
+            perThemeWeekday: perWeekday,
+            perThemePractice: perPractice,
+            confident: tags.count >= Self.minThemeTags
+        )
+    }
+
     // MARK: Bundle
 
     func analyze() -> RhythmsAnalysis {
@@ -331,7 +432,8 @@ struct PatternEngine {
             practiceCorrelation: practiceCorrelation(),
             risk: tomorrowRisk(),
             daysOfDataAvailable: daysOfDataAvailable,
-            hasEnoughData: hasEnoughData
+            hasEnoughData: hasEnoughData,
+            themeInsights: themeInsights()
         )
     }
 }
