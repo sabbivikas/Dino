@@ -23,12 +23,14 @@ final class HealthService: ObservableObject {
     /// Whether Health data is available on this device at all (false on iPad / unsupported).
     var isAvailable: Bool { HKHealthStore.isHealthDataAvailable() }
 
-    /// Current read-authorization status for sleep. Note: for privacy, HealthKit
-    /// reports `.sharingDenied` even when undetermined for read scopes in some
-    /// cases — callers should treat this as a hint, not a guarantee of data.
-    var sleepAuthStatus: HKAuthorizationStatus {
-        guard isAvailable else { return .notDetermined }
-        return store.authorizationStatus(for: sleepType)
+    /// Whether we've ever completed a sleep authorization request. HealthKit
+    /// never reveals read grants (and `authorizationStatus(for:)` only reports
+    /// WRITE status — permanently `.sharingDenied` for a read-only app), so
+    /// "have we asked" is tracked here and "do we have data" is probed by
+    /// actually reading. Those two are the only honest signals available.
+    private static let sleepRequestedKey = "dino.health.sleepRequested"
+    var hasRequestedSleep: Bool {
+        UserDefaults.standard.bool(forKey: Self.sleepRequestedKey)
     }
 
     // MARK: - Permission
@@ -41,6 +43,7 @@ final class HealthService: ObservableObject {
         guard isAvailable else { return false }
         do {
             try await store.requestAuthorization(toShare: [], read: [sleepType])
+            UserDefaults.standard.set(true, forKey: Self.sleepRequestedKey)
             return true
         } catch {
             #if DEBUG

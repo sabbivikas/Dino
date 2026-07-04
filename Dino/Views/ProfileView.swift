@@ -139,7 +139,10 @@ struct ProfileView: View {
     @State private var activeSheet: ProfileSheet?
     @Environment(\.scenePhase) private var scenePhase
     @State private var calendarAccess: CalendarService.CalendarAccess = .notDetermined
-    @State private var healthAuthStatus: HKAuthorizationStatus = .notDetermined
+    /// Honest health-row state: HealthKit hides read grants, so we track
+    /// "asked" ourselves and probe for readable data — never the write status.
+    private enum HealthRowState { case unavailable, notConnected, awaitingData, connected }
+    @State private var healthRowState: HealthRowState = .notConnected
     @State private var showAmbientSounds: Bool = false
     @State private var showForestLetter: Bool = false
     @State private var showRateAlert: Bool = false
@@ -507,22 +510,33 @@ struct ProfileView: View {
     }
 
     @ViewBuilder private var healthRow: some View {
-        switch healthAuthStatus {
-        case .sharingAuthorized:
+        switch healthRowState {
+        case .unavailable:
+            EmptyView()   // no Health on this device (iPad etc.) — no dead row
+        case .connected:
             SBRow(icon: "heart.fill",
                   iconColor: SB.sage,
                   title: "health connected 🌿".localized,
                   subtitle: "dino learns from your sleep") { }
-        case .sharingDenied:
-            SBRow(icon: "heart.slash",
-                  iconColor: SB.rose,
-                  title: "health access needed".localized,
-                  subtitle: "tap to open settings") {
-                if let url = URL(string: UIApplication.openSettingsURLString) {
-                    UIApplication.shared.open(url)
+        case .awaitingData:
+            // asked, but no readable sleep yet — could be denied, could be an
+            // empty night. HealthKit won't say which; be honest, link the
+            // place that actually manages read access (the health app — the
+            // app's own settings page never shows health permissions).
+            SBRow(icon: "heart.text.square",
+                  iconColor: SB.sage,
+                  title: "waiting on sleep data 🌙".localized,
+                  subtitle: "if you meant to allow it, check the health app") {
+                Task {
+                    // re-ask first — free if ios still considers it undecided
+                    _ = await HealthService.shared.requestSleepPermission()
+                    refreshHealthAccess()
+                    if let url = URL(string: "x-apple-health://") {
+                        await UIApplication.shared.open(url)
+                    }
                 }
             }
-        default:   // .notDetermined (and any future case)
+        case .notConnected:
             SBRow(icon: "heart",
                   iconColor: SB.sage,
                   title: "connect apple health".localized,
@@ -536,7 +550,19 @@ struct ProfileView: View {
     }
 
     private func refreshHealthAccess() {
-        healthAuthStatus = HealthService.shared.sleepAuthStatus
+        Task { @MainActor in
+            let service = HealthService.shared
+            guard service.isAvailable else {
+                healthRowState = .unavailable
+                return
+            }
+            guard service.hasRequestedSleep else {
+                healthRowState = .notConnected
+                return
+            }
+            // probe: readable data is the only proof of a granted read scope
+            healthRowState = await service.lastNightSleep() != nil ? .connected : .awaitingData
+        }
     }
 
     private var headerRow: some View {

@@ -101,6 +101,15 @@ struct HomeView: View {
             .onAppear {
                 // Dev shortcut for garden-ecosystem simulator verification.
                 if GardenDebug.autoOpen { viewModel.showGrowth = true }
+                #if DEBUG
+                // -healthQA: fire the sleep authorization sheet on launch so the
+                // request path is verifiable without navigating to profile.
+                if ProcessInfo.processInfo.arguments.contains("-healthQA") {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                        Task { _ = await HealthService.shared.requestSleepPermission() }
+                    }
+                }
+                #endif
             }
             .onReceive(dataManager.$showBreathingFromDeepLink) { shouldShow in
                 guard shouldShow else { return }
