@@ -1993,53 +1993,74 @@ struct ForestLetterOverlay: View {
     @State private var animateLoading: Bool = false
     @State private var hintOpacity: Double = 0.3
     @State private var saveAppeared: Bool = false
-    @State private var letterHeight: CGFloat = 240
 
     var body: some View {
         GeometryReader { geo in
-            let envW: CGFloat = max(0, geo.size.width - 48)
+            let envW: CGFloat = max(0, min(geo.size.width - 48, 420))
             let envH: CGFloat = envW * 0.65
             let flapH: CGFloat = envH * 0.45
             let centerX: CGFloat = geo.size.width / 2
             let centerY: CGFloat = geo.size.height / 2
             let restRot: Double = landed ? -1 : (reduceMotion ? -1 : -8)
             let yEntry: CGFloat = landed ? 0 : (reduceMotion ? 0 : -400)
-            let letterOffset: CGFloat = letterEmerged
-                ? -(envH / 2 + letterHeight / 2 + 16)
-                : 0
+            // After opening, the envelope becomes a small garnish at the
+            // bottom — never more than ~13% of the screen.
+            let garnishScale: CGFloat = min(0.34, (geo.size.height * 0.13) / max(envH, 1))
+            let garnishH: CGFloat = envH * garnishScale
+            let safeTop: CGFloat = max(geo.safeAreaInsets.top, 12)
+            let safeBottom: CGFloat = geo.safeAreaInsets.bottom
+            let envelopeY: CGFloat = letterEmerged
+                ? geo.size.height - safeBottom - garnishH / 2 - 10
+                : centerY
 
             ZStack {
-                // Tap-to-dismiss backdrop
-                Color.black.opacity(0.50)
-                    .ignoresSafeArea()
-                    .contentShape(Rectangle())
-                    .onTapGesture { close() }
-
-                // Envelope cluster
+                // Warm dino scrim — dimmed ink with a soft cream glow behind
+                // the letter, so the reveal feels like a moment, not a sheet.
                 ZStack {
-                    // LETTER (behind body — slides up out of the envelope)
-                    LetterCard(
-                        letter: letter,
-                        loading: loading,
-                        savedToJar: savedToJar,
-                        animateLoading: animateLoading,
-                        saveAppeared: saveAppeared,
-                        width: envW,
-                        onSave: onSave,
-                        onClose: { close() }
+                    Color(hex: "#2E2A24").opacity(0.55)
+                    RadialGradient(
+                        colors: [Color(hex: "#FAF6EC").opacity(0.14), .clear],
+                        center: .center, startRadius: 40, endRadius: geo.size.width * 0.9
                     )
-                    .background(
-                        GeometryReader { proxy in
-                            Color.clear.preference(
-                                key: LetterHeightKey.self,
-                                value: proxy.size.height
-                            )
-                        }
-                    )
-                    .offset(y: letterOffset)
-                    .opacity(letterEmerged ? 1 : 0)
+                }
+                .ignoresSafeArea()
+                .contentShape(Rectangle())
+                .onTapGesture { close() }
 
-                    // ENVELOPE BODY
+                // THE LETTER — the hero. Starts below the safe area, scrolls
+                // when long (letters vary; never clip, never shrink).
+                if letterEmerged {
+                    VStack(spacing: 0) {
+                        ScrollView(showsIndicators: false) {
+                            LetterCard(
+                                letter: letter,
+                                loading: loading,
+                                savedToJar: savedToJar,
+                                animateLoading: animateLoading,
+                                saveAppeared: saveAppeared,
+                                width: envW,
+                                onSave: onSave,
+                                onClose: { close() }
+                            )
+                            .frame(maxWidth: .infinity)
+                            .padding(.top, 6)
+                            .padding(.bottom, 16)
+                        }
+                        // stay clear of the envelope garnish below (include the
+                        // bottom inset — some hosts hand us an edge-to-edge frame)
+                        Color.clear.frame(height: garnishH + 28 + safeBottom)
+                    }
+                    .padding(.top, safeTop + 10)
+                    .transition(
+                        reduceMotion
+                            ? .opacity
+                            : .move(edge: .bottom).combined(with: .opacity)
+                    )
+                }
+
+                // Envelope cluster — full size and centered until opened,
+                // then it settles small beneath the letter.
+                ZStack {
                     EnvelopeBody(width: envW, height: envH)
                         .onTapGesture { openEnvelope() }
 
@@ -2064,7 +2085,8 @@ struct ForestLetterOverlay: View {
                 }
                 .frame(width: envW, height: envH)
                 .rotationEffect(.degrees(restRot))
-                .position(x: centerX, y: centerY)
+                .scaleEffect(letterEmerged ? garnishScale : 1)
+                .position(x: centerX, y: envelopeY)
                 .offset(y: yEntry)
                 .opacity(landed ? 1 : 0)
 
@@ -2072,13 +2094,10 @@ struct ForestLetterOverlay: View {
                 if !envelopeOpen && !dismissing {
                     Text("tap to open")
                         .font(DinoTheme.dinoFont(size: 11))
-                        .foregroundColor(Color(hex: "#6B5B3E").opacity(hintOpacity))
+                        .foregroundColor(Color(hex: "#F5EDD8").opacity(hintOpacity))
                         .position(x: centerX, y: centerY + envH / 2 + 28)
                         .opacity(landed ? 1 : 0)
                 }
-            }
-            .onPreferenceChange(LetterHeightKey.self) { h in
-                if h > 0 { letterHeight = h }
             }
         }
         .onAppear { startEntrance() }
@@ -2087,6 +2106,12 @@ struct ForestLetterOverlay: View {
     // MARK: Animation
 
     private func startEntrance() {
+        #if DEBUG
+        // Layout QA on the simulator: open the envelope without a tap.
+        if ProcessInfo.processInfo.arguments.contains("-letterAutoOpen") {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.1) { openEnvelope() }
+        }
+        #endif
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
             withAnimation(
                 reduceMotion
@@ -2378,11 +2403,4 @@ private struct LetterCard: View {
     }
 }
 
-// MARK: - Preference key for measuring the letter card height
 
-private struct LetterHeightKey: PreferenceKey {
-    static var defaultValue: CGFloat = 0
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-        value = nextValue()
-    }
-}
