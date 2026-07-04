@@ -474,19 +474,41 @@ function isoWeekKey(date: Date): string {
 
 // Coarse theme classification of a single journal entry (DinoMind, opt-in on
 // the client). Text is used ONLY for the OpenAI call — never logged or stored;
-// only the enum theme is returned.
+// only the enum theme is returned. Rate limit: THEME_EXTRACT_DAILY_LIMIT per
+// UID per UTC day — journal entries are infrequent, so the cap is low; the
+// client degrades silently (no theme tag) when it's hit.
+const THEME_EXTRACT_DAILY_LIMIT = 12;
+
 export const extractJournalTheme = onCall(
   { secrets: [OPENAI_API_KEY], timeoutSeconds: 20, memory: "256MiB" },
   async (request) => {
     if (!request.auth) {
       throw new HttpsError("unauthenticated", "sign in required");
     }
+    const uid = request.auth.uid;
     const d = (request.data ?? {}) as Record<string, unknown>;
     for (const k of Object.keys(d)) {
       if (k !== "text") throw new HttpsError("invalid-argument", `unexpected field: ${k}`);
     }
     const text = String(d.text ?? "").slice(0, 1000).trim();
-    if (!text) return { theme: "none" };
+    if (!text) return { theme: "none" };   // free — no model call, no quota burn
+
+    // Rate limit — house pattern: per-UID daily counter, refund on failure.
+    const db = admin.firestore();
+    const dayKey = new Date().toISOString().slice(0, 10);
+    const counterRef = db.collection("themeExtractLimits").doc(uid);
+    await db.runTransaction(async (tx) => {
+      const snap = await tx.get(counterRef);
+      const current = ((snap.data() ?? {})[dayKey] as number | undefined) ?? 0;
+      if (current >= THEME_EXTRACT_DAILY_LIMIT) {
+        throw new HttpsError("resource-exhausted", "daily theme extraction limit reached");
+      }
+      tx.set(
+        counterRef,
+        { [dayKey]: current + 1, updatedAt: admin.firestore.FieldValue.serverTimestamp() },
+        { merge: true }
+      );
+    });
 
     const systemPrompt =
       "you are a careful classifier. read one private journal entry and label the single life area it is mainly about. " +
@@ -513,6 +535,11 @@ export const extractJournalTheme = onCall(
       const theme = THEMES.includes(String(parsed.theme)) ? String(parsed.theme) : "none";
       return { theme };
     } catch (err) {
+      // Refund — a server-side failure never burns the user's daily cap.
+      await counterRef.set(
+        { [dayKey]: admin.firestore.FieldValue.increment(-1) },
+        { merge: true }
+      );
       if (err instanceof HttpsError) throw err;
       const message = err instanceof Error ? err.message : "OpenAI request failed";
       throw new HttpsError("internal", message);
