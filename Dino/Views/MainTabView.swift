@@ -119,7 +119,7 @@ private struct TabIconButton: View {
                 .frame(width: 24, height: 24)
 
             Text(label)
-                .font(.system(size: 10, weight: .medium, design: .rounded))
+                .font(DinoTheme.dinoFont(size: 11))
         }
         .foregroundColor(isSelected ? DinoTheme.accent : DinoTheme.textSecondary.opacity(0.5))
     }

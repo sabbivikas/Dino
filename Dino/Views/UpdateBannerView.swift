@@ -22,7 +22,7 @@ struct UpdateBannerView: View {
                         .font(DinoTheme.dinoFont(size: 14))
                         .foregroundColor(Color(hex: "#2E2A24"))
                     Text("new features waiting for you")
-                        .font(.system(size: 12))
+                        .font(DinoTheme.dinoFont(size: 12))
                         .italic()
                         .foregroundColor(Color(hex: "#7A7266"))
                 }

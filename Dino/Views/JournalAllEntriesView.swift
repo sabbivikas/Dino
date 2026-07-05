@@ -88,7 +88,7 @@ struct JournalAllEntriesView: View {
                 .font(DinoTheme.dinoFont(size: 20))
                 .foregroundColor(DinoTheme.muted)
             Text("your journal entries will live here once you start writing.")
-                .font(.system(size: 13))
+                .font(DinoTheme.dinoFont(size: 13))
                 .italic()
                 .foregroundColor(Color(hex: "#A8A29A"))
                 .multilineTextAlignment(.center)

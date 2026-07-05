@@ -372,7 +372,7 @@ private struct CalendarCard: View {
                     .font(DinoTheme.dinoFont(size: 22))
                     .foregroundColor(StreakCalendarView.INK)
                 Text(yearString(displayedMonth))
-                    .font(.system(size: 12, weight: .regular, design: .rounded))
+                    .font(DinoTheme.numericFont(size: 12))
                     .tracking(1)
                     .foregroundColor(StreakCalendarView.INK2)
             }

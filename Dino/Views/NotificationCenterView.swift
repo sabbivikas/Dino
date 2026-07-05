@@ -97,7 +97,7 @@ struct NotificationCenterView: View {
                     .foregroundColor(titleInk)
                     .lineSpacing(0)
                 Text(formattedDate())
-                    .font(.system(size: 12, design: .serif).italic())
+                    .font(DinoTheme.serifFont(size: 12).italic())
                     .foregroundColor(dateInk)
                     .tracking(0.12)
             }
@@ -108,7 +108,7 @@ struct NotificationCenterView: View {
                         withAnimation(.easeInOut(duration: 0.2)) { store.markAllRead() }
                     } label: {
                         Text("mark all read")
-                            .font(.system(size: 11))
+                            .font(DinoTheme.dinoFont(size: 11))
                             .tracking(0.44)
                             .foregroundColor(dateInk)
                             .padding(.vertical, 4)
@@ -118,7 +118,7 @@ struct NotificationCenterView: View {
                 if !store.notifications.isEmpty {
                     Button { showClearConfirm = true } label: {
                         Text("clear all")
-                            .font(.system(size: 11))
+                            .font(DinoTheme.dinoFont(size: 11))
                             .tracking(0.44)
                             .foregroundColor(dateInk)
                             .padding(.vertical, 4)
@@ -221,7 +221,7 @@ struct NotificationCenterView: View {
                 }
                 // signed-off footer
                 Text("— end of letters —")
-                    .font(.system(size: 11, design: .serif).italic())
+                    .font(DinoTheme.serifFont(size: 11).italic())
                     .foregroundColor(veryMutedInk)
                     .padding(.top, 10)
                     .padding(.bottom, 6)
@@ -250,7 +250,7 @@ struct NotificationCenterView: View {
                 .font(DinoTheme.dinoFont(size: 22))
                 .foregroundColor(emptyTitle)
             Text("dino will write when something's worth saying.")
-                .font(.system(size: 13, design: .serif).italic())
+                .font(DinoTheme.serifFont(size: 13).italic())
                 .foregroundColor(emptySub)
                 .lineSpacing(3)
                 .multilineTextAlignment(.center)
@@ -329,7 +329,7 @@ private struct LetterCard: View {
 
                     // body
                     Text(stripEmoji(note.subtitle))
-                        .font(.system(size: 12, design: .serif).italic())
+                        .font(DinoTheme.serifFont(size: 12).italic())
                         .foregroundColor(Color(hex: "#857C70"))
                         .lineSpacing(12 * 0.45)
                         .fixedSize(horizontal: false, vertical: true)

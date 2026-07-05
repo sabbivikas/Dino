@@ -78,7 +78,7 @@ struct FeedbackView: View {
                         .foregroundColor(ink)
 
                     Text("we read every message")
-                        .font(.system(size: 13, design: .serif).italic())
+                        .font(DinoTheme.serifFont(size: 13).italic())
                         .foregroundColor(muted)
 
                     categoryPills
@@ -87,14 +87,14 @@ struct FeedbackView: View {
 
                     HStack {
                         Text("your message comes from \(authManager.currentUser?.email ?? "anonymous")")
-                            .font(.system(size: 11))
+                            .font(DinoTheme.dinoFont(size: 11))
                             .foregroundColor(muted)
                         Spacer()
                     }
 
                     if case .failure(let msg) = state {
                         Text(msg)
-                            .font(.system(size: 12))
+                            .font(DinoTheme.dinoFont(size: 12))
                             .foregroundColor(Color(hex: "#B85C5C"))
                     }
 
@@ -178,7 +178,7 @@ struct FeedbackView: View {
                 HStack {
                     Spacer()
                     Text("\(text.count)/\(maxChars)")
-                        .font(.system(size: 11))
+                        .font(DinoTheme.numericFont(size: 11))
                         .foregroundColor(muted)
                         .padding(.trailing, 12)
                         .padding(.bottom, 8)

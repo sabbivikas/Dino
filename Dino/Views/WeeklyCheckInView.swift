@@ -238,7 +238,7 @@ private struct EntryView: View {
                     .padding(.horizontal, 32)
 
                 Text("this takes about 3 minutes")
-                    .font(.system(size: 12))
+                    .font(DinoTheme.dinoFont(size: 12))
                     .foregroundColor(mutedInk.opacity(0.8))
 
                 if alreadyCompleted, let existing = existingResult {
@@ -271,7 +271,7 @@ private struct EntryView: View {
                 Spacer()
 
                 Text("this is a reflection tool, not a clinical diagnosis.")
-                    .font(.system(size: 10))
+                    .font(DinoTheme.dinoFont(size: 11))
                     .foregroundColor(mutedInk.opacity(0.7))
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 40)
@@ -327,7 +327,7 @@ private struct QuestionView: View {
                 .padding(.top, 56)
 
                 Text("question \(currentQuestion + 1) of \(questions.count)")
-                    .font(.system(size: 12))
+                    .font(DinoTheme.dinoFont(size: 12))
                     .foregroundColor(mutedInk)
 
                 Spacer().frame(height: 8)
@@ -362,7 +362,7 @@ private struct QuestionView: View {
                 .padding(.horizontal, 24)
 
                 Text("there are no wrong answers \u{1F33F}")
-                    .font(.system(size: 12).italic())
+                    .font(DinoTheme.dinoFont(size: 12).italic())
                     .foregroundColor(mutedInk)
 
                 Spacer()
@@ -541,7 +541,7 @@ private struct ReportView: View {
                         .foregroundColor(darkInk)
 
                     Text(dateRange)
-                        .font(.system(size: 13))
+                        .font(DinoTheme.dinoFont(size: 13))
                         .foregroundColor(mutedInk)
 
                     if report.isMock == true {
@@ -678,7 +678,7 @@ private struct OverallGauge: View {
                         .font(DinoTheme.dinoFont(size: 44))
                         .foregroundColor(darkInk)
                     Text("out of 100")
-                        .font(.system(size: 11))
+                        .font(DinoTheme.dinoFont(size: 11))
                         .foregroundColor(mutedInk)
                 }
             }
@@ -730,7 +730,7 @@ private struct ScoreCard: View {
                     .font(DinoTheme.dinoFont(size: 15))
                     .foregroundColor(darkInk)
                 Text(insight)
-                    .font(.system(size: 13))
+                    .font(DinoTheme.dinoFont(size: 13))
                     .foregroundColor(darkInk.opacity(0.8))
                     .lineSpacing(3)
             }
