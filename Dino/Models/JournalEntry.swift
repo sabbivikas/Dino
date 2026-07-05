@@ -16,6 +16,7 @@ struct JournalEntry: Codable, Identifiable {
     var durationSeconds: Double
     var photoFileName: String?
     var createdAt: Date?         // when it was actually written; nil on legacy docs
+    var updatedAt: Date?         // last text edit; nil until first edited
 
     /// Legacy entries (pre-createdAt) fall back to their entry date.
     var effectiveCreatedAt: Date { createdAt ?? date }
@@ -44,7 +45,8 @@ struct JournalEntry: Codable, Identifiable {
         isFavorite: Bool = false,
         durationSeconds: Double = 0,
         photoFileName: String? = nil,
-        createdAt: Date? = Date()
+        createdAt: Date? = Date(),
+        updatedAt: Date? = nil
     ) {
         self.id = id
         self.date = date
@@ -56,10 +58,11 @@ struct JournalEntry: Codable, Identifiable {
         self.durationSeconds = durationSeconds
         self.photoFileName = photoFileName
         self.createdAt = createdAt
+        self.updatedAt = updatedAt
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, date, audioFileName, title, summary, moodTag, isFavorite, durationSeconds, photoFileName, createdAt
+        case id, date, audioFileName, title, summary, moodTag, isFavorite, durationSeconds, photoFileName, createdAt, updatedAt
     }
 
     init(from decoder: Decoder) throws {
@@ -74,6 +77,23 @@ struct JournalEntry: Codable, Identifiable {
         self.durationSeconds = try c.decode(Double.self, forKey: .durationSeconds)
         self.photoFileName = try c.decodeIfPresent(String.self, forKey: .photoFileName)
         self.createdAt = try c.decodeIfPresent(Date.self, forKey: .createdAt)
+        self.updatedAt = try c.decodeIfPresent(Date.self, forKey: .updatedAt)
+    }
+
+    /// Pure text-edit semantics (unit-tested): trims, edits in place by id,
+    /// preserves date/createdAt and every other field, stamps updatedAt.
+    /// Returns nil (no-op) for empty text, unknown ids, or unchanged text —
+    /// an accidental empty save must never silently blank an entry.
+    static func applyingTextEdit(to entries: [JournalEntry], id: UUID,
+                                 newText: String, now: Date = Date()) -> [JournalEntry]? {
+        let trimmed = newText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty,
+              let idx = entries.firstIndex(where: { $0.id == id }),
+              entries[idx].summary != trimmed else { return nil }
+        var copy = entries
+        copy[idx].summary = trimmed
+        copy[idx].updatedAt = now
+        return copy
     }
 
     var formattedDuration: String {
