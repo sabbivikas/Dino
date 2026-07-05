@@ -125,6 +125,29 @@ final class AnalyticsManager {
         capture("garden_creature_tapped", properties: ["creature": creature])
     }
 
+    // MARK: - Breathing coach (never the raw feeling text — counts,
+    // booleans, and pattern ids only)
+
+    func trackBreathingFeelingSubmitted(chipCount: Int, hadText: Bool) {
+        capture("breathing_feeling_submitted", properties: ["chip_count": chipCount, "had_text": hadText])
+    }
+
+    func trackBreathingAIRecommended(pattern: String, minutes: Int, concern: Bool) {
+        capture("breathing_ai_recommended", properties: ["pattern": pattern, "minutes": minutes, "concern": concern])
+    }
+
+    func trackBreathingDurationAdjusted(minutes: Int) {
+        capture("breathing_duration_adjusted", properties: ["minutes": minutes])
+    }
+
+    func trackBreathingConcernShown() {
+        capture("breathing_concern_shown")
+    }
+
+    func trackBreathingResourceTapped(which: String) {
+        capture("breathing_resource_tapped", properties: ["which": which])
+    }
+
     // MARK: - Meditation
 
     func trackMeditationSessionStarted(scene: String, duration: Int) {

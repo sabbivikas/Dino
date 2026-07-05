@@ -102,6 +102,12 @@ struct HomeView: View {
                 // Dev shortcut for garden-ecosystem simulator verification.
                 if GardenDebug.autoOpen { viewModel.showGrowth = true }
                 #if DEBUG
+                // -breathQA: jump straight to the breathing coach entry.
+                if ProcessInfo.processInfo.arguments.contains("-breathQA") {
+                    viewModel.showBreathing = true
+                }
+                #endif
+                #if DEBUG
                 // -healthQA: fire the sleep authorization sheet on launch so the
                 // request path is verifiable without navigating to profile.
                 if ProcessInfo.processInfo.arguments.contains("-healthQA") {

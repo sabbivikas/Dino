@@ -84,63 +84,25 @@ struct BreathingView: View {
 
                             Spacer()
                         } else {
-                            // Scrolls only where the picker outgrows the screen
-                            // (small devices); sits still everywhere else.
+                            // Adaptive coach entry: feeling → thinking →
+                            // recommendation. The session engine below is
+                            // untouched — the flow only hands back a pattern
+                            // and minutes on an explicit begin tap.
                             ScrollView(showsIndicators: false) {
-                                VStack(spacing: 24) {
-                                    breathingCircle
-                                        .padding(.top, 4)
-
-                                    BreathingPatternPicker(
-                                        selected: viewModel.selectedPattern,
-                                        onSelect: { viewModel.selectedPattern = $0 }
-                                    )
-                                    .padding(.horizontal, DinoTheme.padding)
-
-                                    VStack(spacing: 12) {
-                                        Text("session length")
-                                            .font(DinoTheme.captionFont())
-                                            .foregroundColor(DinoTheme.textSecondary)
-
-                                        HStack(spacing: 12) {
-                                            ForEach(viewModel.durationOptions, id: \.seconds) { option in
-                                                Button(action: {
-                                                    viewModel.selectedDuration = option.seconds
-                                                }) {
-                                                    Text(option.label)
-                                                        .font(DinoTheme.captionFont())
-                                                        .fontWeight(.semibold)
-                                                        .foregroundColor(viewModel.selectedDuration == option.seconds ? .white : DinoTheme.textPrimary)
-                                                        .padding(.horizontal, 20)
-                                                        .padding(.vertical, 10)
-                                                        .background(
-                                                            viewModel.selectedDuration == option.seconds
-                                                                ? DinoTheme.sageGreen
-                                                                : DinoTheme.cardBackground
-                                                        )
-                                                        .clipShape(RoundedRectangle(cornerRadius: DinoDesignSystem.radiusMD, style: .continuous))
-                                                        .overlay(
-                                                            RoundedRectangle(cornerRadius: DinoDesignSystem.radiusMD, style: .continuous)
-                                                                .stroke(
-                                                                    viewModel.selectedDuration == option.seconds
-                                                                        ? DinoTheme.sageGreen
-                                                                        : DinoTheme.divider,
-                                                                    lineWidth: 1
-                                                                )
-                                                        )
-                                                }
-                                                .buttonStyle(ScaleButtonStyle())
-                                            }
-                                        }
-                                    }
-                                    .padding(.bottom, 8)
-                                }
+                                BreathingCoachFlow(onBegin: { pattern, minutes in
+                                    viewModel.selectedPattern = pattern
+                                    viewModel.selectedDuration = minutes * 60
+                                    withAnimation { viewModel.start() }
+                                })
+                                .padding(.horizontal, DinoTheme.padding)
+                                .padding(.top, 4)
                             }
                         }
 
-                        // Controls
+                        // Controls — session only; the coach flow owns begin
+                        if viewModel.isRunning {
                         VStack(spacing: 12) {
-                            // Start / Stop button
+                            // Stop button
                             Button(action: {
                                 withAnimation {
                                     if viewModel.isRunning {
@@ -189,6 +151,7 @@ struct BreathingView: View {
                         }
                         .padding(.horizontal, DinoTheme.padding)
                         .padding(.bottom, 32)
+                        }
                     }
                 }
             }
