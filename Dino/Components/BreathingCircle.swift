@@ -79,7 +79,7 @@ struct BreathingCircle: View {
                         .id(label)
                         .transition(.opacity)
                 }
-                .frame(height: 26)
+                .frame(minHeight: 26)   // grows with the boosted baseline
                 .animation(.easeInOut(duration: 0.3), value: label)
 
                 Text("\(countdown)")

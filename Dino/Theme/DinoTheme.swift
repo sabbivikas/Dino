@@ -171,10 +171,22 @@ struct DinoTheme {
         .system(size: size * textSizeScale)
     }
 
+    /// Serif accents (dino's letters, dated captions) — keeps the editorial
+    /// look while riding the same combined scale as everything else.
+    static func serifFont(size: CGFloat) -> Font {
+        .system(size: size * textSizeScale, design: .serif)
+    }
+
+    /// Baseline readability boost: dino's audience is adults 35+ who mostly
+    /// never touch text settings, so the DEFAULT is lifted 15% app-wide.
+    /// Applied AFTER the user×dynamic-type cap so it raises every themed
+    /// site uniformly (hierarchy ratios preserved).
+    nonisolated static let baselineBoost: CGFloat = 1.15
+
     /// Combined text scale: the in-app setting (`text_size_scale`, 0.8...1.4)
-    /// multiplied by the iOS Dynamic Type category factor, capped at 1.75× —
-    /// the handwriting font stays legible beyond that only in scrolling
-    /// surfaces. Pure → unit-testable.
+    /// multiplied by the iOS Dynamic Type category factor, capped at 1.75×,
+    /// then lifted by the baseline boost (effective ceiling ~2.01×). Pure →
+    /// unit-testable.
     nonisolated static func combinedScale(userScale: Double, category: UIContentSizeCategory) -> CGFloat {
         let user = CGFloat(min(max(userScale == 0 ? 1.0 : userScale, 0.8), 1.4))
         let dt: CGFloat
@@ -190,7 +202,7 @@ struct DinoTheme {
         case .accessibilityLarge: dt = 1.55
         default: dt = category.isAccessibilityCategory ? 1.75 : 1.0
         }
-        return min(max(user * dt, 0.8), 1.75)
+        return min(max(user * dt, 0.8), 1.75) * baselineBoost
     }
 
     /// The live combined scale (in-app setting × the device's Dynamic Type).

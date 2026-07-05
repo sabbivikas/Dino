@@ -50,7 +50,7 @@ struct WellnessProgressView: View {
                 .font(DinoTheme.dinoFont(size: 22))
                 .foregroundColor(DinoTheme.textPrimary)
             Text("how you've been feeling over time")
-                .font(.system(size: 12, design: .serif).italic())
+                .font(DinoTheme.serifFont(size: 12).italic())
                 .foregroundColor(DinoTheme.textSecondary)
         }
     }

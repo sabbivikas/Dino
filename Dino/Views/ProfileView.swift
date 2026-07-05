@@ -660,13 +660,13 @@ struct ProfileView: View {
                 }
                 if !showStreak {
                     Text("paused")
-                        .font(.system(size: 11))
+                        .font(DinoTheme.dinoFont(size: 11))
                         .italic()
                         .foregroundColor(Color(hex: "#A8A29A"))
                         .transition(.opacity)
                 } else if !streakHintSeen {
                     Text("hold to pause 🌿")
-                        .font(.system(size: 10))
+                        .font(DinoTheme.dinoFont(size: 11))
                         .italic()
                         .foregroundColor(Color(hex: "#A8A29A"))
                         .transition(.opacity)

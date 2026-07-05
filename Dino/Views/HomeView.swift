@@ -500,6 +500,8 @@ struct HomeView: View {
                 Text(item.title)
                     .font(DinoTheme.dinoLabelFont(size: 13))
                     .foregroundColor(DinoTheme.textPrimary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)   // "Meditation" never truncates in a narrow column
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 18)

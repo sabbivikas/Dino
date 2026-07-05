@@ -56,7 +56,7 @@ struct VoiceJournalView: View {
                                 .foregroundColor(Color(hex: "#7A7266"))
                             Spacer()
                             Text("tap a card to flip".localized)
-                                .font(.system(size: 11))
+                                .font(DinoTheme.dinoFont(size: 11))
                                 .italic()
                                 .foregroundColor(Color(hex: "#A8A29A"))
                         }
@@ -202,7 +202,7 @@ struct VoiceJournalView: View {
                         .padding(.top, 24)
 
                     Text("pick the day you want this memory to belong to")
-                        .font(.system(size: 12))
+                        .font(DinoTheme.dinoFont(size: 12))
                         .italic()
                         .foregroundColor(Color(hex: "#7A7266"))
                         .multilineTextAlignment(.center)
@@ -403,7 +403,7 @@ private struct JournalComposerCard: View {
                 } label: {
                     HStack(spacing: 6) {
                         Text(metaText)
-                            .font(.system(size: 11, weight: .semibold))
+                            .font(DinoTheme.dinoFont(size: 11))
                             .tracking(0.6)
                             .foregroundColor(Color(hex: "#A67074"))
                         Image(systemName: "calendar")
@@ -761,7 +761,7 @@ private struct EmptyMemoriesCard: View {
                 .font(DinoTheme.dinoHeaderFont(size: 18))
                 .foregroundColor(DinoTheme.ink)
             Text("tap the mic to record your first")
-                .font(.system(size: 13))
+                .font(DinoTheme.dinoFont(size: 13))
                 .foregroundColor(DinoTheme.muted)
         }
         .frame(maxWidth: .infinity)
@@ -791,7 +791,7 @@ private struct SeeAllCard: View {
                 .frame(width: 180, height: 228)
                 .overlay(
                     Text("see all —\n\(count) memories →")
-                        .font(.system(size: 13))
+                        .font(DinoTheme.dinoFont(size: 13))
                         .foregroundColor(Color(hex: "#7A7266"))
                         .multilineTextAlignment(.center)
                 )
@@ -871,7 +871,7 @@ struct JournalPolaroidCard: View {
                     axis: (x: 0, y: 1, z: 0)
                 )
         }
-        .frame(width: 180, height: 228)
+        .frame(width: 180, height: 240)   // room for the boosted caption, photo + date included
         .rotationEffect(.degrees(rotation))
         .opacity(visible ? 1 : 0)
         .offset(y: visible ? 0 : -30)
@@ -929,13 +929,14 @@ struct JournalPolaroidCard: View {
                     .font(DinoTheme.dinoFont(size: 14))
                     .foregroundColor(Color(hex: "#3D3A35"))
                     .lineLimit(loadedPhoto == nil ? 2 : 1)
+                    .minimumScaleFactor(0.9)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 10)
                     .padding(.top, 4)
 
                 if loadedPhoto != nil {
                     Text(shortDate)
-                        .font(.system(size: 10))
+                        .font(DinoTheme.numericFont(size: 10))
                         .tracking(0.5)
                         .foregroundColor(Color(hex: "#A8A29A"))
                 }
@@ -1021,7 +1022,7 @@ struct JournalPolaroidCard: View {
                             .frame(height: 24)
                             .overlay(
                                 Text(snippetText)
-                                    .font(.system(size: 11))
+                                    .font(DinoTheme.dinoFont(size: 11))
                                     .foregroundColor(Color(hex: "#3D3A35"))
                                     .lineLimit(1)
                                     .truncationMode(.tail)
@@ -1509,7 +1510,7 @@ private struct MoodSheet: View {
                         VStack(spacing: 6) {
                             Text(option.emoji).font(.system(size: 32))
                             Text(option.label)
-                                .font(.system(size: 12))
+                                .font(DinoTheme.dinoFont(size: 12))
                                 .foregroundColor(DinoTheme.muted)
                         }
                         .frame(width: 60, height: 84)
@@ -1585,7 +1586,7 @@ struct JournalCardPreviewOverlay: View {
 
                 if let toast = toast {
                     Text(toast)
-                        .font(.system(size: 13))
+                        .font(DinoTheme.dinoFont(size: 13))
                         .padding(.horizontal, 14).padding(.vertical, 8)
                         .background(Color.black.opacity(0.7), in: Capsule())
                         .foregroundColor(.white)
