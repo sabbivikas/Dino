@@ -52,19 +52,31 @@ struct GratitudeJarView: View {
                     .ignoresSafeArea()
 
                 VStack(spacing: 16) {
-                    // Header
+                    // Header — on a soft cream paper label so it stays legible
+                    // over the window art and rose wallpaper behind it (the
+                    // backdrop pins the lace window in this exact corner).
                     HStack(alignment: .top) {
                         VStack(alignment: .leading, spacing: 4) {
                             Text("gratitude jar".localized)
                                 .font(DinoTheme.dinoFont(size: 28))
-                                .foregroundColor(DinoTheme.ink)
-                                .shadow(color: .black.opacity(0.15), radius: 2, x: 0, y: 1)
+                                .foregroundColor(Color(hex: "#4A3520"))
 
                             Text(subNote)
                                 .font(DinoTheme.dinoFont(size: 13))
                                 .italic()
-                                .foregroundColor(DinoTheme.jarMuted)
+                                .foregroundColor(Color(hex: "#7A6F5F"))
                         }
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 10)
+                        .background(
+                            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                .fill(Color(hex: "#FAF6EC").opacity(0.88))
+                                .shadow(color: Color(hex: "#2A1A0C").opacity(0.10), radius: 6, y: 2)
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                .stroke(DinoTheme.jarWoodMid.opacity(0.25), lineWidth: 1)
+                        )
                         Spacer()
                         if dataManager.streakData.currentStreak > 0 {
                             StreakChip(days: dataManager.streakData.currentStreak)
@@ -109,11 +121,16 @@ struct GratitudeJarView: View {
                     }
                     .offset(y: 70)
 
-                    // Count caption under jar
+                    // Count caption under jar — cream pill for contrast over
+                    // the glass and shelf tones
                     if viewModel.totalCount > 0 {
                         Text("\(viewModel.totalCount) keepsakes · this year")
                             .font(DinoTheme.dinoFont(size: 13))
-                            .foregroundColor(DinoTheme.jarMuted)
+                            .foregroundColor(Color(hex: "#4A3520"))
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(Capsule().fill(Color(hex: "#FAF6EC").opacity(0.88)))
+                            .overlay(Capsule().stroke(DinoTheme.jarWoodMid.opacity(0.25), lineWidth: 1))
                             .padding(.top, -8)
                     }
 
