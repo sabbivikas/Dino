@@ -483,6 +483,15 @@ final class SharedDataManager: ObservableObject {
         FirestoreSyncService.shared.scheduleSyncToCloud()
     }
 
+    /// Edit the written body (or a voice note's transcription) in place by id.
+    /// Same doc on sync, no duplicate, no re-granted xp; empty text is a no-op.
+    func updateJournalEntryText(_ entry: JournalEntry, to newText: String) {
+        guard let updated = JournalEntry.applyingTextEdit(
+            to: journalEntries, id: entry.id, newText: newText) else { return }
+        journalEntries = updated
+        FirestoreSyncService.shared.scheduleSyncToCloud()
+    }
+
     func addJournalEntry(_ entry: JournalEntry) {
         journalEntries.insert(entry, at: 0)
         addXP(15)

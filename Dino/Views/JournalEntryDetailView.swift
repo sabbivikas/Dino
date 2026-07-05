@@ -23,6 +23,8 @@ struct JournalEntryDetailView: View {
     @State private var showDeleteConfirm = false
     @State private var showDateEdit = false
     @State private var editedDate = Date()
+    @State private var showTextEdit = false
+    @State private var editedText = ""
     @State private var elapsed: Double = 0
 
     private let ticker = Timer.publish(every: 0.1, on: .main, in: .common).autoconnect()
@@ -43,7 +45,8 @@ struct JournalEntryDetailView: View {
     private var hasAudio: Bool { !entry.audioFileName.isEmpty }
     private var isThisPlaying: Bool { viewModel.isPlaying && viewModel.playingEntryId == entry.id }
     private var bodyText: String {
-        let t = entry.summary.trimmingCharacters(in: .whitespacesAndNewlines)
+        // live entry, not the frozen init copy — reflects text edits instantly
+        let t = current.summary.trimmingCharacters(in: .whitespacesAndNewlines)
         return t.isEmpty ? "voice note recorded" : t
     }
     private var warmDate: String {
@@ -85,11 +88,23 @@ struct JournalEntryDetailView: View {
                                 .fill(Color.white.opacity(0.5)))
                         }
                         if hasAudio { audioPlayer }
-                        Text(bodyText)
-                            .font(DinoTheme.dinoFont(size: 17))
-                            .foregroundColor(ink)
-                            .lineSpacing(6)
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                        HStack(alignment: .top, spacing: 10) {
+                            Text(bodyText)
+                                .font(DinoTheme.dinoFont(size: 17))
+                                .foregroundColor(ink)
+                                .lineSpacing(6)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .contentShape(Rectangle())
+                                .onTapGesture { openTextEdit() }
+                            Button {
+                                openTextEdit()
+                            } label: {
+                                Image(systemName: "pencil")
+                                    .font(.system(size: 15, weight: .medium))
+                                    .foregroundColor(ink3)
+                            }
+                            .buttonStyle(.plain)
+                        }
                         Spacer(minLength: 12)
                     }
                     .padding(.horizontal, 22)
@@ -145,6 +160,49 @@ struct JournalEntryDetailView: View {
                 .padding(.horizontal, 22)
                 .padding(.bottom, 20)
             }
+            }
+            .presentationDetents([.medium, .large])
+            .background(cream)
+        }
+        .sheet(isPresented: $showTextEdit) {
+            ScrollView {
+                VStack(spacing: 14) {
+                    Text("change the words")
+                        .font(DinoTheme.dinoHeaderFont(size: 22))
+                        .foregroundColor(ink)
+                        .padding(.top, 22)
+                    Text(hasAudio ? "your recording stays as it is" : "your entry, your words")
+                        .font(DinoTheme.dinoFont(size: 13))
+                        .foregroundColor(ink3)
+                    TextEditor(text: $editedText)
+                        .font(DinoTheme.inputFont(size: 16))
+                        .foregroundColor(ink)
+                        .scrollContentBackground(.hidden)
+                        .frame(minHeight: 180)
+                        .padding(10)
+                        .background(RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .fill(Color.white.opacity(0.6)))
+                        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .stroke(sage.opacity(0.25), lineWidth: 1))
+                        .padding(.horizontal, 16)
+                    Button {
+                        dataManager.updateJournalEntryText(current, to: editedText)
+                        showTextEdit = false
+                    } label: {
+                        Text("done")
+                            .font(DinoTheme.dinoFont(size: 16))
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 14)
+                            .background(Capsule().fill(
+                                editedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                                    ? sage.opacity(0.4) : sage))
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(editedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    .padding(.horizontal, 22)
+                    .padding(.bottom, 20)
+                }
             }
             .presentationDetents([.medium, .large])
             .background(cream)
@@ -293,6 +351,11 @@ struct JournalEntryDetailView: View {
         var items: [Any] = ["\(bodyText)\n\n— dino journal, \(warmDate)"]
         if let photo = loadedPhoto { items.append(photo) }
         return items
+    }
+
+    private func openTextEdit() {
+        editedText = current.summary   // raw text, not the display fallback
+        showTextEdit = true
     }
 
     private func loadPhoto() {
