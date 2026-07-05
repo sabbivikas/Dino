@@ -162,7 +162,11 @@ struct ProfileView: View {
     @State private var reauthIsWorking = false
 
     private var appVersion: String {
-        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
+        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
+        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "?"
+        // "1.9 (3)" — the row claims to show the current build; without the
+        // build number two TestFlight uploads of one version are identical
+        return "\(version) (\(build))"
     }
 
     // MARK: Derived values

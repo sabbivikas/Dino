@@ -602,7 +602,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Info.plist;
-				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Dino uses the microphone to record your voice journal entries and transcribe them to text.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "dino uses the microphone to record your voice journal and turn it into words.";
 				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Dino transcribes your spoken journal entries into text so you can save them as written reflections.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -640,7 +640,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Info.plist;
-				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Dino uses the microphone to record your voice journal entries and transcribe them to text.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "dino uses the microphone to record your voice journal and turn it into words.";
 				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Dino transcribes your spoken journal entries into text so you can save them as written reflections.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
