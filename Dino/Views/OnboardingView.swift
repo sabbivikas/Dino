@@ -321,6 +321,10 @@ struct OnboardingView: View {
         dataManager.userName = name.isEmpty ? "" : name
         dataManager.dinoName = "Dino"
         dataManager.onboardingComplete = true
+        // Fresh installs never see "what's new" for the version they just
+        // installed — seed it as seen; only future UPDATES show the carousel.
+        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? ""
+        UserDefaults.standard.set(version, forKey: "dino.lastSeenWhatsNewVersion")
         AnalyticsManager.shared.trackOnboardingComplete()
     }
 

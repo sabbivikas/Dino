@@ -201,8 +201,15 @@ struct HomeView: View {
     }
 
     private func maybeShowWhatsNew() {
-        let current = currentAppVersion()
-        guard !current.isEmpty, current != lastSeenWhatsNewVersion else { return }
+        #if DEBUG
+        // -whatsNewQA: force the carousel (normal users see it once per version)
+        if ProcessInfo.processInfo.arguments.contains("-whatsNewQA") {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { showWhatsNew = true }
+            return
+        }
+        #endif
+        guard WhatsNewGate.shouldShow(lastSeen: lastSeenWhatsNewVersion,
+                                      current: currentAppVersion()) else { return }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
             showWhatsNew = true
         }

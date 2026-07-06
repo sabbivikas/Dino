@@ -2,267 +2,250 @@
 //  WhatsNewView.swift
 //  Dino
 //
-//  Modal shown once per app version. Cards walk the user through what
-//  changed; the first card supports a deep link into the ambient flow.
+//  The once-per-version "what's new" carousel. Shown after an update (never
+//  to fresh installs — onboarding seeds the version as seen), then never
+//  again until the marketing version changes. Slides are DATA: swap the
+//  array for the next release, and Chloe's illustrations drop into the
+//  named asset slots ("whatsnew_<id>") with zero code changes.
 //
 
 import SwiftUI
 
-// MARK: - Feature model
+// MARK: - Gate (pure → unit-tested)
 
-private struct WhatsNewFeature: Identifiable {
-    let id = UUID()
-    let icon: String
-    let iconBackground: Color
-    let title: String
-    let description: String
-    let deepLink: String?
-    let buttonLabel: String?
-}
-
-// MARK: - Feature card row
-
-private struct FeatureCardRow: View {
-    let feature: WhatsNewFeature
-    let onDeepLink: (String) -> Void
-    let appeared: Bool
-    let reduceMotion: Bool
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .top, spacing: 14) {
-                ZStack {
-                    Circle()
-                        .fill(feature.iconBackground)
-                        .frame(width: 44, height: 44)
-                    Text(feature.icon)
-                        .font(.system(size: 20))
-                }
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(feature.title)
-                        .font(DinoTheme.dinoFont(size: 16))
-                        .foregroundColor(Color(hex: "#2D3142"))
-                    Text(feature.description)
-                        .font(DinoTheme.dinoFont(size: 14))
-                        .foregroundColor(Color(hex: "#2D3142").opacity(0.65))
-                        .lineSpacing(3)
-                        .multilineTextAlignment(.leading)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-
-                Spacer(minLength: 0)
-            }
-
-            if let deepLink = feature.deepLink, let label = feature.buttonLabel {
-                Button(action: { onDeepLink(deepLink) }) {
-                    Text(label)
-                        .font(DinoTheme.dinoFont(size: 13))
-                        .foregroundColor(Color(hex: "#A8C5A0"))
-                        .padding(.vertical, 4)
-                }
-                .buttonStyle(.plain)
-                .padding(.leading, 58)
-                .padding(.top, 2)
-            }
-        }
-        .padding(16)
-        .background(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(Color(hex: "#FEFBF3"))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(Color(hex: "#E8DDD0"), lineWidth: 1)
-        )
-        .shadow(color: Color.black.opacity(0.04), radius: 6, x: 0, y: 2)
-        .opacity(appeared ? 1 : 0)
-        .offset(y: (appeared || reduceMotion) ? 0 : 20)
+enum WhatsNewGate {
+    /// Once per marketing version. Empty current version never shows;
+    /// an empty lastSeen means a pre-seeding updater — they DO see it
+    /// (fresh installs are seeded at onboarding completion instead).
+    static func shouldShow(lastSeen: String, current: String) -> Bool {
+        guard !current.isEmpty else { return false }
+        return lastSeen != current
     }
 }
 
-// MARK: - What's New
+// MARK: - Slide data
+
+struct WhatsNewSlide: Identifiable {
+    enum Tag: String { case new, better }
+
+    let id: String          // also the illustration slot: asset "whatsnew_<id>"
+    let tag: Tag
+    let accent: Color
+    let title: String
+    let body: String
+    let emoji: [String]     // placeholder illustration until the asset exists
+
+    static let current: [WhatsNewSlide] = [
+        WhatsNewSlide(
+            id: "world",
+            tag: .new,
+            accent: Color(hex: "#7BA872"),
+            title: "dino world + lanterns",
+            body: "a living globe of how people everywhere feel. send a kind lantern to a stranger having a hard day.",
+            emoji: ["🌍", "🏮"]
+        ),
+        WhatsNewSlide(
+            id: "letter",
+            tag: .new,
+            accent: Color(hex: "#F5C6AA"),
+            title: "the daily letter",
+            body: "a hummingbird visits your garden each morning with a letter written for you. tap her to read it.",
+            emoji: ["🐦", "💌"]
+        ),
+        WhatsNewSlide(
+            id: "breathing",
+            tag: .new,
+            accent: Color(hex: "#C4B8D4"),
+            title: "breathing that understands you",
+            body: "tell dino how you feel and it finds the right breathing for your moment.",
+            emoji: ["🌿"]
+        ),
+        WhatsNewSlide(
+            id: "journal",
+            tag: .better,
+            accent: Color(hex: "#E8889A"),
+            title: "your journal, safer and bigger",
+            body: "edit your entries anytime, photos survive a new phone, and everything reads a little bigger now.",
+            emoji: ["✏️", "📔"]
+        ),
+    ]
+}
+
+// MARK: - The carousel
 
 struct WhatsNewView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    @State private var mascotAppeared: Bool = false
-    @State private var cardsAppeared: [Bool] = Array(repeating: false, count: 5)
+    @State private var index = 0
+    private let slides = WhatsNewSlide.current
 
     private var appVersion: String {
-        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.5"
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? ""
     }
-
-    private let features: [WhatsNewFeature] = [
-        WhatsNewFeature(
-            icon: "\u{1F30A}",
-            iconBackground: Color(hex: "#A8C5A0"),
-            title: "ambient sounds",
-            description: "step into a living forest waterfall. close your eyes and let the sounds carry you in. day and night cycles, fireflies, and jumping fish.",
-            deepLink: "dino://ambient",
-            buttonLabel: "enter the forest \u{2192}"
-        ),
-        WhatsNewFeature(
-            icon: "\u{2728}",
-            iconBackground: Color(hex: "#FDDCB5"),
-            title: "onboarding redesign",
-            description: "a completely new first experience \u{2014} premium animations, breathing circle, gratitude slips, and a forest letter welcoming you in.",
-            deepLink: nil,
-            buttonLabel: nil
-        ),
-        WhatsNewFeature(
-            icon: "\u{1F331}",
-            iconBackground: Color(hex: "#C8E0C4"),
-            title: "sunflower fixed",
-            description: "your garden now correctly reads your most recent practice. one check-in a day keeps it healthy.",
-            deepLink: nil,
-            buttonLabel: nil
-        ),
-        WhatsNewFeature(
-            icon: "\u{2B50}",
-            iconBackground: Color(hex: "#F9C784").opacity(0.3),
-            title: "share the love",
-            description: "enjoying dino? a new rating screen helps you share dino with others who might need it.",
-            deepLink: nil,
-            buttonLabel: nil
-        ),
-        WhatsNewFeature(
-            icon: "\u{1F3A8}",
-            iconBackground: Color(hex: "#E8E0F5"),
-            title: "design polish",
-            description: "typography, pill states, card borders, breathing animations \u{2014} everything feels a little more refined.",
-            deepLink: nil,
-            buttonLabel: nil
-        )
-    ]
+    private var accent: Color { slides[index].accent }
+    private var isLast: Bool { index == slides.count - 1 }
 
     var body: some View {
         ZStack {
             Color(hex: "#FAF6EC").ignoresSafeArea()
 
             VStack(spacing: 0) {
-                header
-                    .padding(.top, 24)
+                // skip — quiet, top right
+                HStack {
+                    Spacer()
+                    Button {
+                        AnalyticsManager.shared.trackWhatsNewSkipped()
+                        dismiss()
+                    } label: {
+                        Text("skip")
+                            .font(DinoTheme.dinoFont(size: 14))
+                            .foregroundColor(DinoTheme.textSecondary.opacity(0.7))
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 14)
+                    }
+                    .buttonStyle(.plain)
+                }
 
-                ScrollView(showsIndicators: false) {
-                    LazyVStack(spacing: 12) {
-                        ForEach(Array(features.enumerated()), id: \.element.id) { index, feature in
-                            FeatureCardRow(
-                                feature: feature,
-                                onDeepLink: { link in handleDeepLink(link) },
-                                appeared: reduceMotion ? true : cardsAppeared[safe: index] ?? true,
-                                reduceMotion: reduceMotion
-                            )
+                VStack(spacing: 6) {
+                    Text("what's new in dino")
+                        .font(DinoTheme.dinoFont(size: 24))
+                        .foregroundColor(DinoTheme.textPrimary)
+                    Text("v\(appVersion)")
+                        .font(DinoTheme.dinoFont(size: 11))
+                        .foregroundColor(accent)
+                        .padding(.horizontal, 10).padding(.vertical, 3)
+                        .background(Capsule().fill(accent.opacity(0.14)))
+                        .animation(.easeInOut(duration: 0.3), value: index)
+                }
+
+                TabView(selection: $index) {
+                    ForEach(Array(slides.enumerated()), id: \.element.id) { i, slide in
+                        SlideView(slide: slide)
+                            .tag(i)
+                            .padding(.horizontal, 28)
+                    }
+                }
+                .tabViewStyle(.page(indexDisplayMode: .never))
+                .onChange(of: index) { _, newIndex in
+                    AnalyticsManager.shared.trackWhatsNewSlideViewed(index: newIndex)
+                }
+
+                // tappable dots, tinted by the current slide
+                HStack(spacing: 8) {
+                    ForEach(slides.indices, id: \.self) { i in
+                        Button {
+                            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { index = i }
+                        } label: {
+                            Capsule()
+                                .fill(i == index ? accent : DinoTheme.divider)
+                                .frame(width: i == index ? 22 : 8, height: 8)
                         }
-                    }
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 24)
-                }
-
-                bottomCTA
-                    .padding(.horizontal, 24)
-                    .padding(.bottom, 24)
-            }
-        }
-        .onAppear { startEntrance() }
-    }
-
-    private var header: some View {
-        VStack(spacing: 0) {
-            Image("cut-DinoMascot")
-                .resizable()
-                .scaledToFit()
-                .frame(width: 64, height: 64)
-                .scaleEffect(reduceMotion ? 1.0 : (mascotAppeared ? 1.0 : 0))
-                .opacity(mascotAppeared ? 1 : 0)
-
-            Text("what's new in dino")
-                .font(DinoTheme.dinoFont(size: 28))
-                .foregroundColor(Color(hex: "#2D3142"))
-                .multilineTextAlignment(.center)
-                .padding(.top, 12)
-
-            Text("v\(appVersion)")
-                .font(DinoTheme.dinoFont(size: 12))
-                .foregroundColor(Color(hex: "#A8C5A0"))
-                .padding(.horizontal, 12)
-                .padding(.vertical, 4)
-                .background(Color(hex: "#A8C5A0").opacity(0.12))
-                .clipShape(Capsule())
-                .padding(.top, 8)
-        }
-    }
-
-    private var bottomCTA: some View {
-        VStack(spacing: 8) {
-            Button {
-                HapticManager.shared.light()
-                dismiss()
-            } label: {
-                Text("let's explore")
-                    .font(DinoTheme.dinoFont(size: 17))
-                    .foregroundColor(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 18)
-                    .background(Color(hex: "#A8C5A0"))
-                    .cornerRadius(16)
-                    .shadow(color: Color(hex: "#A8C5A0").opacity(0.4), radius: 12, x: 0, y: 4)
-            }
-            .buttonStyle(.plain)
-
-            Text("released May 2026")
-                .font(DinoTheme.dinoFont(size: 11))
-                .foregroundColor(Color(hex: "#2D3142").opacity(0.35))
-        }
-    }
-
-    // MARK: Animation
-
-    private func startEntrance() {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-            withAnimation(
-                reduceMotion
-                    ? .easeOut(duration: 0.35)
-                    : .spring(response: 0.5, dampingFraction: 0.6)
-            ) {
-                mascotAppeared = true
-            }
-        }
-
-        for i in 0..<features.count {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35 + Double(i) * 0.08) {
-                withAnimation(
-                    reduceMotion
-                        ? .easeOut(duration: 0.3)
-                        : .spring(response: 0.5, dampingFraction: 0.75)
-                ) {
-                    if i < cardsAppeared.count {
-                        cardsAppeared[i] = true
+                        .buttonStyle(.plain)
                     }
                 }
+                .animation(.spring(response: 0.35, dampingFraction: 0.8), value: index)
+                .padding(.top, 4)
+
+                Button {
+                    HapticManager.shared.light()
+                    if isLast {
+                        AnalyticsManager.shared.trackWhatsNewCompleted()
+                        dismiss()
+                    } else {
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) { index += 1 }
+                    }
+                } label: {
+                    Text(isLast ? "start exploring 🦕" : "next")
+                        .font(DinoTheme.dinoFont(size: 17))
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 17)
+                        .background(accent)
+                        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                        .shadow(color: accent.opacity(0.35), radius: 10, y: 3)
+                        .animation(.easeInOut(duration: 0.3), value: index)
+                }
+                .buttonStyle(.plain)
+                .padding(.horizontal, 24)
+                .padding(.top, 16)
+                .padding(.bottom, 24)
             }
         }
-    }
-
-    // MARK: Deep link
-
-    private func handleDeepLink(_ link: String) {
-        guard let url = URL(string: link) else { return }
-        HapticManager.shared.light()
-        dismiss()
-        // Wait for the sheet dismiss animation, then ask the app to handle
-        // the URL through the existing deep-link pipeline.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
-            NotificationCenter.default.post(name: .dinoOpenURL, object: url)
+        .onAppear {
+            AnalyticsManager.shared.trackWhatsNewShown(version: appVersion)
+            AnalyticsManager.shared.trackWhatsNewSlideViewed(index: 0)
         }
     }
 }
 
-// MARK: - Safe-index helper
+// MARK: - One slide
 
-private extension Array {
-    subscript(safe index: Int) -> Element? {
-        indices.contains(index) ? self[index] : nil
+private struct SlideView: View {
+    let slide: WhatsNewSlide
+
+    var body: some View {
+        VStack(spacing: 18) {
+            Spacer(minLength: 8)
+
+            SlideIllustration(slide: slide)
+                .frame(height: 190)
+
+            Text(slide.tag.rawValue)
+                .font(DinoTheme.dinoFont(size: 12))
+                .foregroundColor(.white)
+                .padding(.horizontal, 12).padding(.vertical, 4)
+                .background(Capsule().fill(slide.accent))
+
+            Text(slide.title)
+                .font(DinoTheme.dinoFont(size: 23))
+                .foregroundColor(DinoTheme.textPrimary)
+                .multilineTextAlignment(.center)
+
+            Text(slide.body)
+                .font(DinoTheme.dinoFont(size: 15))
+                .foregroundColor(DinoTheme.textSecondary)
+                .multilineTextAlignment(.center)
+                .lineSpacing(4)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.horizontal, 8)
+
+            Spacer(minLength: 8)
+        }
+    }
+}
+
+// MARK: - Illustration slot (asset wins, cozy placeholder otherwise)
+
+private struct SlideIllustration: View {
+    let slide: WhatsNewSlide
+
+    var body: some View {
+        if let ui = UIImage(named: "whatsnew_\(slide.id)") {
+            Image(uiImage: ui)
+                .resizable()
+                .scaledToFit()
+        } else {
+            // placeholder: a soft accent pool with the feature's emoji resting
+            // in it — replaced wholesale when chloe's art lands in the slot
+            ZStack {
+                Circle()
+                    .fill(slide.accent.opacity(0.16))
+                    .frame(width: 170, height: 170)
+                Circle()
+                    .fill(slide.accent.opacity(0.12))
+                    .frame(width: 130, height: 130)
+                    .offset(x: 26, y: 18)
+                HStack(spacing: 2) {
+                    ForEach(Array(slide.emoji.enumerated()), id: \.offset) { i, e in
+                        Text(e)
+                            .font(.system(size: i == 0 ? 64 : 44))
+                            .offset(y: i == 0 ? 0 : 22)
+                            .rotationEffect(.degrees(i == 0 ? 0 : 8))
+                    }
+                }
+                .shadow(color: slide.accent.opacity(0.3), radius: 14, y: 6)
+            }
+        }
     }
 }

@@ -148,6 +148,24 @@ final class AnalyticsManager {
         capture("breathing_resource_tapped", properties: ["which": which])
     }
 
+    // MARK: - What's new carousel
+
+    func trackWhatsNewShown(version: String) {
+        capture("whats_new_shown", properties: ["version": version])
+    }
+
+    func trackWhatsNewSlideViewed(index: Int) {
+        capture("whats_new_slide_viewed", properties: ["slide": index])
+    }
+
+    func trackWhatsNewCompleted() {
+        capture("whats_new_completed")
+    }
+
+    func trackWhatsNewSkipped() {
+        capture("whats_new_skipped")
+    }
+
     // MARK: - Meditation
 
     func trackMeditationSessionStarted(scene: String, duration: Int) {
