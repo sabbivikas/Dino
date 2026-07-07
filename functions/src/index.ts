@@ -2,11 +2,13 @@ import * as admin from "firebase-admin";
 import * as functions from "firebase-functions/v1";
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { onSchedule } from "firebase-functions/v2/scheduler";
+import { onDocumentCreated } from "firebase-functions/v2/firestore";
 import { defineSecret } from "firebase-functions/params";
 import { setGlobalOptions } from "firebase-functions/v2";
 import OpenAI from "openai";
 import { createHash } from "node:crypto";
 import { seasonForMonth, isSeasonEligible, isSlotActive, REC_SEASON_VALUES } from "./season";
+import { WORLD_PRIVACY_FLOOR, normalizeCountry, foldPulseCountry } from "./world";
 
 admin.initializeApp();
 
@@ -976,8 +978,35 @@ function buildWeeklyPrompt(
 // • idempotent: days still inside the 48h raw window are rebuilt from scratch
 //   each run; older retained days keep their final values.
 // ---------------------------------------------------------------------------
-const WORLD_PRIVACY_FLOOR = 5;
 const WORLD_MOODS = ["clear", "partlyCloudy", "overwhelmed", "drained"] as const;
+
+// LIVE PULSES — every worldMoods write becomes one short-lived anonymous
+// pulse doc that open globes listen to: {countryCode, mood, createdAt,
+// expiresAt(TTL ~10m)}. The pulse names a country ONLY if today's public
+// aggregate already shows it (foldPulseCountry) — below-floor countries
+// bloom as "elsewhere". No uid ever; rules make pulses server-write-only.
+export const onWorldMoodCreated = onDocumentCreated("worldMoods/{docId}", async (event) => {
+  const d = event.data?.data();
+  if (!d) return;
+  const mood = String(d.mood ?? "");
+  if (!(WORLD_MOODS as readonly string[]).includes(mood)) return;
+  const country = normalizeCountry(d.countryCode);
+
+  let visible = false;
+  if (country !== "elsewhere") {
+    const dayKey = String(d.dayKey ?? "");
+    const agg = (await admin.firestore().collection("worldAggregate").doc("current").get()).data();
+    const days = (agg?.days ?? {}) as Record<string, { countries?: Record<string, unknown> }>;
+    visible = days[dayKey]?.countries?.[country] !== undefined;
+  }
+
+  await admin.firestore().collection("worldPulses").add({
+    countryCode: foldPulseCountry(country, visible),
+    mood,
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    expiresAt: admin.firestore.Timestamp.fromMillis(Date.now() + 10 * 60 * 1000),
+  });
+});
 
 // One "what i noticed" note per week for the rhythms screen. Inputs are
 // anonymous BUCKETS AND DELTAS only — the client's WeeklyDigest never sends

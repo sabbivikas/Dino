@@ -55,12 +55,12 @@ final class WorldGlobeScene {
         cameraNode.position = SCNVector3(0, 0, 3.4)
         scene.rootNode.addChildNode(cameraNode)
 
-        // Studio lighting for a lit toy: bright warm key + gentle cool fill.
-        // The terminator still comes from shading, just softer.
+        // Night lighting: a dimmer, warmer key (moonlit campfire, not studio)
+        // so the mood lights become the visual heroes against the dark.
         let key = SCNLight()
         key.type = .directional
-        key.intensity = 900
-        key.color = UIColor(red: 1.0, green: 0.97, blue: 0.90, alpha: 1)
+        key.intensity = 480
+        key.color = UIColor(red: 1.0, green: 0.93, blue: 0.82, alpha: 1)
         let keyNode = SCNNode()
         keyNode.light = key
         let s = Self.sunDirection
@@ -69,7 +69,7 @@ final class WorldGlobeScene {
 
         let fill = SCNLight()
         fill.type = .directional
-        fill.intensity = 260
+        fill.intensity = 140
         fill.color = UIColor(red: 0.88, green: 0.92, blue: 1.0, alpha: 1)
         let fillNode = SCNNode()
         fillNode.light = fill
@@ -79,7 +79,7 @@ final class WorldGlobeScene {
         // Soft ambient — keeps the dark limb cozy, tinted by the mood.
         let ambient = SCNLight()
         ambient.type = .ambient
-        ambient.intensity = 380
+        ambient.intensity = 240
         ambient.color = DinoWorldPalette.cream
         let ambientNode = SCNNode()
         ambientNode.light = ambient
@@ -94,16 +94,20 @@ final class WorldGlobeScene {
         toy.lightingModel = .blinn
         let textures = DinoWorldPalette.toyPlanetTextures()
         toy.diffuse.contents = textures?.diffuse ?? DinoWorldPalette.toyOcean
+        // Dusk pass: multiply darkens the whole texture reliably (cool navy
+        // lean) — the space-dark restyle's "darker oceans".
+        toy.multiply.contents = UIColor(red: 0.52, green: 0.56, blue: 0.70, alpha: 1)
         if let normal = textures?.normal {
             toy.normal.contents = normal
             toy.normal.intensity = 0.9
         }
-        // soft vinyl sheen — a designer toy, not plastic wrap
-        toy.specular.contents = UIColor(white: 0.30, alpha: 1)
-        toy.shininess = 0.25
+        // barely-there sheen — the old vinyl highlight became a glaring white
+        // limb ring against the space-dark sky
+        toy.specular.contents = UIColor(white: 0.08, alpha: 1)
+        toy.shininess = 0.5
         // faint self-glow so the night side never goes pitch black
         toy.emission.contents = textures?.diffuse ?? DinoWorldPalette.toyOcean
-        toy.emission.intensity = 0.10
+        toy.emission.intensity = 0.16         // night side stays cozy, never void
         sphere.firstMaterial = toy
         globeNode.geometry = sphere
         scene.rootNode.addChildNode(globeNode)
@@ -124,11 +128,15 @@ final class WorldGlobeScene {
         rim.cullMode = .front                       // render the far shell → halo
         rim.blendMode = .add
         rim.writesToDepthBuffer = false
+        // Black diffuse: with constant lighting + additive blending, an unset
+        // (white) diffuse renders as a hard white ring against the dark sky —
+        // only the mood-tinted emission should glow.
+        rim.diffuse.contents = UIColor.black
         rim.emission.contents = DinoWorldPalette.peach
         rim.shaderModifiers = [.surface: """
         float rimDot = abs(dot(normalize(_surface.view), normalize(_surface.normal)));
-        float glow = pow(1.0 - rimDot, 1.6);
-        _surface.emission.rgb *= glow * 1.4;
+        float glow = pow(1.0 - rimDot, 2.0);
+        _surface.emission.rgb *= glow * 1.1;
         _surface.transparent.a = glow;
         """]
         rim.transparencyMode = .singleLayer
@@ -267,24 +275,60 @@ final class WorldGlobeScene {
         node.addChildNode(tap)
     }
 
-    private func makeFirefly(color: UIColor, size: CGFloat) -> SCNNode {
+    private func makeFirefly(color: UIColor, size: CGFloat, breathing: Bool = true) -> SCNNode {
         let plane = SCNPlane(width: size, height: size)
         let mat = SCNMaterial()
         mat.lightingModel = .constant
-        // Alpha-blended bead: additive glows disappear against the bright toy
-        // planet (they were tuned for the old dark dotted globe).
+        // Additive glow — against the space-dark planet the lights ARE the
+        // heroes (alpha beads were for the bright toy-planet era).
         mat.diffuse.contents = DinoWorldPalette.fireflySprite(color: color)
-        mat.blendMode = .alpha
+        mat.blendMode = .add
         mat.writesToDepthBuffer = false
         plane.firstMaterial = mat
         let node = SCNNode(geometry: plane)
         node.constraints = [SCNBillboardConstraint()]
-        let up = SCNAction.scale(to: 1.25, duration: Double.random(in: 1.1...1.9))
-        up.timingMode = .easeInEaseOut
-        let down = SCNAction.scale(to: 0.85, duration: Double.random(in: 1.1...1.9))
-        down.timingMode = .easeInEaseOut
-        node.runAction(.repeatForever(.sequence([up, down])))
+        if breathing {
+            let up = SCNAction.scale(to: 1.25, duration: Double.random(in: 1.1...1.9))
+            up.timingMode = .easeInEaseOut
+            let down = SCNAction.scale(to: 0.85, duration: Double.random(in: 1.1...1.9))
+            down.timingMode = .easeInEaseOut
+            node.runAction(.repeatForever(.sequence([up, down])))
+        }
         return node
+    }
+
+    // MARK: - Live pulses (real-time blooms riding the aggregate glow)
+
+    /// A fresh log somewhere in the world right now: bloom bright at the
+    /// country anchor, breathe, then fade into the ambient glow. "elsewhere"
+    /// pulses shimmer over open ocean — below-floor countries are never
+    /// singled out (the server already folded them; this is just the render).
+    func pulse(countryCode: String, mood: EmotionalWeather) {
+        let spot: (lat: Double, lon: Double)
+        if let spots = anchors[countryCode], let first = spots.randomElement() ?? spots.first {
+            spot = (first.lat + Double.random(in: -1.5...1.5),
+                    first.lon + Double.random(in: -1.5...1.5))
+        } else {
+            // open-ocean shimmer bands (mid-pacific / mid-atlantic)
+            let lon = Bool.random() ? Double.random(in: -155 ... -125) : Double.random(in: -38 ... -18)
+            spot = (Double.random(in: -32...32), lon)
+        }
+        let node = makeFirefly(color: DinoWorldPalette.moodColor(mood), size: 0.11, breathing: false)
+        node.name = "pulse"
+        node.opacity = 0
+        position(node, lat: spot.lat, lon: spot.lon, altitude: 1.05)
+        fireflyContainer.addChildNode(node)
+
+        let appear = SCNAction.group([
+            .fadeOpacity(to: 1.0, duration: 0.35),
+            .scale(to: 1.9, duration: 0.45),
+        ])
+        appear.timingMode = .easeOut
+        let settle = SCNAction.scale(to: 1.0, duration: 1.2)
+        settle.timingMode = .easeInEaseOut
+        let linger = SCNAction.wait(duration: 3.0)
+        let fade = SCNAction.fadeOpacity(to: 0, duration: 2.0)
+        node.runAction(.sequence([appear, settle, linger, fade, .removeFromParentNode()]))
     }
 
     private func position(_ node: SCNNode, lat: Double, lon: Double, altitude: Float) {

@@ -40,9 +40,18 @@ service cloud.firestore {
       allow read, update, delete: if false;
     }
 
-    // The hourly aggregate (per-country counts, <5/day folded into "elsewhere").
-    // Read-only for signed-in clients; only the cloud function writes it.
+    // The hourly aggregate (per-country counts, below-floor days folded into
+    // "elsewhere"). Read-only for signed-in clients; only the cloud function
+    // writes it.
     match /worldAggregate/{docId} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+
+    // Live pulses — short-TTL anonymous blooms written ONLY by the
+    // onWorldMoodCreated trigger (admin SDK). Open globes listen; clients
+    // can never write one directly.
+    match /worldPulses/{docId} {
       allow read: if request.auth != null;
       allow write: if false;
     }
