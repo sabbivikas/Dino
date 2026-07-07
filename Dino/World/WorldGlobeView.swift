@@ -33,6 +33,11 @@ struct WorldGlobeView: UIViewRepresentable {
         context.coordinator.scnView = view
         context.coordinator.onGlowTap = onGlowTap
         context.coordinator.startAutoRotate()
+        // Live pulses — listen only while the globe is on screen (removed in
+        // dismantleUIView). Weak globe: the listener never keeps the scene alive.
+        context.coordinator.pulseListener.start { [weak globe] pulse in
+            globe?.pulse(countryCode: pulse.countryCode, mood: pulse.mood)
+        }
 
         let pan = UIPanGestureRecognizer(target: context.coordinator,
                                          action: #selector(Coordinator.handlePan(_:)))
@@ -62,12 +67,14 @@ struct WorldGlobeView: UIViewRepresentable {
     }
 
     static func dismantleUIView(_ uiView: SCNView, coordinator: Coordinator) {
+        coordinator.pulseListener.stop()
         coordinator.globe?.stop()
     }
 
     @MainActor
     final class Coordinator: NSObject {
         var globe: WorldGlobeScene?
+        let pulseListener = WorldPulseListener()
         weak var scnView: SCNView?
         var onGlowTap: ((WorldGlobeScene.WorldGlowHit?) -> Void)?
         var appliedBucket: WorldDayBucket?

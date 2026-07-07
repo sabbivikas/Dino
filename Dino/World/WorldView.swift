@@ -19,10 +19,13 @@ struct WorldView: View {
     @State private var toast: String?
     @State private var loading = true
 
-    private let cream = Color(hex: "#FAF6EC")
-    private let ink = Color(hex: "#3D3A35")
-    private let ink2 = Color(hex: "#7A7266")
-    private let ink3 = Color(hex: "#A8A29A")
+    // Space-dark night sky — warm navy, never cold sci-fi black. The old ink
+    // roles flip to warm creams so every label reads against the dark.
+    private let space = Color(hex: "#161C2E")
+    private let spaceDeep = Color(hex: "#0E1220")
+    private let ink = Color(hex: "#F2EEE3")
+    private let ink2 = Color(hex: "#BFB9AA")
+    private let ink3 = Color(hex: "#8C8779")
     private let sage = Color(hex: "#7BA872")
     private let peach = Color(hex: "#F5C6AA")
 
@@ -39,7 +42,12 @@ struct WorldView: View {
 
     var body: some View {
         ZStack {
-            cream.ignoresSafeArea()
+            LinearGradient(colors: [space, spaceDeep],
+                           startPoint: .top, endPoint: .bottom)
+                .ignoresSafeArea()
+            WorldStarField()
+                .ignoresSafeArea()
+                .allowsHitTesting(false)
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 18) {
                     header
@@ -71,7 +79,7 @@ struct WorldView: View {
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundColor(ink2)
                     .frame(width: 34, height: 34)
-                    .background(Circle().fill(Color.white.opacity(0.6)))
+                    .background(Circle().fill(Color.white.opacity(0.10)))
             }
             .buttonStyle(.plain)
             Spacer()
@@ -104,8 +112,8 @@ struct WorldView: View {
 
     private var globeSection: some View {
         ZStack {
-            // warm peach halo behind the globe
-            RadialGradient(colors: [peach.opacity(0.55), peach.opacity(0.0)],
+            // moonlit peach halo — fainter now, the lights are the heroes
+            RadialGradient(colors: [peach.opacity(0.22), peach.opacity(0.0)],
                            center: .center, startRadius: 30, endRadius: 200)
                 .frame(height: 360)
             WorldGlobeView(bucket: selectedBucket,
@@ -130,8 +138,8 @@ struct WorldView: View {
                     .font(DinoTheme.dinoFont(size: 14))
                     .foregroundColor(ink)
                     .padding(.horizontal, 14).padding(.vertical, 8)
-                    .background(Capsule().fill(Color.white.opacity(0.92)))
-                    .shadow(color: .black.opacity(0.08), radius: 6, y: 2)
+                    .background(Capsule().fill(Color(hex: "#232B42").opacity(0.95)))
+                    .shadow(color: .black.opacity(0.30), radius: 6, y: 2)
                     .offset(y: 130)
                     .transition(.opacity.combined(with: .scale(scale: 0.9)))
                     .allowsHitTesting(false)   // never steal touches from the globe
@@ -181,7 +189,7 @@ struct WorldView: View {
                         .font(DinoTheme.dinoFont(size: 12))
                         .foregroundColor(selected ? .white : ink2)
                         .padding(.horizontal, 12).padding(.vertical, 7)
-                        .background(Capsule().fill(selected ? sage : Color.white.opacity(0.65)))
+                        .background(Capsule().fill(selected ? sage : Color.white.opacity(0.10)))
                 }
                 .buttonStyle(.plain)
             }
@@ -240,7 +248,7 @@ struct WorldView: View {
             }
         }
         .padding(16)
-        .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Color.white.opacity(0.6)))
+        .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Color.white.opacity(0.08)))
         .padding(.horizontal, 16)
     }
 
@@ -305,7 +313,7 @@ struct WorldView: View {
                     }
                     .padding(12)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Color.white.opacity(0.55)))
+                    .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Color.white.opacity(0.07)))
                 }
 
                 if dm.sentLanternCount > 0 {
@@ -316,7 +324,7 @@ struct WorldView: View {
                 }
             }
             .padding(16)
-            .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Color.white.opacity(0.35)))
+            .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Color.white.opacity(0.06)))
             .padding(.horizontal, 16)
         }
     }
