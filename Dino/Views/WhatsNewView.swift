@@ -37,36 +37,36 @@ struct WhatsNewSlide: Identifiable {
 
     static let current: [WhatsNewSlide] = [
         WhatsNewSlide(
-            id: "world",
+            id: "intelligence",
             tag: .new,
             accent: Color(hex: "#7BA872"),
-            title: "dino world + lanterns",
-            body: "a living globe of how people everywhere feel. send a kind lantern to a stranger having a hard day.",
-            emoji: ["🌍", "🏮"]
+            title: "personal intelligence",
+            body: "dino now gently understands your sleep, your movement, and your moments. it learns your rhythms, only ever compares you to you, and knows when to speak and when to just be there",
+            emoji: ["🌙", "🚶"]
         ),
         WhatsNewSlide(
-            id: "letter",
+            id: "recs",
             tag: .new,
-            accent: Color(hex: "#F5C6AA"),
-            title: "the daily letter",
-            body: "a hummingbird visits your garden each morning with a letter written for you. tap her to read it.",
-            emoji: ["🐦", "💌"]
+            accent: Color(hex: "#F5C842"),
+            title: "gentle suggestions",
+            body: "on a heavy day, once in a while, dino offers one soft thing. a playlist, a comfort film, a cozy game. never a feed, always a friend",
+            emoji: ["🎧", "🍵"]
         ),
         WhatsNewSlide(
-            id: "breathing",
+            id: "weather",
             tag: .new,
-            accent: Color(hex: "#C4B8D4"),
-            title: "breathing that understands you",
-            body: "tell dino how you feel and it finds the right breathing for your moment.",
-            emoji: ["🌿"]
+            accent: DinoTheme.skyBlue,
+            title: "real weather in dino's world",
+            body: "rain outside your window means rain in the garden now. dino's world breathes with yours",
+            emoji: ["🌦️", "🌻"]
         ),
         WhatsNewSlide(
-            id: "journal",
+            id: "care",
             tag: .better,
-            accent: Color(hex: "#E8889A"),
-            title: "your journal, safer and bigger",
-            body: "edit your entries anytime, photos survive a new phone, and everything reads a little bigger now.",
-            emoji: ["✏️", "📔"]
+            accent: Color(hex: "#C4B8D4"),
+            title: "quieter care",
+            body: "smarter check ins that know when you slept short, and nudges that lean gentler on heavy days",
+            emoji: ["💬", "🌿"]
         ),
     ]
 }
