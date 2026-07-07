@@ -2,17 +2,23 @@
 //  WeatherService.swift
 //  Dino
 //
+//  Weather-adaptive theming via Apple WeatherKit — no API key, no proxy,
+//  nothing shipped in the binary. Requires the WeatherKit capability on the
+//  App ID (Signing & Capabilities in Xcode + the App Services checkbox on
+//  the developer portal). On ANY failure — denied location, no network,
+//  missing entitlement — the existing cached theme is kept; weather theming
+//  degrades gracefully, never breaks.
+//
 
 import Combine
-
 import Foundation
 import CoreLocation
+import WeatherKit
 
 @MainActor
 final class WeatherService: NSObject, ObservableObject, CLLocationManagerDelegate {
 
     private let locationManager = CLLocationManager()
-    private let apiKey = "bd5e378503939ddaee76f12ad7a97608"
 
     private weak var themeManager: ThemeManager?
 
@@ -43,10 +49,8 @@ final class WeatherService: NSObject, ObservableObject, CLLocationManagerDelegat
 
     nonisolated func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         guard let location = locations.first else { return }
-        let lat = location.coordinate.latitude
-        let lon = location.coordinate.longitude
         Task { @MainActor in
-            await self.fetchWeather(lat: lat, lon: lon)
+            await self.fetchWeather(for: location)
         }
     }
 
@@ -66,63 +70,70 @@ final class WeatherService: NSObject, ObservableObject, CLLocationManagerDelegat
         }
     }
 
-    // MARK: - Weather Fetch
+    // MARK: - Weather Fetch (Apple WeatherKit)
 
-    func fetchWeather(lat: Double, lon: Double) async {
-        guard let url = URL(string: "https://api.openweathermap.org/data/2.5/weather?lat=\(lat)&lon=\(lon)&appid=\(apiKey)") else {
-            themeManager?.isLoadingWeather = false
-            return
-        }
-
+    func fetchWeather(for location: CLLocation) async {
         do {
-            let (data, _) = try await URLSession.shared.data(from: url)
-            let response = try JSONDecoder().decode(WeatherResponse.self, from: data)
-            let theme = mapConditionToTheme(response: response)
-            let condition = response.weather.first?.description ?? response.weather.first?.main
-            themeManager?.updateWeatherTheme(theme, condition: condition)
-            themeManager?.isLoadingWeather = false
+            let current = try await WeatherKit.WeatherService.shared
+                .weather(for: location, including: .current)
+            let theme = Self.mapConditionToTheme(condition: current.condition,
+                                                 isDaylight: current.isDaylight)
+            themeManager?.updateWeatherTheme(theme, condition: Self.conditionLabel(current.condition))
         } catch {
-            themeManager?.isLoadingWeather = false
+            // Missing entitlement, offline, or a WeatherKit hiccup — the
+            // cached theme stays; nothing visible breaks.
+            #if DEBUG
+            print("🌦️ weatherkit error: \(error)")
+            #endif
         }
+        themeManager?.isLoadingWeather = false
     }
 
-    // MARK: - Condition Mapping
+    // MARK: - Condition mapping (pure → testable)
 
-    private func mapConditionToTheme(response: WeatherResponse) -> DinoAppTheme {
-        let main = response.weather.first?.main ?? ""
-        let sunset = response.sys?.sunset ?? 0
-        let now = Int(Date().timeIntervalSince1970)
-        let isNight = sunset > 0 && now > sunset
-
-        switch main {
-        case "Clear":
-            return isNight ? .night : .sunny
-        case "Clouds":
+    /// Night applies to the clear family ONLY — matching the old behavior
+    /// where only a clear sky could become the night theme.
+    nonisolated static func mapConditionToTheme(condition: WeatherCondition, isDaylight: Bool) -> DinoAppTheme {
+        switch condition {
+        case .clear, .mostlyClear, .hot:
+            return isDaylight ? .sunny : .night
+        case .cloudy, .mostlyCloudy, .partlyCloudy, .foggy, .haze, .smoky, .blowingDust:
             return .cloudy
-        case "Rain", "Drizzle":
+        case .rain, .heavyRain, .drizzle, .freezingRain, .freezingDrizzle, .sunShowers:
             return .rainy
-        case "Snow":
+        case .snow, .heavySnow, .flurries, .sunFlurries, .sleet, .wintryMix, .blizzard, .blowingSnow:
             return .snow
-        case "Thunderstorm":
+        case .thunderstorms, .isolatedThunderstorms, .scatteredThunderstorms, .strongStorms,
+             .tropicalStorm, .hurricane, .hail:
             return .storm
         default:
-            return .defaultDino
+            return .defaultDino   // breezy, windy, frigid, future cases
         }
     }
-}
 
-// MARK: - Response Models
-
-private struct WeatherResponse: Decodable {
-    let weather: [WeatherCondition]
-    let sys: SysInfo?
-}
-
-private struct WeatherCondition: Decodable {
-    let main: String
-    let description: String?
-}
-
-private struct SysInfo: Decodable {
-    let sunset: Int?
+    /// Fixed lowercase keyword labels — deliberately NOT WeatherKit's
+    /// localized `description`. MeditationSceneBackground substring-matches
+    /// these ("rain" / "drizzle" / "thunderstorm" / "snow"), so the labels
+    /// must stay stable across locales.
+    nonisolated static func conditionLabel(_ condition: WeatherCondition) -> String {
+        switch condition {
+        case .clear, .mostlyClear, .hot:
+            return "clear"
+        case .cloudy, .mostlyCloudy, .partlyCloudy:
+            return "cloudy"
+        case .foggy, .haze, .smoky, .blowingDust:
+            return "hazy"
+        case .drizzle, .freezingDrizzle:
+            return "drizzle"
+        case .rain, .heavyRain, .freezingRain, .sunShowers:
+            return "rain"
+        case .snow, .heavySnow, .flurries, .sunFlurries, .sleet, .wintryMix, .blizzard, .blowingSnow:
+            return "snow"
+        case .thunderstorms, .isolatedThunderstorms, .scatteredThunderstorms, .strongStorms,
+             .tropicalStorm, .hurricane, .hail:
+            return "thunderstorm"
+        default:
+            return "mild"
+        }
+    }
 }

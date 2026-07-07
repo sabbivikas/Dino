@@ -209,6 +209,18 @@ struct ThemeSettingsView: View {
             .frame(maxWidth: .infinity)
             .dinoCard()
 
+            // Apple requires visible attribution wherever weather appears —
+            // quiet, tappable, links to their legal page.
+            Link(destination: URL(string: "https://weatherkit.apple.com/legal-attribution.html")!) {
+                HStack(spacing: 4) {
+                    Image(systemName: "apple.logo")
+                        .font(.system(size: 9))
+                    Text("Apple Weather")
+                        .font(DinoTheme.dinoFont(size: 10))
+                }
+                .foregroundColor(DinoTheme.textSecondary.opacity(0.7))
+            }
+
             // Refresh button
             Button {
                 weatherService.requestLocation()
