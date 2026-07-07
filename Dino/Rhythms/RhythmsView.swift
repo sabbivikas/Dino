@@ -206,6 +206,7 @@ private struct RhythmsForecastView: View {
     let calendar: Calendar
     let now: Date
     @State private var shape: HelixShape = .helix
+    @State private var noticedLines: [String]?
 
     private var todayWeekday: Int { calendar.component(.weekday, from: now) }
     private var tomorrowWeekday: Int { wd(offset: 1) }
@@ -271,9 +272,22 @@ private struct RhythmsForecastView: View {
                         .padding(.bottom, 22)
                 }
 
-                // Insights (only confident / non-nil).
-                let insights = derivedInsights()
-                if !insights.isEmpty {
+                // What i've noticed — weekly delta-grounded lines when this
+                // week has a story (gpt → local delta templates → sparse
+                // rotation), otherwise the original static insight cards.
+                if let lines = noticedLines, !lines.isEmpty {
+                    Text("what i’ve noticed")
+                        .font(DinoTheme.dinoFont(size: 14)).foregroundColor(RH.ink2)
+                        .padding(.bottom, 10)
+                    VStack(spacing: 10) {
+                        ForEach(lines.indices, id: \.self) { i in
+                            NoticedLineCard(text: lines[i])
+                                .onAppear {
+                                    AnalyticsManager.shared.trackRhythmsInsightViewed(insightType: "weekly_delta")
+                                }
+                        }
+                    }
+                } else if case let insights = derivedInsights(), !insights.isEmpty {
                     Text("what i’ve noticed")
                         .font(DinoTheme.dinoFont(size: 14)).foregroundColor(RH.ink2)
                         .padding(.bottom, 10)
@@ -292,6 +306,9 @@ private struct RhythmsForecastView: View {
             .padding(.horizontal, 20)
             .padding(.top, 14)
             .padding(.bottom, 30)
+        }
+        .task {
+            noticedLines = await WeeklyNoticedService.shared.linesForThisWeek(now: now, calendar: calendar)
         }
         .onAppear {
             AnalyticsManager.shared.trackRhythmsForecastViewed(
@@ -420,6 +437,32 @@ private struct AboutTomorrowCard: View {
             .padding(22)
         }
         .shadow(color: Color(hex: "#141C2E").opacity(0.3), radius: 13, y: 8)
+    }
+}
+
+private struct NoticedLineCard: View {
+    let text: String
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "leaf.fill")
+                .font(.system(size: 14))
+                .foregroundColor(RH.sage)
+                .frame(width: 30, height: 30)
+                .background(Circle().fill(RH.sage.opacity(0.14)))
+            Text(text)
+                .font(DinoTheme.dinoFont(size: 14.5)).foregroundColor(RH.ink)
+                .multilineTextAlignment(.leading)
+                .lineSpacing(3)
+            Spacer(minLength: 0)
+        }
+        .padding(16)
+        .background(RH.card)
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(RH.sageSoft.opacity(0.18), lineWidth: 1)
+        )
+        .shadow(color: Color.black.opacity(0.05), radius: 8, y: 3)
     }
 }
 

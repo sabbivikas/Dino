@@ -186,6 +186,18 @@ final class HealthService: ObservableObject {
     func nightlySleepHours(nights: Int = 14,
                            now: Date = Date(),
                            calendar: Calendar = .current) async -> (lastNight: Double?, priorNights: [Double])? {
+        guard let series = await nightlySleepSeries(nights: nights, now: now, calendar: calendar) else { return nil }
+        let today = calendar.startOfDay(for: now)
+        let last = series.last { calendar.isDate($0.date, inSameDayAs: today) }?.hours
+        let prior = series.filter { !calendar.isDate($0.date, inSameDayAs: today) }.map { $0.hours }
+        return (last, prior)
+    }
+
+    /// Dated per-night asleep hours, oldest → newest (nights with no data
+    /// skipped) — the weekly digest needs dates to split weeks.
+    func nightlySleepSeries(nights: Int = 30,
+                            now: Date = Date(),
+                            calendar: Calendar = .current) async -> [(date: Date, hours: Double)]? {
         guard isAvailable, nights > 0 else { return nil }
         let today = calendar.startOfDay(for: now)
         guard let earliestDay = calendar.date(byAdding: .day, value: -(nights - 1), to: today),
@@ -209,8 +221,7 @@ final class HealthService: ObservableObject {
         let asleep = samples.filter { Self.isAsleep($0.value) }
         guard !asleep.isEmpty else { return nil }
 
-        var lastNight: Double?
-        var prior: [Double] = []
+        var series: [(date: Date, hours: Double)] = []
         for offset in stride(from: nights - 1, through: 0, by: -1) {
             guard let day = calendar.date(byAdding: .day, value: -offset, to: today),
                   let windowStart = calendar.date(byAdding: .hour, value: -4, to: day),
@@ -225,9 +236,9 @@ final class HealthService: ObservableObject {
             let hours = Self.mergeIntervals(clipped)
                 .reduce(0.0) { $0 + $1.1.timeIntervalSince($1.0) } / 3600.0
             guard hours > 0 else { continue }
-            if offset == 0 { lastNight = hours } else { prior.append(hours) }
+            series.append((date: day, hours: hours))
         }
-        return (lastNight, prior)
+        return series.isEmpty ? nil : series
     }
 
     /// True for any "asleep" category value across iOS versions (core, deep, REM,

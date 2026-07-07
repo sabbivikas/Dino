@@ -979,6 +979,114 @@ function buildWeeklyPrompt(
 const WORLD_PRIVACY_FLOOR = 5;
 const WORLD_MOODS = ["clear", "partlyCloudy", "overwhelmed", "drained"] as const;
 
+// One "what i noticed" note per week for the rhythms screen. Inputs are
+// anonymous BUCKETS AND DELTAS only — the client's WeeklyDigest never sends
+// raw step counts, sleep hours, or journal text (themes arrive as enum tags,
+// toggle-gated client-side). The prompt's core job: say what CHANGED vs last
+// week, so two weeks can't read the same.
+const WEEKLY_NOTICED_LIMIT = 2;
+
+export const generateWeeklyNoticed = onCall(
+  { secrets: [OPENAI_API_KEY], timeoutSeconds: 20, memory: "256MiB" },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "sign in required");
+    }
+    const uid = request.auth.uid;
+    const d = (request.data ?? {}) as Record<string, unknown>;
+    const ALLOWED_KEYS = ["moodDirection", "moodLean", "movementDelta", "movementLift",
+      "sleepDirection", "shortNights", "solidNights", "practicedDelta", "topTheme",
+      "themeIsNew", "streakState", "daysLogged", "lastWeekLines", "userLocale"];
+    for (const k of Object.keys(d)) {
+      if (!ALLOWED_KEYS.includes(k)) throw new HttpsError("invalid-argument", `unexpected field: ${k}`);
+    }
+    const pickEnum = (v: unknown, allowed: string[]) => (allowed.includes(String(v)) ? String(v) : "");
+    const moodDirection = pickEnum(d.moodDirection, ["up", "steady", "down"]);
+    const moodLean = pickEnum(d.moodLean, ["gently", "clearly"]);
+    const movementDelta = pickEnum(d.movementDelta, ["more", "less", "same"]);
+    const sleepDirection = pickEnum(d.sleepDirection, ["up", "steady", "down"]);
+    const practicedDelta = pickEnum(d.practicedDelta, ["more", "less", "same"]);
+    const streakState = pickEnum(d.streakState, ["none", "just starting", "building", "strong"]);
+    const topTheme = pickEnum(d.topTheme, ["work", "sleep", "relationships", "health", "money", "self"]);
+    const movementLift = d.movementLift === true;
+    const themeIsNew = d.themeIsNew === true;
+    const clampCount = (v: unknown) => Math.max(0, Math.min(7, Number(v) || 0));
+    const shortNights = d.shortNights === undefined ? -1 : clampCount(d.shortNights);
+    const solidNights = d.solidNights === undefined ? -1 : clampCount(d.solidNights);
+    const daysLogged = clampCount(d.daysLogged);
+    const lastWeekLines = (Array.isArray(d.lastWeekLines) ? d.lastWeekLines : [])
+      .map((l) => String(l).slice(0, 200)).slice(0, 3);
+    const userLocale = typeof d.userLocale === "string" ? d.userLocale : "en";
+
+    // Rate limit: WEEKLY_NOTICED_LIMIT per uid per ISO week (the client caches
+    // one per week; 2 leaves regeneration headroom). Refund on failure.
+    const db = admin.firestore();
+    const weekKey = isoWeekKey(new Date());
+    const counterRef = db.collection("weeklyNoticedLimits").doc(uid);
+    await db.runTransaction(async (tx) => {
+      const snap = await tx.get(counterRef);
+      const data = snap.data() ?? {};
+      const current = (data[weekKey] as number | undefined) ?? 0;
+      if (current >= WEEKLY_NOTICED_LIMIT) {
+        throw new HttpsError("resource-exhausted", "weekly noticed limit reached");
+      }
+      tx.set(counterRef, { [weekKey]: current + 1, updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
+    });
+
+    const systemPrompt =
+      "you are dino, a warm, gentle wellness companion writing the what i noticed part of a weekly letter. " +
+      "you receive only anonymous buckets and week over week deltas, never raw data or numbers. " +
+      "write 2 to 3 short sentences in dino's voice: lowercase, no dashes, warm, plain words, no clinical " +
+      "language, no numbers or statistics, never guilt, never pressure. your core job is to say what CHANGED " +
+      "since last week: lead with the clearest change, and name at most one steady thing. if a movement and " +
+      "mood link is noted and the week was not heavy, you may gently reflect it, never as advice. never " +
+      "repeat any sentence from last week's note and do not reuse its phrasing. if almost nothing changed, " +
+      "say that softly, steadiness is worth naming. " +
+      'respond ONLY with valid JSON, no markdown: {"lines":["...","..."]}.' +
+      getLanguageInstruction(userLocale);
+
+    const parts: string[] = [];
+    if (moodDirection) parts.push(`mood vs last week: ${moodDirection}${moodLean ? " " + moodLean : ""}.`);
+    if (movementDelta) parts.push(`movement days vs last week: ${movementDelta}.`);
+    if (movementLift) parts.push("their brighter days often have a little more movement in them.");
+    if (sleepDirection) parts.push(`rested nights vs last week: ${sleepDirection}.`);
+    if (shortNights >= 0) parts.push(`short nights this week: ${shortNights}.`);
+    if (solidNights >= 0) parts.push(`solid nights this week: ${solidNights}.`);
+    if (practicedDelta) parts.push(`days they practiced vs last week: ${practicedDelta}.`);
+    if (topTheme) parts.push(`a theme on their mind: ${topTheme}${themeIsNew ? " (new this week)" : ""}.`);
+    if (streakState) parts.push(`streak: ${streakState}.`);
+    parts.push(`days they checked in this week: ${daysLogged}.`);
+    if (lastWeekLines.length) parts.push(`last week's note (never repeat these): ${JSON.stringify(lastWeekLines)}`);
+    const userPrompt = parts.join(" ");
+
+    try {
+      const openai = new OpenAI({ apiKey: OPENAI_API_KEY.value() });
+      const resp = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        max_tokens: 160,
+        temperature: 0.8,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+      });
+      let parsed: any = {};
+      try { parsed = JSON.parse(resp.choices[0]?.message?.content ?? "{}"); } catch { parsed = {}; }
+      const lines = (Array.isArray(parsed.lines) ? parsed.lines : [])
+        .map((l: unknown) => String(l).trim().toLowerCase())
+        .filter((l: string) => l.length > 0 && l.length <= 180 && !l.includes("—") && !l.includes("–") && !l.includes(" - "))
+        .slice(0, 3);
+      if (lines.length === 0) throw new HttpsError("internal", "empty noticed lines");
+      return { lines };
+    } catch (err) {
+      await counterRef.set({ [weekKey]: admin.firestore.FieldValue.increment(-1) }, { merge: true });
+      if (err instanceof HttpsError) throw err;
+      const message = err instanceof Error ? err.message : "OpenAI request failed";
+      throw new HttpsError("internal", message);
+    }
+  }
+);
+
 // ============================================================================
 // Gentle recommendations (phase 1: music + cozy content, NO location)
 //
