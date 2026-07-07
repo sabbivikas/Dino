@@ -1024,7 +1024,7 @@ const REC_SOURCES: { name: string; url: string; hint: string }[] = [
   { name: "letterboxd comfort films", url: "https://letterboxd.com/dave/list/comfort-films/", hint: "curated comfort movie list" },
   { name: "indiewire feel-good movies", url: "https://www.indiewire.com/lists/best-feel-good-movies/", hint: "feel-good roundup" },
   { name: "rogerebert features", url: "https://www.rogerebert.com/features", hint: "essays surfacing quiet films" },
-  { name: "justwatch guides", url: "https://www.justwatch.com/us/guides", hint: "streaming guides, links stay watchable" },
+  { name: "empire film features", url: "https://www.empireonline.com/movies/features/", hint: "film features incl. feel-good lists" },
   { name: "time out film", url: "https://www.timeout.com/film", hint: "global feel-good film roundups" },
   // cozy
   { name: "reactor cozy fantasy", url: "https://reactormag.com/tag/cozy-fantasy/", hint: "cozy fantasy and gentle sff" },
