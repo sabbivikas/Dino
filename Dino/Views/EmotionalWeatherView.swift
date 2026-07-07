@@ -13,6 +13,12 @@ struct EmotionalWeatherView: View {
     @State private var showBreakCard = false
     @State private var breakMood: EmotionalWeather = .drained
     @State private var sleepData: HealthService.SleepData?
+    // Steps: honest number + dino's read, always relative to their own baseline.
+    @State private var stepsToday: Double?
+    @State private var stepsRead: StepsRead?
+    @State private var showStepsInsight = false
+    @State private var showStepsInvite = false
+    @AppStorage("dino.health.stepsInviteDismissed") private var stepsInviteDismissed = false
     // Dino World: the post-log moment (always the final beat) + world card.
     @State private var worldBucket: WorldDayBucket?
     @State private var worldMomentLine: String?
@@ -50,6 +56,64 @@ struct EmotionalWeatherView: View {
                                 .font(.caption2)
                                 .foregroundColor(.secondary)
                                 .multilineTextAlignment(.center)
+                        }
+                        .padding(.horizontal, DinoTheme.padding)
+                    }
+
+                    // Today's steps — a gentle wellness signal, never a goal.
+                    // Hidden entirely when Health has nothing to say.
+                    if let steps = stepsToday, let read = stepsRead {
+                        VStack(spacing: 2) {
+                            (Text(StepsSignal.formattedCount(steps))
+                                .font(DinoTheme.numericFont(size: 12))
+                             + Text(" " + "steps today".localized)
+                                .font(DinoTheme.dinoFont(size: 12)))
+                                .foregroundColor(.secondary)
+                            Text(read.dinoLine)
+                                .font(DinoTheme.dinoFont(size: 11))
+                                .foregroundColor(.secondary)
+                                .multilineTextAlignment(.center)
+                            if showStepsInsight {
+                                Text(StepsSignal.insightLine)
+                                    .font(DinoTheme.dinoFont(size: 11))
+                                    .foregroundColor(.secondary)
+                                    .multilineTextAlignment(.center)
+                            }
+                        }
+                        .padding(.horizontal, DinoTheme.padding)
+                    } else if showStepsInvite {
+                        // One-time in-place ask for existing users who already
+                        // connected sleep — gone forever once tapped or dismissed.
+                        HStack(spacing: 10) {
+                            Button {
+                                Task {
+                                    showStepsInvite = false
+                                    _ = await HealthService.shared.requestStepsPermission()
+                                    await loadSteps()
+                                }
+                            } label: {
+                                HStack(spacing: 6) {
+                                    Text("🌿")
+                                        .font(.system(size: 11))
+                                    Text("dino can notice your movement too".localized)
+                                        .font(DinoTheme.dinoFont(size: 12))
+                                        .foregroundColor(DinoTheme.textSecondary)
+                                    Image(systemName: "chevron.right")
+                                        .font(.system(size: 9, weight: .semibold))
+                                        .foregroundColor(DinoTheme.textSecondary.opacity(0.6))
+                                }
+                            }
+                            .buttonStyle(.plain)
+                            Button {
+                                stepsInviteDismissed = true
+                                showStepsInvite = false
+                            } label: {
+                                Image(systemName: "xmark")
+                                    .font(.system(size: 9, weight: .semibold))
+                                    .foregroundColor(DinoTheme.textSecondary.opacity(0.5))
+                                    .padding(4)
+                            }
+                            .buttonStyle(.plain)
                         }
                         .padding(.horizontal, DinoTheme.padding)
                     }
@@ -245,6 +309,7 @@ struct EmotionalWeatherView: View {
             .navigationBarHidden(true)
             .task {
                 if let s = await HealthService.shared.lastNightSleep() { sleepData = s }
+                await loadSteps()
                 if let agg = await WorldMoodService.fetchAggregate() {
                     worldBucket = agg.bucket(for: WorldMoodService.todayKey())
                 }
@@ -280,6 +345,28 @@ struct EmotionalWeatherView: View {
                     LanternReceivedCard(lantern: lantern, onClose: { shownLantern = nil })
                 }
             }
+        }
+    }
+
+    /// Loads the steps card (or the one-time invite for sleep-connected users).
+    /// 90 days: the last 31 feed the card's own-baseline read, the full window
+    /// feeds the movement-mood correlation. All local — no network, no logging.
+    private func loadSteps() async {
+        let service = HealthService.shared
+        guard service.isAvailable else { return }
+        if service.hasRequestedSteps {
+            guard let totals = await service.dailyStepTotals(days: 90) else { return }
+            let today = totals.last?.steps ?? 0
+            let recentHistory = Array(totals.suffix(31).dropLast().map { $0.steps })
+            let read = StepsSignal.read(today: today, history: recentHistory)
+            stepsToday = today
+            stepsRead = read
+            let engine = RhythmsDataAdapter.makeEngine(
+                stepsSamples: totals.map { StepsSample(date: $0.date, steps: $0.steps) })
+            showStepsInsight = StepsSignal.shouldShowInsight(read: read,
+                                                             correlation: engine.movementCorrelation())
+        } else if service.hasRequestedSleep, !stepsInviteDismissed {
+            showStepsInvite = true
         }
     }
 }

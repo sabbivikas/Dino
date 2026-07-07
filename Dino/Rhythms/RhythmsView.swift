@@ -499,7 +499,7 @@ private func previewWeekdays(_ pairs: [(Int, Double, Int)]) -> [Int: WeekdayStat
 private let learningFixture = RhythmsAnalysis(
     overallBaseline: 0, weekdayBaseline: [:],
     trajectory: Trajectory(slope: 0, confident: false),
-    recoveryTimeDays: nil, practiceCorrelation: nil,
+    recoveryTimeDays: nil, practiceCorrelation: nil, movementCorrelation: nil,
     risk: RiskAssessment(score: 0, confident: false, likelyHard: false,
                          factors: RiskFactors(weekdayGap: 0, downwardTrajectory: 0, belowBaseline: 0, noPracticeToday: 0)),
     daysOfDataAvailable: 12, hasEnoughData: false, themeInsights: nil)
@@ -511,6 +511,7 @@ private let calmFixture = RhythmsAnalysis(
     trajectory: Trajectory(slope: 0.1, confident: true),
     recoveryTimeDays: 2.0,
     practiceCorrelation: PracticeCorrelation(withMoodMean: 3.3, withoutMoodMean: 2.2, liftRatio: 1.5),
+    movementCorrelation: nil,
     risk: RiskAssessment(score: 0.3, confident: true, likelyHard: false,
                          factors: RiskFactors(weekdayGap: 0.1, downwardTrajectory: 0, belowBaseline: 0, noPracticeToday: 1)),
     daysOfDataAvailable: 47, hasEnoughData: true, themeInsights: nil)
@@ -522,6 +523,7 @@ private let hardFixture = RhythmsAnalysis(
     trajectory: Trajectory(slope: -0.4, confident: true),
     recoveryTimeDays: 2.0,
     practiceCorrelation: PracticeCorrelation(withMoodMean: 3.4, withoutMoodMean: 1.7, liftRatio: 2.0),
+    movementCorrelation: nil,
     risk: RiskAssessment(score: 0.72, confident: true, likelyHard: true,
                          factors: RiskFactors(weekdayGap: 0.43, downwardTrajectory: 0.4, belowBaseline: 0.2, noPracticeToday: 1)),
     daysOfDataAvailable: 63, hasEnoughData: true, themeInsights: nil)

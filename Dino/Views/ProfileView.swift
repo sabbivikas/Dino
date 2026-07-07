@@ -544,9 +544,9 @@ struct ProfileView: View {
             SBRow(icon: "heart",
                   iconColor: SB.sage,
                   title: "connect apple health".localized,
-                  subtitle: "factor sleep into your patterns") {
+                  subtitle: "factor sleep and movement into your patterns") {
                 Task {
-                    _ = await HealthService.shared.requestSleepPermission()
+                    _ = await HealthService.shared.requestHealthPermissions()
                     refreshHealthAccess()
                 }
             }

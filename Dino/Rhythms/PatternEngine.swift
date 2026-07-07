@@ -19,6 +19,9 @@
 //   • Confidence gates: a weekday baseline needs ≥ minWeekdayCount (3)
 //     instances; the feature only "speaks" at ≥ minDaysToSpeak (21) distinct
 //     days of mood data.
+//   • Steps are SECONDARY: they feed movementCorrelation() and nothing else —
+//     never baselines, trajectory, recovery, or risk. Raw counts never leave
+//     the engine as anything but a relative comparison.
 //
 
 import Foundation
@@ -83,6 +86,12 @@ struct ThemeSample {
     let theme: String   // one of ThemeTag.validThemes
 }
 
+/// One local day's step total from HealthKit (fed by the view layer / adapter).
+struct StepsSample {
+    let date: Date
+    let steps: Double
+}
+
 // MARK: - Outputs
 
 struct WeekdayStat: Equatable {
@@ -134,6 +143,7 @@ struct RhythmsAnalysis {
     let trajectory: Trajectory
     let recoveryTimeDays: Double?
     let practiceCorrelation: PracticeCorrelation?
+    let movementCorrelation: PracticeCorrelation?
     let risk: RiskAssessment
     let daysOfDataAvailable: Int
     let hasEnoughData: Bool
@@ -155,6 +165,8 @@ struct PatternEngine {
     static let trajectoryLastN = 3
     static let minThemeTags = 12               // gate before theme insights "speak"
     static let minPerThemeCount = 4            // per-theme slice confidence
+    static let minMovementDays = 10            // movement correlation: cohort floors
+    static let minStillDays = 10
 
     var calendar: Calendar
     var now: Date
@@ -162,16 +174,19 @@ struct PatternEngine {
     var moodSamples: [MoodSample]
     var practiceDates: [Date]
     var themeSamples: [ThemeSample]
+    var stepsSamples: [StepsSample]
 
     init(moodSamples: [MoodSample],
          practiceDates: [Date] = [],
          themeSamples: [ThemeSample] = [],
+         stepsSamples: [StepsSample] = [],
          now: Date = Date(),
          calendar: Calendar = .current,
          windowDays: Int = PatternEngine.defaultWindowDays) {
         self.moodSamples = moodSamples
         self.practiceDates = practiceDates
         self.themeSamples = themeSamples
+        self.stepsSamples = stepsSamples
         self.now = now
         self.calendar = calendar
         self.windowDays = windowDays
@@ -304,6 +319,41 @@ struct PatternEngine {
         return PracticeCorrelation(withMoodMean: wm, withoutMoodMean: wo, liftRatio: wm / wo)
     }
 
+    // MARK: 6b) Movement correlation (same-day mood, movement vs still days)
+
+    /// Mean SAME-DAY mood on movement days vs still days. A movement day is
+    /// ≥ 0.6× the user's own step median (StepsSignal's relative rule — no
+    /// absolute standard). Only days that have BOTH a mood and step data are
+    /// compared. Nil until the 21-day gate passes AND both cohorts have ≥ 10
+    /// days — the insight would rather stay silent than guess.
+    func movementCorrelation() -> PracticeCorrelation? {
+        guard hasEnoughData else { return nil }
+        let scores = dailyMoodScores
+
+        var stepsByDay: [LocalDay: Double] = [:]
+        for s in stepsSamples {
+            let d = LocalDay(date: s.date, calendar: calendar)
+            guard inWindow(d) else { continue }
+            stepsByDay[d, default: 0] += s.steps
+        }
+        guard let median = StepsSignal.baseline(history: Array(stepsByDay.values)),
+              median > 0 else { return nil }
+
+        var withMood: [Double] = []
+        var withoutMood: [Double] = []
+        for (d, score) in scores {
+            guard let steps = stepsByDay[d], steps > 0 else { continue }
+            if steps >= StepsSignal.movementFactor * median { withMood.append(score) }
+            else { withoutMood.append(score) }
+        }
+        guard withMood.count >= Self.minMovementDays,
+              withoutMood.count >= Self.minStillDays else { return nil }
+        let wm = withMood.reduce(0, +) / Double(withMood.count)
+        let wo = withoutMood.reduce(0, +) / Double(withoutMood.count)
+        guard wo != 0 else { return nil }
+        return PracticeCorrelation(withMoodMean: wm, withoutMoodMean: wo, liftRatio: wm / wo)
+    }
+
     // MARK: 7) Tomorrow risk score
 
     /// Pure weighted sum of the four normalized (0...1) risk factors.
@@ -430,6 +480,7 @@ struct PatternEngine {
             trajectory: trajectory(),
             recoveryTimeDays: recoveryTime(),
             practiceCorrelation: practiceCorrelation(),
+            movementCorrelation: movementCorrelation(),
             risk: tomorrowRisk(),
             daysOfDataAvailable: daysOfDataAvailable,
             hasEnoughData: hasEnoughData,

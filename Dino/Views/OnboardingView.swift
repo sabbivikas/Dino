@@ -823,7 +823,7 @@ private struct StepHealthPage: View {
 
     private func connect() {
         Task {
-            let granted = await HealthService.shared.requestSleepPermission()
+            let granted = await HealthService.shared.requestHealthPermissions()
             await MainActor.run {
                 permissionRequested = true
                 if granted {

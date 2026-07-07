@@ -108,6 +108,7 @@ struct GrowthView: View {
         }
         .background(DinoTheme.background.ignoresSafeArea())
         .onAppear { letterUnread = GardenLetterStore.isUnreadToday() }
+        .task { await vm.refreshMovementBonus() }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
             letterUnread = GardenLetterStore.isUnreadToday()
         }

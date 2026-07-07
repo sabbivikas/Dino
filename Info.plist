@@ -21,7 +21,7 @@
 	<key>NSCalendarsWriteOnlyAccessUsageDescription</key>
 	<string>dino adds a gentle break to your calendar when you want one.</string>
 	<key>NSHealthShareUsageDescription</key>
-	<string>dino reads your sleep to understand how rest affects your emotional patterns, so it can help you prepare for harder days.</string>
+	<string>dino reads your sleep and steps to understand how rest and movement shape your emotional patterns, so it can help you prepare for harder days.</string>
 	<key>NSHealthUpdateUsageDescription</key>
 	<string>dino never writes health data. apple requires this description for any app with healthkit access.</string>
 	<key>UIAppFonts</key>

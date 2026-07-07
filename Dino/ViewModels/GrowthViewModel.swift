@@ -228,14 +228,36 @@ final class GrowthViewModel: ObservableObject {
         journalSessionCount + moodSessionCount + gratitudeSessionCount + breathingSessionCount
     }
 
+    // MARK: - Movement garnish (bonus-only, never negative)
+
+    /// Session-equivalents earned from movement days (0.2 each, capped at 6.0
+    /// ≈ 10% of the bloom journey). Refreshed from HealthKit; 0 whenever steps
+    /// were never connected or Health has nothing to say — a still week leaves
+    /// growth exactly where practices put it.
+    @Published private(set) var movementBonus: Double = 0
+
+    func refreshMovementBonus() async {
+        guard HealthService.shared.hasRequestedSteps,
+              let totals = await HealthService.shared.dailyStepTotals(days: 90) else {
+            movementBonus = 0
+            return
+        }
+        let movementDays = StepsSignal.movementDayCount(dailyTotals: totals.map { $0.steps })
+        movementBonus = StepsSignal.gardenBonus(movementDays: movementDays)
+    }
+
+    /// Practices + movement garnish — the continuous growth driver.
+    var effectiveSessions: Double { Double(totalSessions) + movementBonus }
+
     var journalSessionCount: Int   { dataManager.journalEntries.count }
     var moodSessionCount: Int      { dataManager.moodEntries.count }
     var gratitudeSessionCount: Int { dataManager.gratitudeNotes.count }
     var breathingSessionCount: Int { dataManager.breathingSessions.count }
 
-    /// Normalized growth 0...1 — reaches full bloom at ~62 total sessions.
+    /// Normalized growth 0...1 — reaches full bloom at ~62 total sessions
+    /// (movement days can garnish this, never shrink it).
     var growth: Double {
-        min(Double(totalSessions) / 62.0, 1.0)
+        min(effectiveSessions / 62.0, 1.0)
     }
 
     /// Care 0...1 based on recency of any practice. Happy seed for new users.
@@ -249,7 +271,8 @@ final class GrowthViewModel: ObservableObject {
     // MARK: - Discrete stage + care API
 
     var growthStage: GrowthStage {
-        GrowthStage.from(sessions: totalSessions)
+        // Movement can tip a stage boundary (floor of the garnish), never lower one.
+        GrowthStage.from(sessions: totalSessions + Int(movementBonus))
     }
 
     var nextStageName: String? {

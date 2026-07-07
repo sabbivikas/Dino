@@ -20,7 +20,10 @@ import Foundation
 enum RhythmsDataAdapter {
 
     /// Build a PatternEngine from the live store (no UI, no networking).
+    /// `stepsSamples` come from HealthKit (async), so callers fetch them and
+    /// pass them in — the adapter itself stays synchronous and storage-only.
     static func makeEngine(from data: SharedDataManager = .shared,
+                           stepsSamples: [StepsSample] = [],
                            now: Date = Date(),
                            calendar: Calendar = .current,
                            windowDays: Int = PatternEngine.defaultWindowDays) -> PatternEngine {
@@ -35,6 +38,7 @@ enum RhythmsDataAdapter {
             moodSamples: moodSamples,
             practiceDates: practiceDates,
             themeSamples: themeSamples,
+            stepsSamples: stepsSamples,
             now: now,
             calendar: calendar,
             windowDays: windowDays

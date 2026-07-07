@@ -56,6 +56,14 @@ enum DailyNudgeScheduler {
             payload["sleepSummary"] = "\(sleep.displayString) of sleep"
         }
 
+        // Relative bucket only — raw step counts never travel off-device.
+        if HealthService.shared.hasRequestedSteps,
+           let totals = await HealthService.shared.dailyStepTotals(days: 31, now: now, calendar: calendar),
+           let bucket = StepsSignal.bucket(today: totals.last?.steps ?? 0,
+                                           history: totals.dropLast().map { $0.steps }) {
+            payload["movementToday"] = bucket.rawValue
+        }
+
         let analysis = RhythmsDataAdapter.currentAnalysis(now: now)
         if analysis.risk.confident {
             payload["riskLevel"] = analysis.risk.likelyHard ? "harder" : "steady"

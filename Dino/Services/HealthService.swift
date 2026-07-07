@@ -2,9 +2,10 @@
 //  HealthService.swift
 //  Dino
 //
-//  Read-only Apple Health access for last night's sleep. The ONLY Health data
-//  read is sleepAnalysis; nothing is ever written, and nothing leaves the
-//  device — sleep is used purely to contextualize the local UI and patterns.
+//  Read-only Apple Health access. The ONLY Health data read is sleepAnalysis
+//  and stepCount; nothing is ever written, and nothing leaves the device —
+//  both are used purely to contextualize the local UI and patterns (raw step
+//  values are never logged to analytics or sent anywhere).
 //  Every entry point degrades gracefully when Health is unavailable or denied.
 //
 
@@ -19,6 +20,7 @@ final class HealthService: ObservableObject {
 
     private let store = HKHealthStore()
     private let sleepType = HKCategoryType(.sleepAnalysis)
+    private let stepsType = HKQuantityType(.stepCount)
 
     /// Whether Health data is available on this device at all (false on iPad / unsupported).
     var isAvailable: Bool { HKHealthStore.isHealthDataAvailable() }
@@ -31,6 +33,14 @@ final class HealthService: ObservableObject {
     private static let sleepRequestedKey = "dino.health.sleepRequested"
     var hasRequestedSleep: Bool {
         UserDefaults.standard.bool(forKey: Self.sleepRequestedKey)
+    }
+
+    /// Steps has its OWN ask-flag — never inferred from sleep's grant. An
+    /// existing user who connected sleep in an earlier version has never been
+    /// asked about steps, and these two facts must stay independent.
+    private static let stepsRequestedKey = "dino.health.stepsRequested"
+    var hasRequestedSteps: Bool {
+        UserDefaults.standard.bool(forKey: Self.stepsRequestedKey)
     }
 
     // MARK: - Permission
@@ -51,6 +61,80 @@ final class HealthService: ObservableObject {
             #endif
             return false
         }
+    }
+
+    /// Requests read access to stepCount alone — the in-place ask for existing
+    /// users who already went through the sleep flow.
+    func requestStepsPermission() async -> Bool {
+        guard isAvailable else { return false }
+        do {
+            try await store.requestAuthorization(toShare: [], read: [stepsType])
+            UserDefaults.standard.set(true, forKey: Self.stepsRequestedKey)
+            return true
+        } catch {
+            #if DEBUG
+            print("👣 health auth error: \(error)")
+            #endif
+            return false
+        }
+    }
+
+    /// Requests sleep + steps in a single sheet — the fresh-install ask
+    /// (onboarding and the profile connect row).
+    func requestHealthPermissions() async -> Bool {
+        guard isAvailable else { return false }
+        do {
+            try await store.requestAuthorization(toShare: [], read: [sleepType, stepsType])
+            UserDefaults.standard.set(true, forKey: Self.sleepRequestedKey)
+            UserDefaults.standard.set(true, forKey: Self.stepsRequestedKey)
+            return true
+        } catch {
+            #if DEBUG
+            print("🌿 health auth error: \(error)")
+            #endif
+            return false
+        }
+    }
+
+    // MARK: - Read daily steps
+
+    /// Daily step totals for the trailing `days` local days, oldest → newest,
+    /// with today as the LAST element (partial, midnight → now). Returns nil
+    /// when Health is unavailable or the whole window is empty — a denied read
+    /// and no-data are indistinguishable by design, and both mean stay quiet.
+    func dailyStepTotals(days: Int = 30,
+                         now: Date = Date(),
+                         calendar: Calendar = .current) async -> [(date: Date, steps: Double)]? {
+        guard isAvailable, days > 0 else { return nil }
+        let todayStart = calendar.startOfDay(for: now)
+        guard let windowStart = calendar.date(byAdding: .day, value: -(days - 1), to: todayStart)
+        else { return nil }
+
+        let predicate = HKQuery.predicateForSamples(withStart: windowStart, end: now, options: .strictStartDate)
+        var dayInterval = DateComponents()
+        dayInterval.day = 1
+
+        let totals: [(Date, Double)] = await withCheckedContinuation { continuation in
+            let query = HKStatisticsCollectionQuery(
+                quantityType: stepsType,
+                quantitySamplePredicate: predicate,
+                options: .cumulativeSum,
+                anchorDate: todayStart,
+                intervalComponents: dayInterval
+            )
+            query.initialResultsHandler = { _, results, _ in
+                var out: [(Date, Double)] = []
+                results?.enumerateStatistics(from: windowStart, to: now) { stats, _ in
+                    out.append((stats.startDate, stats.sumQuantity()?.doubleValue(for: .count()) ?? 0))
+                }
+                continuation.resume(returning: out)
+            }
+            store.execute(query)
+        }
+
+        // Probe: readable data is the only proof of a granted read scope.
+        guard totals.contains(where: { $0.1 > 0 }) else { return nil }
+        return totals.map { (date: $0.0, steps: $0.1) }
     }
 
     // MARK: - Read last night's sleep
