@@ -22,10 +22,6 @@ enum GentleRecEngine {
 
     static let scarcityDays = 3            // at most one rec every 3 days
     static let ignoreQuietThreshold = 3    // 3 ignores → that type goes quiet
-    /// Days the crisis marker silences recommendations — keep equal to
-    /// BodyNudge.crisisQuietDays on feature/steps (both branches ride the
-    /// same release train; unify to one constant after they merge).
-    static let crisisQuietDays = 7
     /// Heavy journal themes — deliberately excludes "health" (often physical
     /// illness, where a content rec can land tone-deaf) and the stressor
     /// themes (work/money/relationships say stressed, not depleted).
@@ -69,7 +65,8 @@ enum GentleRecEngine {
         }
         if let c = crisisDate {
             let days = daysAgo(c)
-            if days >= 0 && days < crisisQuietDays { return nil }
+            // One constant across nudges and recs — BodyNudge owns the window.
+            if days >= 0 && days < BodyNudge.crisisQuietDays { return nil }
         }
         guard let slot = timeSlot(hour: calendar.component(.hour, from: now)) else { return nil }
         if let last = lastShownAt, daysAgo(last) < scarcityDays { return nil }
