@@ -6,6 +6,7 @@ import { defineSecret } from "firebase-functions/params";
 import { setGlobalOptions } from "firebase-functions/v2";
 import OpenAI from "openai";
 import { createHash } from "node:crypto";
+import { seasonForMonth, isSeasonEligible, isSlotActive, REC_SEASON_VALUES } from "./season";
 
 admin.initializeApp();
 
@@ -985,24 +986,27 @@ const REC_POOL_MAX_ITEMS = 100;
 const REC_MAX_PER_SOURCE = 8;
 const GENTLE_REC_LIMIT = 3;      // pickGentleRec calls per uid per UTC day
 
-// Curated source list (user-approved 2026-07-07). Each URL gets a one-credit
-// Firecrawl smoke test before deploy; broken/moved pages are swapped then.
-// ~18 single-page scrapes/run ≈ 18 credits weekly — negligible vs the budget.
+// Curated source list (user-approved revision 2026-07-07): global, the soft
+// side of every genre — dino is a warm friend, not a yoga studio. Each URL
+// gets a one-credit Firecrawl smoke test before deploy; broken/moved pages
+// are swapped then. ~19 single-page scrapes/run (+ at most 2 seasonal slots)
+// ≈ 21 credits weekly worst case — negligible vs the budget.
 const REC_SOURCES: { name: string; url: string; hint: string }[] = [
-  // music
-  { name: "bandcamp daily: best ambient", url: "https://daily.bandcamp.com/best-ambient", hint: "monthly ambient roundups" },
-  { name: "bandcamp daily: lists", url: "https://daily.bandcamp.com/lists", hint: "gentle genre lists" },
-  { name: "pitchfork ambient", url: "https://pitchfork.com/reviews/genre/ambient/", hint: "ambient and experimental reviews" },
-  { name: "the quietus columns", url: "https://thequietus.com/columns", hint: "leftfield calm music columns" },
-  { name: "npr all songs considered", url: "https://www.npr.org/sections/allsongs/", hint: "new music, keep only calm fits" },
+  // music — every genre's soft side, global
+  { name: "npr tiny desk", url: "https://www.npr.org/series/tiny-desk-concerts/", hint: "intimate performances, every genre, global artists" },
+  { name: "the line of best fit", url: "https://www.thelineofbestfit.com/features", hint: "gentle pop, acoustic and stripped sessions" },
+  { name: "bandwagon asia", url: "https://www.bandwagon.asia/", hint: "soft k-pop, j-pop, city pop editorial" },
+  { name: "nme asia", url: "https://www.nme.com/asia", hint: "soft k-pop and j-pop roundups" },
+  { name: "okayplayer", url: "https://www.okayplayer.com/", hint: "gentle r&b and soul editorial" },
+  { name: "ones to watch", url: "https://www.onestowatch.com/", hint: "bedroom pop and soft new artists" },
+  { name: "bandcamp daily: best ambient", url: "https://daily.bandcamp.com/best-ambient", hint: "ambient, 2am has its place" },
   { name: "chillhop blog", url: "https://chillhop.com/blog/", hint: "lo-fi and chill editorial" },
-  { name: "stereogum album of the week", url: "https://www.stereogum.com/category/franchises/album-of-the-week/", hint: "mixed; keep only calm fits" },
-  // film
+  // film — comfort + global breadth
   { name: "letterboxd comfort films", url: "https://letterboxd.com/dave/list/comfort-films/", hint: "curated comfort movie list" },
   { name: "indiewire feel-good movies", url: "https://www.indiewire.com/lists/best-feel-good-movies/", hint: "feel-good roundup" },
   { name: "rogerebert features", url: "https://www.rogerebert.com/features", hint: "essays surfacing quiet films" },
-  { name: "criterion current", url: "https://www.criterion.com/current", hint: "calm cinema essays" },
   { name: "justwatch guides", url: "https://www.justwatch.com/us/guides", hint: "streaming guides, links stay watchable" },
+  { name: "time out film", url: "https://www.timeout.com/film", hint: "global feel-good film roundups" },
   // cozy
   { name: "reactor cozy fantasy", url: "https://reactormag.com/tag/cozy-fantasy/", hint: "cozy fantasy and gentle sff" },
   { name: "rps best cozy games", url: "https://www.rockpapershotgun.com/best-cozy-games", hint: "curated cozy games editorial" },
@@ -1012,15 +1016,28 @@ const REC_SOURCES: { name: string; url: string; hint: string }[] = [
   { name: "colossal", url: "https://www.thisiscolossal.com/", hint: "quiet art and beauty pieces" },
 ];
 
+// Rotating seasonal slots — scraped only in their months (no spring slot by
+// design; nothing distinctly spring-cozy earns a weekly credit).
+const SEASONAL_REC_SOURCES: { name: string; url: string; hint: string; months: number[] }[] = [
+  { name: "time out christmas films", url: "https://www.timeout.com/film/the-best-christmas-movies", hint: "cozy winter and holiday films", months: [11, 12, 1, 2] },
+  { name: "pitchfork lists and guides", url: "https://pitchfork.com/features/lists-and-guides/", hint: "summer evening playlist roundups", months: [6, 7, 8] },
+  { name: "electric literature", url: "https://electricliterature.com/", hint: "autumn reading lists", months: [9, 10, 11] },
+];
+
 const REC_CURATOR_PROMPT =
   "you are a careful content curator for a gentle mental wellness app. from the scraped page text, extract up " +
   "to 8 real recommendations (playlists, albums, films, or cozy content like books, games, or slow gentle reads). " +
   'respond ONLY with valid JSON, no markdown: {"items":[{"type":"music|film|cozy","title":"...","oneLiner":"...",' +
-  '"link":"https://...","moodFit":["drained"|"overwhelmed"|"restless"|"foggy"],"energy":"none|low|medium"}]}. ' +
+  '"link":"https://...","moodFit":["drained"|"overwhelmed"|"restless"|"foggy"],"energy":"none|low|medium",' +
+  '"season":"any|spring|summer|autumn|winter"}]}. ' +
   "rules: only items actually present on the page, with a link that appears on the page. never invent or guess " +
-  "links. oneLiner is one warm lowercase sentence, no dashes, no hype, no superlatives, under 90 characters. " +
+  "links. any genre is welcome as long as the item itself is soft and kind: gentle pop, quiet r&b, acoustic " +
+  "sessions, soft k-pop or j-pop, a warm comedy — softness is about the feeling, not the genre. " +
+  "oneLiner is one warm lowercase sentence, no dashes, no hype, no superlatives, under 90 characters. " +
   "moodFit lists which heavy states the item genuinely suits. energy is what the item asks of the person: none " +
-  "means just press play, low means gentle attention, medium means some engagement. never include anything " +
+  "means just press play, low means gentle attention, medium means some engagement. " +
+  'season is "any" unless the item is clearly seasonal: a snow day film is winter, a summer evening playlist is summer. ' +
+  "never include anything " +
   "sponsored, promotional, affiliate-linked, or requiring signup or payment to even see. if the page has " +
   'nothing suitable, return {"items":[]}.';
 
@@ -1047,7 +1064,12 @@ export const refreshRecommendationPool = onSchedule(
     const items: Record<string, unknown>[] = [];
     const seenLinks = new Set<string>();
 
-    for (const source of REC_SOURCES) {
+    const month = new Date().getUTCMonth() + 1;
+    const activeSources = [
+      ...REC_SOURCES,
+      ...SEASONAL_REC_SOURCES.filter((s) => isSlotActive(s.months, month)),
+    ];
+    for (const source of activeSources) {
       try {
         const md = await scrapeRecSource(source.url, FIRECRAWL_API_KEY.value());
         const resp = await openai.chat.completions.create({
@@ -1074,10 +1096,11 @@ export const refreshRecommendationPool = onSchedule(
           if (!REC_TYPES.includes(type) || !title || !oneLiner || moodFit.length === 0) continue;
           if (!REC_ENERGY.includes(energy)) continue;
           if (!link.startsWith("https://") || seenLinks.has(link)) continue;
+          const season = REC_SEASON_VALUES.includes(String(it?.season)) ? String(it.season) : "any";
           seenLinks.add(link);
           items.push({
             id: createHash("sha1").update(link).digest("hex").slice(0, 12),
-            type, title, oneLiner, link, moodFit, energy,
+            type, title, oneLiner, link, moodFit, energy, season,
             sourceName: source.name,
             geo: null, startsAt: null, endsAt: null,   // phase 2 slots
           });
@@ -1151,9 +1174,14 @@ export const pickGentleRec = onCall(
       const moodShades = mood === "drained" ? ["drained", "foggy"]
         : mood === "overwhelmed" ? ["overwhelmed", "restless"]
         : REC_MOODS;
+      // Season: out-of-season items are excluded outright (no christmas-cozy
+      // films in july); "any" is always eligible. Northern hemisphere for now
+      // (see season.ts TODO).
+      const currentSeason = seasonForMonth(new Date().getUTCMonth() + 1);
       const candidates = pool.filter((i) =>
         typeFits.includes(i?.type) &&
         !quietTypes.includes(i?.type) &&
+        isSeasonEligible(String(i?.season ?? "any"), currentSeason) &&
         Array.isArray(i?.moodFit) && i.moodFit.some((m: string) => moodShades.includes(m))
       ).slice(0, 25);
 
@@ -1167,7 +1195,8 @@ export const pickGentleRec = onCall(
         "fits this person right now, and write one short lowercase delivery line in dino's voice: warm, no " +
         "dashes, no pressure, no urgency, never mention data, tracking, or apps. the line must feel completely " +
         'optional, like "tonight feels like a quiet one. this playlist is soft, for whenever you\'re ready 🌙". ' +
-        "never tell them they should do anything. respond ONLY with valid JSON, no markdown: " +
+        "never tell them they should do anything. if a candidate fits the current season especially well, you " +
+        "may lean toward it. respond ONLY with valid JSON, no markdown: " +
         '{"itemId":"...","line":"..."}. if nothing truly fits, respond {"itemId":"","line":""} — offering ' +
         "nothing is always better than a forced fit." +
         getLanguageInstruction(userLocale);
@@ -1175,11 +1204,12 @@ export const pickGentleRec = onCall(
       const context = [
         `mood: ${mood || "not logged, but a heavy day signal"}.`,
         `time of day: ${timeOfDay}.`,
+        `it is ${currentSeason} right now.`,
         recentThemes.length ? `recent themes: ${recentThemes.join(", ")}.` : "",
         "candidates:",
         JSON.stringify(candidates.map((c) => ({
           itemId: c.id, type: c.type, title: c.title, oneLiner: c.oneLiner,
-          moodFit: c.moodFit, energy: c.energy,
+          moodFit: c.moodFit, energy: c.energy, season: c.season ?? "any",
         }))),
       ].filter(Boolean).join("\n");
 

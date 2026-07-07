@@ -3,6 +3,7 @@
   "description": "Cloud Functions for Dino",
   "scripts": {
     "build": "tsc",
+    "test": "npm run build && node --test lib/*.test.js",
     "build:watch": "tsc --watch",
     "serve": "npm run build && firebase emulators:start --only functions",
     "shell": "npm run build && firebase functions:shell",
