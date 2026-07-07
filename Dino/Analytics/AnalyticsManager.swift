@@ -229,6 +229,20 @@ final class AnalyticsManager {
         capture("growth_stage_reached", properties: ["stage": stage])
     }
 
+    // MARK: - Gentle recommendations (type only — never titles, links, or moods)
+
+    func trackRecShown(type: String) {
+        capture("rec_shown", properties: ["type": type])
+    }
+
+    func trackRecTapped() {
+        capture("rec_tapped")
+    }
+
+    func trackRecIgnored() {
+        capture("rec_ignored")
+    }
+
     // MARK: - Assessment
 
     func trackAssessmentStarted() {
