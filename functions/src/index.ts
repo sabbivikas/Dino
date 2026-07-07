@@ -7,6 +7,7 @@ import { setGlobalOptions } from "firebase-functions/v2";
 import OpenAI from "openai";
 import { createHash } from "node:crypto";
 import { seasonForMonth, isSeasonEligible, isSlotActive, REC_SEASON_VALUES } from "./season";
+import { capSources, shouldRun, monthKey, creditSummary, REC_MAX_SOURCES_PER_RUN, REC_MIN_RUN_INTERVAL_DAYS } from "./credits";
 
 admin.initializeApp();
 
@@ -1187,17 +1188,48 @@ async function scrapeRecSource(url: string, apiKey: string): Promise<string> {
 export const refreshRecommendationPool = onSchedule(
   { schedule: "every monday 06:00", secrets: [FIRECRAWL_API_KEY, OPENAI_API_KEY], timeoutSeconds: 540, memory: "512MiB" },
   async () => {
+    const db = admin.firestore();
+
+    // CREDIT GUARD 1/2 — frequency: at most one run per REC_MIN_RUN_INTERVAL_DAYS,
+    // manual triggers and retry storms included. The stamp is written in the
+    // same transaction that checks it, so concurrent duplicate triggers can't
+    // both pass; it's written BEFORE scraping so a mid-run crash can't invite
+    // a same-day re-spend either.
+    const guardRef = db.collection("recPoolMeta").doc("guard");
+    const allowed = await db.runTransaction(async (tx) => {
+      const snap = await tx.get(guardRef);
+      const lastRunAt = (snap.data()?.lastRunAt as admin.firestore.Timestamp | undefined)?.toMillis() ?? null;
+      if (!shouldRun(lastRunAt, Date.now())) return false;
+      tx.set(guardRef, { lastRunAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
+      return true;
+    });
+    if (!allowed) {
+      console.warn(`rec pool: SKIPPED — last run under ${REC_MIN_RUN_INTERVAL_DAYS} days ago (credit guard; manual triggers included)`);
+      return;
+    }
+
     const openai = new OpenAI({ apiKey: OPENAI_API_KEY.value() });
     const items: Record<string, unknown>[] = [];
     const seenLinks = new Set<string>();
 
     const month = new Date().getUTCMonth() + 1;
-    const activeSources = [
+    // CREDIT GUARD 2/2 — hard per-run cap: never more than 25 scrapes, no
+    // matter what the source list contains (config mistake, bad merge).
+    const { kept: activeSources, dropped } = capSources([
       ...REC_SOURCES,
       ...SEASONAL_REC_SOURCES.filter((s) => isSlotActive(s.months, month)),
-    ];
+    ], REC_MAX_SOURCES_PER_RUN);
+    if (dropped > 0) {
+      console.error(`rec pool: SOURCE LIST OVER CAP — scraping first ${REC_MAX_SOURCES_PER_RUN}, dropped ${dropped}. Trim REC_SOURCES.`);
+    }
+
+    // NOTE: exactly ONE fetch per source per run — a failed source is skipped
+    // (caught below), never retried; each retry would be a credit. The
+    // scheduler job and the onSchedule trigger both have no retry config.
+    let scraped = 0;
     for (const source of activeSources) {
       try {
+        scraped += 1;   // count the attempt — conservative: assume it billed
         const md = await scrapeRecSource(source.url, FIRECRAWL_API_KEY.value());
         const resp = await openai.chat.completions.create({
           model: "gpt-4o-mini",
@@ -1236,6 +1268,16 @@ export const refreshRecommendationPool = onSchedule(
         console.error(`rec pool: source failed: ${source.name}`, err);
       }
     }
+
+    // BUDGET LOG — monthly tally so spend is visible without the dashboard.
+    const creditsRef = db.collection("recPoolMeta").doc("credits");
+    const mKey = monthKey(new Date());
+    await creditsRef.set(
+      { [mKey]: admin.firestore.FieldValue.increment(scraped), updatedAt: admin.firestore.FieldValue.serverTimestamp() },
+      { merge: true }
+    );
+    const monthTotal = Number((await creditsRef.get()).data()?.[mKey] ?? scraped);
+    console.log(creditSummary(scraped, monthTotal));
 
     if (items.length < REC_POOL_MIN_ITEMS) {
       console.error(`rec pool: thin run (${items.length} items) — keeping previous pool`);
