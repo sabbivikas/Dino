@@ -5,12 +5,15 @@ import { onSchedule } from "firebase-functions/v2/scheduler";
 import { defineSecret } from "firebase-functions/params";
 import { setGlobalOptions } from "firebase-functions/v2";
 import OpenAI from "openai";
+import { createHash } from "node:crypto";
+import { seasonForMonth, isSeasonEligible, isSlotActive, REC_SEASON_VALUES } from "./season";
 
 admin.initializeApp();
 
 setGlobalOptions({ region: "us-central1", maxInstances: 10 });
 
 const OPENAI_API_KEY = defineSecret("OPENAI_API_KEY");
+const FIRECRAWL_API_KEY = defineSecret("FIRECRAWL_API_KEY");
 
 const DAILY_LIMIT = 5;
 
@@ -975,6 +978,287 @@ function buildWeeklyPrompt(
 // ---------------------------------------------------------------------------
 const WORLD_PRIVACY_FLOOR = 5;
 const WORLD_MOODS = ["clear", "partlyCloudy", "overwhelmed", "drained"] as const;
+
+// ============================================================================
+// Gentle recommendations (phase 1: music + cozy content, NO location)
+//
+// POLICY: nothing sponsored, ever. No affiliate links, no paid placements,
+// no partnerships. Every pool item comes from an editorially curated public
+// source, is filtered again by the curator prompt, and exists solely because
+// it might genuinely help someone on a heavy day. If a source starts running
+// sponsored content, remove it from REC_SOURCES.
+//
+// Privacy: the pool is anonymous public content. pickGentleRec receives only
+// enum buckets (mood/timeOfDay/theme enums) — raw journal text NEVER reaches
+// these functions; it stays inside the existing extractJournalTheme pipeline.
+//
+// Phase 2 (local parks/events + location opt-in) slots into the same schema:
+// type gains "place"|"event", and the geo/startsAt/endsAt fields (null in
+// phase 1) become meaningful. Nothing here should need restructuring.
+// ============================================================================
+
+const REC_TYPES = ["music", "film", "cozy"];
+const REC_MOODS = ["drained", "overwhelmed", "restless", "foggy"];
+const REC_ENERGY = ["none", "low", "medium"];
+const REC_POOL_MIN_ITEMS = 15;   // under this, keep the previous pool untouched
+const REC_POOL_MAX_ITEMS = 100;
+const REC_MAX_PER_SOURCE = 8;
+const GENTLE_REC_LIMIT = 3;      // pickGentleRec calls per uid per UTC day
+
+// Curated source list (user-approved revision 2026-07-07): global, the soft
+// side of every genre — dino is a warm friend, not a yoga studio. Each URL
+// gets a one-credit Firecrawl smoke test before deploy; broken/moved pages
+// are swapped then. ~19 single-page scrapes/run (+ at most 2 seasonal slots)
+// ≈ 21 credits weekly worst case — negligible vs the budget.
+const REC_SOURCES: { name: string; url: string; hint: string }[] = [
+  // music — every genre's soft side, global
+  { name: "npr tiny desk", url: "https://www.npr.org/series/tiny-desk-concerts/", hint: "intimate performances, every genre, global artists" },
+  { name: "the line of best fit", url: "https://www.thelineofbestfit.com/features", hint: "gentle pop, acoustic and stripped sessions" },
+  { name: "bandwagon asia", url: "https://www.bandwagon.asia/", hint: "soft k-pop, j-pop, city pop editorial" },
+  { name: "nme asia", url: "https://www.nme.com/asia", hint: "soft k-pop and j-pop roundups" },
+  { name: "okayplayer", url: "https://www.okayplayer.com/", hint: "gentle r&b and soul editorial" },
+  { name: "ones to watch", url: "https://www.onestowatch.com/", hint: "bedroom pop and soft new artists" },
+  { name: "bandcamp daily: best ambient", url: "https://daily.bandcamp.com/best-ambient", hint: "ambient, 2am has its place" },
+  { name: "chillhop blog", url: "https://chillhop.com/blog/", hint: "lo-fi and chill editorial" },
+  // film — comfort + global breadth
+  { name: "letterboxd comfort films", url: "https://letterboxd.com/dave/list/comfort-films/", hint: "curated comfort movie list" },
+  { name: "indiewire feel-good movies", url: "https://www.indiewire.com/lists/best-feel-good-movies/", hint: "feel-good roundup" },
+  { name: "rogerebert features", url: "https://www.rogerebert.com/features", hint: "essays surfacing quiet films" },
+  { name: "justwatch guides", url: "https://www.justwatch.com/us/guides", hint: "streaming guides, links stay watchable" },
+  { name: "time out film", url: "https://www.timeout.com/film", hint: "global feel-good film roundups" },
+  // cozy
+  { name: "reactor cozy fantasy", url: "https://reactormag.com/tag/cozy-fantasy/", hint: "cozy fantasy and gentle sff" },
+  { name: "rps best cozy games", url: "https://www.rockpapershotgun.com/best-cozy-games", hint: "curated cozy games editorial" },
+  { name: "the marginalian", url: "https://www.themarginalian.org/", hint: "gentle essays and reads" },
+  { name: "book riot cozy", url: "https://bookriot.com/tag/cozy/", hint: "cozy reads" },
+  { name: "cup of jo", url: "https://cupofjo.com/", hint: "comfort content roundups" },
+  { name: "colossal", url: "https://www.thisiscolossal.com/", hint: "quiet art and beauty pieces" },
+];
+
+// Rotating seasonal slots — scraped only in their months (no spring slot by
+// design; nothing distinctly spring-cozy earns a weekly credit).
+const SEASONAL_REC_SOURCES: { name: string; url: string; hint: string; months: number[] }[] = [
+  { name: "time out christmas films", url: "https://www.timeout.com/film/the-best-christmas-movies", hint: "cozy winter and holiday films", months: [11, 12, 1, 2] },
+  { name: "pitchfork lists and guides", url: "https://pitchfork.com/features/lists-and-guides/", hint: "summer evening playlist roundups", months: [6, 7, 8] },
+  { name: "electric literature", url: "https://electricliterature.com/", hint: "autumn reading lists", months: [9, 10, 11] },
+];
+
+const REC_CURATOR_PROMPT =
+  "you are a careful content curator for a gentle mental wellness app. from the scraped page text, extract up " +
+  "to 8 real recommendations (playlists, albums, films, or cozy content like books, games, or slow gentle reads). " +
+  'respond ONLY with valid JSON, no markdown: {"items":[{"type":"music|film|cozy","title":"...","oneLiner":"...",' +
+  '"link":"https://...","moodFit":["drained"|"overwhelmed"|"restless"|"foggy"],"energy":"none|low|medium",' +
+  '"season":"any|spring|summer|autumn|winter"}]}. ' +
+  "rules: only items actually present on the page, with a link that appears on the page. never invent or guess " +
+  "links. any genre is welcome as long as the item itself is soft and kind: gentle pop, quiet r&b, acoustic " +
+  "sessions, soft k-pop or j-pop, a warm comedy — softness is about the feeling, not the genre. " +
+  "oneLiner is one warm lowercase sentence, no dashes, no hype, no superlatives, under 90 characters. " +
+  "moodFit lists which heavy states the item genuinely suits. energy is what the item asks of the person: none " +
+  "means just press play, low means gentle attention, medium means some engagement. " +
+  'season is "any" unless the item is clearly seasonal: a snow day film is winter, a summer evening playlist is summer. ' +
+  "never include anything " +
+  "sponsored, promotional, affiliate-linked, or requiring signup or payment to even see. if the page has " +
+  'nothing suitable, return {"items":[]}.';
+
+async function scrapeRecSource(url: string, apiKey: string): Promise<string> {
+  const resp = await fetch("https://api.firecrawl.dev/v1/scrape", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+    body: JSON.stringify({ url, formats: ["markdown"], onlyMainContent: true }),
+  });
+  if (!resp.ok) throw new Error(`firecrawl ${resp.status}`);
+  const json = (await resp.json()) as { data?: { markdown?: string } };
+  const md = json?.data?.markdown;
+  if (typeof md !== "string" || md.length < 200) throw new Error("empty scrape");
+  return md.slice(0, 30000);
+}
+
+// Weekly pool refresh: scrape each curated source once, tag with gpt-4o-mini,
+// validate + dedupe by link, and replace recPool/current — unless the run is
+// thin, in which case the previous pool is kept (a stale pool beats a bad one).
+export const refreshRecommendationPool = onSchedule(
+  { schedule: "every monday 06:00", secrets: [FIRECRAWL_API_KEY, OPENAI_API_KEY], timeoutSeconds: 540, memory: "512MiB" },
+  async () => {
+    const openai = new OpenAI({ apiKey: OPENAI_API_KEY.value() });
+    const items: Record<string, unknown>[] = [];
+    const seenLinks = new Set<string>();
+
+    const month = new Date().getUTCMonth() + 1;
+    const activeSources = [
+      ...REC_SOURCES,
+      ...SEASONAL_REC_SOURCES.filter((s) => isSlotActive(s.months, month)),
+    ];
+    for (const source of activeSources) {
+      try {
+        const md = await scrapeRecSource(source.url, FIRECRAWL_API_KEY.value());
+        const resp = await openai.chat.completions.create({
+          model: "gpt-4o-mini",
+          max_tokens: 1400,
+          temperature: 0,
+          messages: [
+            { role: "system", content: REC_CURATOR_PROMPT },
+            { role: "user", content: `source: ${source.name} (${source.hint})\n\n${md}` },
+          ],
+        });
+        let parsed: any = {};
+        try { parsed = JSON.parse(resp.choices[0]?.message?.content ?? "{}"); } catch { parsed = {}; }
+        const raw = Array.isArray(parsed.items) ? parsed.items.slice(0, REC_MAX_PER_SOURCE) : [];
+        for (const it of raw) {
+          const type = String(it?.type ?? "");
+          const title = String(it?.title ?? "").trim().slice(0, 120);
+          const oneLiner = String(it?.oneLiner ?? "").trim().slice(0, 120);
+          const link = String(it?.link ?? "").trim();
+          const energy = String(it?.energy ?? "");
+          const moodFit = Array.isArray(it?.moodFit)
+            ? it.moodFit.map(String).filter((m: string) => REC_MOODS.includes(m))
+            : [];
+          if (!REC_TYPES.includes(type) || !title || !oneLiner || moodFit.length === 0) continue;
+          if (!REC_ENERGY.includes(energy)) continue;
+          if (!link.startsWith("https://") || seenLinks.has(link)) continue;
+          const season = REC_SEASON_VALUES.includes(String(it?.season)) ? String(it.season) : "any";
+          seenLinks.add(link);
+          items.push({
+            id: createHash("sha1").update(link).digest("hex").slice(0, 12),
+            type, title, oneLiner, link, moodFit, energy, season,
+            sourceName: source.name,
+            geo: null, startsAt: null, endsAt: null,   // phase 2 slots
+          });
+        }
+      } catch (err) {
+        console.error(`rec pool: source failed: ${source.name}`, err);
+      }
+    }
+
+    if (items.length < REC_POOL_MIN_ITEMS) {
+      console.error(`rec pool: thin run (${items.length} items) — keeping previous pool`);
+      return;
+    }
+    await admin.firestore().collection("recPool").doc("current").set({
+      weekKey: new Date().toISOString().slice(0, 10),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      itemCount: items.length,
+      items: items.slice(0, REC_POOL_MAX_ITEMS),
+    });
+    console.log(`rec pool: refreshed with ${items.length} items`);
+  }
+);
+
+// Picks the ONE pool item that fits this person's moment and writes dino's
+// delivery line. Inputs are enum buckets only. The client's moment engine
+// (crisis window, 3-day scarcity, time fit, ignore-learning) gates every call.
+export const pickGentleRec = onCall(
+  { secrets: [OPENAI_API_KEY], timeoutSeconds: 20, memory: "256MiB" },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "sign in required");
+    }
+    const uid = request.auth.uid;
+    const d = (request.data ?? {}) as Record<string, unknown>;
+    const ALLOWED_KEYS = ["mood", "timeOfDay", "recentThemes", "quietTypes", "userLocale"];
+    for (const k of Object.keys(d)) {
+      if (!ALLOWED_KEYS.includes(k)) throw new HttpsError("invalid-argument", `unexpected field: ${k}`);
+    }
+    const mood = ["clear", "partlyCloudy", "overwhelmed", "drained"].includes(String(d.mood)) ? String(d.mood) : "";
+    const timeOfDay = ["midday", "evening"].includes(String(d.timeOfDay)) ? String(d.timeOfDay) : "";
+    if (!timeOfDay) throw new HttpsError("invalid-argument", "bad timeOfDay");
+    const VALID_THEMES = ["work", "sleep", "relationships", "health", "money", "self"];
+    const recentThemes = (Array.isArray(d.recentThemes) ? d.recentThemes : [])
+      .map(String).filter((t) => VALID_THEMES.includes(t)).slice(0, 3);
+    const quietTypes = (Array.isArray(d.quietTypes) ? d.quietTypes : [])
+      .map(String).filter((t) => REC_TYPES.includes(t));
+    const userLocale = typeof d.userLocale === "string" ? d.userLocale : "en";
+
+    const db = admin.firestore();
+    const dayKey = new Date().toISOString().slice(0, 10);
+    const counterRef = db.collection("gentleRecLimits").doc(uid);
+    await db.runTransaction(async (tx) => {
+      const snap = await tx.get(counterRef);
+      const data = snap.data() ?? {};
+      const current = (data[dayKey] as number | undefined) ?? 0;
+      if (current >= GENTLE_REC_LIMIT) {
+        throw new HttpsError("resource-exhausted", "gentle rec limit reached");
+      }
+      tx.set(counterRef, { [dayKey]: current + 1, updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
+    });
+
+    const refund = () =>
+      counterRef.set({ [dayKey]: admin.firestore.FieldValue.increment(-1) }, { merge: true });
+
+    try {
+      const poolSnap = await db.collection("recPool").doc("current").get();
+      const pool = (poolSnap.data()?.items ?? []) as any[];
+      const typeFits = timeOfDay === "evening" ? ["music", "film"] : ["cozy"];
+      // Heavy moods map to their moodFit shades; no/light mood (journal-signal
+      // moments) leaves every shade eligible rather than faking a mood.
+      const moodShades = mood === "drained" ? ["drained", "foggy"]
+        : mood === "overwhelmed" ? ["overwhelmed", "restless"]
+        : REC_MOODS;
+      // Season: out-of-season items are excluded outright (no christmas-cozy
+      // films in july); "any" is always eligible. Northern hemisphere for now
+      // (see season.ts TODO).
+      const currentSeason = seasonForMonth(new Date().getUTCMonth() + 1);
+      const candidates = pool.filter((i) =>
+        typeFits.includes(i?.type) &&
+        !quietTypes.includes(i?.type) &&
+        isSeasonEligible(String(i?.season ?? "any"), currentSeason) &&
+        Array.isArray(i?.moodFit) && i.moodFit.some((m: string) => moodShades.includes(m))
+      ).slice(0, 25);
+
+      if (candidates.length === 0) {
+        await refund();   // an empty pool shouldn't spend the user's quota
+        return { itemId: "", line: "" };
+      }
+
+      const pickPrompt =
+        "you are dino, a warm, gentle wellness companion. from the candidate list, pick the ONE item that best " +
+        "fits this person right now, and write one short lowercase delivery line in dino's voice: warm, no " +
+        "dashes, no pressure, no urgency, never mention data, tracking, or apps. the line must feel completely " +
+        'optional, like "tonight feels like a quiet one. this playlist is soft, for whenever you\'re ready 🌙". ' +
+        "never tell them they should do anything. if a candidate fits the current season especially well, you " +
+        "may lean toward it. respond ONLY with valid JSON, no markdown: " +
+        '{"itemId":"...","line":"..."}. if nothing truly fits, respond {"itemId":"","line":""} — offering ' +
+        "nothing is always better than a forced fit." +
+        getLanguageInstruction(userLocale);
+
+      const context = [
+        `mood: ${mood || "not logged, but a heavy day signal"}.`,
+        `time of day: ${timeOfDay}.`,
+        `it is ${currentSeason} right now.`,
+        recentThemes.length ? `recent themes: ${recentThemes.join(", ")}.` : "",
+        "candidates:",
+        JSON.stringify(candidates.map((c) => ({
+          itemId: c.id, type: c.type, title: c.title, oneLiner: c.oneLiner,
+          moodFit: c.moodFit, energy: c.energy, season: c.season ?? "any",
+        }))),
+      ].filter(Boolean).join("\n");
+
+      const openai = new OpenAI({ apiKey: OPENAI_API_KEY.value() });
+      const resp = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        max_tokens: 120,
+        temperature: 0.7,
+        messages: [
+          { role: "system", content: pickPrompt },
+          { role: "user", content: context },
+        ],
+      });
+      let parsed: any = {};
+      try { parsed = JSON.parse(resp.choices[0]?.message?.content ?? "{}"); } catch { parsed = {}; }
+      const item = candidates.find((c) => c.id === String(parsed.itemId ?? ""));
+      if (!item) return { itemId: "", line: "" };   // model chose silence — honor it
+      let line = typeof parsed.line === "string" ? parsed.line.trim().toLowerCase() : "";
+      if (!line || line.length > 160 || line.includes("—") || line.includes("–")) {
+        line = String(item.oneLiner);   // fall back to the curated one-liner
+      }
+      return { itemId: item.id, type: item.type, title: item.title, link: item.link, line };
+    } catch (err) {
+      await refund();
+      if (err instanceof HttpsError) throw err;
+      const message = err instanceof Error ? err.message : "gentle rec failed";
+      throw new HttpsError("internal", message);
+    }
+  }
+);
 
 export const aggregateWorldMoods = onSchedule("every 60 minutes", async () => {
   const db = admin.firestore();

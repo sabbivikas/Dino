@@ -30,6 +30,11 @@ struct EmotionalWeatherView: View {
     @State private var showLanternCompose = false
     @State private var pendingLantern: ReceivedLantern?
     @State private var shownLantern: ReceivedLantern?
+    // Gentle recommendation: ONE real thing, one warm line, only when the
+    // moment engine says so (see GentleRecEngine — scarcity is the feature).
+    @State private var pendingRec: GentleRec?
+    @State private var shownRec: GentleRec?
+    @State private var recWasTapped = false
 
     var body: some View {
         NavigationStack {
@@ -175,6 +180,12 @@ struct EmotionalWeatherView: View {
                             // Quietly ask the pool for today's lantern so it's
                             // ready when the break card closes. Nil = nothing shows.
                             Task { pendingLantern = await LanternService.claimLantern() }
+                            // And — rarely — a gentle recommendation for after
+                            // the break card. Every gate runs locally first.
+                            Task {
+                                pendingRec = await GentleRecCoordinator.fetchIfMomentIsRight(
+                                    dataManager: dataManager, freshHeavyMood: w)
+                            }
                         } else if let w = logged {
                             // clear / partlyCloudy → the moment shows right away,
                             // plus a gentle invitation to send a lantern onward.
@@ -247,6 +258,46 @@ struct EmotionalWeatherView: View {
                         .transition(.opacity.combined(with: .move(edge: .bottom)))
                     }
 
+                    // Gentle recommendation — one item, one warm line, no
+                    // pressure. Tap opens the link; leaving without tapping
+                    // counts as an ignore for the learning loop.
+                    if let rec = shownRec {
+                        Button {
+                            recWasTapped = true
+                            GentleRecStore.recordTapped(type: rec.type)
+                            AnalyticsManager.shared.trackRecTapped()
+                            if let url = URL(string: rec.link) {
+                                UIApplication.shared.open(url)
+                            }
+                        } label: {
+                            HStack(spacing: 10) {
+                                Text(rec.type == "music" ? "🎧" : rec.type == "film" ? "🎬" : "🍵")
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(rec.line)
+                                        .font(DinoTheme.dinoFont(size: 14))
+                                        .foregroundColor(DinoTheme.textPrimary)
+                                        .multilineTextAlignment(.leading)
+                                    Text(rec.title)
+                                        .font(DinoTheme.dinoFont(size: 12))
+                                        .foregroundColor(DinoTheme.textSecondary)
+                                        .lineLimit(1)
+                                }
+                                Spacer(minLength: 0)
+                                Image(systemName: "arrow.up.right")
+                                    .font(.system(size: 11, weight: .semibold))
+                                    .foregroundColor(DinoTheme.textSecondary.opacity(0.6))
+                            }
+                            .padding(14)
+                            .background(
+                                RoundedRectangle(cornerRadius: DinoDesignSystem.radiusMD, style: .continuous)
+                                    .fill(DinoTheme.lavender.opacity(0.14))
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .padding(.horizontal, DinoTheme.padding)
+                        .transition(.opacity.combined(with: .move(edge: .bottom)))
+                    }
+
                     // Lantern invite — after a bright log, pass the light on.
                     if showLanternInvite {
                         Button {
@@ -297,10 +348,25 @@ struct EmotionalWeatherView: View {
                 if let agg = await WorldMoodService.fetchAggregate() {
                     worldBucket = agg.bucket(for: WorldMoodService.todayKey())
                 }
+                // Journal-signal path: a heavy day can be visible without a
+                // fresh mood log (only when the journal toggle is on).
+                if shownRec == nil, pendingRec == nil,
+                   let rec = await GentleRecCoordinator.fetchIfMomentIsRight(dataManager: dataManager) {
+                    presentRec(rec)
+                }
             }
             .onAppear {
                 AnalyticsManager.shared.trackMoodScreenOpened()
                 AnalyticsManager.shared.trackScreen("mood")
+            }
+            .onDisappear {
+                // Shown but never tapped → an ignore for the learning loop
+                // (3 ignores of a type and that type goes quiet).
+                if let rec = shownRec, !recWasTapped {
+                    GentleRecStore.recordIgnored(type: rec.type)
+                    AnalyticsManager.shared.trackRecIgnored()
+                    shownRec = nil
+                }
             }
             .sheet(isPresented: $showBreakCard, onDismiss: {
                 // The break card finished (confirmed or dismissed). First the
@@ -314,6 +380,10 @@ struct EmotionalWeatherView: View {
                     worldMomentPending = nil
                     worldMomentMood = pending.mood
                     withAnimation(.easeInOut(duration: 0.35)) { worldMomentLine = pending.line }
+                }
+                if let rec = pendingRec {
+                    pendingRec = nil
+                    presentRec(rec)
                 }
             }) {
                 BreakSuggestionCard(mood: breakMood, onDismiss: { showBreakCard = false })
@@ -375,6 +445,13 @@ struct EmotionalWeatherView: View {
         } else if service.hasRequestedSleep, !stepsInviteDismissed {
             showStepsInvite = true
         }
+    }
+
+    private func presentRec(_ rec: GentleRec) {
+        GentleRecStore.recordShown()   // the scarcity clock starts at display, not fetch
+        AnalyticsManager.shared.trackRecShown(type: rec.type)
+        recWasTapped = false
+        withAnimation(.easeInOut(duration: 0.35)) { shownRec = rec }
     }
 }
 
