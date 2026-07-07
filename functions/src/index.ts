@@ -732,7 +732,7 @@ export const generateDailyNudge = onCall(
     }
     const uid = request.auth.uid;
     const d = (request.data ?? {}) as Record<string, unknown>;
-    const ALLOWED_KEYS = ["lastMood", "streakState", "sleepSummary", "weekday", "riskLevel", "topTheme", "userLocale"];
+    const ALLOWED_KEYS = ["lastMood", "streakState", "sleepSummary", "weekday", "riskLevel", "topTheme", "userLocale", "movementToday", "sleepLastNight", "movementLately"];
     for (const k of Object.keys(d)) {
       if (!ALLOWED_KEYS.includes(k)) throw new HttpsError("invalid-argument", `unexpected field: ${k}`);
     }
@@ -743,6 +743,13 @@ export const generateDailyNudge = onCall(
     const weekday = String(d.weekday ?? "").slice(0, 20);
     const riskLevel = String(d.riskLevel ?? "").slice(0, 20);
     const topTheme = String(d.topTheme ?? "").slice(0, 20);
+    // Body-context buckets, relative to the user's own baseline (computed
+    // client-side; raw hours/step counts never reach this function). Values
+    // outside the enums are dropped, never thrown — odd clients must not
+    // break nudge generation.
+    const movementToday = ["low", "typical", "high"].includes(String(d.movementToday)) ? String(d.movementToday) : "";
+    const sleepLastNight = ["short", "typical", "solid"].includes(String(d.sleepLastNight)) ? String(d.sleepLastNight) : "";
+    const movementLately = String(d.movementLately ?? "") === "quiet" ? "quiet" : "";
 
     // Rate limit: DAILY_NUDGE_LIMIT per uid per UTC day (defense in depth; the
     // client already caches one nudge per local day).
@@ -764,11 +771,23 @@ export const generateDailyNudge = onCall(
       "write ONE short check-in nudge as a single lowercase sentence in dino's voice: warm, no dashes, " +
       "no clinical language, never pressuring or guilt-inducing. keep it very short, it is a notification. " +
       "gently invite them to check in when they can. you may lightly reflect their recent context but never " +
-      'mention data, tracking, ai, apps, scores, or numbers. respond ONLY with valid JSON, no markdown: {"nudge":"..."}.' +
+      "mention data, tracking, ai, apps, scores, or numbers. " +
+      "body context rules: sleep and movement notes are flavor only, most nudges should not mention them. " +
+      "never mention numbers, hours, counts, steps, goals, or targets. never imply they slept too little or " +
+      "moved too little. if sleep was short and their mood has been heavy, lean gentle and restorative, like " +
+      '"last night was a short one. be a little softer with yourself today 🌙". if movement was high, you may ' +
+      "warmly acknowledge it, like \"your body did a lot today. you've earned a quiet evening 🌿\". if movement " +
+      'lately has been quiet and their mood is light, you may make one soft optional offer, like "a little walk ' +
+      'might feel nice today 🌱". never suggest walking or moving when their mood is heavy. if their context ' +
+      "suggests distress, ignore body notes entirely and just be gentle. " +
+      'respond ONLY with valid JSON, no markdown: {"nudge":"..."}.' +
       getLanguageInstruction(userLocale);
 
     const parts = [`mood lately: ${lastMood || "unknown"}.`, `streak: ${streakState || "unknown"}.`];
     if (sleepSummary) parts.push(`last night: ${sleepSummary}.`);
+    if (sleepLastNight) parts.push(`sleep last night: ${sleepLastNight}.`);
+    if (movementToday) parts.push(`movement today: ${movementToday}.`);
+    if (movementLately) parts.push("movement lately has been quiet.");
     if (weekday) parts.push(`today is ${weekday}.`);
     if (riskLevel) parts.push(`tomorrow looks ${riskLevel}.`);
     if (topTheme) parts.push(`a recurring theme for them is ${topTheme}.`);

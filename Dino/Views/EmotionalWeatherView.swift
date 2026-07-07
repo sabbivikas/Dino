@@ -46,42 +46,26 @@ struct EmotionalWeatherView: View {
                     .padding(.top, 12)
                     .padding(.horizontal, DinoTheme.padding)
 
-                    // Last night's sleep — only when Health is authorized + data exists.
-                    if let sleep = sleepData {
-                        VStack(spacing: 2) {
-                            Text(sleep.displayString)
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                            Text(sleep.dinoObservation)
-                                .font(.caption2)
-                                .foregroundColor(.secondary)
-                                .multilineTextAlignment(.center)
-                        }
-                        .padding(.horizontal, DinoTheme.padding)
-                    }
-
-                    // Today's steps — a gentle wellness signal, never a goal.
+                    // One quiet body card — sleep + steps merged into a single
+                    // top line and ONE combined read (priority: today's body
+                    // state, then last night, then insight, then neutral).
                     // Hidden entirely when Health has nothing to say.
-                    if let steps = stepsToday, let read = stepsRead {
+                    if sleepData != nil || stepsToday != nil {
                         VStack(spacing: 2) {
-                            (Text(StepsSignal.formattedCount(steps))
-                                .font(DinoTheme.numericFont(size: 12))
-                             + Text(" " + "steps today".localized)
-                                .font(DinoTheme.dinoFont(size: 12)))
-                                .foregroundColor(.secondary)
-                            Text(read.dinoLine)
-                                .font(DinoTheme.dinoFont(size: 11))
-                                .foregroundColor(.secondary)
-                                .multilineTextAlignment(.center)
-                            if showStepsInsight {
-                                Text(StepsSignal.insightLine)
+                            bodyTopLine
+                            if let line = StepsSignal.combinedRead(sleepHours: sleepData?.durationHours,
+                                                                   stepsRead: stepsRead,
+                                                                   showInsight: showStepsInsight) {
+                                Text(line)
                                     .font(DinoTheme.dinoFont(size: 11))
                                     .foregroundColor(.secondary)
                                     .multilineTextAlignment(.center)
                             }
                         }
                         .padding(.horizontal, DinoTheme.padding)
-                    } else if showStepsInvite {
+                    }
+
+                    if showStepsInvite {
                         // One-time in-place ask for existing users who already
                         // connected sleep — gone forever once tapped or dismissed.
                         HStack(spacing: 10) {
@@ -346,6 +330,29 @@ struct EmotionalWeatherView: View {
                 }
             }
         }
+    }
+
+    /// "🌙 7h 12m  ·  🚶 4,400 steps" — digits in numericFont, the rest in
+    /// dinoFont. Sleep-only shows just the moon; steps-only says "steps today".
+    private var bodyTopLine: some View {
+        var line = Text("")
+        var stepsOnly = true
+        if let sleep = sleepData {
+            line = line + Text("🌙 ").font(DinoTheme.dinoFont(size: 12))
+                + Text(StepsSignal.compactSleep(hours: sleep.durationHours))
+                    .font(DinoTheme.numericFont(size: 12))
+            stepsOnly = false
+        }
+        if let steps = stepsToday {
+            if !stepsOnly {
+                line = line + Text("  ·  ").font(DinoTheme.dinoFont(size: 12))
+            }
+            line = line + Text("🚶 ").font(DinoTheme.dinoFont(size: 12))
+                + Text(StepsSignal.formattedCount(steps)).font(DinoTheme.numericFont(size: 12))
+                + Text(" " + (stepsOnly ? "steps today".localized : "steps".localized))
+                    .font(DinoTheme.dinoFont(size: 12))
+        }
+        return line.foregroundColor(.secondary)
     }
 
     /// Loads the steps card (or the one-time invite for sleep-connected users).

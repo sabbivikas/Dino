@@ -170,6 +170,9 @@ struct BreathingCoachFlow: View {
             pattern: result.patternID, minutes: result.minutes, concern: result.concern)
         if result.concern {
             AnalyticsManager.shared.trackBreathingConcernShown()
+            // Local-only marker (UserDefaults, never synced/logged): quiets
+            // body-flavored nudges for a week after any crisis surface.
+            CrisisMarker.stamp()
         }
         withAnimation { stage = .recommendation }
     }

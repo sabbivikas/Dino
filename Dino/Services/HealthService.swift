@@ -178,6 +178,58 @@ final class HealthService: ObservableObject {
         return SleepData(durationHours: totalSeconds / 3600.0, startTime: earliest, endTime: latest)
     }
 
+    /// Per-night asleep hours for the trailing `nights` nights. A night ends
+    /// on its morning day (window: previous day 8pm → 10am, same as
+    /// lastNightSleep). Nights with no data are SKIPPED, never zeroed.
+    /// `lastNight` is the night ending today; `priorNights` feed the user's
+    /// own baseline. Nil when Health is unavailable or the span is empty.
+    func nightlySleepHours(nights: Int = 14,
+                           now: Date = Date(),
+                           calendar: Calendar = .current) async -> (lastNight: Double?, priorNights: [Double])? {
+        guard isAvailable, nights > 0 else { return nil }
+        let today = calendar.startOfDay(for: now)
+        guard let earliestDay = calendar.date(byAdding: .day, value: -(nights - 1), to: today),
+              let spanStart = calendar.date(byAdding: .hour, value: -4, to: earliestDay),
+              let spanEnd = calendar.date(byAdding: .hour, value: 10, to: today)
+        else { return nil }
+
+        let predicate = HKQuery.predicateForSamples(withStart: spanStart, end: spanEnd, options: [])
+        let samples: [HKCategorySample] = await withCheckedContinuation { continuation in
+            let query = HKSampleQuery(
+                sampleType: sleepType,
+                predicate: predicate,
+                limit: HKObjectQueryNoLimit,
+                sortDescriptors: [NSSortDescriptor(key: HKSampleSortIdentifierStartDate, ascending: true)]
+            ) { _, results, _ in
+                continuation.resume(returning: (results as? [HKCategorySample]) ?? [])
+            }
+            store.execute(query)
+        }
+
+        let asleep = samples.filter { Self.isAsleep($0.value) }
+        guard !asleep.isEmpty else { return nil }
+
+        var lastNight: Double?
+        var prior: [Double] = []
+        for offset in stride(from: nights - 1, through: 0, by: -1) {
+            guard let day = calendar.date(byAdding: .day, value: -offset, to: today),
+                  let windowStart = calendar.date(byAdding: .hour, value: -4, to: day),
+                  let windowEnd = calendar.date(byAdding: .hour, value: 10, to: day)
+            else { continue }
+            let clipped: [(Date, Date)] = asleep.compactMap { s in
+                let start = max(s.startDate, windowStart)
+                let end = min(s.endDate, windowEnd)
+                return start < end ? (start, end) : nil
+            }
+            guard !clipped.isEmpty else { continue }
+            let hours = Self.mergeIntervals(clipped)
+                .reduce(0.0) { $0 + $1.1.timeIntervalSince($1.0) } / 3600.0
+            guard hours > 0 else { continue }
+            if offset == 0 { lastNight = hours } else { prior.append(hours) }
+        }
+        return (lastNight, prior)
+    }
+
     /// True for any "asleep" category value across iOS versions (core, deep, REM,
     /// and the legacy unspecified `asleep`). Excludes inBed and awake.
     private static func isAsleep(_ value: Int) -> Bool {

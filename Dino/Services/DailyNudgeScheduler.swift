@@ -13,6 +13,7 @@ import Foundation
 @MainActor
 enum DailyNudgeScheduler {
     private static let lastGenKey = "dino.dailyNudge.lastGenDayKey"
+    private static let bodyFlavorDaysKey = "dino.nudge.bodyFlavorDays"
 
     /// Safe to call on every foreground; generates at most once per local day.
     static func generateIfNeeded(now: Date = Date(), calendar: Calendar = .current) async {
@@ -52,16 +53,38 @@ enum DailyNudgeScheduler {
             "userLocale": Locale.current.language.languageCode?.identifier ?? "en",
         ]
 
-        if let sleep = await HealthService.shared.lastNightSleep() {
-            payload["sleepSummary"] = "\(sleep.displayString) of sleep"
-        }
-
-        // Relative bucket only — raw step counts never travel off-device.
-        if HealthService.shared.hasRequestedSteps,
-           let totals = await HealthService.shared.dailyStepTotals(days: 31, now: now, calendar: calendar),
-           let bucket = StepsSignal.bucket(today: totals.last?.steps ?? 0,
-                                           history: totals.dropLast().map { $0.steps }) {
-            payload["movementToday"] = bucket.rawValue
+        // Body context: relative buckets ONLY — raw hours and step counts
+        // never leave the device. Flavor is capped at 2 payloads per rolling
+        // week, and the LOCAL-ONLY crisis marker (UserDefaults, never synced,
+        // never in analytics) silences it entirely for 7 days, so nudges stay
+        // mood-driven — never fitness-app nagging.
+        let moodIsHeavy = lastMood == "overwhelmed" || lastMood == "drained"
+        let flavorDates = (UserDefaults.standard.array(forKey: bodyFlavorDaysKey) as? [Date]) ?? []
+        if BodyNudge.allowFlavor(flavorDates: flavorDates,
+                                 crisisDate: CrisisMarker.lastTriggered(calendar: calendar),
+                                 now: now, calendar: calendar) {
+            var sleepBucket: StepsSignal.SleepBucket?
+            if HealthService.shared.hasRequestedSleep,
+               let nights = await HealthService.shared.nightlySleepHours(now: now, calendar: calendar),
+               let last = nights.lastNight {
+                sleepBucket = StepsSignal.sleepBucket(lastNight: last, priorNights: nights.priorNights)
+            }
+            var movementBucket: StepsSignal.MovementBucket?
+            var quietStretch = false
+            if HealthService.shared.hasRequestedSteps,
+               let totals = await HealthService.shared.dailyStepTotals(days: 31, now: now, calendar: calendar) {
+                movementBucket = StepsSignal.bucket(today: totals.last?.steps ?? 0,
+                                                    history: totals.dropLast().map { $0.steps })
+                quietStretch = BodyNudge.isQuietStretch(dailyTotals: totals.map { $0.steps })
+            }
+            let fields = BodyNudge.fields(moodIsHeavy: moodIsHeavy,
+                                          sleepBucket: sleepBucket,
+                                          movementBucket: movementBucket,
+                                          quietStretch: quietStretch)
+            if !fields.isEmpty {
+                for (k, v) in fields { payload[k] = v }
+                UserDefaults.standard.set(Array(flavorDates.suffix(9)) + [now], forKey: bodyFlavorDaysKey)
+            }
         }
 
         let analysis = RhythmsDataAdapter.currentAnalysis(now: now)

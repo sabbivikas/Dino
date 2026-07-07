@@ -208,6 +208,142 @@ final class StepsSignalTests: XCTestCase {
         XCTAssertEqual(with.tomorrowRisk(), without.tomorrowRisk())
     }
 
+    // MARK: - Combined body card read (priority table)
+
+    func testCombinedReadStepsBeatSleep() {
+        // today's body state outranks last night, both directions
+        XCTAssertEqual(StepsSignal.combinedRead(sleepHours: 4, stepsRead: .busiest, showInsight: false),
+                       StepsRead.busiest.dinoLine)
+        XCTAssertEqual(StepsSignal.combinedRead(sleepHours: 8, stepsRead: .quiet, showInsight: false),
+                       StepsRead.quiet.dinoLine)
+    }
+
+    func testCombinedReadRoughNightBeatsCelebration() {
+        XCTAssertEqual(StepsSignal.combinedRead(sleepHours: 4.5, stepsRead: .high, showInsight: false),
+                       StepsSignal.shortNightLine)
+        XCTAssertEqual(StepsSignal.combinedRead(sleepHours: 5.5, stepsRead: .high, showInsight: false),
+                       StepsSignal.lighterSleepLine)
+        // rested night → high steps take the line over solid sleep
+        XCTAssertEqual(StepsSignal.combinedRead(sleepHours: 8, stepsRead: .high, showInsight: false),
+                       StepsRead.high.dinoLine)
+    }
+
+    func testCombinedReadSolidSleepBeatsInsight() {
+        XCTAssertEqual(StepsSignal.combinedRead(sleepHours: 7.5, stepsRead: .neutral, showInsight: true),
+                       StepsSignal.sleptWellLine)
+        // insight only takes an otherwise-neutral line
+        XCTAssertEqual(StepsSignal.combinedRead(sleepHours: 6.5, stepsRead: .neutral, showInsight: true),
+                       StepsSignal.insightLine)
+        XCTAssertEqual(StepsSignal.combinedRead(sleepHours: 6.5, stepsRead: .neutral, showInsight: false),
+                       StepsRead.neutral.dinoLine)
+    }
+
+    func testCombinedReadPartials() {
+        // neither signal → card hides
+        XCTAssertNil(StepsSignal.combinedRead(sleepHours: nil, stepsRead: nil, showInsight: false))
+        // sleep-only
+        XCTAssertEqual(StepsSignal.combinedRead(sleepHours: 6.5, stepsRead: nil, showInsight: false),
+                       StepsSignal.decentRestLine)
+        XCTAssertEqual(StepsSignal.combinedRead(sleepHours: 7.2, stepsRead: nil, showInsight: false),
+                       StepsSignal.sleptWellLine)
+        XCTAssertEqual(StepsSignal.combinedRead(sleepHours: 4.2, stepsRead: nil, showInsight: false),
+                       StepsSignal.shortNightLine)
+        // steps-only
+        XCTAssertEqual(StepsSignal.combinedRead(sleepHours: nil, stepsRead: .building, showInsight: false),
+                       StepsRead.building.dinoLine)
+        XCTAssertEqual(StepsSignal.combinedRead(sleepHours: nil, stepsRead: .neutral, showInsight: false),
+                       StepsRead.neutral.dinoLine)
+    }
+
+    func testCompactSleepFormat() {
+        XCTAssertEqual(StepsSignal.compactSleep(hours: 7.2), "7h 12m")
+        XCTAssertEqual(StepsSignal.compactSleep(hours: 7.0), "7h")
+    }
+
+    // MARK: - Sleep bucket (relative to their own nights)
+
+    func testSleepBucketRelativeToOwnMedian() {
+        let prior: [Double] = [7, 7, 7, 7, 7]
+        XCTAssertEqual(StepsSignal.sleepBucket(lastNight: 5.5, priorNights: prior), .short)   // ≤ 5.95
+        XCTAssertEqual(StepsSignal.sleepBucket(lastNight: 7.0, priorNights: prior), .typical)
+        XCTAssertEqual(StepsSignal.sleepBucket(lastNight: 8.0, priorNights: prior), .solid)   // ≥ 7.7
+    }
+
+    func testSleepBucketSilentUnderFiveNights() {
+        XCTAssertNil(StepsSignal.sleepBucket(lastNight: 7, priorNights: [7, 7, 7, 7]))
+        XCTAssertNil(StepsSignal.sleepBucket(lastNight: 7, priorNights: []))
+    }
+
+    // MARK: - Body-flavor gate (cap + crisis)
+
+    private func daysAgo(_ n: Int, from now: Date) -> Date {
+        cal.date(byAdding: .day, value: -n, to: now)!
+    }
+
+    func testFlavorCapTwoPerRollingWeek() {
+        let now = date(2024, 6, 20)
+        XCTAssertTrue(BodyNudge.allowFlavor(flavorDates: [], crisisDate: nil, now: now, calendar: cal))
+        XCTAssertTrue(BodyNudge.allowFlavor(flavorDates: [daysAgo(3, from: now)],
+                                            crisisDate: nil, now: now, calendar: cal))
+        XCTAssertFalse(BodyNudge.allowFlavor(flavorDates: [daysAgo(1, from: now), daysAgo(2, from: now)],
+                                             crisisDate: nil, now: now, calendar: cal))
+        // entries older than the window don't count
+        XCTAssertTrue(BodyNudge.allowFlavor(flavorDates: [daysAgo(8, from: now), daysAgo(10, from: now)],
+                                            crisisDate: nil, now: now, calendar: cal))
+    }
+
+    func testCrisisMarkerSilencesFlavorForAWeek() {
+        let now = date(2024, 6, 20)
+        XCTAssertFalse(BodyNudge.allowFlavor(flavorDates: [], crisisDate: daysAgo(2, from: now),
+                                             now: now, calendar: cal))
+        XCTAssertFalse(BodyNudge.allowFlavor(flavorDates: [], crisisDate: now,
+                                             now: now, calendar: cal))
+        XCTAssertTrue(BodyNudge.allowFlavor(flavorDates: [], crisisDate: daysAgo(8, from: now),
+                                            now: now, calendar: cal))
+    }
+
+    // MARK: - Body fields (never-on-heavy-day rule)
+
+    func testHeavyMoodKeepsOnlyShortSleep() {
+        let fields = BodyNudge.fields(moodIsHeavy: true, sleepBucket: .short,
+                                      movementBucket: .high, quietStretch: true)
+        XCTAssertEqual(fields, ["sleepLastNight": "short"])
+        // heavy + nothing gentling to say → no body fields at all
+        XCTAssertTrue(BodyNudge.fields(moodIsHeavy: true, sleepBucket: .solid,
+                                       movementBucket: .high, quietStretch: true).isEmpty)
+        XCTAssertTrue(BodyNudge.fields(moodIsHeavy: true, sleepBucket: nil,
+                                       movementBucket: .low, quietStretch: true).isEmpty)
+    }
+
+    func testLightMoodPassesAllBuckets() {
+        let fields = BodyNudge.fields(moodIsHeavy: false, sleepBucket: .solid,
+                                      movementBucket: .typical, quietStretch: true)
+        XCTAssertEqual(fields, ["sleepLastNight": "solid",
+                                "movementToday": "typical",
+                                "movementLately": "quiet"])
+    }
+
+    func testQuietStretchRule() {
+        let quiet = Array(repeating: 5000.0, count: 26) + [1000, 1000, 1000, 1000]
+        XCTAssertTrue(BodyNudge.isQuietStretch(dailyTotals: quiet))
+        let broken = Array(repeating: 5000.0, count: 26) + [1000, 5000, 1000, 1000]
+        XCTAssertFalse(BodyNudge.isQuietStretch(dailyTotals: broken))
+        XCTAssertFalse(BodyNudge.isQuietStretch(dailyTotals: []))          // no baseline
+        XCTAssertFalse(BodyNudge.isQuietStretch(dailyTotals: [500, 400]))  // thin history
+    }
+
+    // MARK: - Crisis marker (local-only round trip)
+
+    func testCrisisMarkerRoundTrip() {
+        let old = UserDefaults.standard.string(forKey: CrisisMarker.key)
+        defer { UserDefaults.standard.set(old, forKey: CrisisMarker.key) }
+        let stamped = date(2024, 6, 20, 15)
+        CrisisMarker.stamp(now: stamped, calendar: cal)
+        let read = CrisisMarker.lastTriggered(calendar: cal)
+        XCTAssertNotNil(read)
+        XCTAssertEqual(read.map { cal.startOfDay(for: $0) }, cal.startOfDay(for: stamped))
+    }
+
     // MARK: - Permission flags stay independent
 
     @MainActor

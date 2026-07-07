@@ -63,10 +63,14 @@ enum StepsSignal {
     static func baseline(history: [Double]) -> Double? {
         let positive = history.filter { $0 > 0 }.sorted()
         guard positive.count >= minBaselineDays else { return nil }
-        let mid = positive.count / 2
-        return positive.count % 2 == 0
-            ? (positive[mid - 1] + positive[mid]) / 2
-            : positive[mid]
+        return median(ofSorted: positive)
+    }
+
+    fileprivate static func median(ofSorted values: [Double]) -> Double {
+        let mid = values.count / 2
+        return values.count % 2 == 0
+            ? (values[mid - 1] + values[mid]) / 2
+            : values[mid]
     }
 
     // MARK: Card read rules (first match wins)
@@ -123,6 +127,52 @@ enum StepsSignal {
         return .typical
     }
 
+    // MARK: Sleep bucket (nudge payload — relative to their own nights)
+
+    enum SleepBucket: String {
+        case short, typical, solid
+    }
+
+    static let sleepShortFactor = 0.85    // short ≤ 0.85× own median night
+    static let sleepSolidFactor = 1.1     // solid ≥ 1.1× own median night
+    static let minSleepBaselineNights = 5
+
+    /// Nil until ≥ 5 prior nights exist — no bucket, no payload field, silence.
+    static func sleepBucket(lastNight: Double, priorNights: [Double]) -> SleepBucket? {
+        let positive = priorNights.filter { $0 > 0 }.sorted()
+        guard positive.count >= minSleepBaselineNights else { return nil }
+        let med = median(ofSorted: positive)
+        guard med > 0 else { return nil }
+        if lastNight <= sleepShortFactor * med { return .short }
+        if lastNight >= sleepSolidFactor * med { return .solid }
+        return .typical
+    }
+
+    // MARK: Combined body card (sleep + steps merged, ONE read line)
+
+    static var shortNightLine: String { "a short night. be gentle with yourself today 🌿".localized }
+    static var lighterSleepLine: String { "lighter sleep than usual. today might feel a little heavier".localized }
+    static var sleptWellLine: String { "you slept well. good foundation for today 🌱".localized }
+    static var decentRestLine: String { "decent rest last night 🌿".localized }
+
+    /// Priority: today's body state (busiest/quiet) beats last night; a rough
+    /// night (very short/short) beats celebration (high steps/solid sleep);
+    /// the insight only ever takes an otherwise-neutral line. Nil when both
+    /// signals are absent — the card hides entirely.
+    static func combinedRead(sleepHours: Double?, stepsRead: StepsRead?, showInsight: Bool) -> String? {
+        guard sleepHours != nil || stepsRead != nil else { return nil }
+        if stepsRead == .busiest { return StepsRead.busiest.dinoLine }
+        if stepsRead == .quiet { return StepsRead.quiet.dinoLine }
+        if let h = sleepHours, h < 5 { return shortNightLine }
+        if let h = sleepHours, h < 6 { return lighterSleepLine }
+        if stepsRead == .high { return StepsRead.high.dinoLine }
+        if let h = sleepHours, h >= 7 { return sleptWellLine }
+        if showInsight { return insightLine }   // upstream gates: never on quiet/building
+        if stepsRead == nil { return decentRestLine }               // sleep-only, 6–7h
+        if stepsRead == .building, sleepHours == nil { return StepsRead.building.dinoLine }
+        return StepsRead.neutral.dinoLine
+    }
+
     // MARK: Display
 
     /// "4,200" — grouped digits for the card's number line.
@@ -132,5 +182,67 @@ enum StepsSignal {
         f.maximumFractionDigits = 0
         f.locale = locale
         return f.string(from: NSNumber(value: max(steps, 0))) ?? "\(Int(max(steps, 0)))"
+    }
+
+    /// "7h 12m" / "7h" for the card's top line.
+    static func compactSleep(hours: Double) -> String {
+        let h = Int(hours)
+        let m = Int((hours - Double(h)) * 60)
+        return m > 0 ? "\(h)h \(m)m" : "\(h)h"
+    }
+}
+
+// MARK: - Body-flavored nudges (gating is pure so every rule is testable)
+
+/// Decides which body-context buckets may ride today's nudge payload. The
+/// buckets are the ONLY body data that ever leaves the device — never raw
+/// hours or counts — and flavor is rationed so nudges stay mood-driven,
+/// never fitness-app nagging.
+enum BodyNudge {
+    static let weeklyCap = 2          // body-flavored payloads per rolling week
+    static let capWindowDays = 7
+    static let crisisQuietDays = 7    // crisis marker silences flavor this long
+    static let quietStretchDays = 4
+
+    /// True when body fields may be included today: no crisis in the last
+    /// week, and fewer than `weeklyCap` flavored payloads in the last week.
+    static func allowFlavor(flavorDates: [Date], crisisDate: Date?,
+                            now: Date, calendar: Calendar) -> Bool {
+        func daysAgo(_ d: Date) -> Int {
+            calendar.dateComponents([.day], from: calendar.startOfDay(for: d),
+                                    to: calendar.startOfDay(for: now)).day ?? 0
+        }
+        if let c = crisisDate {
+            let days = daysAgo(c)
+            if days >= 0 && days < crisisQuietDays { return false }
+        }
+        let recent = flavorDates.filter { let d = daysAgo($0); return d >= 0 && d < capWindowDays }
+        return recent.count < weeklyCap
+    }
+
+    /// The payload fields. On a heavy-mood day the ONLY field that survives is
+    /// sleepLastNight: short (it makes the nudge gentler) — movement flavor and
+    /// the walk offer are structurally impossible, not just prompt-discouraged.
+    static func fields(moodIsHeavy: Bool,
+                       sleepBucket: StepsSignal.SleepBucket?,
+                       movementBucket: StepsSignal.MovementBucket?,
+                       quietStretch: Bool) -> [String: String] {
+        if moodIsHeavy {
+            return sleepBucket == .short ? ["sleepLastNight": "short"] : [:]
+        }
+        var out: [String: String] = [:]
+        if let s = sleepBucket { out["sleepLastNight"] = s.rawValue }
+        if let m = movementBucket { out["movementToday"] = m.rawValue }
+        if quietStretch { out["movementLately"] = "quiet" }
+        return out
+    }
+
+    /// A quiet stretch: the last `quietStretchDays` step days all below the
+    /// movement threshold vs the window's own median. False without a baseline.
+    static func isQuietStretch(dailyTotals: [Double]) -> Bool {
+        guard let med = StepsSignal.baseline(history: dailyTotals), med > 0 else { return false }
+        let lastN = dailyTotals.suffix(quietStretchDays)
+        guard lastN.count >= quietStretchDays else { return false }
+        return lastN.allSatisfy { $0 < StepsSignal.movementFactor * med }
     }
 }
