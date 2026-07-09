@@ -29,7 +29,7 @@ enum JournalMoments {
 
     // MARK: - Copy (owner-approved 2026-07-09; lowercase, no dashes)
 
-    static let inviteLine = "want to write about your day? i can show you some moments 🌿"
+    static let inviteLine = "want to write about your day?"   // short: the row is single-line
     static let inviteAction = "show me"
 
     static let consentTitle = "moments from your day"

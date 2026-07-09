@@ -27,7 +27,13 @@ struct MoodEntity: AppEntity {
     var weather: EmotionalWeather { EmotionalWeather(rawValue: id) ?? .partlyCloudy }
 
     var displayRepresentation: DisplayRepresentation {
-        DisplayRepresentation(title: "\(weather.label.lowercased())")
+        // Entity-level synonyms: the system matches these INLINE in trigger
+        // phrases and at the prompt — "tell dino i'm feeling exhausted" works.
+        // Refreshed via updateAppShortcutParameters() at app launch.
+        DisplayRepresentation(
+            title: "\(weather.label.lowercased())",
+            synonyms: MoodSynonyms.synonyms(for: weather).map { LocalizedStringResource(stringLiteral: $0) }
+        )
     }
 
     static let all = EmotionalWeather.allCases.map { MoodEntity(id: $0.rawValue) }
@@ -167,6 +173,7 @@ struct DinoShortcuts: AppShortcutsProvider {
             intent: LogMoodIntent(),
             phrases: [
                 "tell \(.applicationName) i'm feeling \(\.$mood)",
+                "tell \(.applicationName) how i'm feeling",   // no-mood → the prompt path
                 "log my mood in \(.applicationName)",
             ],
             shortTitle: "log mood",

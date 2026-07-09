@@ -342,12 +342,15 @@ private struct JournalComposerCard: View {
 
     @available(iOS 17.2, *)
     private var momentsInviteRow: some View {
+        // Single clean line, sitting ON the paper: sibling rows pad leading 60
+        // to clear the diary's punched holes and red margin line.
         HStack(spacing: 8) {
             Text("🌿").font(.system(size: 13))
             Text(JournalMoments.inviteLine)
                 .font(DinoTheme.dinoFont(size: 13))
                 .foregroundColor(Color(hex: "#7A7266"))
-                .multilineTextAlignment(.leading)
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
             Spacer(minLength: 4)
             momentsShowMeAffordance
             Button {
@@ -362,6 +365,8 @@ private struct JournalComposerCard: View {
             }
             .buttonStyle(.plain)
         }
+        .padding(.leading, 60)
+        .padding(.trailing, 16)
         .onAppear {
             if !momentsInviteTracked {
                 momentsInviteTracked = true

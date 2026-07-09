@@ -32,6 +32,15 @@ enum MoodSynonyms {
                   "wonderful", "calm", "peaceful", "content", "amazing", "lovely", "better"]),
     ]
 
+    /// The donated synonyms for one mood family — fed to the AppEntity's
+    /// DisplayRepresentation so "i'm feeling exhausted" matches INLINE in the
+    /// trigger phrase, not just at the prompt. (Excludes the canonical label
+    /// itself, which the title already covers.)
+    static func synonyms(for weather: EmotionalWeather) -> [String] {
+        table.first { $0.weather == weather }?.synonyms
+            .filter { $0 != weather.label } ?? []
+    }
+
     /// Case/punctuation-insensitive, with soft prefixes ("i'm feeling", "so",
     /// "really"…) stripped. Exact match after normalization; nil → siri asks
     /// once with the four options.

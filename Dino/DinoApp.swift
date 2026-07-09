@@ -4,6 +4,7 @@
 //
 
 import SwiftUI
+import AppIntents
 import FirebaseCore
 import FirebaseFirestore
 import GoogleSignIn
@@ -17,6 +18,10 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
         print("[App] Firebase configured")
         UNUserNotificationCenter.current().delegate = self
         registerNotificationCategories()
+        // Donate the mood entity values (+ their synonyms) so the
+        // parameterized siri phrase can match — without this call the phrase
+        // "tell dino i'm feeling ⟨mood⟩" has no known values and never fires.
+        DinoShortcuts.updateAppShortcutParameters()
         return true
     }
 

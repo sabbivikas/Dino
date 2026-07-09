@@ -42,6 +42,22 @@ final class SiriVoiceTests: XCTestCase {
         XCTAssertNil(MoodSynonyms.match("hungry"))
     }
 
+    // MARK: - Donated entity synonyms (inline phrase matching)
+
+    func testDonatedSynonymsRoundTripToTheirFamily() {
+        for weather in EmotionalWeather.allCases {
+            let synonyms = MoodSynonyms.synonyms(for: weather)
+            XCTAssertFalse(synonyms.isEmpty, "\(weather) donates no synonyms")
+            // every donated synonym must resolve back to the same family
+            for s in synonyms {
+                XCTAssertEqual(MoodSynonyms.match(s), weather,
+                               "donated '\(s)' resolves to the wrong family")
+            }
+            // the canonical label is the title, never duplicated as a synonym
+            XCTAssertFalse(synonyms.contains(weather.label))
+        }
+    }
+
     // MARK: - Reply rotation (deterministic, never twice in a row)
 
     func testMoodLineRotationIsDeterministicAndVaries() {
