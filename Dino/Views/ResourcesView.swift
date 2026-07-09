@@ -2,53 +2,19 @@
 //  ResourcesView.swift
 //  Dino
 //
+//  Regional crisis resources — rendered from the human-verified directory in
+//  CrisisResources.swift. Region comes from the device setting (no location
+//  permission, works offline); unknown regions get the international block.
+//
 
 import SwiftUI
 import UIKit
 
 struct ResourcesView: View {
     @ObservedObject private var themeManager = ThemeManager.shared
-
     @Environment(\.dismiss) private var dismiss
 
-    struct HotlineResource {
-        let emoji: String
-        let name: String
-        let description: String
-        let action: String
-        let urlString: String
-    }
-
-    let resources: [HotlineResource] = [
-        HotlineResource(
-            emoji: "📞",
-            name: "988 Suicide & Crisis Lifeline",
-            description: "call or text 988 — available 24/7",
-            action: "Call 988",
-            urlString: "tel://988"
-        ),
-        HotlineResource(
-            emoji: "💬",
-            name: "Crisis Text Line",
-            description: "text HOME to 741741 — free, 24/7 crisis counseling",
-            action: "Text 741741",
-            urlString: "sms://741741"
-        ),
-        HotlineResource(
-            emoji: "🧠",
-            name: "NAMI Helpline",
-            description: "1-800-950-NAMI (6264) — Mon–Fri, 10am–10pm ET",
-            action: "Call NAMI",
-            urlString: "tel://18009506264"
-        ),
-        HotlineResource(
-            emoji: "🌿",
-            name: "SAMHSA Helpline",
-            description: "1-800-662-HELP (4357) — treatment referrals, free & confidential",
-            action: "Call SAMHSA",
-            urlString: "tel://18006624357"
-        )
-    ]
+    private let regional = CrisisResources.resources(for: Locale.current.region?.identifier)
 
     var body: some View {
         NavigationStack {
@@ -68,20 +34,29 @@ struct ResourcesView: View {
                             .foregroundColor(DinoTheme.textSecondary)
                             .multilineTextAlignment(.center)
                             .padding(.horizontal, 16)
+
+                        if regional.isFallback {
+                            Text(CrisisResources.fallbackLine)
+                                .font(DinoTheme.dinoFont(size: 14))
+                                .foregroundColor(DinoTheme.textSecondary)
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal, 16)
+                                .padding(.top, 4)
+                        }
                     }
                     .padding(.top, 12)
                     .padding(.horizontal, DinoTheme.padding)
 
-                    // Resource cards
+                    // Resource cards (regional or international fallback)
                     VStack(spacing: 14) {
-                        ForEach(resources, id: \.name) { resource in
-                            ResourceCard(resource: resource)
+                        ForEach(regional.list, id: \.name) { resource in
+                            RegionalResourceCard(resource: resource)
                         }
                     }
                     .padding(.horizontal, DinoTheme.padding)
 
-                    // Disclaimer
-                    Text("if you are in immediate danger, please call 911.")
+                    // Region-neutral emergency footer
+                    Text(CrisisResources.emergencyFooter)
                         .font(DinoTheme.captionFont())
                         .foregroundColor(DinoTheme.textSecondary)
                         .multilineTextAlignment(.center)
@@ -103,32 +78,50 @@ struct ResourcesView: View {
 }
 
 // MARK: - Resource Card
-struct ResourceCard: View {
-    let resource: ResourcesView.HotlineResource
+
+private struct RegionalResourceCard: View {
+    let resource: RegionalResource
+
+    private var emoji: String {
+        switch resource.kind {
+        case .call:     return "📞"
+        case .text:     return "💬"
+        case .whatsapp: return "💬"
+        case .link:     return "🌍"
+        }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(spacing: 12) {
-                Text(resource.emoji)
+                Text(emoji)
                     .font(DinoTheme.dinoFont(size: 28))
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(resource.name)
-                        .font(DinoTheme.headlineFont())
-                        .foregroundColor(DinoTheme.textPrimary)
-
-                    Text(resource.description)
+                    HStack(spacing: 6) {
+                        Text(resource.name)
+                            .font(DinoTheme.headlineFont())
+                            .foregroundColor(DinoTheme.textPrimary)
+                        if resource.is24h {
+                            Text("24/7")
+                                .font(DinoTheme.dinoFont(size: 10))
+                                .foregroundColor(DinoTheme.sageGreen)
+                                .padding(.horizontal, 6).padding(.vertical, 2)
+                                .background(Capsule().fill(DinoTheme.sageGreen.opacity(0.14)))
+                        }
+                    }
+                    Text(resource.detail)
                         .font(DinoTheme.captionFont())
                         .foregroundColor(DinoTheme.textSecondary)
                 }
             }
 
             Button(action: {
-                if let url = URL(string: resource.urlString) {
+                if let url = resource.actionURL {
                     UIApplication.shared.open(url)
                 }
             }) {
-                Text(resource.action)
+                Text(resource.actionLabel)
                     .font(DinoTheme.subheadlineFont())
                     .fontWeight(.semibold)
                     .foregroundColor(DinoTheme.warmRose)

@@ -413,6 +413,7 @@ private struct BreezeWisp: View {
 struct DoneScreen: View {
     @ObservedObject var viewModel: BreathingViewModel
     let onDismiss: () -> Void
+    @State private var showShareRow = false
 
     var body: some View {
         VStack(spacing: 28) {
@@ -420,6 +421,12 @@ struct DoneScreen: View {
 
             Text("🌿")
                 .font(.system(size: 70))
+                .onAppear {
+                    if ShareDino.shouldShowContextualNow() {
+                        ShareDino.markContextualShown()
+                        showShareRow = true
+                    }
+                }
 
             VStack(spacing: 10) {
                 Text("well done")
@@ -443,6 +450,32 @@ struct DoneScreen: View {
                 .foregroundColor(DinoTheme.textSecondary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, DinoTheme.padding)
+
+            // Share dino — the once-ever contextual moment (never naggy).
+            if showShareRow {
+                HStack(spacing: 10) {
+                    ShareLink(item: ShareDino.appStoreURL,
+                              message: Text(ShareDino.shareText)) {
+                        HStack(spacing: 8) {
+                            Text("🦕")
+                            Text(ShareDino.contextualLine)
+                                .font(DinoTheme.dinoFont(size: 13))
+                                .foregroundColor(DinoTheme.textSecondary)
+                                .multilineTextAlignment(.leading)
+                        }
+                    }
+                    Button {
+                        withAnimation { showShareRow = false }
+                    } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 9, weight: .semibold))
+                            .foregroundColor(DinoTheme.textSecondary.opacity(0.5))
+                            .padding(4)
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(.horizontal, DinoTheme.padding)
+            }
 
             Spacer()
 

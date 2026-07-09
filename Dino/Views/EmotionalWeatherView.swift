@@ -35,6 +35,13 @@ struct EmotionalWeatherView: View {
     @State private var pendingRec: GentleRec?
     @State private var shownRec: GentleRec?
     @State private var recWasTapped = false
+    // Tiered support: quiet glyph always; the row only on a heavy stretch
+    // (StretchSignal). Support beats the gentle rec when both are eligible.
+    @State private var showResources = false
+    @State private var pendingSupportRow = false
+    @State private var showSupportRow = false
+    // Share dino — the once-ever contextual moment (after a lantern lands).
+    @State private var showShareRow = false
 
     var body: some View {
         NavigationStack {
@@ -180,11 +187,17 @@ struct EmotionalWeatherView: View {
                             // Quietly ask the pool for today's lantern so it's
                             // ready when the break card closes. Nil = nothing shows.
                             Task { pendingLantern = await LanternService.claimLantern() }
-                            // And — rarely — a gentle recommendation for after
-                            // the break card. Every gate runs locally first.
-                            Task {
-                                pendingRec = await GentleRecCoordinator.fetchIfMomentIsRight(
-                                    dataManager: dataManager, freshHeavyMood: w)
+                            // Support row on a heavy stretch — it takes the
+                            // slot; the gentle rec stays quiet that day.
+                            if stretchSignalFires() {
+                                pendingSupportRow = true
+                            } else {
+                                // And — rarely — a gentle recommendation for
+                                // after the break card. Gates run locally first.
+                                Task {
+                                    pendingRec = await GentleRecCoordinator.fetchIfMomentIsRight(
+                                        dataManager: dataManager, freshHeavyMood: w)
+                                }
                             }
                         } else if let w = logged {
                             // clear / partlyCloudy → the moment shows right away,
@@ -256,6 +269,64 @@ struct EmotionalWeatherView: View {
                         .buttonStyle(.plain)
                         .padding(.horizontal, DinoTheme.padding)
                         .transition(.opacity.combined(with: .move(edge: .bottom)))
+                    }
+
+                    // Support row — only on a heavy stretch, never a single
+                    // tired tuesday (StretchSignal), max once per 7 days.
+                    if showSupportRow {
+                        Button {
+                            showResources = true
+                        } label: {
+                            HStack(spacing: 10) {
+                                Image(systemName: "lifepreserver")
+                                    .font(.system(size: 15))
+                                    .foregroundColor(DinoTheme.sageGreen)
+                                Text(StretchSignal.supportLine)
+                                    .font(DinoTheme.dinoFont(size: 14))
+                                    .foregroundColor(DinoTheme.textPrimary)
+                                    .multilineTextAlignment(.leading)
+                                Spacer(minLength: 0)
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 11, weight: .semibold))
+                                    .foregroundColor(DinoTheme.textSecondary.opacity(0.6))
+                            }
+                            .padding(14)
+                            .background(
+                                RoundedRectangle(cornerRadius: DinoDesignSystem.radiusMD, style: .continuous)
+                                    .fill(DinoTheme.sageGreen.opacity(0.12))
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .padding(.horizontal, DinoTheme.padding)
+                        .transition(.opacity.combined(with: .move(edge: .bottom)))
+                    }
+
+                    // Share dino — the once-ever contextual moment.
+                    if showShareRow {
+                        HStack(spacing: 10) {
+                            ShareLink(item: ShareDino.appStoreURL,
+                                      message: Text(ShareDino.shareText)) {
+                                HStack(spacing: 8) {
+                                    Text("🦕")
+                                    Text(ShareDino.contextualLine)
+                                        .font(DinoTheme.dinoFont(size: 13))
+                                        .foregroundColor(DinoTheme.textSecondary)
+                                        .multilineTextAlignment(.leading)
+                                }
+                            }
+                            Spacer(minLength: 0)
+                            Button {
+                                withAnimation { showShareRow = false }
+                            } label: {
+                                Image(systemName: "xmark")
+                                    .font(.system(size: 9, weight: .semibold))
+                                    .foregroundColor(DinoTheme.textSecondary.opacity(0.5))
+                                    .padding(4)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        .padding(.horizontal, DinoTheme.padding)
+                        .transition(.opacity)
                     }
 
                     // Gentle recommendation — one item, one warm line, no
@@ -348,10 +419,11 @@ struct EmotionalWeatherView: View {
                 if let agg = await WorldMoodService.fetchAggregate() {
                     worldBucket = agg.bucket(for: WorldMoodService.todayKey())
                 }
-                // Journal-signal path: a heavy day can be visible without a
-                // fresh mood log (only when the journal toggle is on).
-                if shownRec == nil, pendingRec == nil,
-                   let rec = await GentleRecCoordinator.fetchIfMomentIsRight(dataManager: dataManager) {
+                // Journal-signal path — support beats the gentle rec here too.
+                if stretchSignalFires() {
+                    presentSupportRow()
+                } else if shownRec == nil, pendingRec == nil,
+                          let rec = await GentleRecCoordinator.fetchIfMomentIsRight(dataManager: dataManager) {
                     presentRec(rec)
                 }
             }
@@ -381,7 +453,10 @@ struct EmotionalWeatherView: View {
                     worldMomentMood = pending.mood
                     withAnimation(.easeInOut(duration: 0.35)) { worldMomentLine = pending.line }
                 }
-                if let rec = pendingRec {
+                if pendingSupportRow {
+                    pendingSupportRow = false
+                    presentSupportRow()
+                } else if let rec = pendingRec {
                     pendingRec = nil
                     presentRec(rec)
                 }
@@ -396,8 +471,34 @@ struct EmotionalWeatherView: View {
             }
             .overlay {
                 if let lantern = shownLantern {
-                    LanternReceivedCard(lantern: lantern, onClose: { shownLantern = nil })
+                    LanternReceivedCard(lantern: lantern, onClose: {
+                        shownLantern = nil
+                        // a lantern just landed — the one contextual share moment
+                        if ShareDino.shouldShowContextualNow() {
+                            ShareDino.markContextualShown()
+                            withAnimation(.easeInOut(duration: 0.35)) { showShareRow = true }
+                        }
+                    })
                 }
+            }
+            .overlay(alignment: .topTrailing) {
+                // Quiet persistent support affordance — always present, never
+                // animated, never badged. Availability without diagnosis.
+                Button {
+                    showResources = true
+                } label: {
+                    Image(systemName: "lifepreserver")
+                        .font(.system(size: 17))
+                        .foregroundColor(DinoTheme.textSecondary.opacity(0.55))
+                        .padding(10)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("support resources")
+                .padding(.trailing, 8)
+                .padding(.top, 4)
+            }
+            .sheet(isPresented: $showResources) {
+                ResourcesView()
             }
         }
     }
@@ -445,6 +546,23 @@ struct EmotionalWeatherView: View {
         } else if service.hasRequestedSleep, !stepsInviteDismissed {
             showStepsInvite = true
         }
+    }
+
+    private func stretchSignalFires(now: Date = Date()) -> Bool {
+        StretchSignal.shouldOffer(
+            moodEntries: dataManager.moodEntries.map { ($0.date, $0.weatherType) },
+            journalToggleOn: dataManager.journalThemeLearningEnabled,
+            journalThemesToday: dataManager.themeTags
+                .filter { $0.source == ThemeTag.sourceJournal && Calendar.current.isDate($0.date, inSameDayAs: now) }
+                .map { $0.theme },
+            lastShownAt: SupportRowStore.lastShownAt(),
+            now: now,
+            calendar: .current)
+    }
+
+    private func presentSupportRow() {
+        SupportRowStore.recordShown()
+        withAnimation(.easeInOut(duration: 0.35)) { showSupportRow = true }
     }
 
     private func presentRec(_ rec: GentleRec) {
