@@ -42,6 +42,8 @@ struct EmotionalWeatherView: View {
     @State private var showSupportRow = false
     // Share dino — the once-ever contextual moment (after a lantern lands).
     @State private var showShareRow = false
+    // Siri return moment: one quiet line after a voice-logged mood, once.
+    @State private var siriReturnLine: String?
 
     var body: some View {
         NavigationStack {
@@ -329,6 +331,30 @@ struct EmotionalWeatherView: View {
                         .transition(.opacity)
                     }
 
+                    // While you were away — one quiet line after a siri-logged
+                    // mood (consumed on show; x just hides it).
+                    if let line = siriReturnLine {
+                        HStack(spacing: 8) {
+                            Text("🦕").font(.system(size: 12))
+                            Text(line)
+                                .font(DinoTheme.dinoFont(size: 13))
+                                .foregroundColor(DinoTheme.textSecondary)
+                                .multilineTextAlignment(.leading)
+                            Spacer(minLength: 0)
+                            Button {
+                                withAnimation { siriReturnLine = nil }
+                            } label: {
+                                Image(systemName: "xmark")
+                                    .font(.system(size: 9, weight: .semibold))
+                                    .foregroundColor(DinoTheme.textSecondary.opacity(0.5))
+                                    .padding(4)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        .padding(.horizontal, DinoTheme.padding)
+                        .transition(.opacity)
+                    }
+
                     // Gentle recommendation — one item, one warm line, no
                     // pressure. Tap opens the link; leaving without tapping
                     // counts as an ignore for the learning loop.
@@ -414,6 +440,9 @@ struct EmotionalWeatherView: View {
             .navigationTitle("")
             .navigationBarHidden(true)
             .task {
+                if siriReturnLine == nil, let line = SiriReturnMoment.consume() {
+                    siriReturnLine = line
+                }
                 if let s = await HealthService.shared.lastNightSleep() { sleepData = s }
                 await loadSteps()
                 if let agg = await WorldMoodService.fetchAggregate() {
