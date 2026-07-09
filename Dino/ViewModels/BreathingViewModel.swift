@@ -153,6 +153,7 @@ class BreathingViewModel: ObservableObject {
         phase = .idle
         phaseLabel = BreathingPhase.idle.label
         stepIndex = -1
+        BreathingHaptics.shared.stop()
         circleScale = 0.6
         circleOpacity = 0.85
         phaseCountdown = selectedPattern.steps.first?.seconds ?? 4
@@ -166,6 +167,7 @@ class BreathingViewModel: ObservableObject {
         guard isRunning && !isPaused else { return }
         isPaused = true
         lastPauseDate = Date()
+        BreathingHaptics.shared.stopCurrent()
         mainTimer?.invalidate()
         phaseTimer?.invalidate()
         mainTimer = nil
@@ -257,6 +259,10 @@ class BreathingViewModel: ObservableObject {
         phaseLabel = step.label
         phaseCountdown = step.seconds
 
+        // The breath you can feel — same transition that drives the circle,
+        // so the tide can never drift from the animation.
+        BreathingHaptics.shared.play(phase: phase, duration: Double(step.seconds))
+
         if step.kind == .hold {
             if selectedPattern.shimmersOnHold && !skipAnimation && !UIAccessibility.isReduceMotionEnabled {
                 // the hold never freezes — light pulses gently behind closed eyes
@@ -307,6 +313,7 @@ class BreathingViewModel: ObservableObject {
         isPaused = false
         phase = .done
         phaseLabel = BreathingPhase.done.label
+        BreathingHaptics.shared.stop()
         withAnimation(.easeInOut(duration: 0.5)) {
             circleScale = 0.8
             circleOpacity = 0.9

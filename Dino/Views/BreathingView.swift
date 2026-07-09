@@ -15,6 +15,7 @@ struct BreathingView: View {
     @Environment(\.dismiss) private var dismiss
 
     private let phaseTick = UIImpactFeedbackGenerator(style: .light)
+    @State private var hapticsOn = BreathingHaptics.isEnabled
 
     private var breathingCircle: some View {
         BreathingCircle(
@@ -40,6 +41,31 @@ struct BreathingView: View {
                 // Atmosphere background
                 BreathingAtmosphere()
                     .ignoresSafeArea()
+
+                // The breath you can feel — quiet toggle, hidden entirely on
+                // devices without CoreHaptics (no dead switch, ever).
+                if BreathingHaptics.deviceSupported {
+                    VStack {
+                        HStack {
+                            Spacer()
+                            Button {
+                                hapticsOn.toggle()
+                                BreathingHaptics.isEnabled = hapticsOn
+                                if !hapticsOn { BreathingHaptics.shared.stop() }
+                            } label: {
+                                Image(systemName: "water.waves")
+                                    .font(.system(size: 16))
+                                    .foregroundColor(DinoTheme.textSecondary.opacity(hapticsOn ? 0.85 : 0.35))
+                                    .padding(10)
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel(hapticsOn ? "breathing haptics on" : "breathing haptics off")
+                        }
+                        Spacer()
+                    }
+                    .padding(.trailing, 12)
+                    .padding(.top, 4)
+                }
 
                 if viewModel.phase == .done {
                     DoneScreen(viewModel: viewModel, onDismiss: { dismiss() })
@@ -185,8 +211,12 @@ struct BreathingView: View {
         }
         .onChange(of: viewModel.stepIndex) { _, idx in
             guard idx >= 0, viewModel.isRunning else { return }
-            // the top up inhale gets a lighter tick so the double breath is felt
-            phaseTick.impactOccurred(intensity: viewModel.isTopUpStep ? 0.55 : 0.9)
+            // the continuous tide replaces the discrete tick — both together
+            // would read as a notification buzz, the one forbidden feeling
+            if !(hapticsOn && BreathingHaptics.deviceSupported) {
+                // the top up inhale gets a lighter tick so the double breath is felt
+                phaseTick.impactOccurred(intensity: viewModel.isTopUpStep ? 0.55 : 0.9)
+            }
         }
         .onChange(of: viewModel.isRunning) { _, running in
             if running {
