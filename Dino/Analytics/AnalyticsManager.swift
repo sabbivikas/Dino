@@ -229,6 +229,17 @@ final class AnalyticsManager {
         capture("growth_stage_reached", properties: ["stage": stage])
     }
 
+    // MARK: - Journaling moments (content-free counters ONLY — the picked
+    // moment, and even its type, never enter analytics)
+
+    func trackJournalMomentsInviteShown() {
+        capture("journal_moments_invite_shown")
+    }
+
+    func trackJournalMomentsPickerOpened() {
+        capture("journal_moments_picker_opened")
+    }
+
     // MARK: - Gentle recommendations (type only — never titles, links, or moods)
 
     func trackRecShown(type: String) {

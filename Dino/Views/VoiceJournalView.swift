@@ -317,8 +317,113 @@ private struct JournalComposerCard: View {
     @State private var showCameraDialog: Bool = false
     @State private var showMoodSheet: Bool = false
     @State private var isTranscribing: Bool = false
+    // Journaling suggestions (iOS 17.2+): invitation lives ONLY in the empty
+    // composer, once per composer session, quiet for the day after an x.
+    @State private var showMomentsConsent: Bool = false
+    @State private var momentsDoneThisSession: Bool = false
+    @State private var momentsInviteTracked: Bool = false
 
     @StateObject private var transcriber = SpeechTranscriber()
+
+    // MARK: - Journaling suggestions
+
+    private var momentsInviteEligible: Bool {
+        guard UIDevice.current.userInterfaceIdiom == .phone else { return false }
+        if #available(iOS 17.2, *) {
+            return JournalMoments.shouldInvite(
+                composerEmpty: composerText.isEmpty && selectedImage == nil,
+                dismissedDayKey: UserDefaults.standard.string(forKey: JournalMoments.dismissedDayKeyKey),
+                todayKey: JournalMoments.todayKey(),
+                shownThisSession: momentsDoneThisSession,
+                available: true)
+        }
+        return false
+    }
+
+    @available(iOS 17.2, *)
+    private var momentsInviteRow: some View {
+        HStack(spacing: 8) {
+            Text("🌿").font(.system(size: 13))
+            Text(JournalMoments.inviteLine)
+                .font(DinoTheme.dinoFont(size: 13))
+                .foregroundColor(Color(hex: "#7A7266"))
+                .multilineTextAlignment(.leading)
+            Spacer(minLength: 4)
+            momentsShowMeAffordance
+            Button {
+                HapticManager.shared.light()
+                JournalMoments.markDismissedToday()
+                withAnimation(.easeInOut(duration: 0.2)) { momentsDoneThisSession = true }
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundColor(Color(hex: "#A8A29A"))
+                    .padding(4)
+            }
+            .buttonStyle(.plain)
+        }
+        .onAppear {
+            if !momentsInviteTracked {
+                momentsInviteTracked = true
+                AnalyticsManager.shared.trackJournalMomentsInviteShown()
+            }
+        }
+        .sheet(isPresented: $showMomentsConsent) {
+            #if canImport(JournalingSuggestions)
+            JournalMomentsConsentSheet(
+                onMoment: { image, line in
+                    showMomentsConsent = false
+                    applyMoment(image: image, line: line)
+                },
+                onLater: {
+                    showMomentsConsent = false
+                    JournalMoments.markDismissedToday()
+                    withAnimation { momentsDoneThisSession = true }
+                }
+            )
+            #endif
+        }
+    }
+
+    @available(iOS 17.2, *)
+    @ViewBuilder
+    private var momentsShowMeAffordance: some View {
+        #if canImport(JournalingSuggestions)
+        if JournalMoments.consentSeen {
+            JournalMomentsPickerButton(onMoment: { image, line in
+                applyMoment(image: image, line: line)
+            }) {
+                momentsShowMeLabel
+            }
+        } else {
+            Button {
+                JournalMoments.consentSeen = true   // they've read the explainer
+                showMomentsConsent = true
+            } label: {
+                momentsShowMeLabel
+            }
+            .buttonStyle(.plain)
+        }
+        #else
+        EmptyView()
+        #endif
+    }
+
+    private var momentsShowMeLabel: some View {
+        Text(JournalMoments.inviteAction)
+            .font(DinoTheme.dinoFont(size: 12))
+            .foregroundColor(.white)
+            .padding(.horizontal, 10).padding(.vertical, 5)
+            .background(Capsule().fill(Color(hex: "#7BA872")))
+    }
+
+    /// One moment becomes at most one photo + ONE seeded line — then the
+    /// cursor is theirs. Nothing about the moment is stored or logged.
+    private func applyMoment(image: UIImage?, line: String?) {
+        if let image { selectedImage = image }
+        if let line, composerText.isEmpty { composerText = line + "\n" }
+        withAnimation(.easeInOut(duration: 0.2)) { momentsDoneThisSession = true }
+    }
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -441,6 +546,13 @@ private struct JournalComposerCard: View {
                 }
                 .padding(.leading, 60)
                 .padding(.trailing, 16)
+
+                // Moments invitation — the blank page, softened (iOS 17.2+ only;
+                // on older iOS the row never exists).
+                if #available(iOS 17.2, *), momentsInviteEligible {
+                    momentsInviteRow
+                        .padding(.bottom, 6)
+                }
 
                 // Text editor
                 ZStack(alignment: .topLeading) {
