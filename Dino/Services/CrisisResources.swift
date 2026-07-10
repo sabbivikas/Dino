@@ -29,6 +29,17 @@ struct RegionalResource {
     var smsBody: String? = nil
     let detail: String       // lowercase, includes hours; "hours vary" when unverified
     let is24h: Bool
+    /// Optional tap-to-text alternative for lines that answer both ways
+    /// (e.g. US 988). Rendered as the hero card's quiet secondary action.
+    var textNumber: String? = nil
+
+    var secondaryURL: URL? {
+        textNumber.flatMap { URL(string: "sms:" + $0.filter { $0.isNumber || $0 == "+" }) }
+    }
+
+    var secondaryLabel: String? {
+        textNumber.map { "text \($0) instead" }
+    }
 
     var actionURL: URL? {
         switch kind {
@@ -90,9 +101,11 @@ enum CrisisResources {
     /// ISO 3166-1 alpha-2 → verified resources. Owner-reviewed 2026-07-09.
     static let directory: [String: [RegionalResource]] = [
         "US": [
-            // source: https://988lifeline.org
+            // source: https://988lifeline.org — call and text both official
+            // (owner-approved data change 2026-07-10: secondary text action)
             RegionalResource(name: "988 suicide & crisis lifeline", kind: .call, contact: "988",
-                             detail: "call or text 988, free and confidential", is24h: true),
+                             detail: "call or text 988, free and confidential", is24h: true,
+                             textNumber: "988"),
             // source: https://www.crisistextline.org
             RegionalResource(name: "crisis text line", kind: .text, contact: "741741", smsBody: "HOME",
                              detail: "a real human answers", is24h: true),

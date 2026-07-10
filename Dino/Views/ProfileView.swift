@@ -992,14 +992,7 @@ struct ProfileView: View {
             ) {
                 activeSheet = .assessment
             }
-            SBRow(
-                icon: "heart.text.square.fill",
-                iconColor: SB.sage,
-                title: "resources",
-                subtitle: "grounding, crisis, kindness"
-            ) {
-                activeSheet = .resources
-            }
+            // one door to support, not two — the warmer label survives
             SBRow(
                 icon: "exclamationmark.bubble.fill",
                 iconColor: SB.rose,
