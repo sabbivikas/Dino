@@ -94,6 +94,16 @@ struct PhotoStore {
     }
 }
 
+// MARK: - Dirty detection (pure — photo is deliberately NOT an input:
+// it persists on pick; cancel discards name/bio only)
+
+enum ProfileDetailsDirty {
+    static func hasChanges(name: String, originalName: String,
+                           bio: String, originalBio: String) -> Bool {
+        name != originalName || bio != originalBio
+    }
+}
+
 // MARK: - ProfileDetailsView
 
 struct ProfileDetailsView: View {
@@ -116,7 +126,10 @@ struct ProfileDetailsView: View {
     private enum Field { case name, bio }
 
     private var hasChanges: Bool {
-        name != originalName || bio != originalBio || photoUIImage !== originalPhoto
+        // Photo persists ON PICK (see loadPickedImage) — only text edits
+        // drive the save button now.
+        ProfileDetailsDirty.hasChanges(name: name, originalName: originalName,
+                                       bio: bio, originalBio: originalBio)
     }
 
     private var canSave: Bool {
@@ -366,6 +379,12 @@ struct ProfileDetailsView: View {
             if let data = try await item.loadTransferable(type: Data.self),
                let img = UIImage(data: data) {
                 photoUIImage = img
+                // IMMEDIATE PERSIST: the photo applies on pick (standard iOS
+                // avatar behavior). Before this, the pick lived only in sheet
+                // @State — a disabled save button (empty name) or a swipe
+                // dismissal silently lost it, reverting to the mascot.
+                _ = PhotoStore.save(image: img)
+                originalPhoto = img
             }
         } catch {
             // Silent failure — user can retry
@@ -379,10 +398,7 @@ struct ProfileDetailsView: View {
         // updated (and cross-view observers refresh correctly).
         dataManager.userName = trimmedName
         UserDefaults.standard.set(bio, forKey: bioKey)
-
-        if photoUIImage !== originalPhoto, let img = photoUIImage {
-            _ = PhotoStore.save(image: img)
-        }
+        // (photo already persisted at pick time — nothing to do here)
 
         // Haptic
         let gen = UINotificationFeedbackGenerator()
