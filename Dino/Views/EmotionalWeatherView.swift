@@ -25,11 +25,12 @@ struct EmotionalWeatherView: View {
     @State private var worldMomentMood: EmotionalWeather = .clear
     @State private var worldMomentPending: (line: String, mood: EmotionalWeather)?
     @State private var showWorld = false
-    // Lanterns: invite after bright logs, one received after heavy ones.
+    // Lanterns: invite after bright logs; after heavy ones the arrival
+    // CEREMONY replaces the old popup (claim mechanics untouched).
     @State private var showLanternInvite = false
     @State private var showLanternCompose = false
-    @State private var pendingLantern: ReceivedLantern?
-    @State private var shownLantern: ReceivedLantern?
+    @State private var ceremonyLantern: ReceivedLantern?
+    @State private var showJarLine = false
     // Gentle recommendation: ONE real thing, one warm line, only when the
     // moment engine says so (see GentleRecEngine — scarcity is the feature).
     @State private var pendingRec: GentleRec?
@@ -180,15 +181,11 @@ struct EmotionalWeatherView: View {
                         // Break-finder hook: show the card on every low mood.
                         if let w = logged, w == .overwhelmed || w == .drained {
                             breakMood = w
-                            showBreakCard = true
                             // World moment waits for the break card to finish —
                             // it is always the final beat, never an interruption.
                             if let line = WorldMoodService.worldMomentLine(mood: w, bucket: worldBucket ?? WorldMoodService.cachedTodayBucket) {
                                 worldMomentPending = (line, w)
                             }
-                            // Quietly ask the pool for today's lantern so it's
-                            // ready when the break card closes. Nil = nothing shows.
-                            Task { pendingLantern = await LanternService.claimLantern() }
                             // Support row on a heavy stretch — it takes the
                             // slot; the gentle rec stays quiet that day.
                             if stretchSignalFires() {
@@ -199,6 +196,23 @@ struct EmotionalWeatherView: View {
                                 Task {
                                     pendingRec = await GentleRecCoordinator.fetchIfMomentIsRight(
                                         dataManager: dataManager, freshHeavyMood: w)
+                                }
+                            }
+                            // The ceremony is the headliner when a lantern is
+                            // available: claim races a short window; nil or
+                            // slow → today's exact flow (break card first).
+                            Task {
+                                let lantern: ReceivedLantern? = await withTaskGroup(of: ReceivedLantern?.self) { group in
+                                    group.addTask { await LanternService.claimLantern() }
+                                    group.addTask { try? await Task.sleep(for: .seconds(2.5)); return nil }
+                                    let first = await group.next() ?? nil
+                                    group.cancelAll()
+                                    return first
+                                }
+                                if let lantern {
+                                    ceremonyLantern = lantern
+                                } else {
+                                    showBreakCard = true
                                 }
                             }
                         } else if let w = logged {
@@ -331,6 +345,19 @@ struct EmotionalWeatherView: View {
                         .transition(.opacity)
                     }
 
+                    // Tonight's lantern — the ceremony's quiet coda.
+                    if showJarLine {
+                        HStack(spacing: 8) {
+                            Text("🏮").font(.system(size: 12))
+                            Text(CeremonyStrings.jarStackLine)
+                                .font(DinoTheme.dinoFont(size: 13))
+                                .foregroundColor(DinoTheme.textSecondary)
+                            Spacer(minLength: 0)
+                        }
+                        .padding(.horizontal, DinoTheme.padding)
+                        .transition(.opacity)
+                    }
+
                     // While you were away — one quiet line after a siri-logged
                     // mood (consumed on show; x just hides it).
                     if let line = siriReturnLine {
@@ -355,43 +382,25 @@ struct EmotionalWeatherView: View {
                         .transition(.opacity)
                     }
 
-                    // Gentle recommendation — one item, one warm line, no
-                    // pressure. Tap opens the link; leaving without tapping
-                    // counts as an ignore for the learning loop.
+                    // Comfort slip (concept 3a) — the gentle rec's new body.
+                    // "not tonight" feeds the exact ignore signal leaving did;
+                    // every GentleRecEngine gate is unchanged.
                     if let rec = shownRec {
-                        Button {
+                        ComfortSlipView(rec: rec, onTake: {
                             recWasTapped = true
                             GentleRecStore.recordTapped(type: rec.type)
                             AnalyticsManager.shared.trackRecTapped()
                             if let url = URL(string: rec.link) {
                                 UIApplication.shared.open(url)
                             }
-                        } label: {
-                            HStack(spacing: 10) {
-                                Text(rec.type == "music" ? "🎧" : rec.type == "film" ? "🎬" : "🍵")
-                                VStack(alignment: .leading, spacing: 3) {
-                                    Text(rec.line)
-                                        .font(DinoTheme.dinoFont(size: 14))
-                                        .foregroundColor(DinoTheme.textPrimary)
-                                        .multilineTextAlignment(.leading)
-                                    Text(rec.title)
-                                        .font(DinoTheme.dinoFont(size: 12))
-                                        .foregroundColor(DinoTheme.textSecondary)
-                                        .lineLimit(1)
-                                }
-                                Spacer(minLength: 0)
-                                Image(systemName: "arrow.up.right")
-                                    .font(.system(size: 11, weight: .semibold))
-                                    .foregroundColor(DinoTheme.textSecondary.opacity(0.6))
-                            }
-                            .padding(14)
-                            .background(
-                                RoundedRectangle(cornerRadius: DinoDesignSystem.radiusMD, style: .continuous)
-                                    .fill(DinoTheme.lavender.opacity(0.14))
-                            )
-                        }
-                        .buttonStyle(.plain)
+                        }, onNotTonight: {
+                            recWasTapped = true   // consumed — no double count on disappear
+                            GentleRecStore.recordIgnored(type: rec.type)
+                            AnalyticsManager.shared.trackRecIgnored()
+                            withAnimation(.easeInOut(duration: 0.35)) { shownRec = nil }
+                        })
                         .padding(.horizontal, DinoTheme.padding)
+                        .padding(.top, 12)
                         .transition(.opacity.combined(with: .move(edge: .bottom)))
                     }
 
@@ -470,13 +479,8 @@ struct EmotionalWeatherView: View {
                 }
             }
             .sheet(isPresented: $showBreakCard, onDismiss: {
-                // The break card finished (confirmed or dismissed). First the
-                // received lantern drifts down (if one was claimed), then the
-                // world moment line appears as the final beat below.
-                if let lantern = pendingLantern {
-                    pendingLantern = nil
-                    shownLantern = lantern
-                }
+                // The break card finished (confirmed or dismissed) — the world
+                // moment line appears as the final beat below.
                 if let pending = worldMomentPending {
                     worldMomentPending = nil
                     worldMomentMood = pending.mood
@@ -498,17 +502,19 @@ struct EmotionalWeatherView: View {
             .fullScreenCover(isPresented: $showLanternCompose) {
                 LanternComposeView(onDismiss: { showLanternCompose = false })
             }
-            .overlay {
-                if let lantern = shownLantern {
-                    LanternReceivedCard(lantern: lantern, onClose: {
-                        shownLantern = nil
-                        // a lantern just landed — the one contextual share moment
-                        if ShareDino.shouldShowContextualNow() {
-                            ShareDino.markContextualShown()
-                            withAnimation(.easeInOut(duration: 0.35)) { showShareRow = true }
-                        }
-                    })
-                }
+            .fullScreenCover(item: $ceremonyLantern) { lantern in
+                LanternArrivalView(lantern: lantern, onFinished: {
+                    ceremonyLantern = nil
+                    withAnimation(.easeInOut(duration: 0.5)) { showJarLine = true }
+                    // a lantern just landed — the one contextual share moment
+                    if ShareDino.shouldShowContextualNow() {
+                        ShareDino.markContextualShown()
+                        withAnimation(.easeInOut(duration: 0.35)) { showShareRow = true }
+                    }
+                    // ceremony before break card — the stack follows as today
+                    showBreakCard = true
+                })
+                .presentationBackground(.clear)
             }
             .overlay(alignment: .topTrailing) {
                 // Quiet persistent support affordance — always present, never
