@@ -880,28 +880,6 @@ struct ProfileView: View {
             ) {
                 activeSheet = .windDown
             }
-            // Share dino — quiet row, matches the SBRow look with a ShareLink.
-            ShareLink(item: ShareDino.appStoreURL,
-                      message: Text(ShareDino.shareText)) {
-                HStack(spacing: 12) {
-                    ZStack {
-                        Circle().fill(SB.peach).frame(width: 36, height: 36)
-                        Text("🦕").font(.system(size: 16))
-                    }
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(ShareDino.profileRowTitle)
-                            .font(DinoTheme.dinoFont(size: 16)).foregroundColor(SB.nearBlack)
-                        Text("a gentle companion travels well")
-                            .font(DinoTheme.dinoFont(size: 12)).foregroundColor(SB.sage)
-                    }
-                    Spacer(minLength: 0)
-                    Image(systemName: "square.and.arrow.up")
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundColor(SB.sage)
-                }
-                .padding(.vertical, 6)
-            }
-            .buttonStyle(.plain)
         }
     }
 
@@ -1055,6 +1033,28 @@ struct ProfileView: View {
             ) {
                 showRateAlert = true
             }
+            // Share dino — quiet row, matches the SBRow look with a ShareLink.
+            ShareLink(item: ShareDino.appStoreURL,
+                      message: Text(ShareDino.shareText)) {
+                HStack(spacing: 12) {
+                    ZStack {
+                        Circle().fill(SB.peach).frame(width: 36, height: 36)
+                        Text("🦕").font(.system(size: 16))
+                    }
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(ShareDino.profileRowTitle)
+                            .font(DinoTheme.dinoFont(size: 16)).foregroundColor(SB.nearBlack)
+                        Text("a gentle companion travels well")
+                            .font(DinoTheme.dinoFont(size: 12)).foregroundColor(SB.sage)
+                    }
+                    Spacer(minLength: 0)
+                    Image(systemName: "square.and.arrow.up")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(SB.sage)
+                }
+                .padding(.vertical, 6)
+            }
+            .buttonStyle(.plain)
 
             HStack(spacing: 12) {
                 ZStack {
