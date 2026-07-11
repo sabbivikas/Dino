@@ -24,3 +24,18 @@ Secondary ref noted for scroll effects only: eleev/swiftui-new-metal-shaders (un
 - Screenshot iter1/baseline-home.png (what's-new sheet — new build re-triggered it; app renders warm and clean).
 - RUBRIC (baseline, no visual delta yet — scores reflect unchanged app): tide 4 · storybook 5 · readability 5 · calming 4.
 - TODO 1 (GradientSeed) CHECKED — deterministic palette + tests green.
+
+=== ITER 2 — breathing water (2026-07-11) ===
+- BreathingCircle outer glow gets BreathingWaterGlow: ViewModifier + Animatable whose animatableData is the
+  normalized breath (0..1). It rides the SAME withAnimation the VM uses for circleScale — the transition that
+  also fires BreathingHaptics.play — so water, circle, and tide share one clock, zero drift.
+- distortionEffect dinoBreathingWater (strength 5, maxSampleOffset 12) + colorEffect dinoCausticShimmer,
+  wrapped in TimelineView(.animation) via visualEffect. Reduce Motion → no shader, static soft glow
+  (opacity 0.9+0.1*breath).
+- Debug arg -breathQARun added (BreathingView.onAppear, DEBUG only) to auto-start a session for screenshots.
+- Sim prefs gotcha: what's-new sheet resurfaced; simctl defaults write hits global domain — wrote container
+  plist domain path instead (dino.lastSeenWhatsNewVersion=2.0).
+- Full DinoTests PASSED, debug build 0 errors. Shots iter2/water-a.png (exhale: glow has soft pebble-like
+  water wobble, clearly breathing), water-b.png (rest: settles near-circular, calm).
+- RUBRIC: tide 4 · storybook 4 · readability 5 (label/countdown untouched by distortion) · calming 4 → GREEN.
+- TODO 2 (breathing water) CHECKED.

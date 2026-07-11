@@ -201,6 +201,14 @@ struct BreathingView: View {
         }
         .onAppear {
             AnalyticsManager.shared.trackScreen("breathing")
+            #if DEBUG
+            // -breathQARun: start a session on arrival so the breathing water
+            // is screenshotable without tapping through the coach.
+            if ProcessInfo.processInfo.arguments.contains("-breathQARun"),
+               !viewModel.isRunning {
+                viewModel.start()
+            }
+            #endif
         }
         .onDisappear {
             viewModel.stop()

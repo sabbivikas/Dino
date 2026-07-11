@@ -35,10 +35,12 @@ struct BreathingCircle: View {
 
     var body: some View {
         ZStack {
-            // Outer glow — 200pt, sage green 25%
+            // Outer glow — 200pt, sage green 25%. The water lives here and
+            // only here: the glow breathes, the text never distorts.
             Circle()
                 .fill(DinoTheme.sageGreen.opacity(0.25))
                 .frame(width: 200, height: 200)
+                .modifier(BreathingWaterGlow(breath: normalized))
                 .scaleEffect(breatheScale)
 
             // Mid ring — 160pt, sage green, 0.5s delay feel via slightly dampened scale
@@ -96,6 +98,55 @@ struct BreathingCircle: View {
             jump.disablesAnimations = true
             withTransaction(jump) { tickScale = 1.05 }
             withAnimation(.easeOut(duration: 0.3)) { tickScale = 1.0 }
+        }
+    }
+}
+
+// MARK: - Breathing water
+
+/// Water on the glow that breathes with the phase. `breath` rides the same
+/// withAnimation the view model uses for the circle scale — the one
+/// transition that also drives the haptic tide — so the water, the circle,
+/// and the tide can never drift apart. Animatable conformance means SwiftUI
+/// hands us the interpolated in-between values, not just the targets.
+private struct BreathingWaterGlow: ViewModifier, Animatable {
+    var breath: CGFloat
+
+    var animatableData: CGFloat {
+        get { breath }
+        set { breath = newValue }
+    }
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    func body(content: Content) -> some View {
+        if reduceMotion {
+            // static soft glow — the breath still shows, nothing moves
+            content.opacity(0.9 + 0.1 * Double(breath))
+        } else {
+            TimelineView(.animation) { timeline in
+                let t = timeline.date.timeIntervalSinceReferenceDate
+                content
+                    .visualEffect { view, proxy in
+                        view
+                            .distortionEffect(
+                                ShaderLibrary.dinoBreathingWater(
+                                    .float2(proxy.size),
+                                    .float(t),
+                                    .float(breath),
+                                    .float(5)
+                                ),
+                                maxSampleOffset: CGSize(width: 12, height: 12)
+                            )
+                            .colorEffect(
+                                ShaderLibrary.dinoCausticShimmer(
+                                    .float2(proxy.size),
+                                    .float(t),
+                                    .float(breath)
+                                )
+                            )
+                    }
+            }
         }
     }
 }
