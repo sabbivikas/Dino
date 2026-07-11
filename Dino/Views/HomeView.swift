@@ -106,6 +106,10 @@ struct HomeView: View {
                 if ProcessInfo.processInfo.arguments.contains("-breathQA") {
                     viewModel.showBreathing = true
                 }
+                // -resourcesQA: jump straight to the support resources screen.
+                if ProcessInfo.processInfo.arguments.contains("-resourcesQA") {
+                    viewModel.showResources = true
+                }
                 #endif
                 #if DEBUG
                 // -healthQA: fire the sleep authorization sheet on launch so the

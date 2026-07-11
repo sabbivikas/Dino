@@ -148,6 +148,8 @@ struct ComfortSlipView: View {
         .background(
             RoundedRectangle(cornerRadius: 6, style: .continuous)
                 .fill(Color(hex: "#FFFDF6"))
+                // same fiber as the resources cards — static, never boils
+                .colorEffect(ShaderLibrary.dinoPaperGrain(.float(0.05)))
                 .overlay(RoundedRectangle(cornerRadius: 6, style: .continuous)
                     .stroke(Color(hex: "#EFE7D2"), lineWidth: 1))
                 .shadow(color: Color(red: 40/255, green: 30/255, blue: 15/255).opacity(0.10), radius: 13, y: 10)

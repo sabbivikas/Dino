@@ -283,15 +283,11 @@ private struct PaperSurface: View {
 
 private struct PaperGrain: View {
     var body: some View {
-        Canvas { ctx, size in
-            var y: CGFloat = 0
-            while y < size.height {
-                ctx.fill(Path(CGRect(x: 0, y: y, width: size.width, height: 2)),
-                         with: .color(Color(hex: "#3D3A35").opacity(0.012)))
-                y += 4
-            }
-        }
-        .allowsHitTesting(false)
+        // whisper-subtle fiber via the dinoPaperGrain shader — static by
+        // construction (position hash only, no time): paper never boils
+        Color(hex: "#FFFDF6")
+            .colorEffect(ShaderLibrary.dinoPaperGrain(.float(0.05)))
+            .allowsHitTesting(false)
     }
 }
 

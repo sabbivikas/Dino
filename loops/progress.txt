@@ -39,3 +39,13 @@ Secondary ref noted for scroll effects only: eleev/swiftui-new-metal-shaders (un
   water wobble, clearly breathing), water-b.png (rest: settles near-circular, calm).
 - RUBRIC: tide 4 · storybook 4 · readability 5 (label/countdown untouched by distortion) · calming 4 → GREEN.
 - TODO 2 (breathing water) CHECKED.
+
+=== ITER 3 — paper grain shader (2026-07-11) ===
+- ResourcesView.PaperGrain reimplemented: raster line-scan Canvas → Color(#FFFDF6).colorEffect(dinoPaperGrain 0.05).
+  Static by construction (position hash, no time) — paper never boils.
+- ComfortSlipView background gains the same colorEffect on its fill (before stroke/shadow so shadow stays clean).
+- Debug arg -resourcesQA added in HomeView (DEBUG) → viewModel.showResources.
+- Full DinoTests PASSED, debug build 0 errors. Shot iter3/resources-grain.png: even fiber on hero + rows,
+  reads as real paper stock; tape stripes and hour badges intact; every number crisp.
+- RUBRIC: tide 4 · storybook 5 · readability 5 · calming 4 → GREEN.
+- TODO 3 (paper grain) CHECKED.
