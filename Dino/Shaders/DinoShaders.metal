@@ -149,3 +149,97 @@ float fbm(float2 p) {
     half4 moteColor = half4(1.0h, 0.97h, 0.88h, 1.0h); // warm white
     return mix(currentColor, moteColor, min(mote, 0.85h));
 }
+
+// ============================================================================
+// THE ATMOSPHERE LAYER (loop 1). Techniques adapted from Inferno
+// (github.com/twostraws/Inferno), MIT License, Copyright (c) 2023 Paul
+// Hudson and other authors — approaches borrowed, every parameter retuned
+// for dino: gentle, slow, warm (cream #FAF6EC, sage #7BA872, dusk navys).
+// No package dependency; these functions are ours.
+// ============================================================================
+
+// Inferno's noise trick (dot-product sine hash) with TIME REMOVED for the
+// grain use — paper never boils.
+static float dinoHash(float2 position, float offset) {
+    float sum = dot(position, float2(12.9898, 78.233));
+    return fract(sin(sum) * 43758.5453 * offset);
+}
+
+// ── paper grain — whisper-subtle, STATIC (colorEffect) ────────────────
+// amount ~0.035 reads as fiber, not sandpaper. floor() cells keep retina
+// densities from shimmering.
+[[ stitchable ]] half4 dinoPaperGrain(float2 position, half4 color, float amount) {
+    if (color.a <= 0.0h) { return color; }
+    float g = dinoHash(floor(position * 0.9), 1.0);
+    half delta = half((g - 0.5) * amount);
+    return half4(color.rgb + half3(delta) * color.a, color.a);
+}
+
+// ── breathing water (distortionEffect) ───────────────────────────
+// Inferno's water slowed to a tide: their speed 3 becomes 0.35, and the
+// strength swells with `breath` (0 rest → 1 full inhale) so the water
+// breathes WITH the circle — the phase clock lives outside, shared with
+// the animation and the haptic tide.
+[[ stitchable ]] float2 dinoBreathingWater(float2 position, float2 size, float time, float breath, float strength) {
+    float2 uv = position / size;
+    const float TWO_PI = 6.28318530718;
+    float phase = fmod(time * 0.35, TWO_PI);
+    float s = (strength / 100.0) * (0.35 + 0.65 * breath);
+    uv.x += sin(uv.y * 6.0 + phase) * s;
+    uv.y += cos(uv.x * 5.0 + phase) * s;
+    return uv * size;
+}
+
+// ── caustic shimmer (colorEffect) ──────────────────────────────
+// Two crossed slow sines brighten by at most 6% at full breath — light on
+// water seen from a pillow, never a disco.
+[[ stitchable ]] half4 dinoCausticShimmer(float2 position, half4 color, float2 size, float time, float breath) {
+    if (color.a <= 0.0h) { return color; }
+    float2 uv = position / size;
+    float phase = fmod(time * 0.4, 6.28318530718);
+    float band = sin(10.0 * uv.x + phase) * sin(9.0 * uv.y - phase * 0.8);
+    half glow = half(max(0.0, band) * 0.06 * breath);
+    return half4(color.rgb + half3(glow) * color.a, color.a);
+}
+
+// ── storybook weather (colorEffect on a clear overlay) ───────────────
+// kind: 1 rain · 2 snow · 3 fog. intensity 0..1. Drawn INTO transparency:
+// the overlay rect is clear and the shader paints gentle weather onto it.
+// Column/cell hashes keep patterns from visibly repeating; speeds are
+// storybook-slow — never particle spam.
+[[ stitchable ]] half4 dinoWeather(float2 position, half4 color, float2 size, float time, float kind, float intensity) {
+    float2 uv = position / size;
+    half4 out = half4(0.0h);
+    if (kind < 0.5) { return out; }
+
+    if (kind < 1.5) {
+        // rain: sparse thin streaks drifting down, dusk-navy at whisper alpha
+        float col = floor(uv.x * 26.0);
+        float colHash = dinoHash(float2(col, 7.0), 1.3);
+        float speed = 0.14 + colHash * 0.10;
+        float y = fract(uv.y * 0.9 - time * speed - colHash * 7.0);
+        float streak = smoothstep(0.0, 0.05, y) * smoothstep(0.16, 0.05, y);
+        float gate = step(0.72, colHash);            // ~1 in 4 columns rains
+        float a = streak * gate * 0.10 * intensity;
+        out = half4(0.36h, 0.40h, 0.52h, 1.0h) * half(a);
+    } else if (kind < 2.5) {
+        // snow: soft warm-white motes, one per sparse cell, drifting with sway
+        float2 grid = float2(14.0, 10.0);
+        float2 cell = floor(uv * grid);
+        float h = dinoHash(cell, 2.1);
+        float fall = fract(h * 5.0 + time * (0.03 + h * 0.03));
+        float sway = sin(time * 0.4 + h * 6.28318) * 0.08;
+        float2 inCell = fract(uv * grid) - 0.5;
+        float2 moteCenter = float2(sway, (fall - 0.5) * 0.9);
+        float mote = smoothstep(0.17, 0.05, length(inCell - moteCenter));
+        float gate = step(0.55, h);
+        float a = mote * gate * 0.16 * intensity;
+        out = half4(1.0h, 0.99h, 0.96h, 1.0h) * half(a);
+    } else {
+        // fog: two low-frequency bands breathing across, barely there
+        float band = sin(uv.x * 2.2 + time * 0.06) * sin(uv.y * 1.4 - time * 0.045);
+        float a = max(0.0, band) * 0.05 * intensity * (0.7 + 0.3 * sin(time * 0.1));
+        out = half4(0.98h, 0.96h, 0.90h, 1.0h) * half(a);
+    }
+    return out;
+}

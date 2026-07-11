@@ -1,0 +1,26 @@
+LOOP 1 — the atmosphere layer · branch feature/dino-shaders · max 25 iters
+===========================================================================
+SETUP (2026-07-11): main clean @ 804467e (build 9 untouched, 8× CURRENT_PROJECT_VERSION=9).
+Branches feature/dino-shaders + feature/mood-refresh created off main. loops/ scaffolded.
+
+STEP ZERO: cloned github.com/twostraws/Inferno @ depth 1 to /tmp/Inferno.
+LICENSE VERIFIED: MIT, Copyright (c) 2023 Paul Hudson and other authors.
+Attribution recorded here and in Dino/Shaders/DinoShaders.metal header.
+Studied: Water.metal (UV distortion, sin/cos with fmod-wrapped phase),
+WhiteNoise/RainbowNoise.metal (dot-product sine hash → fract), 
+AnimatedGradientFill.metal (angle-based cycling). Techniques adapted, every
+parameter retuned for dino (gentle/slow/warm); no package dependency added.
+Secondary ref noted for scroll effects only: eleev/swiftui-new-metal-shaders (unused so far).
+
+---------------------------------------------------------------------------
+
+=== ITER 1 — GradientSeed + shader foundation (2026-07-11) ===
+- Appended atmosphere section to existing Dino/Shaders/DinoShaders.metal (kept June ambient shaders):
+  dinoHash (time-free — paper never boils), dinoPaperGrain (~0.035), dinoBreathingWater (speed 0.35 vs
+  Inferno 3.0, strength swells 0.35+0.65*breath, phase clock external/shared), dinoCausticShimmer (<=6%),
+  dinoWeather (rain 1-in-4 columns a0.10 dusk navy / snow warm motes / fog bands a0.05). MIT attribution
+  in section header.
+- GradientSeed.swift + GradientSeedTests: 6/6 pass. Full DinoTests: PASSED. Debug build: 0 errors.
+- Screenshot iter1/baseline-home.png (what's-new sheet — new build re-triggered it; app renders warm and clean).
+- RUBRIC (baseline, no visual delta yet — scores reflect unchanged app): tide 4 · storybook 5 · readability 5 · calming 4.
+- TODO 1 (GradientSeed) CHECKED — deterministic palette + tests green.
