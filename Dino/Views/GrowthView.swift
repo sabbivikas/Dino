@@ -82,6 +82,13 @@ struct GrowthView: View {
     // and the delivery never begins
     @State private var letterUnread = GardenLetterStore.isUnreadToday()
     @State private var letterLeftForLater = false
+    // share my garden — postcard composition
+    @State private var composingShare = false
+    @State private var shareImage: UIImage?
+    @State private var showShareSheet = false
+    #if DEBUG
+    @State private var showShareQAGallery = false
+    #endif
 
     /// Night + unread → she waits for first light; the status line says so.
     private var letterWaitsForMorning: Bool {
@@ -97,6 +104,18 @@ struct GrowthView: View {
                 Garden3DPanel(vm: vm, reduceMotion: reduceMotion,
                               letterUnread: $letterUnread,
                               letterLeftForLater: $letterLeftForLater)
+                    .overlay(alignment: .topTrailing) {
+                        // quiet share affordance — availability, never a nag
+                        Button { shareGarden() } label: {
+                            Image(systemName: "square.and.arrow.up")
+                                .font(.system(size: 15))
+                                .foregroundColor(DinoTheme.textSecondary.opacity(0.55))
+                                .padding(10)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(GardenShare.shareButtonLabel)
+                        .padding(6)
+                    }
                 StatusLine(vm: vm, letterWaiting: letterWaitsForMorning,
                            letterLeftForLater: letterLeftForLater)
                 PracticePillsRow(vm: vm)
@@ -123,9 +142,223 @@ struct GrowthView: View {
         }
         .onAppear {
             AnalyticsManager.shared.trackScreen("growth_garden")
+            #if DEBUG
+            // -gardenShareQA: postcard fixture gallery for loop screenshots.
+            if ProcessInfo.processInfo.arguments.contains("-gardenShareQA") {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { showShareQAGallery = true }
+            }
+            #endif
+        }
+        .overlay {
+            if composingShare {
+                Text(GardenShare.composingLine)
+                    .font(DinoTheme.dinoFont(size: 14))
+                    .foregroundColor(DinoTheme.textPrimary)
+                    .padding(.horizontal, 16).padding(.vertical, 10)
+                    .background(Capsule().fill(Color(hex: "#FFFDF6")).shadow(color: .black.opacity(0.12), radius: 8, y: 3))
+                    .transition(.opacity)
+            }
+        }
+        .sheet(isPresented: $showShareSheet) {
+            if let image = shareImage {
+                GardenShareSheet(items: [image, GardenShare.shareText, ShareDino.appStoreURL])
+            }
+        }
+        #if DEBUG
+        .fullScreenCover(isPresented: $showShareQAGallery) {
+            GardenPostcardQAGallery()
+        }
+        #endif
+    }
+
+    // MARK: - Share my garden
+
+    private func shareGarden() {
+        AnalyticsManager.shared.trackGardenShareOpened()
+        HapticManager.shared.light()
+        withAnimation(.easeInOut(duration: 0.2)) { composingShare = true }
+        // next runloop beat: let the composing line paint before the render
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+            let snap = SunflowerSnapshot(
+                stage: vm.growthStage, careState: vm.careState,
+                sproutP: vm.sproutP, stemP: vm.stemP, leafP: vm.leafP,
+                budP: vm.budP, bloomP: vm.bloomP, care: vm.care)
+            let scene = sceneKey(theme: themeManager.currentTheme, date: Date())
+            let day = GardenShare.age(firstPractice: vm.firstPracticeDate)
+            let image = GardenPostcardComposer.compose(
+                snap: snap, scene: scene, day: day, uid: GardenShare.currentUID())
+            withAnimation(.easeInOut(duration: 0.2)) { composingShare = false }
+            if let image {
+                shareImage = image
+                showShareSheet = true
+            }
         }
     }
 }
+
+// MARK: - Share my garden — the postcard
+// Lives in this file on purpose: the card reuses the hand-drawn 2D garden
+// (drawBackground/drawSunflower) that the 3D panel replaced on screen —
+// on paper, the drawing IS the better garden.
+
+fileprivate struct GardenPostcardView: View {
+    let snap: SunflowerSnapshot
+    let scene: GardenScene
+    let day: Int
+    let uid: String
+    /// one fixed instant — a postcard is a still, not a boil
+    var time: TimeInterval = 12_000
+
+    var body: some View {
+        VStack(spacing: 0) {
+            Canvas { ctx, size in
+                var c = ctx
+                drawBackground(ctx: &c, size: size, scene: scene, t: time, reduceMotion: true)
+                drawSunflower(ctx: &c, size: size, snap: snap, t: time,
+                              reduceMotion: true, appearScale: 1.0)
+            }
+            .frame(width: 484, height: 424)
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(Color(hex: "#EFE7D2"), lineWidth: 1))
+            .padding(.top, 30)
+
+            Spacer(minLength: 0)
+
+            Text(GardenShare.caption(day: day))
+                .font(DinoTheme.dinoFont(size: 25))
+                .foregroundColor(Color(hex: "#3D3A35"))
+
+            Spacer(minLength: 0)
+
+            Text(GardenShare.footer)
+                .font(DinoTheme.dinoFont(size: 14))
+                .foregroundColor(Color(hex: "#A8A29A"))
+                .padding(.bottom, 22)
+        }
+        .frame(width: 540, height: 675)
+        .background(PostcardPaper())
+        .overlay(alignment: .topTrailing) {
+            // the stamp — theirs, forever — with its cancellation mark
+            ZStack(alignment: .topTrailing) {
+                GardenPostmarkView(day: day)
+                    .offset(x: -38, y: 62)   // hangs off the stamp's lower-left corner
+                GardenStampView(uid: uid)
+                    .rotationEffect(.degrees(2))
+                    .shadow(color: .black.opacity(0.10), radius: 2, y: 1)
+            }
+            .padding(.top, 14)
+            .padding(.trailing, 16)
+        }
+    }
+}
+
+/// cream stock with raster grain — ImageRenderer cannot run Metal shader
+/// effects, so the postcard uses the drawn-line grain (renders identically
+/// offline), near-square corners, hairline edge
+fileprivate struct PostcardPaper: View {
+    var body: some View {
+        RoundedRectangle(cornerRadius: 6, style: .continuous)
+            .fill(Color(hex: "#FFFDF6"))
+            .overlay(
+                Canvas { ctx, size in
+                    var y: CGFloat = 0
+                    while y < size.height {
+                        ctx.fill(Path(CGRect(x: 0, y: y, width: size.width, height: 2)),
+                                 with: .color(Color(hex: "#3D3A35").opacity(0.012)))
+                        y += 4
+                    }
+                }
+                .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+            )
+            .overlay(RoundedRectangle(cornerRadius: 6, style: .continuous)
+                .stroke(Color(hex: "#EFE7D2"), lineWidth: 1))
+    }
+}
+
+@MainActor
+fileprivate enum GardenPostcardComposer {
+    /// 540×675pt at 2x → 1080×1350px — instagram story friendly 4:5
+    static func compose(snap: SunflowerSnapshot, scene: GardenScene, day: Int, uid: String) -> UIImage? {
+        let renderer = ImageRenderer(content: GardenPostcardView(snap: snap, scene: scene, day: day, uid: uid))
+        renderer.scale = 2
+        renderer.isOpaque = true
+        return renderer.uiImage
+    }
+}
+
+/// house activity-sheet wrapper (same iPad popover anchor fix as journal share)
+fileprivate struct GardenShareSheet: UIViewControllerRepresentable {
+    let items: [Any]
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        let controller = UIActivityViewController(activityItems: items, applicationActivities: nil)
+        if let popover = controller.popoverPresentationController {
+            let window = UIApplication.shared.connectedScenes
+                .compactMap { $0 as? UIWindowScene }
+                .flatMap { $0.windows }
+                .first(where: { $0.isKeyWindow })
+            popover.sourceView = window
+            popover.sourceRect = CGRect(x: window?.bounds.midX ?? UIScreen.main.bounds.midX,
+                                        y: window?.bounds.midY ?? UIScreen.main.bounds.midY,
+                                        width: 0, height: 0)
+            popover.permittedArrowDirections = []
+        }
+        return controller
+    }
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
+}
+
+#if DEBUG
+// MARK: - Postcard QA gallery (-gardenShareQA)
+// Fixture postcards for loop screenshots: young day, grown night, and the
+// two-uid stamp proof. View-local fixtures — writes nothing.
+
+fileprivate struct GardenPostcardQAGallery: View {
+    @Environment(\.dismiss) private var dismiss
+
+    private static let young = SunflowerSnapshot(
+        stage: .sprout, careState: .healthy,
+        sproutP: 1.0, stemP: 0.15, leafP: 0.10, budP: 0, bloomP: 0, care: 1.0)
+    private static let grown = SunflowerSnapshot(
+        stage: .thriving, careState: .healthy,
+        sproutP: 1.0, stemP: 1.0, leafP: 1.0, budP: 1.0, bloomP: 1.0, care: 1.0)
+
+    var body: some View {
+        ScrollView {
+            VStack(spacing: 14) {
+                Text("postcard qa").font(DinoTheme.dinoFont(size: 14))
+                HStack(spacing: 10) {
+                    GardenPostcardView(snap: Self.young, scene: .morning, day: 6, uid: "stamp-proof-a")
+                        .scaleEffect(0.32).frame(width: 178, height: 220)
+                    GardenPostcardView(snap: Self.grown, scene: .night, day: 84, uid: "stamp-proof-a")
+                        .scaleEffect(0.32).frame(width: 178, height: 220)
+                }
+                Text("same uid above · different uids below").font(DinoTheme.dinoFont(size: 12))
+                HStack(spacing: 10) {
+                    GardenPostcardView(snap: Self.grown, scene: .afternoon, day: 30, uid: "stamp-proof-a")
+                        .scaleEffect(0.32).frame(width: 178, height: 220)
+                    GardenPostcardView(snap: Self.grown, scene: .afternoon, day: 30, uid: "stamp-proof-b")
+                        .scaleEffect(0.32).frame(width: 178, height: 220)
+                }
+                HStack(spacing: 24) {
+                    VStack(spacing: 4) {
+                        GardenStampView(uid: "stamp-proof-a").scaleEffect(1.6).frame(width: 110, height: 130)
+                        Text("uid a").font(DinoTheme.dinoFont(size: 11))
+                    }
+                    VStack(spacing: 4) {
+                        GardenStampView(uid: "stamp-proof-b").scaleEffect(1.6).frame(width: 110, height: 130)
+                        Text("uid b").font(DinoTheme.dinoFont(size: 11))
+                    }
+                }
+                Button("close") { dismiss() }.padding(.bottom, 30)
+            }
+            .padding(.top, 24)
+            .frame(maxWidth: .infinity)
+        }
+        .background(Color(hex: "#EFE9DC").ignoresSafeArea())
+    }
+}
+#endif
 
 // MARK: - GrowthHeader
 

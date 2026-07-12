@@ -225,6 +225,11 @@ final class AnalyticsManager {
         capture("growth_garden_opened")
     }
 
+    /// Content-free counter — the postcard itself never enters analytics.
+    func trackGardenShareOpened() {
+        capture("garden_share_opened")
+    }
+
     func trackGrowthStageReached(stage: String) {
         capture("growth_stage_reached", properties: ["stage": stage])
     }
