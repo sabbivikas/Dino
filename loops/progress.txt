@@ -78,3 +78,17 @@ SETUP
   faint paper tue/sat — reads as a week of skies, zero emoji.
 - RUBRIC: paper 4 · gentle-when-heavy 5 · painterly/hand-feel 4 · XXL provisional 4 → GREEN.
 - BOX 5 (seven skies) CHECKED.
+
+=== L2 ITER 6 — state sweep (2026-07-11) ===
+- States verified by screenshot: nothing-selected (iter3 cards-none) · clear/drained (iter3) ·
+  cloudy/overwhelmed (iter6) · logged twice (saved-moment.png: sage + DrawnCheck "saved"; logged.png:
+  post-log rest — selection cleared, button asleep, today's sky painted into the strip) · XXL type
+  (xxl-top/xxl-bottom: header wraps, cards+glyphs+labels legible, adaptive line intact, seven skies +
+  world card fine — zero truncation) · Reduce Motion (a11y defaults key; static render correct, layout
+  identical).
+- QA additions this iter: -moodQAsaved (light-mood save after 0.6s). Content size + reduce motion restored.
+- Full DinoTests PASSED. No breakages found — nothing to fix.
+- RUBRIC: survives-XXL 5 · paper 4 · choosing 5 · alive 4 · glyphs 5 · gentle 5 → GREEN.
+- BOX 6 (state sweep) CHECKED.
+
+=== LOOP 2 COMPLETE — 6/6 boxes, 6 iterations, all rubric scores ≥4, zero emoji in new UI ===

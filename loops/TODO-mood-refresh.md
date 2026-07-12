@@ -26,9 +26,11 @@ glyphs-feel-hand-drawn-not-icon-pack · gentle-when-heavy · survives-XXL-type
       fills lavender (#9C8FB8 family), designed thumbs (warm disc, hand-drawn
       ring), native accessibility + haptics preserved
       (iter 4 — paper 4 · drawn 4 · alive 4; a11y added where none existed)
-- [ ] week strip → seven skies: seeded gradient sky squares via GradientSeed
+- [x] week strip → seven skies: seeded gradient sky squares via GradientSeed
       (seed = userId + dayKey + mood; heavy dusk, light warm, no-log faint
       empty paper), day labels stay, a11y label = day + mood, radius 8,
       hairline, soft inner light
-- [ ] state sweep: nothing-selected · each mood selected · logged · XXL type ·
+      (iter 5 — paper 4 · gentle 5 · painterly 4)
+- [x] state sweep: nothing-selected · each mood selected · logged · XXL type ·
       Reduce Motion — screenshot-verified, breakages fixed
+      (iter 6 — XXL 5 · all states green, zero breakages found)

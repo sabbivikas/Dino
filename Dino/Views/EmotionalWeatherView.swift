@@ -471,6 +471,13 @@ struct EmotionalWeatherView: View {
                 ]
                 if let match = qaMoods.first(where: { qaArgs.contains($0.0) }) {
                     viewModel.selectedWeather = match.1
+                    // -moodQAsaved: capture the logged state (light mood — no
+                    // heavy post-log flow fires during the sweep)
+                    if qaArgs.contains("-moodQAsaved") {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+                            viewModel.saveMood()
+                        }
+                    }
                 }
                 #endif
             }
