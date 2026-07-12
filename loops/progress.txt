@@ -92,3 +92,17 @@ SETUP
 - BOX 6 (state sweep) CHECKED.
 
 === LOOP 2 COMPLETE — 6/6 boxes, 6 iterations, all rubric scores ≥4, zero emoji in new UI ===
+
+POLISH LOOP — restore ambient life (feature/mood-refresh, max 10 iters)
+Context: owner reported the glyph rewrite lost the old cards' character. RM key deleted (was 0), relaunched.
+
+=== P ITER 1 — sun soul (2026-07-11) ===
+- SunGlyph rebuilt: Shape+repeatForever → TimelineView(1/30, paused: reduceMotion) + Canvas, Double time
+  (no float32 issues). Face restored: ink dot eyes blinking (~4s cycle, 0.14 squash in the 0.90-0.96
+  window), quad-curve smile slightly off true, peach blush thumbprints. Squash-stretch bounce 2.2s at
+  ~0.6x the old cartoon amplitude (x1.07/y0.94 peak). Rays breathe 3.6s, swell 0.92-1.06 (bigger than
+  before). Muted variant keeps the face at soft ink.
+- Full DinoTests PASSED, build 0 errors. Shots iter1/sun-{1..5}.png (0.9s apart): rays tucked → squashed
+  wide → mid-swell across moments; face reads warm and drawn.
+- RUBRIC: character 5 · hand-drawn 4 · calm-at-arm's-length 4 · gentle n/a → GREEN.
+- POLISH BOX 1 (sun soul) CHECKED.

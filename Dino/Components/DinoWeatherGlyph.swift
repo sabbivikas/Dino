@@ -32,6 +32,9 @@ struct DinoWeatherGlyph: View {
     }
 
     static let ink = Color(hex: "#3D3A35")
+
+    static func inkColor(muted: Bool) -> Color { ink.opacity(muted ? 0.40 : 0.82) }
+    static func softInkColor(muted: Bool) -> Color { ink.opacity(muted ? 0.32 : 0.62) }
 }
 
 // MARK: - Shared stroke maths
@@ -45,60 +48,104 @@ private func inkStyle(_ rect: CGRect) -> StrokeStyle {
     StrokeStyle(lineWidth: rect.inkWidth, lineCap: .round, lineJoin: .round)
 }
 
-// MARK: - Sun (clear) — soft uneven rays that breathe
+// MARK: - Sun (clear) — a little sun with a face: it bounces, blinks, and
+// its rays breathe. Time-driven Canvas (Double math — no shader precision
+// worries); paused-still under Reduce Motion.
 
 private struct SunGlyph: View {
     let muted: Bool
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var breath: CGFloat = 0
 
-    var body: some View {
-        GeometryReader { geo in
-            let rect = CGRect(origin: .zero, size: geo.size)
-            ZStack {
-                SunRays()
-                    .stroke(DinoWeatherGlyph.ink.opacity(muted ? 0.40 : 0.82), style: inkStyle(rect))
-                    .scaleEffect(reduceMotion ? 1.0 : 0.95 + 0.09 * breath)
-                SunCore()
-                    .fill(Color(hex: "#F5D98C").opacity(muted ? 0.13 : 0.30))
-                SunCore()
-                    .stroke(DinoWeatherGlyph.ink.opacity(muted ? 0.40 : 0.82), style: inkStyle(rect))
-            }
-        }
-        .onAppear {
-            guard !reduceMotion else { return }
-            withAnimation(.easeInOut(duration: 3.6).repeatForever(autoreverses: true)) { breath = 1 }
-        }
-    }
-}
-
-private struct SunCore: Shape {
-    func path(in rect: CGRect) -> Path {
-        // a hair squashed — a drawn circle, not a compass circle
-        let w = rect.side * 0.42, h = rect.side * 0.40
-        return Path(ellipseIn: CGRect(x: rect.midX - w / 2, y: rect.midY - h / 2 + rect.side * 0.01,
-                                      width: w, height: h))
-    }
-}
-
-private struct SunRays: Shape {
     // uneven angles and lengths — no two rays agree
     private static let rays: [(deg: Double, len: CGFloat)] = [
         (3, 0.140), (49, 0.108), (92, 0.150), (137, 0.100),
         (184, 0.132), (226, 0.112), (271, 0.146), (317, 0.118),
     ]
-    func path(in rect: CGRect) -> Path {
-        var p = Path()
-        let c = CGPoint(x: rect.midX, y: rect.midY)
-        let r0 = rect.side * 0.30
-        for ray in Self.rays {
-            let a = ray.deg * .pi / 180
-            let dir = CGPoint(x: cos(a), y: sin(a))
-            p.move(to: CGPoint(x: c.x + dir.x * r0, y: c.y + dir.y * r0))
-            p.addLine(to: CGPoint(x: c.x + dir.x * (r0 + rect.side * ray.len),
-                                  y: c.y + dir.y * (r0 + rect.side * ray.len)))
+
+    var body: some View {
+        TimelineView(.animation(minimumInterval: 1.0 / 30, paused: reduceMotion)) { timeline in
+            let t = reduceMotion ? 0 : timeline.date.timeIntervalSinceReferenceDate
+            Canvas { ctx, size in
+                let rect = CGRect(origin: .zero, size: size)
+                let s = rect.side
+                let c = CGPoint(x: rect.midX, y: rect.midY + s * 0.01)
+                let ink = DinoWeatherGlyph.inkColor(muted: muted)
+                let style = StrokeStyle(lineWidth: rect.inkWidth, lineCap: .round, lineJoin: .round)
+
+                // rays breathe — 3.6s swell
+                let breathe = 0.5 + 0.5 * sin(t * 2 * .pi / 3.6)
+                let rayScale = 0.92 + 0.14 * CGFloat(breathe)
+                let r0 = s * 0.30 * rayScale
+                for ray in Self.rays {
+                    let a = ray.deg * .pi / 180
+                    let dir = CGPoint(x: CGFloat(cos(a)), y: CGFloat(sin(a)))
+                    var p = Path()
+                    p.move(to: CGPoint(x: c.x + dir.x * r0, y: c.y + dir.y * r0))
+                    p.addLine(to: CGPoint(x: c.x + dir.x * (r0 + s * ray.len * rayScale),
+                                          y: c.y + dir.y * (r0 + s * ray.len * rayScale)))
+                    ctx.stroke(p, with: .color(ink), style: style)
+                }
+
+                // gentle squash and stretch — 2.2s, calmer than the old cartoon
+                let bt = ((t / 2.2).truncatingRemainder(dividingBy: 1) + 1).truncatingRemainder(dividingBy: 1)
+                let (sx, sy) = Self.bounceScale(bt)
+                ctx.translateBy(x: c.x, y: c.y)
+                ctx.scaleBy(x: sx, y: sy)
+                ctx.translateBy(x: -c.x, y: -c.y)
+
+                // core — a hair squashed, drawn not lathed
+                let w = s * 0.42, h = s * 0.40
+                let core = Path(ellipseIn: CGRect(x: c.x - w / 2, y: c.y - h / 2, width: w, height: h))
+                ctx.fill(core, with: .color(Color(hex: "#F5D98C").opacity(muted ? 0.13 : 0.30)))
+                ctx.stroke(core, with: .color(ink), style: style)
+
+                // blush — two warm thumbprints
+                let blushR = s * 0.036
+                let blushY = c.y + h * 0.17
+                for bx in [c.x - w * 0.31, c.x + w * 0.31] {
+                    ctx.fill(Path(ellipseIn: CGRect(x: bx - blushR, y: blushY - blushR,
+                                                    width: blushR * 2, height: blushR * 2)),
+                             with: .color(Color(hex: "#F5C6AA").opacity(muted ? 0.28 : 0.60)))
+                }
+
+                // eyes — ink dots that blink on a ~4s natural cycle
+                let blinkT = ((t / 4.0).truncatingRemainder(dividingBy: 1) + 1).truncatingRemainder(dividingBy: 1)
+                let eyeSquash: CGFloat = (blinkT > 0.90 && blinkT < 0.96) ? 0.14 : 1.0
+                let eyeR = s * 0.023
+                let eyeY = c.y - h * 0.10
+                for ex in [c.x - w * 0.19, c.x + w * 0.19] {
+                    ctx.fill(Path(ellipseIn: CGRect(x: ex - eyeR, y: eyeY - eyeR * eyeSquash,
+                                                    width: eyeR * 2, height: eyeR * 2 * eyeSquash)),
+                             with: .color(ink))
+                }
+
+                // smile — one quad curve, slightly off true
+                var smile = Path()
+                let smileY = c.y + h * 0.11
+                smile.move(to: CGPoint(x: c.x - w * 0.18, y: smileY))
+                smile.addQuadCurve(to: CGPoint(x: c.x + w * 0.18, y: smileY - s * 0.004),
+                                   control: CGPoint(x: c.x, y: smileY + h * 0.18))
+                ctx.stroke(smile, with: .color(ink),
+                           style: StrokeStyle(lineWidth: rect.inkWidth * 0.85, lineCap: .round))
+            }
         }
-        return p
+    }
+
+    /// squash-stretch profile — the old cartoon's arc at roughly 0.6x amplitude
+    private static func bounceScale(_ t: Double) -> (CGFloat, CGFloat) {
+        if t < 0.35 {
+            let p = CGFloat(t / 0.35)
+            return (1 + 0.07 * p, 1 - 0.06 * p)
+        } else if t < 0.50 {
+            let p = CGFloat((t - 0.35) / 0.15)
+            return (1.07 - 0.10 * p, 0.94 + 0.12 * p)
+        } else if t < 0.70 {
+            let p = CGFloat((t - 0.50) / 0.20)
+            return (0.97 + 0.06 * p, 1.06 - 0.09 * p)
+        } else {
+            let p = CGFloat((t - 0.70) / 0.30)
+            return (1.03 - 0.03 * p, 0.97 + 0.03 * p)
+        }
     }
 }
 
