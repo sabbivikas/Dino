@@ -94,6 +94,9 @@ enum GradientSeed {
 /// visually mesh-like, cheap, and honest about its era.
 struct SeededMeshGradient: View {
     let seed: String
+    /// roughly the rendered size — small tiles need small radials or the
+    /// mesh flattens into one blended tone
+    var radius: CGFloat = 220
 
     var body: some View {
         let grid = GradientSeed.meshGrid(seed)
@@ -104,7 +107,7 @@ struct SeededMeshGradient: View {
                     RadialGradient(
                         gradient: Gradient(colors: [grid[row][col].color, .clear]),
                         center: UnitPoint(x: Double(col) / 2, y: Double(row) / 2),
-                        startRadius: 0, endRadius: 220)
+                        startRadius: 0, endRadius: radius)
                         .opacity(0.65)
                 }
             }

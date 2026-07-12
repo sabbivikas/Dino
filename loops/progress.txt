@@ -64,3 +64,17 @@ SETUP
 - Full DinoTests PASSED, build 0 errors. Shot iter4/sliders.png: gold and lavender light, drawn rings.
 - RUBRIC: paper 4 · hand-drawn 4 · alive 4 · gentle 4 · choosing n/a · XXL provisional 4 → GREEN.
 - BOX 4 (sliders as light) CHECKED.
+
+=== L2 ITER 5 — week strip → seven skies (2026-07-11) ===
+- WeekSky (pure, tested): seed = userId|dayKey|mood.rawValue, isHeavy, dayKey formatter. userId from
+  FirebaseAuth uid (fallback "dino").
+- WeeklyMoodTrend: emoji row → DaySky squares 38pt (SeededMeshGradient radius 34 — added radius param,
+  220 flattened at tile size), heavy days get dusk veil (hue .63 s.38 b.32 @ .42), light days warm gold
+  veil .14, soft inner light radial, empty days faint cream paper. Radius 8 + #EFE7D2 hairline. a11y:
+  per-day element "weekday, mood label / no log"; square itself hidden.
+- QA: -moodQAweek fixture week (view-local, writes nothing).
+- Tests: seed stability/distinctness + fingerprint divergence, heavy classification, dayKey format.
+- Full DinoTests PASSED, build 0 errors. Shot iter5/week-skies.png: dusk wed/thu vs warm sun/mon/fri,
+  faint paper tue/sat — reads as a week of skies, zero emoji.
+- RUBRIC: paper 4 · gentle-when-heavy 5 · painterly/hand-feel 4 · XXL provisional 4 → GREEN.
+- BOX 5 (seven skies) CHECKED.

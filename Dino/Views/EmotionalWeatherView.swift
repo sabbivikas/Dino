@@ -4,6 +4,7 @@
 //
 
 import SwiftUI
+import FirebaseAuth
 
 struct EmotionalWeatherView: View {
     @ObservedObject private var themeManager = ThemeManager.shared
@@ -712,9 +713,44 @@ struct MoodSlider: View {
     }
 }
 
-// MARK: - Weekly Trend
+// MARK: - Weekly Trend — seven skies
+
+/// pure seed + tone rules for the week strip (tested)
+enum WeekSky {
+    /// stable per user · day · mood — the same sky every time you look back
+    static func seed(userId: String, dayKey: String, mood: EmotionalWeather) -> String {
+        userId + "|" + dayKey + "|" + mood.rawValue
+    }
+
+    static func isHeavy(_ mood: EmotionalWeather) -> Bool {
+        mood == .overwhelmed || mood == .drained
+    }
+
+    static func dayKey(_ date: Date, calendar: Calendar = .current) -> String {
+        let c = calendar.dateComponents([.year, .month, .day], from: date)
+        return String(format: "%04d-%02d-%02d", c.year ?? 0, c.month ?? 0, c.day ?? 0)
+    }
+}
+
 struct WeeklyMoodTrend: View {
     @ObservedObject var viewModel: MoodViewModel
+
+    private var userId: String { Auth.auth().currentUser?.uid ?? "dino" }
+
+    #if DEBUG
+    /// -moodQAweek: fixture week for screenshots — view-local, writes nothing
+    private static let qaMoods: [EmotionalWeather?] = [
+        .clear, .partlyCloudy, nil, .drained, .overwhelmed, .clear, nil,
+    ]
+    private var qaWeek: Bool { ProcessInfo.processInfo.arguments.contains("-moodQAweek") }
+    #endif
+
+    private func moodFor(_ date: Date, index: Int) -> EmotionalWeather? {
+        #if DEBUG
+        if qaWeek { return Self.qaMoods[index % Self.qaMoods.count] }
+        #endif
+        return viewModel.moodForDay(date)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -722,22 +758,27 @@ struct WeeklyMoodTrend: View {
                 .font(DinoTheme.dinoLabelFont(size: 14))
                 .foregroundColor(DinoTheme.textSecondary)
 
-            HStack(spacing: 0) {
-                ForEach(viewModel.last7Days, id: \.self) { date in
-                    let mood = viewModel.moodForDay(date)
+            HStack(spacing: 8) {
+                ForEach(Array(viewModel.last7Days.enumerated()), id: \.element) { index, date in
+                    let mood = moodFor(date, index: index)
                     VStack(spacing: 8) {
-                        Text(mood?.emoji ?? "·")
-                            .font(.system(size: mood != nil ? 28 : 16))
-
+                        DaySky(mood: mood,
+                               seed: mood.map {
+                                   WeekSky.seed(userId: userId,
+                                                dayKey: WeekSky.dayKey(date),
+                                                mood: $0)
+                               })
                         Text(dayLabel(date))
                             .font(DinoTheme.dinoFont(size: 11))
                             .foregroundColor(DinoTheme.textSecondary)
                     }
                     .frame(maxWidth: .infinity)
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel("\(fullDayLabel(date)), \(mood?.label ?? "no log")")
                 }
             }
             .padding(.vertical, 16)
-            .padding(.horizontal, 8)
+            .padding(.horizontal, 10)
             .dsCardLarge()
         }
     }
@@ -746,5 +787,42 @@ struct WeeklyMoodTrend: View {
         let formatter = DateFormatter()
         formatter.dateFormat = "EEE"
         return formatter.string(from: date).lowercased()
+    }
+
+    private func fullDayLabel(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "EEEE"
+        return formatter.string(from: date)
+    }
+}
+
+/// one day's sky: a seeded gradient square — dusk-toned when the day was
+/// heavy, warm when it was kind, faint empty paper when nothing was logged
+private struct DaySky: View {
+    let mood: EmotionalWeather?
+    let seed: String?
+
+    var body: some View {
+        ZStack {
+            if let seed, let mood {
+                SeededMeshGradient(seed: seed, radius: 34)
+                // the day's tone: dusk settles over heavy skies, warmth over kind ones
+                Rectangle()
+                    .fill(WeekSky.isHeavy(mood)
+                        ? Color(hue: 0.63, saturation: 0.38, brightness: 0.32).opacity(0.42)
+                        : Color(hex: "#F5C87A").opacity(0.14))
+                // soft inner light
+                RadialGradient(gradient: Gradient(colors: [.white.opacity(0.22), .clear]),
+                               center: .init(x: 0.35, y: 0.30), startRadius: 0, endRadius: 34)
+            } else {
+                // faint empty paper — a page not written on
+                Color(hex: "#FFFDF6").opacity(0.55)
+            }
+        }
+        .frame(width: 38, height: 38)
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous)
+            .strokeBorder(Color(hex: "#EFE7D2"), lineWidth: 1))
+        .accessibilityHidden(true)
     }
 }

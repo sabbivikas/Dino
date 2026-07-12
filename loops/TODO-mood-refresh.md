@@ -22,9 +22,10 @@ glyphs-feel-hand-drawn-not-icon-pack · gentle-when-heavy · survives-XXL-type
       alternating tilt + sage tape + deeper shadow (spring .28s overshoot),
       heavy-mood selection SOFTER than light (dimmer tape, gentler lift)
       (iter 3 — paper 5 · choosing 5 · gentle 5 · glyphs 5)
-- [ ] sliders as light: energy fills warm gold (#E8B84A family), intensity
+- [x] sliders as light: energy fills warm gold (#E8B84A family), intensity
       fills lavender (#9C8FB8 family), designed thumbs (warm disc, hand-drawn
       ring), native accessibility + haptics preserved
+      (iter 4 — paper 4 · drawn 4 · alive 4; a11y added where none existed)
 - [ ] week strip → seven skies: seeded gradient sky squares via GradientSeed
       (seed = userId + dayKey + mood; heavy dusk, light warm, no-log faint
       empty paper), day labels stay, a11y label = day + mood, radius 8,
