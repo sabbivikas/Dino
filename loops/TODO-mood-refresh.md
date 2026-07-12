@@ -7,10 +7,11 @@ rubric per box (1–5, ALL ≥4): paper-not-plastic ·
 selection-feels-like-choosing-a-card · button-feels-alive-not-needy ·
 glyphs-feel-hand-drawn-not-icon-pack · gentle-when-heavy · survives-XXL-type
 
-- [ ] designed weather glyphs: DinoWeatherGlyph — four hand-drawn-feel vector
+- [x] designed weather glyphs: DinoWeatherGlyph — four hand-drawn-feel vector
       marks (sun with soft uneven rays / drifting cloud / storm cloud with rain
       strokes / low mist bands), irregular strokes, idle animation <4s cycle,
       Reduce Motion static, per-glyph structure for Chloe's future art swap
+      (iter 1 — glyphs 5 · gentle 4 · XXL 4 · selection 4)
 - [ ] the log button: sage breathing pulse (3.2s), selected mood's glyph,
       honest muted disabled state, pressed squish, adaptive handwritten line
       after selection (heavy: "however it is, it counts" / light: "glad the

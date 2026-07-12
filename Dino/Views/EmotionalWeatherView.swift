@@ -225,36 +225,25 @@ struct EmotionalWeatherView: View {
                             withAnimation(.easeInOut(duration: 0.35)) { showLanternInvite = true }
                         }
                     }) {
-                        HStack(spacing: 10) {
-                            if viewModel.saved {
-                                Image(systemName: "checkmark.circle.fill")
-                                Text("saved!")
-                            } else {
-                                Image(systemName: "cloud.fill")
-                                Text("log this feeling")
-                            }
-                        }
-                        .font(DinoTheme.headlineFont())
-                        .foregroundColor(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 18)
-                        .background(
-                            viewModel.saved
-                                ? DinoTheme.sageGreen
-                                : (viewModel.selectedWeather == nil ? DinoTheme.textSecondary.opacity(0.5) : DinoTheme.accent)
-                        )
-                        .clipShape(RoundedRectangle(cornerRadius: DinoDesignSystem.radiusMD, style: .continuous))
-                        .shadow(
-                            color: viewModel.selectedWeather != nil && !viewModel.saved
-                                ? DinoTheme.accent.opacity(0.35)
-                                : Color.clear,
-                            radius: 8, y: 3
-                        )
-                        .animation(.easeInOut(duration: 0.2), value: viewModel.saved)
+                        MoodLogButtonLabel(selected: viewModel.selectedWeather,
+                                           saved: viewModel.saved)
                     }
                     .buttonStyle(ScaleButtonStyle())
                     .disabled(viewModel.selectedWeather == nil)
                     .padding(.horizontal, DinoTheme.padding)
+
+                    // one handwritten line once a mood is chosen — softer for
+                    // the heavy skies, lighter for the kind ones
+                    if let chosen = viewModel.selectedWeather, !viewModel.saved {
+                        Text(MoodButtonVoice.line(for: chosen))
+                            .font(DinoTheme.dinoFont(size: 13))
+                            .foregroundColor(DinoTheme.textSecondary)
+                            .multilineTextAlignment(.center)
+                            .frame(maxWidth: .infinity)
+                            .padding(.top, -8)
+                            .padding(.horizontal, DinoTheme.padding)
+                            .transition(.opacity)
+                    }
 
                     // Dino World post-log moment — one soft line, tap to visit.
                     if let line = worldMomentLine {
@@ -445,6 +434,7 @@ struct EmotionalWeatherView: View {
                 }
             }
             .scrollIndicators(.hidden)
+            .defaultScrollAnchor(moodQAScrollBottom ? .bottom : .top)
             .background(DinoTheme.background.ignoresSafeArea())
             .navigationTitle("")
             .navigationBarHidden(true)
@@ -468,6 +458,17 @@ struct EmotionalWeatherView: View {
             .onAppear {
                 AnalyticsManager.shared.trackMoodScreenOpened()
                 AnalyticsManager.shared.trackScreen("mood")
+                #if DEBUG
+                // -moodQAselect<Mood>: preselect a card for loop screenshots.
+                let qaArgs = ProcessInfo.processInfo.arguments
+                let qaMoods: [(String, EmotionalWeather)] = [
+                    ("-moodQAselectClear", .clear), ("-moodQAselectCloudy", .partlyCloudy),
+                    ("-moodQAselectOverwhelmed", .overwhelmed), ("-moodQAselectDrained", .drained),
+                ]
+                if let match = qaMoods.first(where: { qaArgs.contains($0.0) }) {
+                    viewModel.selectedWeather = match.1
+                }
+                #endif
             }
             .onDisappear {
                 // Shown but never tapped → an ignore for the learning loop
@@ -581,6 +582,15 @@ struct EmotionalWeatherView: View {
         } else if service.hasRequestedSleep, !stepsInviteDismissed {
             showStepsInvite = true
         }
+    }
+
+    /// QA screenshots of the log button need the fold moved — DEBUG only.
+    private var moodQAScrollBottom: Bool {
+        #if DEBUG
+        return ProcessInfo.processInfo.arguments.contains { $0.hasPrefix("-moodQAselect") }
+        #else
+        return false
+        #endif
     }
 
     private func stretchSignalFires(now: Date = Date()) -> Bool {

@@ -25,3 +25,20 @@ SETUP
 - RUBRIC (box scope): glyphs-hand-drawn 5 · gentle-when-heavy 4 · survives-XXL 4 (fixed-size marks) ·
   selection 4 (ink deepens + wash blooms on select). paper/button dims belong to later boxes. GREEN.
 - BOX 1 (designed weather glyphs) CHECKED.
+
+=== L2 ITER 2 — the log button (2026-07-11) ===
+- New Dino/Components/MoodLogButton.swift: MoodButtonVoice (pure, voice-tested) + MoodLogButtonLabel.
+  Sage when armed/saved; honest muted (ink 0.08 bg, #7A7266 text, no shadow) before selection; selected
+  mood's glyph rides a 34pt cream paper token; DrawnCheck shape replaces SF checkmark on saved; "saved"
+  replaces "saved!" (dash/emoji-free voice). Breathing: 3.2s cycle (1.6s autoreverse) scale 1.012 +
+  sage shadow swell 8→14, only while armed+unsaved, still under Reduce Motion. Squish via house
+  ScaleButtonStyle.
+- Adaptive line under button after selection: heavy "however it is, it counts" / light "glad the sky is
+  kind today" (MoodButtonVoice.line, mapping tested).
+- New DinoTests/MoodRefreshTests.swift: voice contract (lowercase/no dash/ascii-only) + heavy/light mapping.
+- QA: -moodQAselect{Clear,Cloudy,Overwhelmed,Drained} preselect args + DEBUG bottom scroll anchor so the
+  button is in frame for shots.
+- Full DinoTests PASSED (incl. 3 new), build 0 errors. Shots iter2/button-{disabled,drained,clear}.png.
+- RUBRIC: alive-not-needy 4 · gentle-when-heavy 5 · glyphs 5 · paper 4 · selection 4 · XXL provisional 4
+  (sweep box will verify) → GREEN.
+- BOX 2 (the log button) CHECKED.
