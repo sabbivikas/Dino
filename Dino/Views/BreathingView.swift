@@ -25,7 +25,8 @@ struct BreathingView: View {
             countdown: viewModel.phaseCountdown,
             accent: viewModel.selectedPattern.accent,
             quarterRingProgress: viewModel.quarterRingProgress,
-            emptying: viewModel.selectedPattern.thinsOnExhale && viewModel.phase == .exhale
+            emptying: viewModel.selectedPattern.thinsOnExhale && viewModel.phase == .exhale,
+            paused: viewModel.isPaused
         )
     }
 
@@ -201,6 +202,14 @@ struct BreathingView: View {
         }
         .onAppear {
             AnalyticsManager.shared.trackScreen("breathing")
+            #if DEBUG
+            // -breathQARun: start a session on arrival so the breathing water
+            // is screenshotable without tapping through the coach.
+            if ProcessInfo.processInfo.arguments.contains("-breathQARun"),
+               !viewModel.isRunning {
+                viewModel.start()
+            }
+            #endif
         }
         .onDisappear {
             viewModel.stop()
