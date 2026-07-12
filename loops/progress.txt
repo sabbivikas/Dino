@@ -168,3 +168,16 @@ Context: owner reported the glyph rewrite lost the old cards' character. RM key 
 - Verified by screenshot: idle grid (idle-a/b differ — motion live), all four selected states (tape,
   lift, dimmed-when-heavy all working over the colorful art), button-drained token. Full DinoTests
   PASSED, build 0 errors. Shots in loops/shots/mood-polish/restore/.
+
+=== BREATHING WATER — settled on mood-refresh (2026-07-12) ===
+- FINDING: 343e861 had only the shader FILE (dinoBreathingWater unused); BreathingCircle/BreathingView
+  were byte-identical to main — water was NOT in the build.
+- Baseline captured first (temp -breathQARun hook, uncommitted): water-compare/main-baseline-a/b.png —
+  perfect-circle glow. Then both files taken from feature/dino-shaders @ 87a2d70 (water glyph + time-wrap
+  + pause discipline + QA hook), committed caa484b. water-compare/water-a/b.png: edge undulates but reads
+  too subtle at arm's length → amplitude loop.
+- AMP ITER 1: strength 5→12, maxSampleOffset 12→26, shimmer cap 0.06→0.15. Shots water-amp/iter1/w1-3:
+  inhale-top full liquid swell, mid-exhale pebble undulation, near-empty soft lobe — silhouette clearly
+  changes per phase, text crisp, nothing strobes. RUBRIC: liquid 5 · calm 4 · readability 5 → GREEN in
+  one iteration. Full DinoTests PASSED.
+- WATER_VISIBLE.

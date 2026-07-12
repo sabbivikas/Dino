@@ -191,14 +191,14 @@ static float dinoHash(float2 position, float offset) {
 }
 
 // ── caustic shimmer (colorEffect) ──────────────────────────────
-// Two crossed slow sines brighten by at most 6% at full breath — light on
-// water seen from a pillow, never a disco.
+// Two crossed slow sines brighten by at most 15% at full breath — light on
+// water you can actually see from arm's length, still never a disco.
 [[ stitchable ]] half4 dinoCausticShimmer(float2 position, half4 color, float2 size, float time, float breath) {
     if (color.a <= 0.0h) { return color; }
     float2 uv = position / size;
     float phase = fmod(time * 0.4, 6.28318530718);
     float band = sin(10.0 * uv.x + phase) * sin(9.0 * uv.y - phase * 0.8);
-    half glow = half(max(0.0, band) * 0.06 * breath);
+    half glow = half(max(0.0, band) * 0.15 * breath);
     return half4(color.rgb + half3(glow) * color.a, color.a);
 }
 

@@ -141,9 +141,9 @@ private struct BreathingWaterGlow: ViewModifier, Animatable {
                                     .float2(proxy.size),
                                     .float(t),
                                     .float(breath),
-                                    .float(5)
+                                    .float(12)   // clearly liquid at arm's length
                                 ),
-                                maxSampleOffset: CGSize(width: 12, height: 12)
+                                maxSampleOffset: CGSize(width: 26, height: 26)
                             )
                             .colorEffect(
                                 ShaderLibrary.dinoCausticShimmer(
