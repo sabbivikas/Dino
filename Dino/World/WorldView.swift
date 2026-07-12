@@ -87,9 +87,13 @@ struct WorldView: View {
                 Text("dino world")
                     .font(.custom(DinoTheme.customFontName, size: 24))
                     .foregroundColor(ink)
-                Text(headline)
-                    .font(DinoTheme.dinoFont(size: 12))
-                    .foregroundColor(ink3)
+                // count moved to the constellation's warm total — the header
+                // only speaks when the sky is empty or still loading
+                if let line = headline {
+                    Text(line)
+                        .font(DinoTheme.dinoFont(size: 12))
+                        .foregroundColor(ink3)
+                }
             }
             Spacer()
             Color.clear.frame(width: 34, height: 34)
@@ -98,14 +102,11 @@ struct WorldView: View {
         .padding(.top, 14)
     }
 
-    private var headline: String {
+    private var headline: String? {
         guard let b = selectedBucket, b.global.total > 0 else {
-            return loading ? "the world is waking up…" : "no lights yet today. yours could be the first 🌱"
+            return loading ? "the world is waking up…" : "no lights yet today. yours could be the first \u{1F331}"
         }
-        let noun = b.global.total == 1 ? "dino" : "dinos"
-        return selectedDayKey == todayKey
-            ? "\(b.global.total) \(noun) checked in today"
-            : "\(b.global.total) \(noun) checked in"
+        return nil   // deduped by owner call — the warm total is the headline now
     }
 
     // MARK: - Globe
@@ -260,27 +261,14 @@ struct WorldView: View {
                 Text("lights around the world")
                     .font(DinoTheme.dinoFont(size: 13))
                     .foregroundColor(ink2)
-                    .padding(.bottom, 10)
+                    .padding(.bottom, 12)
 
-                let ranked = b.countries.sorted {
-                    if $0.key == "elsewhere" { return false }
-                    if $1.key == "elsewhere" { return true }
-                    return $0.value.total > $1.value.total
-                }.prefix(12)
-
-                ForEach(Array(ranked), id: \.key) { code, counts in
-                    HStack(spacing: 10) {
-                        WorldPulseDot(color: DinoWorldPalette.moodSwiftUIColor(counts.dominantMood ?? .partlyCloudy))
-                        Text(countryName(code))
-                            .font(DinoTheme.dinoFont(size: 14))
-                            .foregroundColor(ink)
-                        Spacer()
-                        Text("\(counts.total)")
-                            .font(DinoTheme.dinoFont(size: 13))
-                            .foregroundColor(ink3)
-                    }
-                    .padding(.vertical, 7)
-                }
+                // the constellation — a sky of names, no rows, no ranks, no digits
+                WorldConstellationSection(bucket: b,
+                                          isToday: selectedDayKey == todayKey,
+                                          dayKey: selectedDayKey,
+                                          countryName: countryName)
+                    .frame(maxWidth: .infinity)
             }
         }
         .padding(.horizontal, 24)

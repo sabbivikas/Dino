@@ -145,9 +145,12 @@ struct HomeView: View {
             .onAppear {
                 #if DEBUG
                 // Dev shortcut: jump straight to the world when verifying with
-                // the -worldTestAggregate fixture on the simulator.
+                // the -worldTestAggregate fixture on the simulator. Small delay:
+                // presenting in the same beat as first appear gets dropped.
                 if ProcessInfo.processInfo.arguments.contains("-worldTestAggregate") {
-                    showWorld = true
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                        showWorld = true
+                    }
                 }
                 #endif
             }

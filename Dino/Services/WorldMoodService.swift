@@ -144,6 +144,14 @@ enum WorldMoodService {
         #if DEBUG
         // Simulator/dev verification: launch with -worldTestAggregate to see a
         // populated globe without touching Firestore.
+        // constellation QA shapes first — they ride alongside -worldTestAggregate
+        // (which also drives the auto-open in HomeView)
+        if ProcessInfo.processInfo.arguments.contains("-worldQAEven") {
+            return debugEvenAggregate()
+        }
+        if ProcessInfo.processInfo.arguments.contains("-worldQASingle") {
+            return debugSingleAggregate()
+        }
         if ProcessInfo.processInfo.arguments.contains("-worldTestAggregate") {
             return debugTestAggregate()
         }
@@ -201,6 +209,41 @@ enum WorldMoodService {
         }
         let bucket = WorldDayBucket(global: global, countries: countries)
         return WorldAggregate(days: [todayKey(): bucket])
+    }
+
+    private static func debugAggregate(from countries: [String: WorldMoodCounts]) -> WorldAggregate {
+        var global = WorldMoodCounts()
+        for c in countries.values {
+            global.clear += c.clear; global.partlyCloudy += c.partlyCloudy
+            global.overwhelmed += c.overwhelmed; global.drained += c.drained
+            global.total += c.total
+        }
+        return WorldAggregate(days: [todayKey(): WorldDayBucket(global: global, countries: countries)])
+    }
+
+    /// Constellation QA: a dozen countries at near-equal volume.
+    static func debugEvenAggregate() -> WorldAggregate {
+        func counts(_ clear: Int, _ pc: Int, _ ow: Int, _ dr: Int) -> WorldMoodCounts {
+            var c = WorldMoodCounts()
+            c.clear = clear; c.partlyCloudy = pc; c.overwhelmed = ow; c.drained = dr
+            c.total = clear + pc + ow + dr
+            return c
+        }
+        let countries: [String: WorldMoodCounts] = [
+            "JP": counts(4, 1, 1, 1), "US": counts(1, 1, 1, 4), "BR": counts(1, 4, 1, 1),
+            "DE": counts(1, 1, 4, 1), "IN": counts(3, 1, 1, 1), "GB": counts(1, 3, 1, 1),
+            "AU": counts(4, 1, 1, 0), "FR": counts(1, 1, 3, 1), "CA": counts(3, 1, 1, 1),
+            "MX": counts(1, 3, 1, 1), "KR": counts(1, 1, 1, 3), "elsewhere": counts(2, 2, 1, 1),
+        ]
+        return debugAggregate(from: countries)
+    }
+
+    /// Constellation QA: a single-country day.
+    static func debugSingleAggregate() -> WorldAggregate {
+        var c = WorldMoodCounts()
+        c.clear = 9; c.partlyCloudy = 3; c.overwhelmed = 1; c.drained = 1
+        c.total = 14
+        return debugAggregate(from: ["JP": c])
     }
     #endif
 
