@@ -49,3 +49,24 @@ Secondary ref noted for scroll effects only: eleev/swiftui-new-metal-shaders (un
   reads as real paper stock; tape stripes and hour badges intact; every number crisp.
 - RUBRIC: tide 4 · storybook 5 · readability 5 · calming 4 → GREEN.
 - TODO 3 (paper grain) CHECKED.
+
+=== ITER 4 — mood weather (IN PROGRESS, paused 2026-07-11 ~7pm) ===
+- MoodWeatherLayer added to EmotionalWeatherView (dinoWeather shader, TimelineView, Reduce Motion → nothing,
+  nil condition → nothing). Debug args: -moodTabQA (MainTabView → tab 2), -moodQArain/-moodQAsnow/-moodQAfog.
+- BUG FOUND+FIXED: raw timeIntervalSinceReferenceDate (~8e8 s) freezes float32 shader animation (64 s
+  quantization). All shader call sites now wrap time: truncatingRemainder(dividingBy: 3600) in Double first.
+  (Also fixed in BreathingWaterGlow — iter2's water was rendering but phase-frozen.)
+- BUG FOUND+FIXED: weather background stacked BEHIND the chain's earlier opaque
+  .background(DinoTheme.background) — merged into one ZStack background (theme below, weather above).
+- Rain tuned: thin threads (not column bands), 30 cols, alpha 0.16. Snow: cool dusk-tint motes (visible on
+  cream), alpha 0.26. Fog retinted dusk-gray 0.07 (cream-on-cream was invisible).
+- VERIFIED via screenshots: rain GREEN (sparse dusk threads between cards, storybook), snow GREEN (soft
+  painterly motes). Fog: retint built + shot taken but NOT yet read — WozCode auth expired mid-verification.
+- NOT committed yet; TODO 4 box NOT checked. Next: read iter4/weather-fog.png, score, run full DinoTests,
+  commit iter4, continue to TODO 5 (world rim+bloom).
+
+=== ITER 4 — COMPLETED (2026-07-11 7:21pm, after woz relogin) ===
+- Fog verified from iter4/weather-fog.png: dusk-gray bands breathing along top-right edge, whisper mist. GREEN.
+- Full DinoTests PASSED post-fix. Diagnostic shots (diag-red*.png) kept as debugging record.
+- RUBRIC — rain: tide 4 · storybook 4 · readability 5 · calming 4. snow: 4/4/5/4. fog: 4/4/5/5. ALL GREEN.
+- TODO 4 (mood weather) CHECKED.

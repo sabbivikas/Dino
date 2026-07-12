@@ -125,7 +125,10 @@ private struct BreathingWaterGlow: ViewModifier, Animatable {
             content.opacity(0.9 + 0.1 * Double(breath))
         } else {
             TimelineView(.animation) { timeline in
+                // wrap in Double BEFORE the float32 shader sees it — raw
+                // reference-date seconds freeze float32 animation entirely
                 let t = timeline.date.timeIntervalSinceReferenceDate
+                    .truncatingRemainder(dividingBy: 3600)
                 content
                     .visualEffect { view, proxy in
                         view

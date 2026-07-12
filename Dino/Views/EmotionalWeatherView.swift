@@ -445,7 +445,14 @@ struct EmotionalWeatherView: View {
                 }
             }
             .scrollIndicators(.hidden)
-            .background(DinoTheme.background.ignoresSafeArea())
+            .background {
+                ZStack {
+                    DinoTheme.background.ignoresSafeArea()
+                    // storybook weather — the sky outside, whispered behind the cards
+                    MoodWeatherLayer(condition: themeManager.weatherCondition)
+                        .ignoresSafeArea()
+                }
+            }
             .navigationTitle("")
             .navigationBarHidden(true)
             .task {
@@ -534,6 +541,63 @@ struct EmotionalWeatherView: View {
             }
             .sheet(isPresented: $showResources) {
                 ResourcesView()
+            }
+        }
+    }
+
+    // MARK: - Storybook weather layer
+
+    /// WeatherKit's condition label → a whisper of real weather painted by the
+    /// dinoWeather shader behind the mood cards. Rain is sparse dusk streaks,
+    /// snow is drifting warm motes, haze is breathing fog — never particle
+    /// spam, and a storm outside stays storybook rain in here. Gone entirely
+    /// under Reduce Motion or when there is no condition to show.
+    private struct MoodWeatherLayer: View {
+        let condition: String?
+        @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+        private var effectiveCondition: String? {
+            #if DEBUG
+            let args = ProcessInfo.processInfo.arguments
+            if args.contains("-moodQArain") { return "rain" }
+            if args.contains("-moodQAsnow") { return "snow" }
+            if args.contains("-moodQAfog")  { return "hazy" }
+            #endif
+            return condition
+        }
+
+        /// (shader kind, intensity) — nil means clear skies, draw nothing.
+        static func weather(for condition: String?) -> (kind: Double, intensity: Double)? {
+            switch condition {
+            case "drizzle":              return (1, 0.7)
+            case "rain", "thunderstorm": return (1, 1.0)
+            case "snow":                 return (2, 1.0)
+            case "hazy":                 return (3, 1.0)
+            default:                     return nil
+            }
+        }
+
+        var body: some View {
+            if !reduceMotion, let w = Self.weather(for: effectiveCondition) {
+                TimelineView(.animation) { timeline in
+                    // wrap in Double BEFORE the float32 shader sees it — raw
+                    // reference-date seconds freeze float32 animation entirely
+                    let t = timeline.date.timeIntervalSinceReferenceDate
+                        .truncatingRemainder(dividingBy: 3600)
+                    Rectangle()
+                        .fill(Color.white.opacity(0.001))   // gives the shader a full-bleed layer
+                        .visualEffect { view, proxy in
+                            view.colorEffect(
+                                ShaderLibrary.dinoWeather(
+                                    .float2(proxy.size),
+                                    .float(t),
+                                    .float(w.kind),
+                                    .float(w.intensity)
+                                )
+                            )
+                        }
+                }
+                .allowsHitTesting(false)
             }
         }
     }

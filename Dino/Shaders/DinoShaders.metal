@@ -212,18 +212,23 @@ static float dinoHash(float2 position, float offset) {
     half4 out = half4(0.0h);
     if (kind < 0.5) { return out; }
 
+    // NOTE: callers pass a PRE-WRAPPED time (seconds mod 3600, wrapped in
+    // Swift as Double) — raw timeIntervalSinceReferenceDate quantizes to
+    // ~64 s steps in float32 and freezes every animation here.
     if (kind < 1.5) {
         // rain: sparse thin streaks drifting down, dusk-navy at whisper alpha
-        float col = floor(uv.x * 26.0);
+        float col = floor(uv.x * 30.0);
         float colHash = dinoHash(float2(col, 7.0), 1.3);
         float speed = 0.14 + colHash * 0.10;
         float y = fract(uv.y * 0.9 - time * speed - colHash * 7.0);
-        float streak = smoothstep(0.0, 0.05, y) * smoothstep(0.16, 0.05, y);
+        float fall = smoothstep(0.0, 0.04, y) * smoothstep(0.14, 0.04, y);
+        float xin = fract(uv.x * 30.0);
+        float thin = smoothstep(0.22, 0.08, fabs(xin - 0.5));   // a thread, not a band
         float gate = step(0.72, colHash);            // ~1 in 4 columns rains
-        float a = streak * gate * 0.10 * intensity;
+        float a = fall * thin * gate * 0.16 * intensity;
         out = half4(0.36h, 0.40h, 0.52h, 1.0h) * half(a);
     } else if (kind < 2.5) {
-        // snow: soft warm-white motes, one per sparse cell, drifting with sway
+        // snow: soft motes with a cool dusk tint so they read on cream skies
         float2 grid = float2(14.0, 10.0);
         float2 cell = floor(uv * grid);
         float h = dinoHash(cell, 2.1);
@@ -231,15 +236,16 @@ static float dinoHash(float2 position, float offset) {
         float sway = sin(time * 0.4 + h * 6.28318) * 0.08;
         float2 inCell = fract(uv * grid) - 0.5;
         float2 moteCenter = float2(sway, (fall - 0.5) * 0.9);
-        float mote = smoothstep(0.17, 0.05, length(inCell - moteCenter));
+        float mote = smoothstep(0.14, 0.04, length(inCell - moteCenter));
         float gate = step(0.55, h);
-        float a = mote * gate * 0.16 * intensity;
-        out = half4(1.0h, 0.99h, 0.96h, 1.0h) * half(a);
+        float a = mote * gate * 0.26 * intensity;
+        out = half4(0.72h, 0.77h, 0.88h, 1.0h) * half(a);
     } else {
-        // fog: two low-frequency bands breathing across, barely there
+        // fog: two low-frequency bands breathing across — dusk-gray, since
+        // cream mist vanishes on dino's light skies
         float band = sin(uv.x * 2.2 + time * 0.06) * sin(uv.y * 1.4 - time * 0.045);
-        float a = max(0.0, band) * 0.05 * intensity * (0.7 + 0.3 * sin(time * 0.1));
-        out = half4(0.98h, 0.96h, 0.90h, 1.0h) * half(a);
+        float a = max(0.0, band) * 0.07 * intensity * (0.7 + 0.3 * sin(time * 0.1));
+        out = half4(0.55h, 0.58h, 0.68h, 1.0h) * half(a);
     }
     return out;
 }
