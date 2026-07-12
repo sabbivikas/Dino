@@ -43,9 +43,12 @@ struct MainTabView: View {
         }
         .onAppear {
             #if DEBUG
-            // -moodTabQA: land on the mood tab for loop screenshots.
-            if ProcessInfo.processInfo.arguments.contains("-moodTabQA") {
-                selectedTab = 2
+            // tab QA args: land on a tab for loop/regression screenshots.
+            let tabArgs: [(String, Int)] = [
+                ("-moodTabQA", 2), ("-journalTabQA", 1), ("-jarTabQA", 3), ("-profileTabQA", 4),
+            ]
+            if let match = tabArgs.first(where: { ProcessInfo.processInfo.arguments.contains($0.0) }) {
+                selectedTab = match.1
             }
             #endif
         }

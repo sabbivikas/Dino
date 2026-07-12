@@ -469,6 +469,15 @@ struct EmotionalWeatherView: View {
                     ("-moodQAselectClear", .clear), ("-moodQAselectCloudy", .partlyCloudy),
                     ("-moodQAselectOverwhelmed", .overwhelmed), ("-moodQAselectDrained", .drained),
                 ]
+                // -ceremonyQA: present the lantern arrival ceremony with a
+                // fixture lantern (render check only — no claim, no server).
+                if qaArgs.contains("-ceremonyQA") {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+                        ceremonyLantern = ReceivedLantern(
+                            text: "someone far away wished you a softer night",
+                            countryCode: "JP")
+                    }
+                }
                 if let match = qaMoods.first(where: { qaArgs.contains($0.0) }) {
                     viewModel.selectedWeather = match.1
                     // -moodQAsaved: capture the logged state (light mood — no
