@@ -338,52 +338,74 @@ private struct StormCloud: Shape {
 private struct MistGlyph: View {
     let muted: Bool
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var drift: CGFloat = 0
+
+    // (start x, y, width, drift dir, phase) — every band a different reach
+    private static let bands: [(x: CGFloat, y: CGFloat, w: CGFloat, dir: CGFloat, phase: Double)] = [
+        (-0.26, -0.02, 0.46,  1, 0.0),
+        (-0.20,  0.10, 0.62, -1, 0.9),
+        (-0.32,  0.21, 0.44,  1, 1.7),
+        (-0.12,  0.32, 0.42, -1, 2.6),
+    ]
 
     var body: some View {
-        GeometryReader { geo in
-            let rect = CGRect(origin: .zero, size: geo.size)
-            let inkColor = DinoWeatherGlyph.ink.opacity(muted ? 0.38 : 0.72)
-            ZStack {
-                MistBand(index: 0)
-                    .stroke(inkColor, style: inkStyle(rect))
-                    .offset(x: reduceMotion ? 0 : (drift - 0.5) * rect.side * 0.06)
-                MistBand(index: 1)
-                    .stroke(inkColor, style: inkStyle(rect))
-                    .offset(x: reduceMotion ? 0 : (0.5 - drift) * rect.side * 0.06)
-                MistBand(index: 2)
-                    .stroke(inkColor, style: inkStyle(rect))
-                    .offset(x: reduceMotion ? 0 : (drift - 0.5) * rect.side * 0.045)
-                MistBand(index: 3)
-                    .stroke(inkColor.opacity(0.75), style: inkStyle(rect))
-                    .offset(x: reduceMotion ? 0 : (0.5 - drift) * rect.side * 0.045)
+        TimelineView(.animation(minimumInterval: 1.0 / 30, paused: reduceMotion)) { timeline in
+            let t = reduceMotion ? 0 : timeline.date.timeIntervalSinceReferenceDate
+            Canvas { ctx, size in
+                let rect = CGRect(origin: .zero, size: size)
+                let s = rect.side
+                let ink = DinoWeatherGlyph.ink.opacity(muted ? 0.38 : 0.72)
+                let style = inkStyle(rect)
+
+                // a small tired cloud, sinking a little as it breathes
+                let bob = CGFloat(sin(t * 2 * .pi / 4.4)) * s * 0.015
+                ctx.drawLayer { cloud in
+                    cloud.translateBy(x: 0, y: bob)
+                    let cc = CGPoint(x: rect.midX - s * 0.14, y: rect.midY - s * 0.27)
+                    var lump = Path()
+                    lump.move(to: CGPoint(x: cc.x - s * 0.17, y: cc.y + s * 0.07))
+                    lump.addQuadCurve(to: CGPoint(x: cc.x - s * 0.06, y: cc.y - s * 0.075),
+                                      control: CGPoint(x: cc.x - s * 0.20, y: cc.y - s * 0.05))
+                    lump.addQuadCurve(to: CGPoint(x: cc.x + s * 0.09, y: cc.y - s * 0.045),
+                                      control: CGPoint(x: cc.x + s * 0.03, y: cc.y - s * 0.12))
+                    lump.addQuadCurve(to: CGPoint(x: cc.x + s * 0.17, y: cc.y + s * 0.07),
+                                      control: CGPoint(x: cc.x + s * 0.21, y: cc.y - s * 0.01))
+                    lump.addQuadCurve(to: CGPoint(x: cc.x - s * 0.17, y: cc.y + s * 0.07),
+                                      control: CGPoint(x: cc.x, y: cc.y + s * 0.10))
+                    lump.closeSubpath()
+                    cloud.fill(lump, with: .color(Color(hex: "#C8CDD4").opacity(muted ? 0.13 : 0.26)))
+                    cloud.stroke(lump, with: .color(ink), style: style)
+
+                    // heavy lids — two small downward arcs, nearly closed
+                    let lidStyle = StrokeStyle(lineWidth: rect.inkWidth * 0.8, lineCap: .round)
+                    for ex in [cc.x - s * 0.065, cc.x + s * 0.045] {
+                        var lid = Path()
+                        lid.move(to: CGPoint(x: ex - s * 0.025, y: cc.y - s * 0.005))
+                        lid.addQuadCurve(to: CGPoint(x: ex + s * 0.025, y: cc.y - s * 0.005),
+                                         control: CGPoint(x: ex, y: cc.y + s * 0.022))
+                        cloud.stroke(lid, with: .color(ink), style: lidStyle)
+                    }
+                    // a flat little mouth — not sad, just tired
+                    var mouth = Path()
+                    mouth.move(to: CGPoint(x: cc.x - s * 0.028, y: cc.y + s * 0.048))
+                    mouth.addLine(to: CGPoint(x: cc.x + s * 0.024, y: cc.y + s * 0.046))
+                    cloud.stroke(mouth, with: .color(ink), style: lidStyle)
+                }
+
+                // mist bands drift — visibly now, each on its own slow walk
+                for band in Self.bands {
+                    let dx = CGFloat(sin(t * 2 * .pi / 3.9 + band.phase)) * band.dir * s * 0.10
+                    let alpha = 0.78 + 0.22 * sin(t * 2 * .pi / 3.9 + band.phase + 0.6)
+                    let y = rect.midY + band.y * s
+                    let x0 = rect.midX + band.x * s + dx
+                    var p = Path()
+                    p.move(to: CGPoint(x: x0, y: y))
+                    p.addQuadCurve(to: CGPoint(x: x0 + band.w * s * 0.55, y: y - s * 0.020),
+                                   control: CGPoint(x: x0 + band.w * s * 0.28, y: y - s * 0.055))
+                    p.addQuadCurve(to: CGPoint(x: x0 + band.w * s, y: y),
+                                   control: CGPoint(x: x0 + band.w * s * 0.80, y: y + s * 0.030))
+                    ctx.stroke(p, with: .color(ink.opacity(alpha)), style: style)
+                }
             }
         }
-        .onAppear {
-            guard !reduceMotion else { return }
-            withAnimation(.easeInOut(duration: 3.9).repeatForever(autoreverses: true)) { drift = 1 }
-        }
-    }
-}
-
-private struct MistBand: Shape {
-    let index: Int
-    // (start x, y, width) fractions — every band a different reach
-    private static let bands: [(x: CGFloat, y: CGFloat, w: CGFloat)] = [
-        (-0.30, -0.20, 0.52), (-0.20, -0.04, 0.62), (-0.32, 0.12, 0.44), (-0.12, 0.26, 0.42),
-    ]
-    func path(in rect: CGRect) -> Path {
-        let b = Self.bands[index]
-        let s = rect.side
-        let y = rect.midY + b.y * s
-        let x0 = rect.midX + b.x * s
-        var p = Path()
-        p.move(to: CGPoint(x: x0, y: y))
-        // a soft single wave, not a straight rule
-        p.addQuadCurve(to: CGPoint(x: x0 + b.w * s * 0.55, y: y - s * 0.020),
-                       control: CGPoint(x: x0 + b.w * s * 0.28, y: y - s * 0.055))
-        p.addQuadCurve(to: CGPoint(x: x0 + b.w * s, y: y),
-                       control: CGPoint(x: x0 + b.w * s * 0.80, y: y + s * 0.030))
-        return p
     }
 }

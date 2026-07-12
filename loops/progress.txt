@@ -126,3 +126,15 @@ Context: owner reported the glyph rewrite lost the old cards' character. RM key 
   shot, cloud offset shifting, splash visible faint in shot 3.
 - RUBRIC: character 4 · gentle-when-heavy 5 · hand-drawn 4 · calm 4 → GREEN.
 - POLISH BOX 3 (overwhelmed) CHECKED.
+
+=== P ITER 4 — drained breath + tired face proposal (2026-07-11) ===
+- MistGlyph rebuilt on TimelineView+Canvas: bands drift ±10% (was ±6/4.5%) on staggered 3.9s phases with
+  per-band alpha breathing 0.78→1.0. PROPOSAL: small tired cloud above the mist — heavy-lidded eyes
+  (closed downward arcs), flat mouth, slow 4.4s sink-bob. First pass: top band collided with the cloud,
+  read cluttered — honest fail, fixed same iteration (cloud raised to −0.27, bands shifted down, band 0
+  shortened). Shots mist-{1..3} (before fix) + mist-{4..6} (after).
+- VERDICT: reads as a cloud dozing above its own fog — sleepy, not sad clipart; visibly softer than the
+  partly-cloudy face. FACE KEPT.
+- Full DinoTests PASSED (post-fix build 0 errors).
+- RUBRIC: character 4 · gentle-when-heavy 4 · hand-drawn 4 · calm 5 → GREEN.
+- POLISH BOX 4 (drained) CHECKED.
