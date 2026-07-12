@@ -153,14 +153,15 @@ struct EmotionalWeatherView: View {
                             .transition(.opacity.combined(with: .scale(scale: 0.97)))
                     }
 
-                    // Sliders
+                    // Sliders — the light metaphor: energy fills warm gold,
+                    // intensity fills lavender dusk
                     VStack(spacing: 24) {
                         MoodSlider(
                             title: "energy",
                             value: $viewModel.energyLevel,
                             lowLabel: "drained",
                             highLabel: "energized",
-                            color: DinoTheme.skyBlue
+                            color: Color(hex: "#E8B84A")
                         )
 
                         MoodSlider(
@@ -168,7 +169,7 @@ struct EmotionalWeatherView: View {
                             value: $viewModel.intensityLevel,
                             lowLabel: "calm",
                             highLabel: "intense",
-                            color: DinoTheme.lavender
+                            color: Color(hex: "#9C8FB8")
                         )
                     }
                     .padding(DinoTheme.padding)
@@ -620,13 +621,18 @@ struct EmotionalWeatherView: View {
     }
 }
 
-// MARK: - Mood Slider
+// MARK: - Mood Slider — a measure of light
+// The fill IS the metaphor: light gathering in the track, glowing brightest
+// at the leading edge. The thumb is a small warm disc with a hand-drawn ring
+// (a hair squashed and turned — drawn, not lathed). No icons needed.
 struct MoodSlider: View {
     let title: String
     @Binding var value: Double
     let lowLabel: String
     let highLabel: String
     let color: Color
+
+    private let tick = UISelectionFeedbackGenerator()
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -640,41 +646,58 @@ struct MoodSlider: View {
                     .foregroundColor(color)
             }
 
-            // Custom thick slider track with large thumb
             GeometryReader { geo in
+                let fraction = CGFloat((value - 1) / 9)
                 ZStack(alignment: .leading) {
-                    // Track background
-                    RoundedRectangle(cornerRadius: 3)
-                        .fill(color.opacity(0.15))
-                        .frame(height: 6)
+                    // unlit track — a paper groove
+                    RoundedRectangle(cornerRadius: 5)
+                        .fill(color.opacity(0.13))
+                        .overlay(RoundedRectangle(cornerRadius: 5)
+                            .strokeBorder(Color(hex: "#EFE7D2"), lineWidth: 1))
+                        .frame(height: 10)
 
-                    // Track fill
-                    RoundedRectangle(cornerRadius: 3)
-                        .fill(color)
-                        .frame(width: geo.size.width * CGFloat((value - 1) / 9), height: 6)
+                    // the light gathers — dimmer where it began, bright at the edge
+                    RoundedRectangle(cornerRadius: 5)
+                        .fill(LinearGradient(colors: [color.opacity(0.45), color],
+                                             startPoint: .leading, endPoint: .trailing))
+                        .frame(width: max(10, geo.size.width * fraction), height: 10)
+                        .shadow(color: color.opacity(0.45), radius: 5, y: 0)
 
-                    // Thumb
-                    Circle()
-                        .fill(.white)
-                        .frame(width: 26, height: 26)
-                        .shadow(color: color.opacity(0.30), radius: 6, y: 2)
-                        .overlay(
-                            Circle()
-                                .fill(color)
-                                .frame(width: 12, height: 12)
-                        )
-                        .offset(x: geo.size.width * CGFloat((value - 1) / 9) - 13)
-                        .gesture(
-                            DragGesture(minimumDistance: 0)
-                                .onChanged { drag in
-                                    let fraction = max(0, min(1, drag.location.x / geo.size.width))
-                                    value = 1 + (fraction * 9).rounded()
-                                }
-                        )
+                    // warm disc, hand-drawn ring
+                    ZStack {
+                        Circle()
+                            .fill(Color(hex: "#FFFDF6"))
+                            .shadow(color: color.opacity(0.35), radius: 6, y: 2)
+                        Ellipse()
+                            .stroke(color.opacity(0.9), lineWidth: 2.2)
+                            .frame(width: 19.5, height: 20.5)
+                            .rotationEffect(.degrees(8))
+                    }
+                    .frame(width: 28, height: 28)
+                    .offset(x: geo.size.width * fraction - 14)
+                    .gesture(
+                        DragGesture(minimumDistance: 0)
+                            .onChanged { drag in
+                                let f = max(0, min(1, drag.location.x / geo.size.width))
+                                let stepped = 1 + (f * 9).rounded()
+                                if stepped != value { tick.selectionChanged() }
+                                value = stepped
+                            }
+                    )
                 }
-                .frame(height: 26)
+                .frame(height: 28)
             }
-            .frame(height: 26)
+            .frame(height: 28)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(title)
+            .accessibilityValue("\(Int(value.rounded())) of 10")
+            .accessibilityAdjustableAction { direction in
+                switch direction {
+                case .increment: value = min(10, value + 1)
+                case .decrement: value = max(1, value - 1)
+                @unknown default: break
+                }
+            }
 
             HStack {
                 Text(lowLabel)

@@ -54,3 +54,13 @@ SETUP
 - Full DinoTests PASSED, build 0 errors. Shots iter3/cards-{none,Clear,Drained}.png.
 - RUBRIC: paper 5 · choosing-a-card 5 · glyphs 5 · gentle-when-heavy 5 · alive 4 · XXL provisional 4 → GREEN.
 - BOX 3 (mood cards in paper) CHECKED.
+
+=== L2 ITER 4 — sliders as light (2026-07-11) ===
+- MoodSlider rebuilt: unlit paper groove (color 0.13 + #EFE7D2 hairline, h10), lit fill = gradient
+  color.45→color with soft glow shadow (light gathering at the edge), thumb = cream disc + hand-drawn
+  ring (ellipse 19.5x20.5 rotated 8°, lw 2.2). Energy #E8B84A, intensity #9C8FB8 (call sites).
+- Accessibility ADDED (old custom slider had none): element ignores children, label/value ("n of 10"),
+  adjustableAction ±1 clamped 1...10. Step haptic: UISelectionFeedbackGenerator on stepped change.
+- Full DinoTests PASSED, build 0 errors. Shot iter4/sliders.png: gold and lavender light, drawn rings.
+- RUBRIC: paper 4 · hand-drawn 4 · alive 4 · gentle 4 · choosing n/a · XXL provisional 4 → GREEN.
+- BOX 4 (sliders as light) CHECKED.

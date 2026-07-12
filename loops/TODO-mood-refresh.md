@@ -17,10 +17,11 @@ glyphs-feel-hand-drawn-not-icon-pack · gentle-when-heavy · survives-XXL-type
       after selection (heavy: "however it is, it counts" / light: "glad the
       sky is kind today") — in voice tests
       (iter 2 — alive 4 · gentle 5 · glyphs 5 · paper 4)
-- [ ] mood cards in paper: shader grain material, radius 8–10, hairline
+- [x] mood cards in paper: shader grain material, radius 8–10, hairline
       #EFE7D2, glyphs replace illustrations, selection = lift + 1.4°
       alternating tilt + sage tape + deeper shadow (spring .28s overshoot),
       heavy-mood selection SOFTER than light (dimmer tape, gentler lift)
+      (iter 3 — paper 5 · choosing 5 · gentle 5 · glyphs 5)
 - [ ] sliders as light: energy fills warm gold (#E8B84A family), intensity
       fills lavender (#9C8FB8 family), designed thumbs (warm disc, hand-drawn
       ring), native accessibility + haptics preserved
