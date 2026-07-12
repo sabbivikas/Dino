@@ -115,3 +115,14 @@ Context: owner reported the glyph rewrite lost the old cards' character. RM key 
   back left; face reads tender, not clipart.
 - RUBRIC: character 5 · hand-drawn 4 · calm 4 · gentle n/a → GREEN.
 - POLISH BOX 2 (partly cloudy) CHECKED.
+
+=== P ITER 3 — overwhelmed rain (2026-07-11) ===
+- StormGlyph rebuilt on TimelineView+Canvas: three drops on independent 1.7s cycles (staggered delays,
+  uneven lengths), each falling 26% of the glyph with fade-in 15% / fade-out 28%, soft-ink strokes.
+  Tiny elliptical splash blinks in the last 20% of each drop's cycle at 0.55 alpha — barely there.
+  Cloud sways on a weary 3.2s cycle (±2.5% x, ±1.2% y phase-shifted) — nothing like the old 0.8s jiggle.
+  Dead RainStrokes shape removed. No face on the storm cloud — heavy stays quiet.
+- Full DinoTests PASSED, build 0 errors. Shots iter3/rain-{1..3}.png: drops at different fall phases per
+  shot, cloud offset shifting, splash visible faint in shot 3.
+- RUBRIC: character 4 · gentle-when-heavy 5 · hand-drawn 4 · calm 4 → GREEN.
+- POLISH BOX 3 (overwhelmed) CHECKED.

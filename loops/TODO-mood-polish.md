@@ -10,8 +10,9 @@ screenshot every card's idle at 3+ moments in its cycle.
 - [x] partly cloudy: drift restored to old ±7px feel (scaled), sun peeking
       with soft pulse, quiet cloud face if it reads hand-drawn
       (iter 2 — character 5 · drawn 4 · calm 4; face kept, reads tender)
-- [ ] overwhelmed: per-drop falling rain with fade-outs, tiny splashes
+- [x] overwhelmed: per-drop falling rain with fade-outs, tiny splashes
       optional, cloud gets a soft slow sway (wearier than the old jiggle)
+      (iter 3 — character 4 · gentle 5 · drawn 4 · calm 4; splashes kept subtle)
 - [ ] drained: mist stays (no lightning), bands drift more visibly, propose a
       small tired cloud face (heavy lids, flat mouth) — judge honestly
 - [ ] amplitude pass: all idle motion 2–3x current subtlety, visible at

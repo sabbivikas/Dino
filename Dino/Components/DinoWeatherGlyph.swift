@@ -251,25 +251,63 @@ private struct CloudLump: Shape {
 private struct StormGlyph: View {
     let muted: Bool
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var fall: CGFloat = 0
+
+    // (x offset, phase delay, stroke length) — three drops, none agreeing
+    private static let drops: [(x: CGFloat, delay: Double, len: CGFloat)] = [
+        (-0.17, 0.00, 0.075), (0.02, 0.62, 0.058), (0.20, 1.15, 0.068),
+    ]
 
     var body: some View {
-        GeometryReader { geo in
-            let rect = CGRect(origin: .zero, size: geo.size)
-            ZStack {
-                StormCloud()
-                    .fill(Color(hex: "#C4B8D4").opacity(muted ? 0.13 : 0.28))
-                StormCloud()
-                    .stroke(DinoWeatherGlyph.ink.opacity(muted ? 0.40 : 0.82), style: inkStyle(rect))
-                RainStrokes()
-                    .stroke(DinoWeatherGlyph.ink.opacity(muted ? 0.32 : 0.62), style: inkStyle(rect))
-                    .offset(y: reduceMotion ? 0 : fall * rect.side * 0.05)
-                    .opacity(reduceMotion ? 1.0 : 1.0 - 0.35 * Double(fall))
+        TimelineView(.animation(minimumInterval: 1.0 / 30, paused: reduceMotion)) { timeline in
+            let t = reduceMotion ? 0 : timeline.date.timeIntervalSinceReferenceDate
+            Canvas { ctx, size in
+                let rect = CGRect(origin: .zero, size: size)
+                let s = rect.side
+                let ink = DinoWeatherGlyph.inkColor(muted: muted)
+                let soft = DinoWeatherGlyph.softInkColor(muted: muted)
+                let style = inkStyle(rect)
+
+                // the cloud sways — weary and slow, nothing like the old jiggle
+                let sway = sin(t * 2 * .pi / 3.2)
+                ctx.drawLayer { cloud in
+                    cloud.translateBy(x: CGFloat(sway) * s * 0.025,
+                                      y: CGFloat(sin(t * 2 * .pi / 3.2 + 0.9)) * s * 0.012)
+                    let path = StormCloud().path(in: rect)
+                    cloud.fill(path, with: .color(Color(hex: "#C4B8D4").opacity(muted ? 0.13 : 0.28)))
+                    cloud.stroke(path, with: .color(ink), style: style)
+                }
+
+                // rain, drop by drop — each stroke falls and fades on its own time
+                let slant = CGPoint(x: -0.20, y: 0.98)
+                let topY = rect.midY + s * 0.08
+                let travel = s * 0.26
+                for drop in Self.drops {
+                    let cycle = 1.7
+                    let dt = (((t + drop.delay) / cycle).truncatingRemainder(dividingBy: 1) + 1)
+                        .truncatingRemainder(dividingBy: 1)
+                    let y = topY + CGFloat(dt) * travel
+                    let fade = dt < 0.15 ? dt / 0.15 : (dt > 0.72 ? max(0, (1.0 - dt) / 0.28) : 1.0)
+                    let x = rect.midX + drop.x * s
+                    var p = Path()
+                    p.move(to: CGPoint(x: x, y: y))
+                    p.addLine(to: CGPoint(x: x + slant.x * drop.len * s,
+                                          y: y + slant.y * drop.len * s))
+                    ctx.stroke(p, with: .color(soft.opacity(fade)), style: style)
+
+                    // a tiny splash where the drop lands — blink and it's gone
+                    if dt > 0.80 {
+                        let sp = (dt - 0.80) / 0.20
+                        let r = s * 0.030 * (0.6 + CGFloat(sp) * 0.7)
+                        let splashY = topY + travel + s * 0.035
+                        var splash = Path()
+                        splash.addEllipse(in: CGRect(x: x - r, y: splashY - r * 0.35,
+                                                     width: r * 2, height: r * 0.7))
+                        let splashFade = sp < 0.4 ? sp / 0.4 : (1.0 - sp) / 0.6
+                        ctx.stroke(splash, with: .color(soft.opacity(0.55 * splashFade)),
+                                   style: StrokeStyle(lineWidth: rect.inkWidth * 0.6))
+                    }
+                }
             }
-        }
-        .onAppear {
-            guard !reduceMotion else { return }
-            withAnimation(.easeInOut(duration: 3.4).repeatForever(autoreverses: true)) { fall = 1 }
         }
     }
 }
@@ -291,25 +329,6 @@ private struct StormCloud: Shape {
         p.addQuadCurve(to: CGPoint(x: leftX, y: baseY),
                        control: CGPoint(x: rect.midX, y: baseY + s * 0.06))
         p.closeSubpath()
-        return p
-    }
-}
-
-private struct RainStrokes: Shape {
-    // three slanted strokes — staggered starts, uneven lengths
-    private static let drops: [(x: CGFloat, y: CGFloat, len: CGFloat)] = [
-        (-0.18, 0.14, 0.16), (0.02, 0.18, 0.11), (0.20, 0.13, 0.14),
-    ]
-    func path(in rect: CGRect) -> Path {
-        var p = Path()
-        let s = rect.side
-        let slant = CGPoint(x: -0.22, y: 0.975)   // rain leans a little
-        for d in Self.drops {
-            let start = CGPoint(x: rect.midX + d.x * s, y: rect.midY + d.y * s)
-            p.move(to: start)
-            p.addLine(to: CGPoint(x: start.x + slant.x * d.len * s,
-                                  y: start.y + slant.y * d.len * s))
-        }
         return p
     }
 }
