@@ -138,3 +138,18 @@ Context: owner reported the glyph rewrite lost the old cards' character. RM key 
 - Full DinoTests PASSED (post-fix build 0 errors).
 - RUBRIC: character 4 · gentle-when-heavy 4 · hand-drawn 4 · calm 5 → GREEN.
 - POLISH BOX 4 (drained) CHECKED.
+
+=== P ITER 5 — amplitude pass + reduce motion proof (2026-07-11) ===
+- Amplitudes already landed 2-3x+ during the rebuilds: sun rays 0.92→1.06 swell + squash-stretch bounce
+  + blink (was ±4.5% ray scale only); cloud drift ±11% + bob (was ±3.5%); rain per-drop 26% travel with
+  fades + splashes (was a 5% layer shift); mist ±10% + alpha breathing (was ±6/4.5%). Cycles 1.7–4.4s —
+  nothing frantic.
+- Evidence: live-a/live-b 2s apart DIFFER (cmp) — motion visible at arm's length in stills; per-glyph
+  moment shots in iters 1-4 show clear frame deltas.
+- Reduce Motion: a11y key enabled → rm-a/rm-b 2.5s apart are BIT-IDENTICAL (cmp) and render all four
+  characters correctly frozen. Key deleted after, app relaunched live.
+- Full DinoTests PASSED.
+- RUBRIC: character 4 · gentle-when-heavy 4 · hand-drawn 4 · calm 5 → GREEN.
+- POLISH BOX 5 (amplitude + RM) CHECKED.
+
+=== POLISH LOOP COMPLETE — 5/5 boxes, 5 iterations, all rubric scores ≥4 ===

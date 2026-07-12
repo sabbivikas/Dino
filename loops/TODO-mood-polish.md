@@ -16,5 +16,6 @@ screenshot every card's idle at 3+ moments in its cycle.
 - [x] drained: mist stays (no lightning), bands drift more visibly, propose a
       small tired cloud face (heavy lids, flat mouth) — judge honestly
       (iter 4 — face KEPT after spacing fix; character 4 · gentle 4 · calm 5)
-- [ ] amplitude pass: all idle motion 2–3x current subtlety, visible at
+- [x] amplitude pass: all idle motion 2–3x current subtlety, visible at
       arm's length, never frantic. Reduce Motion stills everything.
+      (iter 5 — live shots differ / RM shots bit-identical; calm 5)
