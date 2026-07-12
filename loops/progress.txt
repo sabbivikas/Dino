@@ -153,3 +153,18 @@ Context: owner reported the glyph rewrite lost the old cards' character. RM key 
 - POLISH BOX 5 (amplitude + RM) CHECKED.
 
 === POLISH LOOP COMPLETE — 5/5 boxes, 5 iterations, all rubric scores ≥4 ===
+
+=== OWNER CORRECTION — restore AnimatedWeatherIllustration (2026-07-11 ~11:45pm) ===
+- Owner call: the original colorful animated characters should never have been replaced. Restored
+  AnimatedWeatherIllustration as the mood cards' visual, exactly as on main, with ONLY the two permitted
+  changes: (1) all four illustrations now respect Reduce Motion (TimelineView paused + t frozen — the
+  old version ignored it), (2) stormy screen-flash softened (peak 0.7→0.30, hold 0.3→0.13) — bolt and
+  storm untouched.
+- WeatherCard: DinoWeatherGlyph → AnimatedWeatherIllustration(48). Paper material/tape/lift/tilt all
+  kept — verified the colorful characters sit well on cream paper + mood wash (no clash, no adjustment).
+- Button token: owner delegated the call — chose the mini AnimatedWeatherIllustration(26) in the cream
+  token over the glyph (matches the cards; glyph would now read foreign). Glyph stays in codebase, off
+  the cards and button.
+- Verified by screenshot: idle grid (idle-a/b differ — motion live), all four selected states (tape,
+  lift, dimmed-when-heavy all working over the colorful art), button-drained token. Full DinoTests
+  PASSED, build 0 errors. Shots in loops/shots/mood-polish/restore/.

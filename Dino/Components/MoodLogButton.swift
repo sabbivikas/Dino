@@ -48,10 +48,11 @@ struct MoodLogButtonLabel: View {
                 Text(MoodButtonVoice.savedLabel)
             } else {
                 if let mood = selected {
-                    // the chosen weather rides a little paper token
+                    // the chosen weather rides a little paper token — the same
+                    // colorful character as its card, in miniature
                     ZStack {
                         Circle().fill(Color(hex: "#FFFDF6"))
-                        DinoWeatherGlyph(weather: mood, size: 24)
+                        AnimatedWeatherIllustration(weather: mood, size: 26)
                     }
                     .frame(width: 34, height: 34)
                     .transition(.scale(scale: 0.6).combined(with: .opacity))

@@ -30,7 +30,9 @@ struct WeatherCard: View {
     var body: some View {
         Button(action: onTap) {
             VStack(spacing: 10) {
-                DinoWeatherGlyph(weather: weather, size: 46, muted: !isSelected)
+                // the original animated characters, restored by owner call —
+                // full color, full motion (now Reduce Motion aware)
+                AnimatedWeatherIllustration(weather: weather, size: 48)
 
                 Text(weather.label)
                     .font(DinoTheme.dinoLabelFont(size: 13))

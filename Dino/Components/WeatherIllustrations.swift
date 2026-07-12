@@ -34,13 +34,11 @@ struct AnimatedWeatherIllustration: View {
 // MARK: - Sunny: Bouncing sun with rotating rays and face
 
 private struct SunnyIllustration: View {
-    @State private var phase: Double = 0
-    @State private var rayRotation: Double = 0
-    @State private var blinkTimer: Bool = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 30)) { timeline in
-            let t = timeline.date.timeIntervalSinceReferenceDate
+        TimelineView(.animation(minimumInterval: 1.0 / 30, paused: reduceMotion)) { timeline in
+            let t = reduceMotion ? 0 : timeline.date.timeIntervalSinceReferenceDate
             Canvas { context, size in
                 let w = size.width
                 let h = size.height
@@ -133,9 +131,11 @@ private struct SunnyIllustration: View {
 // MARK: - Partly Cloudy: Sun peeking behind drifting cloud
 
 private struct PartlyCloudyIllustration: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 30)) { timeline in
-            let t = timeline.date.timeIntervalSinceReferenceDate
+        TimelineView(.animation(minimumInterval: 1.0 / 30, paused: reduceMotion)) { timeline in
+            let t = reduceMotion ? 0 : timeline.date.timeIntervalSinceReferenceDate
             Canvas { context, size in
                 let w = size.width
                 let h = size.height
@@ -190,9 +190,11 @@ private struct PartlyCloudyIllustration: View {
 // MARK: - Rainy: Jiggling cloud with falling drops
 
 private struct RainyIllustration: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 30)) { timeline in
-            let t = timeline.date.timeIntervalSinceReferenceDate
+        TimelineView(.animation(minimumInterval: 1.0 / 30, paused: reduceMotion)) { timeline in
+            let t = reduceMotion ? 0 : timeline.date.timeIntervalSinceReferenceDate
             Canvas { context, size in
                 let w = size.width
                 let h = size.height
@@ -252,9 +254,11 @@ private struct RainyIllustration: View {
 // MARK: - Stormy: Shaking cloud with lightning bolt
 
 private struct StormyIllustration: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 30)) { timeline in
-            let t = timeline.date.timeIntervalSinceReferenceDate
+        TimelineView(.animation(minimumInterval: 1.0 / 30, paused: reduceMotion)) { timeline in
+            let t = reduceMotion ? 0 : timeline.date.timeIntervalSinceReferenceDate
             Canvas { context, size in
                 let w = size.width
                 let h = size.height
@@ -313,11 +317,12 @@ private struct StormyIllustration: View {
         return 0
     }
 
+    // softened per owner review — the storm stays, the screen-flash whispers
     private func flashBgOpacity(_ t: Double) -> Double {
         if t < 0.40 { return 0 }
-        if t < 0.47 { return 0.7 * ((t - 0.40) / 0.07) }
-        if t < 0.55 { return 0.3 }
-        if t < 0.65 { return 0.3 * (1.0 - (t - 0.55) / 0.10) }
+        if t < 0.47 { return 0.30 * ((t - 0.40) / 0.07) }
+        if t < 0.55 { return 0.13 }
+        if t < 0.65 { return 0.13 * (1.0 - (t - 0.55) / 0.10) }
         return 0
     }
 }
