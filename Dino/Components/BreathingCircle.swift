@@ -15,6 +15,8 @@ struct BreathingCircle: View {
     let quarterRingProgress: Double?
     /// big sigh exhale: the mid ring thins slightly as the breath empties
     let emptying: Bool
+    /// session paused — the water freezes with it (no off-duty redraws)
+    var paused: Bool = false
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var tickScale: CGFloat = 1.0
@@ -40,7 +42,7 @@ struct BreathingCircle: View {
             Circle()
                 .fill(DinoTheme.sageGreen.opacity(0.25))
                 .frame(width: 200, height: 200)
-                .modifier(BreathingWaterGlow(breath: normalized))
+                .modifier(BreathingWaterGlow(breath: normalized, paused: paused))
                 .scaleEffect(breatheScale)
 
             // Mid ring — 160pt, sage green, 0.5s delay feel via slightly dampened scale
@@ -111,6 +113,7 @@ struct BreathingCircle: View {
 /// hands us the interpolated in-between values, not just the targets.
 private struct BreathingWaterGlow: ViewModifier, Animatable {
     var breath: CGFloat
+    var paused: Bool = false
 
     var animatableData: CGFloat {
         get { breath }
@@ -124,7 +127,8 @@ private struct BreathingWaterGlow: ViewModifier, Animatable {
             // static soft glow — the breath still shows, nothing moves
             content.opacity(0.9 + 0.1 * Double(breath))
         } else {
-            TimelineView(.animation) { timeline in
+            // paused session → paused schedule: zero redraws until it resumes
+            TimelineView(.animation(minimumInterval: nil, paused: paused)) { timeline in
                 // wrap in Double BEFORE the float32 shader sees it — raw
                 // reference-date seconds freeze float32 animation entirely
                 let t = timeline.date.timeIntervalSinceReferenceDate

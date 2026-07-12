@@ -45,6 +45,10 @@ struct EmotionalWeatherView: View {
     @State private var showShareRow = false
     // Siri return moment: one quiet line after a voice-logged mood, once.
     @State private var siriReturnLine: String?
+    // Weather-shader discipline: tick only while this tab is on screen and
+    // the app is active — battery-innocent by construction.
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var weatherOnScreen = false
 
     var body: some View {
         NavigationStack {
@@ -449,7 +453,8 @@ struct EmotionalWeatherView: View {
                 ZStack {
                     DinoTheme.background.ignoresSafeArea()
                     // storybook weather — the sky outside, whispered behind the cards
-                    MoodWeatherLayer(condition: themeManager.weatherCondition)
+                    MoodWeatherLayer(condition: themeManager.weatherCondition,
+                                     paused: !weatherOnScreen || scenePhase != .active)
                         .ignoresSafeArea()
                 }
             }
@@ -542,6 +547,8 @@ struct EmotionalWeatherView: View {
             .sheet(isPresented: $showResources) {
                 ResourcesView()
             }
+            .onAppear { weatherOnScreen = true }
+            .onDisappear { weatherOnScreen = false }
         }
     }
 
@@ -554,6 +561,7 @@ struct EmotionalWeatherView: View {
     /// under Reduce Motion or when there is no condition to show.
     private struct MoodWeatherLayer: View {
         let condition: String?
+        var paused: Bool = false
         @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
         private var effectiveCondition: String? {
@@ -579,7 +587,8 @@ struct EmotionalWeatherView: View {
 
         var body: some View {
             if !reduceMotion, let w = Self.weather(for: effectiveCondition) {
-                TimelineView(.animation) { timeline in
+                // 30 fps is plenty for drifting weather; paused → zero redraws
+                TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: paused)) { timeline in
                     // wrap in Double BEFORE the float32 shader sees it — raw
                     // reference-date seconds freeze float32 animation entirely
                     let t = timeline.date.timeIntervalSinceReferenceDate

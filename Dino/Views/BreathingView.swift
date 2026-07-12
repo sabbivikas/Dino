@@ -25,7 +25,8 @@ struct BreathingView: View {
             countdown: viewModel.phaseCountdown,
             accent: viewModel.selectedPattern.accent,
             quarterRingProgress: viewModel.quarterRingProgress,
-            emptying: viewModel.selectedPattern.thinsOnExhale && viewModel.phase == .exhale
+            emptying: viewModel.selectedPattern.thinsOnExhale && viewModel.phase == .exhale,
+            paused: viewModel.isPaused
         )
     }
 

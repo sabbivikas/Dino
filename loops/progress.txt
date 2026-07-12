@@ -81,3 +81,18 @@ Secondary ref noted for scroll effects only: eleev/swiftui-new-metal-shaders (un
   visible bleed halo (b), warm rim halo present, fireflies unharmed.
 - RUBRIC: tide 4 · storybook 4 · readability 5 · calming 4 → GREEN.
 - TODO 5 (world rim+bloom) CHECKED.
+
+=== ITER 6 — discipline pass (2026-07-11) ===
+- BreathingWaterGlow: TimelineView(.animation(paused:)) wired to viewModel.isPaused via new
+  BreathingCircle.paused — paused session = zero shader redraws (water freezes with the breath).
+- MoodWeatherLayer: 30fps cap (minimumInterval 1/30) + paused when tab off-screen (onAppear/onDisappear)
+  or scenePhase != .active.
+- Audit of the rest: paper grain is colorEffect with no timeline (static, zero ongoing cost);
+  world rim breathe rides SceneKit frames that the pre-existing auto-rotate already renders
+  (rendersContinuously=false unchanged); GradientSeed mesh is static.
+- Full DinoTests PASSED, debug build 0 errors. Regression shots iter6/breath-recheck.png (wobble intact),
+  rain-recheck.png (threads drifting at 30fps).
+- RUBRIC (regression): tide 4 · storybook 4 · readability 5 · calming 4 → GREEN.
+- TODO 6 (discipline) CHECKED.
+
+=== LOOP 1 COMPLETE — 6/6 TODOs, 6 iterations, all rubric scores ≥4 ===
