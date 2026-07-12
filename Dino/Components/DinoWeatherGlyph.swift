@@ -154,26 +154,53 @@ private struct SunGlyph: View {
 private struct DriftCloudGlyph: View {
     let muted: Bool
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var drift: CGFloat = 0
 
     var body: some View {
-        GeometryReader { geo in
-            let rect = CGRect(origin: .zero, size: geo.size)
-            ZStack {
-                // the sun peeks from behind, upper right — just an arc and two rays
-                PeekSun()
-                    .stroke(DinoWeatherGlyph.ink.opacity(muted ? 0.32 : 0.62), style: inkStyle(rect))
-                CloudLump()
-                    .fill(Color(hex: "#A8D4E6").opacity(muted ? 0.12 : 0.26))
-                    .offset(x: reduceMotion ? 0 : (drift - 0.5) * rect.side * 0.07)
-                CloudLump()
-                    .stroke(DinoWeatherGlyph.ink.opacity(muted ? 0.40 : 0.82), style: inkStyle(rect))
-                    .offset(x: reduceMotion ? 0 : (drift - 0.5) * rect.side * 0.07)
+        TimelineView(.animation(minimumInterval: 1.0 / 30, paused: reduceMotion)) { timeline in
+            let t = reduceMotion ? 0 : timeline.date.timeIntervalSinceReferenceDate
+            Canvas { ctx, size in
+                let rect = CGRect(origin: .zero, size: size)
+                let s = rect.side
+                let ink = DinoWeatherGlyph.inkColor(muted: muted)
+                let soft = DinoWeatherGlyph.softInkColor(muted: muted)
+                let style = inkStyle(rect)
+
+                // the sun peeks with a soft pulse — 3s swell and glow
+                let pulse = 0.5 + 0.5 * sin(t * 2 * .pi / 3.0)
+                let sunScale = 0.94 + 0.12 * CGFloat(pulse)
+                let sunC = CGPoint(x: rect.midX + s * 0.20, y: rect.midY - s * 0.16)
+                ctx.drawLayer { sun in
+                    sun.opacity = 0.72 + 0.28 * pulse
+                    sun.translateBy(x: sunC.x, y: sunC.y)
+                    sun.scaleBy(x: sunScale, y: sunScale)
+                    sun.translateBy(x: -sunC.x, y: -sunC.y)
+                    sun.stroke(PeekSun().path(in: rect), with: .color(soft), style: style)
+                }
+
+                // cloud drifts — the old ±7px stroll, scaled to the glyph,
+                // with the faintest vertical bob riding along
+                let dx = CGFloat(sin(t * 2 * .pi / 4.0)) * s * 0.11
+                let dy = CGFloat(sin(t * 2 * .pi / 4.0 + 1.3)) * s * 0.02
+                ctx.translateBy(x: dx, y: dy)
+                let lump = CloudLump().path(in: rect)
+                ctx.fill(lump, with: .color(Color(hex: "#A8D4E6").opacity(muted ? 0.12 : 0.26)))
+                ctx.stroke(lump, with: .color(ink), style: style)
+
+                // a quiet face, drifting with its cloud
+                let eyeY = rect.midY + s * 0.05
+                let eyeR = s * 0.018
+                for ex in [rect.midX - s * 0.115, rect.midX + s * 0.005] {
+                    ctx.fill(Path(ellipseIn: CGRect(x: ex - eyeR, y: eyeY - eyeR,
+                                                    width: eyeR * 2, height: eyeR * 2)),
+                             with: .color(ink))
+                }
+                var smile = Path()
+                smile.move(to: CGPoint(x: rect.midX - s * 0.085, y: eyeY + s * 0.055))
+                smile.addQuadCurve(to: CGPoint(x: rect.midX - s * 0.025, y: eyeY + s * 0.055),
+                                   control: CGPoint(x: rect.midX - s * 0.055, y: eyeY + s * 0.082))
+                ctx.stroke(smile, with: .color(ink),
+                           style: StrokeStyle(lineWidth: rect.inkWidth * 0.8, lineCap: .round))
             }
-        }
-        .onAppear {
-            guard !reduceMotion else { return }
-            withAnimation(.easeInOut(duration: 3.8).repeatForever(autoreverses: true)) { drift = 1 }
         }
     }
 }

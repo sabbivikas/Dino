@@ -106,3 +106,12 @@ Context: owner reported the glyph rewrite lost the old cards' character. RM key 
   wide → mid-swell across moments; face reads warm and drawn.
 - RUBRIC: character 5 · hand-drawn 4 · calm-at-arm's-length 4 · gentle n/a → GREEN.
 - POLISH BOX 1 (sun soul) CHECKED.
+
+=== P ITER 2 — partly cloudy life (2026-07-11) ===
+- DriftCloudGlyph rebuilt on TimelineView+Canvas: cloud strolls ±11% of glyph (the old ±7px feel scaled)
+  on a 4s cycle with a faint phase-shifted vertical bob; peek sun pulses (scale 0.94→1.06, opacity
+  0.72→1.0, 3s). Quiet face added to the cloud — two ink dots + small off-center smile, riding the drift.
+- Full DinoTests PASSED, build 0 errors. Shots iter2/cloud-{1..3}.png: cloud left of sun → covering it →
+  back left; face reads tender, not clipart.
+- RUBRIC: character 5 · hand-drawn 4 · calm 4 · gentle n/a → GREEN.
+- POLISH BOX 2 (partly cloudy) CHECKED.
