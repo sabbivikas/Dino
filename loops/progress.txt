@@ -1,0 +1,27 @@
+LOOP 2 — THE MOOD SCREEN REFRESH (feature/mood-refresh)
+started 2026-07-11 ~7:40pm · max 20 iterations · branch local, never pushed
+
+SETUP
+- branched state: feature/mood-refresh @ 804467e (main's build 9 tip).
+- carried over from feature/dino-shaders @ 4404e54 (file checkout, not cherry-pick commit):
+  Dino/Shaders/GradientSeed.swift, DinoTests/GradientSeedTests.swift, and Dino/Shaders/DinoShaders.metal
+  (branch-tip version incl. the iter4 time-precision + fog-tint fixes — needed for dinoPaperGrain).
+- current mood screen inventory: cards use AnimatedWeatherIllustration (cartoon vector), week strip uses
+  raw mood.emoji, log button uses SF cloud.fill on a gray/accent slab, sliders single-color fill.
+- interpretation note: "0.13 ink" read as the mood-color WASH opacity (~0.13–0.25) under #3D3A35 ink
+  strokes at hand-drawn weight (~6% of glyph size) — rubric will judge.
+
+=== L2 ITER 1 — DinoWeatherGlyph (2026-07-11) ===
+- New Dino/Components/DinoWeatherGlyph.swift: four per-glyph structs (SunGlyph/DriftCloudGlyph/StormGlyph/
+  MistGlyph) — ink #3D3A35 strokes at 6.2% of glyph size, round caps, deliberately uneven geometry
+  (8 rays no two alike, lopsided cloud, staggered rain, trailing mist). Mood-color washes 0.26-0.30
+  (muted 0.12-0.13). Idle: sun breathes 3.6s, cloud drifts 3.8s, rain falls 3.4s, mist drifts 3.9s —
+  all under 4s, all still under Reduce Motion. accessibilityHidden (card carries label). muted: prop
+  for unselected cards. Swap-friendly for Chloe's art.
+- WeatherCard: AnimatedWeatherIllustration → DinoWeatherGlyph(46, muted: !isSelected).
+- MainTabView: -moodTabQA hook added on this branch.
+- Full DinoTests PASSED, build 0 errors. Shot iter1/glyphs.png: all four read as drawn marks, not icons;
+  no emoji anywhere in the grid.
+- RUBRIC (box scope): glyphs-hand-drawn 5 · gentle-when-heavy 4 · survives-XXL 4 (fixed-size marks) ·
+  selection 4 (ink deepens + wash blooms on select). paper/button dims belong to later boxes. GREEN.
+- BOX 1 (designed weather glyphs) CHECKED.

@@ -41,6 +41,14 @@ struct MainTabView: View {
             // Custom tab bar
             DinoCustomTabBar(selectedTab: $selectedTab)
         }
+        .onAppear {
+            #if DEBUG
+            // -moodTabQA: land on the mood tab for loop screenshots.
+            if ProcessInfo.processInfo.arguments.contains("-moodTabQA") {
+                selectedTab = 2
+            }
+            #endif
+        }
         .onReceive(dataManager.$deepLinkTab) { tab in
             guard let tab, (0...4).contains(tab) else {
                 return
