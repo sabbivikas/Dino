@@ -136,8 +136,10 @@ final class WorldGlobeScene {
         rim.shaderModifiers = [.surface: """
         float rimDot = abs(dot(normalize(_surface.view), normalize(_surface.normal)));
         float glow = pow(1.0 - rimDot, 2.0);
-        _surface.emission.rgb *= glow * 1.1;
-        _surface.transparent.a = glow;
+        // the atmosphere breathes — a ~12s swell, never a blink
+        float breathe = 0.90 + 0.10 * sin(u_time * 0.5);
+        _surface.emission.rgb *= glow * 1.1 * breathe;
+        _surface.transparent.a = glow * breathe;
         """]
         rim.transparencyMode = .singleLayer
         rimSphere.firstMaterial = rim
@@ -318,6 +320,25 @@ final class WorldGlobeScene {
         node.opacity = 0
         position(node, lat: spot.lat, lon: spot.lon, altitude: 1.05)
         fireflyContainer.addChildNode(node)
+
+        // bleeding light: a wider, fainter halo blooms outward behind the core
+        // and dissolves first — the light spills, then settles into the glow
+        let halo = makeFirefly(color: DinoWorldPalette.moodColor(mood), size: 0.26, breathing: false)
+        halo.name = "pulse-halo"
+        halo.opacity = 0
+        position(halo, lat: spot.lat, lon: spot.lon, altitude: 1.048)
+        fireflyContainer.addChildNode(halo)
+        let haloIn = SCNAction.group([
+            .fadeOpacity(to: 0.55, duration: 0.4),
+            .scale(to: 1.6, duration: 0.6),
+        ])
+        haloIn.timingMode = .easeOut
+        let haloOut = SCNAction.group([
+            .scale(to: 2.3, duration: 2.4),
+            .fadeOpacity(to: 0, duration: 2.4),
+        ])
+        haloOut.timingMode = .easeInEaseOut
+        halo.runAction(.sequence([haloIn, haloOut, .removeFromParentNode()]))
 
         let appear = SCNAction.group([
             .fadeOpacity(to: 1.0, duration: 0.35),

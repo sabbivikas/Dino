@@ -38,6 +38,20 @@ struct WorldGlobeView: UIViewRepresentable {
         context.coordinator.pulseListener.start { [weak globe] pulse in
             globe?.pulse(countryCode: pulse.countryCode, mood: pulse.mood)
         }
+        #if DEBUG
+        // -worldPulseQA: staged local pulses so the bloom + bleed halo are
+        // screenshotable without live Firestore traffic.
+        if ProcessInfo.processInfo.arguments.contains("-worldPulseQA") {
+            let staged: [(String, EmotionalWeather)] = [
+                ("US", .clear), ("JP", .drained), ("BR", .partlyCloudy), ("elsewhere", .overwhelmed),
+            ]
+            for (i, entry) in staged.enumerated() {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2.0 + Double(i) * 2.5) { [weak globe] in
+                    globe?.pulse(countryCode: entry.0, mood: entry.1)
+                }
+            }
+        }
+        #endif
 
         let pan = UIPanGestureRecognizer(target: context.coordinator,
                                          action: #selector(Coordinator.handlePan(_:)))

@@ -70,3 +70,14 @@ Secondary ref noted for scroll effects only: eleev/swiftui-new-metal-shaders (un
 - Full DinoTests PASSED post-fix. Diagnostic shots (diag-red*.png) kept as debugging record.
 - RUBRIC — rain: tide 4 · storybook 4 · readability 5 · calming 4. snow: 4/4/5/4. fog: 4/4/5/5. ALL GREEN.
 - TODO 4 (mood weather) CHECKED.
+
+=== ITER 5 — world rim breathing + pulse bleed halo (2026-07-11) ===
+- Rim shader modifier gains a ~12s breathe (0.90+0.10*sin(u_time*0.5)) on emission AND alpha — the
+  atmosphere swells, never blinks. (SceneKit side: SwiftUI shaders can't touch an SCNView.)
+- pulse() now spawns a second wider halo sprite (0.26, altitude 1.048) that blooms to 0.55 opacity,
+  spills outward to 2.3x over 2.4s and dissolves before the core settles — light bleeding, additive.
+- Debug arg -worldPulseQA (WorldGlobeView, DEBUG): stages US/JP/BR/elsewhere pulses at 2.5s intervals.
+- Full DinoTests PASSED, debug build 0 errors. Shots iter5/world-pulse-a/b.png: rose pulse mid-bloom with
+  visible bleed halo (b), warm rim halo present, fireflies unharmed.
+- RUBRIC: tide 4 · storybook 4 · readability 5 · calming 4 → GREEN.
+- TODO 5 (world rim+bloom) CHECKED.
