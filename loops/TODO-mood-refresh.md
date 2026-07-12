@@ -12,10 +12,11 @@ glyphs-feel-hand-drawn-not-icon-pack · gentle-when-heavy · survives-XXL-type
       strokes / low mist bands), irregular strokes, idle animation <4s cycle,
       Reduce Motion static, per-glyph structure for Chloe's future art swap
       (iter 1 — glyphs 5 · gentle 4 · XXL 4 · selection 4)
-- [ ] the log button: sage breathing pulse (3.2s), selected mood's glyph,
+- [x] the log button: sage breathing pulse (3.2s), selected mood's glyph,
       honest muted disabled state, pressed squish, adaptive handwritten line
       after selection (heavy: "however it is, it counts" / light: "glad the
       sky is kind today") — in voice tests
+      (iter 2 — alive 4 · gentle 5 · glyphs 5 · paper 4)
 - [ ] mood cards in paper: shader grain material, radius 8–10, hairline
       #EFE7D2, glyphs replace illustrations, selection = lift + 1.4°
       alternating tilt + sage tape + deeper shadow (spring .28s overshoot),

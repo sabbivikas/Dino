@@ -42,3 +42,15 @@ SETUP
 - RUBRIC: alive-not-needy 4 · gentle-when-heavy 5 · glyphs 5 · paper 4 · selection 4 · XXL provisional 4
   (sweep box will verify) → GREEN.
 - BOX 2 (the log button) CHECKED.
+
+=== L2 ITER 3 — mood cards in paper (2026-07-11) ===
+- WeatherCard rewritten: cream #FFFDF6 + dinoPaperGrain(0.05), radius 9, hairline #EFE7D2, glyph 46pt
+  muted-when-unselected. Selection: spring(.28, damping .62 = slight overshoot), alternating tilt via grid
+  index (light ±1.4°, heavy ±1.0°), sage TapeStrip overhanging top (heavy: opacity .45 vs .78), lift
+  scale 1.035/1.02 (light/heavy), shadow 13@0.16 / 9@0.11, faint mood wash 0.09 on selection. a11y:
+  label + isSelected trait; tape/glyph hidden.
+- Grid spacing 12→14 + top padding for tape overhang. QA scroll anchor decoupled to -moodQAscrollBottom
+  (was fighting card shots).
+- Full DinoTests PASSED, build 0 errors. Shots iter3/cards-{none,Clear,Drained}.png.
+- RUBRIC: paper 5 · choosing-a-card 5 · glyphs 5 · gentle-when-heavy 5 · alive 4 · XXL provisional 4 → GREEN.
+- BOX 3 (mood cards in paper) CHECKED.

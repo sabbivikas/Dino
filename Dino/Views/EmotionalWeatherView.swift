@@ -118,11 +118,12 @@ struct EmotionalWeatherView: View {
                     }
 
                     // Weather cards
-                    LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)], spacing: 12) {
-                        ForEach(EmotionalWeather.allCases, id: \.self) { weather in
+                    LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)], spacing: 14) {
+                        ForEach(Array(EmotionalWeather.allCases.enumerated()), id: \.element) { index, weather in
                             WeatherCard(
                                 weather: weather,
                                 isSelected: viewModel.selectedWeather == weather,
+                                index: index,
                                 onTap: {
                                     HapticManager.shared.light()
                                     withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
@@ -133,6 +134,7 @@ struct EmotionalWeatherView: View {
                         }
                     }
                     .padding(.horizontal, DinoTheme.padding)
+                    .padding(.top, 4)   // room for the tape to overhang the top row
 
                     // Suggestion text
                     if viewModel.selectedWeather != nil {
@@ -587,7 +589,7 @@ struct EmotionalWeatherView: View {
     /// QA screenshots of the log button need the fold moved — DEBUG only.
     private var moodQAScrollBottom: Bool {
         #if DEBUG
-        return ProcessInfo.processInfo.arguments.contains { $0.hasPrefix("-moodQAselect") }
+        return ProcessInfo.processInfo.arguments.contains("-moodQAscrollBottom")
         #else
         return false
         #endif
