@@ -52,10 +52,10 @@ struct WorldView: View {
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 18) {
                     header
-                    findMyLightButton
-                    dayChips
                     globeSection
                     warmTotalSection
+                    findMyLightButton
+                    dayChips
                     percentageSection
                     countryList
                     lanternSection
