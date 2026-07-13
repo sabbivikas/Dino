@@ -74,7 +74,7 @@ struct EmotionalWeatherView: View {
                                                                    showInsight: showStepsInsight) {
                                 Text(line)
                                     .font(DinoTheme.dinoFont(size: 11))
-                                    .foregroundColor(.secondary)
+                                    .foregroundColor(DinoTheme.textSecondary)
                                     .multilineTextAlignment(.center)
                             }
                         }
@@ -96,11 +96,11 @@ struct EmotionalWeatherView: View {
                                     Text("🌿")
                                         .font(.system(size: 11))
                                     Text("dino can notice your movement too".localized)
-                                        .font(DinoTheme.dinoFont(size: 12))
-                                        .foregroundColor(DinoTheme.textSecondary)
+                                        .font(DinoTheme.dinoFont(size: 13))
+                                        .foregroundColor(DinoTheme.textPrimary)
                                     Image(systemName: "chevron.right")
                                         .font(.system(size: 9, weight: .semibold))
-                                        .foregroundColor(DinoTheme.textSecondary.opacity(0.6))
+                                        .foregroundColor(DinoTheme.textSecondary.opacity(0.85))
                                 }
                             }
                             .buttonStyle(.plain)
@@ -463,6 +463,15 @@ struct EmotionalWeatherView: View {
                 AnalyticsManager.shared.trackMoodScreenOpened()
                 AnalyticsManager.shared.trackScreen("mood")
                 #if DEBUG
+                if ProcessInfo.processInfo.arguments.contains("-moodStepsQA") {
+                    sleepData = HealthService.SleepData(durationHours: 7.2,
+                        startTime: Date(), endTime: Date())
+                    stepsToday = 4400
+                    stepsRead = .high
+                    showStepsInsight = true
+                }
+                #endif
+                #if DEBUG
                 // -moodQAselect<Mood>: preselect a card for loop screenshots.
                 let qaArgs = ProcessInfo.processInfo.arguments
                 let qaMoods: [(String, EmotionalWeather)] = [
@@ -579,7 +588,7 @@ struct EmotionalWeatherView: View {
                 + Text(" " + (stepsOnly ? "steps today".localized : "steps".localized))
                     .font(DinoTheme.dinoFont(size: 12))
         }
-        return line.foregroundColor(.secondary)
+        return line.foregroundColor(DinoTheme.textSecondary)
     }
 
     /// Loads the steps card (or the one-time invite for sleep-connected users).
@@ -830,9 +839,16 @@ private struct DaySky: View {
                 // soft inner light
                 RadialGradient(gradient: Gradient(colors: [.white.opacity(0.22), .clear]),
                                center: .init(x: 0.35, y: 0.30), startRadius: 0, endRadius: 34)
+                // soft scrim so the ink glyph reads on any sky (stronger on dark heavy days)
+                Circle()
+                    .fill(Color.white.opacity(WeekSky.isHeavy(mood) ? 0.55 : 0.28))
+                    .frame(width: 30, height: 30)
+                    .blur(radius: 4)
+                // the day, instantly readable as its mood — static hand-drawn glyph
+                DinoWeatherGlyph(weather: mood, size: 22, paused: true)
             } else {
                 // faint empty paper — a page not written on
-                Color(hex: "#FFFDF6").opacity(0.55)
+                Color(hex: "#FFFDF6").opacity(0.75)
             }
         }
         .frame(width: 38, height: 38)

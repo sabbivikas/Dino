@@ -16,8 +16,8 @@ struct SignInView: View {
     @State private var heartOffset2: CGFloat = 0
     @State private var heartOpacity1: Double = 0.7
     @State private var heartOpacity2: Double = 0.7
-    @State private var showEmailSignUp = false
-    @State private var emailText = ""
+    @State private var showEmailSignUp = ProcessInfo.processInfo.arguments.contains("-authQA")
+    @State private var emailText = ProcessInfo.processInfo.arguments.contains("-authQA") ? "dino@example.com" : ""
     @State private var passwordText = ""
     @State private var confirmPasswordText = ""
     @State private var isSignUp = true
@@ -286,14 +286,25 @@ struct DinoTextField: View {
                 .foregroundColor(DinoTheme.textSecondary)
                 .frame(width: 20)
 
-            if isSecure {
-                SecureField(placeholder, text: $text)
-                    .font(DinoTheme.bodyFont())
-            } else {
-                TextField(placeholder, text: $text)
-                    .font(DinoTheme.bodyFont())
-                    .keyboardType(.emailAddress)
-                    .textInputAutocapitalization(.never)
+            ZStack(alignment: .leading) {
+                // legible placeholder — SwiftUI's default is a faint gray that
+                // vanishes on the near-white field background
+                if text.isEmpty {
+                    Text(placeholder)
+                        .font(DinoTheme.bodyFont())
+                        .foregroundColor(DinoTheme.textSecondary)
+                }
+                if isSecure {
+                    SecureField("", text: $text)
+                        .font(DinoTheme.bodyFont())
+                        .foregroundColor(DinoTheme.textPrimary)
+                } else {
+                    TextField("", text: $text)
+                        .font(DinoTheme.bodyFont())
+                        .foregroundColor(DinoTheme.textPrimary)
+                        .keyboardType(.emailAddress)
+                        .textInputAutocapitalization(.never)
+                }
             }
         }
         .padding(.horizontal, 16)
