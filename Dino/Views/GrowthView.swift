@@ -4,6 +4,7 @@
 //
 
 import SwiftUI
+import UIKit
 
 // MARK: - File-private helpers
 
@@ -86,6 +87,11 @@ struct GrowthView: View {
     @State private var composingShare = false
     @State private var shareImage: UIImage?
     @State private var showShareSheet = false
+    @State private var shareFailedToast = false
+    #if DEBUG
+    @State private var showRenderDiag = false
+    @State private var renderDiagImage: UIImage?
+    #endif
     #if DEBUG
     @State private var showShareQAGallery = false
     #endif
@@ -152,6 +158,24 @@ struct GrowthView: View {
             if ProcessInfo.processInfo.arguments.contains("-gardenShareQA") {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { showShareQAGallery = true }
             }
+            // -gardenRenderQA: compose via the REAL composer and display the raw
+            // UIImage on magenta — isolates render (black/cream/nil) from sharing.
+            if ProcessInfo.processInfo.arguments.contains("-gardenShareAuto") {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { shareGarden() }
+            }
+            if ProcessInfo.processInfo.arguments.contains("-gardenRenderQA") {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                    let snap = SunflowerSnapshot(
+                        stage: vm.growthStage, careState: vm.careState,
+                        sproutP: vm.sproutP, stemP: vm.stemP, leafP: vm.leafP,
+                        budP: vm.budP, bloomP: vm.bloomP, care: vm.care)
+                    // EXACT real-share scene computation
+                    let realScene = sceneKey(theme: themeManager.currentTheme, date: Date())
+                    renderDiagImage = GardenPostcardComposer.compose(
+                        snap: snap, scene: realScene, day: 30, uid: "render-diag")
+                    showRenderDiag = true
+                }
+            }
             #endif
         }
         .overlay {
@@ -161,6 +185,15 @@ struct GrowthView: View {
                     .foregroundColor(DinoTheme.textPrimary)
                     .padding(.horizontal, 16).padding(.vertical, 10)
                     .background(Capsule().fill(Color(hex: "#FFFDF6")).shadow(color: .black.opacity(0.12), radius: 8, y: 3))
+                    .transition(.opacity)
+            } else if shareFailedToast {
+                Text("couldn't make your postcard just now. try again 🌱")
+                    .font(DinoTheme.dinoFont(size: 13))
+                    .foregroundColor(DinoTheme.textPrimary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 16).padding(.vertical, 10)
+                    .background(Capsule().fill(Color(hex: "#FFFDF6")).shadow(color: .black.opacity(0.12), radius: 8, y: 3))
+                    .padding(.horizontal, 30)
                     .transition(.opacity)
             }
         }
@@ -172,6 +205,22 @@ struct GrowthView: View {
         #if DEBUG
         .fullScreenCover(isPresented: $showShareQAGallery) {
             GardenPostcardQAGallery()
+        }
+        .fullScreenCover(isPresented: $showRenderDiag) {
+            ZStack {
+                Color(red: 1, green: 0, blue: 1).ignoresSafeArea()  // magenta backdrop
+                if let img = renderDiagImage {
+                    VStack(spacing: 8) {
+                        Text("composed \(Int(img.size.width))x\(Int(img.size.height)) @\(Int(img.scale))x")
+                            .font(.system(size: 12)).foregroundColor(.white)
+                        Image(uiImage: img).resizable().scaledToFit()
+                            .frame(maxWidth: 320, maxHeight: 420)
+                            .border(Color.white, width: 2)
+                    }
+                } else {
+                    Text("RENDER RETURNED NIL").font(.system(size: 20)).foregroundColor(.white)
+                }
+            }
         }
         #endif
     }
@@ -193,9 +242,15 @@ struct GrowthView: View {
             let image = GardenPostcardComposer.compose(
                 snap: snap, scene: scene, day: day, uid: GardenShare.currentUID())
             withAnimation(.easeInOut(duration: 0.2)) { composingShare = false }
-            if let image {
+            // never open the share sheet with a nil or black render
+            if let image, !GardenPostcardComposer.isMostlyDark(image) {
                 shareImage = image
                 showShareSheet = true
+            } else {
+                withAnimation(.easeInOut(duration: 0.2)) { shareFailedToast = true }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2.2) {
+                    withAnimation { shareFailedToast = false }
+                }
             }
         }
     }
@@ -283,12 +338,67 @@ fileprivate struct PostcardPaper: View {
 
 @MainActor
 fileprivate enum GardenPostcardComposer {
-    /// 540×675pt at 2x → 1080×1350px — instagram story friendly 4:5
+    /// 540×675pt at 2x → 1080×1350px — instagram story friendly 4:5.
+    ///
+    /// Renders by hosting the SwiftUI view in the key window and snapshotting
+    /// via UIKit (drawHierarchy). SwiftUI's ImageRenderer returns a BLACK image
+    /// for Canvas content on some physical devices (Metal-backed path) even
+    /// though it works in the simulator — this path avoids that entirely. The
+    /// colorScheme is pinned light so the postcard is always cream.
     static func compose(snap: SunflowerSnapshot, scene: GardenScene, day: Int, uid: String) -> UIImage? {
-        let renderer = ImageRenderer(content: GardenPostcardView(snap: snap, scene: scene, day: day, uid: uid))
-        renderer.scale = 2
-        renderer.isOpaque = true
-        return renderer.uiImage
+        let target = CGSize(width: 540, height: 675)
+        let content = GardenPostcardView(snap: snap, scene: scene, day: day, uid: uid)
+            .environment(\.colorScheme, .light)
+            .frame(width: target.width, height: target.height)
+
+        guard let window = UIApplication.shared.connectedScenes
+            .compactMap({ $0 as? UIWindowScene })
+            .flatMap({ $0.windows })
+            .first(where: { $0.isKeyWindow }) else {
+            // no window (unlikely) — fall back to ImageRenderer
+            let r = ImageRenderer(content: content); r.scale = 2
+            return r.uiImage
+        }
+
+        let host = UIHostingController(rootView: content)
+        host.view.frame = CGRect(origin: .zero, size: target)
+        host.view.backgroundColor = .clear
+        host.view.layer.zPosition = -1
+        window.addSubview(host.view)
+        window.sendSubviewToBack(host.view)
+        host.view.setNeedsLayout()
+        host.view.layoutIfNeeded()
+
+        let format = UIGraphicsImageRendererFormat.default()
+        format.scale = 2
+        format.opaque = false
+        let image = UIGraphicsImageRenderer(size: target, format: format).image { _ in
+            host.view.drawHierarchy(in: host.view.bounds, afterScreenUpdates: true)
+        }
+        host.view.removeFromSuperview()
+        return image
+    }
+
+    /// The hard guard: never share a failed (mostly-dark) render. Samples a
+    /// 20×20 grid of the composed image.
+    static func isMostlyDark(_ image: UIImage) -> Bool {
+        guard let cg = image.cgImage, cg.width > 0, cg.height > 0,
+              let data = cg.dataProvider?.data,
+              let ptr = CFDataGetBytePtr(data) else { return true }
+        let w = cg.width, h = cg.height
+        let bpp = cg.bitsPerPixel / 8, bpr = cg.bytesPerRow
+        let stepX = max(1, w / 20), stepY = max(1, h / 20)
+        var dark = 0, total = 0, y = 0
+        while y < h {
+            var x = 0
+            while x < w {
+                let i = y * bpr + x * bpp
+                if Int(ptr[i]) < 40 && Int(ptr[i + 1]) < 40 && Int(ptr[i + 2]) < 40 { dark += 1 }
+                total += 1; x += stepX
+            }
+            y += stepY
+        }
+        return total > 0 && Double(dark) / Double(total) > 0.85
     }
 }
 
