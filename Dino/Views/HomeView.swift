@@ -110,6 +110,11 @@ struct HomeView: View {
                 if ProcessInfo.processInfo.arguments.contains("-resourcesQA") {
                     viewModel.showResources = true
                 }
+                // -gardenShareQA: open the garden (its onAppear presents the
+                // postcard fixture gallery).
+                if ProcessInfo.processInfo.arguments.contains("-gardenShareQA") {
+                    viewModel.showGrowth = true
+                }
                 #endif
                 #if DEBUG
                 // -healthQA: fire the sleep authorization sheet on launch so the

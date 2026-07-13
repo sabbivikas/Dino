@@ -401,6 +401,14 @@ final class GrowthViewModel: ObservableObject {
         return max(0, cal.dateComponents([.day], from: a, to: b).day ?? 0)
     }
 
+    /// The garden's birthday — the earliest recorded practice across all four
+    /// practices. Nil for a garden that hasn't been tended yet. Never resets.
+    var firstPracticeDate: Date? {
+        PracticeType.allCases
+            .flatMap { datesUsed(for: $0) }
+            .min()
+    }
+
     private func datesUsed(for practice: PracticeType) -> [Date] {
         switch practice {
         case .journal:   return dataManager.journalEntries.map { $0.date }
