@@ -191,15 +191,19 @@ enum WorldMoodService {
             c.total = clear + pc + ow + dr
             return c
         }
+        // realistic shape: a few big english-speaking + sea countries lead,
+        // a tail folds into the quieter lights. totals strictly descending;
+        // dominant moods vary so the list shows the full dot palette.
         let countries: [String: WorldMoodCounts] = [
-            "JP": counts(40, 5, 3, 2),    // gold, big
-            "US": counts(4, 6, 8, 30),    // rose
-            "BR": counts(3, 25, 4, 2),    // sage
-            "DE": counts(2, 3, 20, 4),    // lavender
-            "IN": counts(15, 4, 2, 1),    // gold
-            "GB": counts(2, 10, 3, 1),    // sage
-            "AU": counts(8, 1, 1, 0),     // gold, small
-            "FR": counts(1, 2, 7, 3),     // lavender, small
+            "US": counts(35, 18, 12, 10),   // 75 — clear (gold)
+            "GB": counts(8, 10, 9, 15),     // 42 — drained (rose)
+            "PH": counts(7, 16, 5, 4),      // 32 — partly cloudy (sage)
+            "SG": counts(4, 5, 13, 3),      // 25 — overwhelmed (lavender)
+            "MY": counts(11, 4, 3, 2),      // 20 — clear (gold)
+            "IN": counts(2, 7, 2, 1),       // 12 — partly (sage), quieter
+            "AU": counts(1, 2, 1, 4),       // 8  — drained (rose)
+            "JP": counts(1, 1, 4, 1),       // 7  — overwhelmed (lavender)
+            "elsewhere": counts(3, 1, 1, 0) // 5  — clear (gold)
         ]
         var global = WorldMoodCounts()
         for c in countries.values {
