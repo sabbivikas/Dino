@@ -27,7 +27,7 @@ struct ContentView: View {
                     LetterView {
                         withAnimation { hasSeenLetter = true }
                     }
-                } else if !hasPassedAuth {
+                } else if !hasPassedAuth || authQA {
                     SignInView()
                 } else if !dataManager.onboardingComplete {
                     OnboardingView()
@@ -65,6 +65,14 @@ struct ContentView: View {
         )) {
             AmbientSoundsView()
         }
+    }
+
+    private var authQA: Bool {
+        #if DEBUG
+        return ProcessInfo.processInfo.arguments.contains("-authQA")
+        #else
+        return false
+        #endif
     }
 
     private func handleDeepLink(_ url: URL) {

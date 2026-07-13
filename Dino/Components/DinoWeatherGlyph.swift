@@ -17,14 +17,17 @@ struct DinoWeatherGlyph: View {
     var size: CGFloat = 44
     /// unselected cards: ink softens, the wash nearly disappears
     var muted: Bool = false
+    /// force-static (no idle animation) regardless of reduce motion — e.g. the
+    /// week strip, where seven breathing glyphs would be noise
+    var paused: Bool = false
 
     var body: some View {
         Group {
             switch weather {
-            case .clear:        SunGlyph(muted: muted)
-            case .partlyCloudy: DriftCloudGlyph(muted: muted)
-            case .overwhelmed:  StormGlyph(muted: muted)
-            case .drained:      MistGlyph(muted: muted)
+            case .clear:        SunGlyph(muted: muted, paused: paused)
+            case .partlyCloudy: DriftCloudGlyph(muted: muted, paused: paused)
+            case .overwhelmed:  StormGlyph(muted: muted, paused: paused)
+            case .drained:      MistGlyph(muted: muted, paused: paused)
             }
         }
         .frame(width: size, height: size)
@@ -54,6 +57,7 @@ private func inkStyle(_ rect: CGRect) -> StrokeStyle {
 
 private struct SunGlyph: View {
     let muted: Bool
+    var paused: Bool = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     // uneven angles and lengths — no two rays agree
@@ -63,8 +67,8 @@ private struct SunGlyph: View {
     ]
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 30, paused: reduceMotion)) { timeline in
-            let t = reduceMotion ? 0 : timeline.date.timeIntervalSinceReferenceDate
+        TimelineView(.animation(minimumInterval: 1.0 / 30, paused: paused || reduceMotion)) { timeline in
+            let t = (paused || reduceMotion) ? 0 : timeline.date.timeIntervalSinceReferenceDate
             Canvas { ctx, size in
                 let rect = CGRect(origin: .zero, size: size)
                 let s = rect.side
@@ -153,11 +157,12 @@ private struct SunGlyph: View {
 
 private struct DriftCloudGlyph: View {
     let muted: Bool
+    var paused: Bool = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 30, paused: reduceMotion)) { timeline in
-            let t = reduceMotion ? 0 : timeline.date.timeIntervalSinceReferenceDate
+        TimelineView(.animation(minimumInterval: 1.0 / 30, paused: paused || reduceMotion)) { timeline in
+            let t = (paused || reduceMotion) ? 0 : timeline.date.timeIntervalSinceReferenceDate
             Canvas { ctx, size in
                 let rect = CGRect(origin: .zero, size: size)
                 let s = rect.side
@@ -250,6 +255,7 @@ private struct CloudLump: Shape {
 
 private struct StormGlyph: View {
     let muted: Bool
+    var paused: Bool = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     // (x offset, phase delay, stroke length) — three drops, none agreeing
@@ -258,8 +264,8 @@ private struct StormGlyph: View {
     ]
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 30, paused: reduceMotion)) { timeline in
-            let t = reduceMotion ? 0 : timeline.date.timeIntervalSinceReferenceDate
+        TimelineView(.animation(minimumInterval: 1.0 / 30, paused: paused || reduceMotion)) { timeline in
+            let t = (paused || reduceMotion) ? 0 : timeline.date.timeIntervalSinceReferenceDate
             Canvas { ctx, size in
                 let rect = CGRect(origin: .zero, size: size)
                 let s = rect.side
@@ -337,6 +343,7 @@ private struct StormCloud: Shape {
 
 private struct MistGlyph: View {
     let muted: Bool
+    var paused: Bool = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     // (start x, y, width, drift dir, phase) — every band a different reach
@@ -348,8 +355,8 @@ private struct MistGlyph: View {
     ]
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 30, paused: reduceMotion)) { timeline in
-            let t = reduceMotion ? 0 : timeline.date.timeIntervalSinceReferenceDate
+        TimelineView(.animation(minimumInterval: 1.0 / 30, paused: paused || reduceMotion)) { timeline in
+            let t = (paused || reduceMotion) ? 0 : timeline.date.timeIntervalSinceReferenceDate
             Canvas { ctx, size in
                 let rect = CGRect(origin: .zero, size: size)
                 let s = rect.side
