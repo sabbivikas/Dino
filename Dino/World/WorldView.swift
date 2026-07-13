@@ -18,6 +18,7 @@ struct WorldView: View {
     @State private var findTrigger = 0
     @State private var toast: String?
     @State private var loading = true
+    @State private var showLanternGallery = false
 
     // Space-dark night sky — warm navy, never cold sci-fi black. The old ink
     // roles flip to warm creams so every label reads against the dark.
@@ -51,9 +52,10 @@ struct WorldView: View {
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 18) {
                     header
-                    globeSection
                     findMyLightButton
                     dayChips
+                    globeSection
+                    warmTotalSection
                     percentageSection
                     countryList
                     lanternSection
@@ -61,13 +63,29 @@ struct WorldView: View {
                 }
                 .padding(.bottom, 28)
             }
+            .defaultScrollAnchor(worldQAScrollBottom ? .bottom : .top)
         }
         .task {
             aggregate = await WorldMoodService.fetchAggregate()
             if selectedDayKey.isEmpty { selectedDayKey = todayKey }
             loading = false
         }
-        .onAppear { AnalyticsManager.shared.trackWorldViewed() }
+        .onAppear {
+            AnalyticsManager.shared.trackWorldViewed()
+            #if DEBUG
+            if ProcessInfo.processInfo.arguments.contains("-worldQAGallery") {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { showLanternGallery = true }
+            }
+            #endif
+        }
+    }
+
+    private var worldQAScrollBottom: Bool {
+        #if DEBUG
+        return ProcessInfo.processInfo.arguments.contains("-worldQAScrollBottom")
+        #else
+        return false
+        #endif
     }
 
     // MARK: - Header
@@ -255,20 +273,34 @@ struct WorldView: View {
 
     // MARK: - Country list
 
+    // MARK: - The number, directly under the globe (Change 1)
+
+    @ViewBuilder private var warmTotalSection: some View {
+        if let b = selectedBucket, b.global.total > 0 {
+            VStack(spacing: 3) {
+                (Text(WorldRedesignVoice.totalNumber(b.global.total))
+                    .foregroundColor(Color(hex: "#f6da63"))
+                 + Text(WorldRedesignVoice.totalSuffix(total: b.global.total,
+                                                        isToday: selectedDayKey == todayKey))
+                    .foregroundColor(Color(hex: "#ede8d6")))
+                    .font(.custom(DinoTheme.customFontName, size: 27))
+                    .shadow(color: Color(hex: "#f6da63").opacity(0.45), radius: 10)
+                    .multilineTextAlignment(.center)
+                Text(WorldConstellationVoice.subLine(countries: b.countries.count))
+                    .font(DinoTheme.dinoFont(size: 13))
+                    .foregroundColor(Color(hex: "#9aa0cc"))
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.horizontal, 20)
+        }
+    }
+
     private var countryList: some View {
         VStack(alignment: .leading, spacing: 0) {
             if let b = selectedBucket, !b.countries.isEmpty {
-                Text("lights around the world")
-                    .font(DinoTheme.dinoFont(size: 13))
-                    .foregroundColor(ink2)
-                    .padding(.bottom, 12)
-
-                // the constellation — a sky of names, no rows, no ranks, no digits
-                WorldConstellationSection(bucket: b,
-                                          isToday: selectedDayKey == todayKey,
-                                          dayKey: selectedDayKey,
-                                          countryName: countryName)
-                    .frame(maxWidth: .infinity)
+                WorldCountryList(bucket: b,
+                                 isToday: selectedDayKey == todayKey,
+                                 countryName: countryName)
             }
         }
         .padding(.horizontal, 24)
@@ -281,39 +313,43 @@ struct WorldView: View {
 
     // MARK: - Your lanterns 🏮
 
+    /// The lanterns the grid/gallery show — real data, except under the
+    /// `-worldQALanterns` screenshot arg, where non-persisting fixtures with
+    /// distinct ids (so their seeded glows differ) stand in.
+    private var worldLanterns: [ReceivedLantern] {
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("-worldQALanterns") {
+            return WorldMoodService.debugLanternFixtures()
+        }
+        #endif
+        return SharedDataManager.shared.receivedLanterns
+    }
+
     @ViewBuilder private var lanternSection: some View {
         let dm = SharedDataManager.shared
-        if !dm.receivedLanterns.isEmpty || dm.sentLanternCount > 0 {
-            VStack(alignment: .leading, spacing: 10) {
-                Text("your lanterns 🏮")
-                    .font(DinoTheme.dinoFont(size: 13))
-                    .foregroundColor(ink2)
-
-                ForEach(dm.receivedLanterns.prefix(20)) { lantern in
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("\u{201C}\(lantern.text)\u{201D}")
-                            .font(DinoTheme.dinoFont(size: 14))
-                            .foregroundColor(ink)
-                            .lineSpacing(3)
-                        Text("from \(LanternService.countryName(lantern.countryCode)) · \(lantern.receivedAt.formatted(.dateTime.month(.abbreviated).day()).lowercased())")
-                            .font(DinoTheme.dinoFont(size: 11))
-                            .foregroundColor(ink3)
-                    }
-                    .padding(12)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Color.white.opacity(0.07)))
+        let lanterns = worldLanterns
+        if !lanterns.isEmpty {
+            VStack(alignment: .leading, spacing: 14) {
+                WorldLanternGrid(lanterns: lanterns) {
+                    AnalyticsManager.shared.trackWorldLanternGalleryOpened()
+                    showLanternGallery = true
                 }
 
                 if dm.sentLanternCount > 0 {
                     Text("you've sent \(dm.sentLanternCount) lantern\(dm.sentLanternCount == 1 ? "" : "s") into the world")
                         .font(DinoTheme.dinoFont(size: 12))
                         .foregroundColor(ink2)
-                        .padding(.top, 2)
+                        .padding(.horizontal, 16)
                 }
             }
-            .padding(16)
-            .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Color.white.opacity(0.06)))
-            .padding(.horizontal, 16)
+            .fullScreenCover(isPresented: $showLanternGallery) {
+                LanternGalleryView(lanterns: lanterns)
+            }
+        } else if dm.sentLanternCount > 0 {
+            Text("you've sent \(dm.sentLanternCount) lantern\(dm.sentLanternCount == 1 ? "" : "s") into the world")
+                .font(DinoTheme.dinoFont(size: 12))
+                .foregroundColor(ink2)
+                .padding(.horizontal, 16)
         }
     }
 

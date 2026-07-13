@@ -493,6 +493,11 @@ final class AnalyticsManager {
         capture("world_rewind_used")
     }
 
+    /// Content-free counter — no lantern content ever enters analytics.
+    func trackWorldLanternGalleryOpened() {
+        capture("world_lantern_gallery_opened")
+    }
+
     // MARK: - Lanterns (no lantern text in event properties, ever)
 
     func trackLanternComposed() {

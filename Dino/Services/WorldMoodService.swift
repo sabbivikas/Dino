@@ -238,6 +238,24 @@ enum WorldMoodService {
         return debugAggregate(from: countries)
     }
 
+    /// Screenshot fixtures for the lantern grid/gallery — distinct ids give
+    /// each lantern a different seeded glow. Non-persisting (view-local use).
+    static func debugLanternFixtures() -> [ReceivedLantern] {
+        let base = Date(timeIntervalSinceReferenceDate: 800_000_000)
+        let raw: [(String, String, Int)] = [
+            ("you matter more than the hardest day tells you", "JP", 0),
+            ("someone far away is rooting for you tonight", "BR", 1),
+            ("rest is allowed. you have done enough today", "DE", 3),
+            ("the sky is wide and there is room for you in it", "US", 5),
+            ("go gently. small steps still move you forward", "IN", 8),
+            ("you are not as alone as the quiet makes you feel", "GB", 12),
+        ]
+        return raw.map { text, code, daysAgo in
+            ReceivedLantern(text: text, countryCode: code,
+                            receivedAt: base.addingTimeInterval(Double(-daysAgo) * 86_400))
+        }
+    }
+
     /// Constellation QA: a single-country day.
     static func debugSingleAggregate() -> WorldAggregate {
         var c = WorldMoodCounts()
