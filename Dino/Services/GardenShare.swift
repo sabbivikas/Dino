@@ -24,6 +24,24 @@ enum GardenShare {
 
     static func caption(day: Int) -> String { "my little garden \u{00B7} day \(day)" }
     static let footer = "grown with dino \u{1F995}"
+    static let topLabel = "\u{00B7} the dino garden \u{00B7}"
+    static let daysLabel = "days"
+    static let stampFailToast = "couldn't make your postcard just now. try again \u{1F331}"
+
+    /// stage-only caption for the stamp — privacy safe (never mood or streak)
+    static func stageCaption(_ stage: GrowthStage) -> String {
+        switch stage {
+        case .seed:     return "just planted"
+        case .cracking: return "breaking ground"
+        case .sprout:   return "a new sprout"
+        case .seedling: return "a young seedling"
+        case .growing:  return "growing tall"
+        case .budding:  return "about to bloom"
+        case .opening:  return "opening up"
+        case .bloomed:  return "in full bloom"
+        case .thriving: return "thriving"
+        }
+    }
     static let postmarkTop = "dino post"
     static func postmarkDay(day: Int) -> String { "day \(day)" }
     static let composingLine = "picking the best light..."
@@ -31,7 +49,9 @@ enum GardenShare {
     static let shareButtonLabel = "share my garden"
 
     static var allFixedStrings: [String] {
-        [caption(day: 3), footer, postmarkTop, postmarkDay(day: 3), composingLine, shareText, shareButtonLabel]
+        [caption(day: 3), footer, postmarkTop, postmarkDay(day: 3), composingLine, shareText, shareButtonLabel,
+         topLabel, daysLabel, stampFailToast,
+         stageCaption(.seed), stageCaption(.sprout), stageCaption(.growing), stageCaption(.bloomed), stageCaption(.thriving)]
     }
 
     /// Every string that appears ON the composed card — the privacy sweep

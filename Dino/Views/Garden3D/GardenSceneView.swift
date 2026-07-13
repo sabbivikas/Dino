@@ -156,6 +156,7 @@ private struct GardenSceneRepresentable: UIViewRepresentable {
                                          action: #selector(Coordinator.handleTap(_:)))
         view.addGestureRecognizer(tap)
         context.coordinator.view = view
+        GardenSnapshotBridge.scnView = view   // hand the live SCNView to the share flow
 
         context.coordinator.handle = handle
         applyState(view: view, coordinator: context.coordinator, animatedCare: false)
@@ -175,6 +176,7 @@ private struct GardenSceneRepresentable: UIViewRepresentable {
     static func dismantleUIView(_ view: SCNView, coordinator: Coordinator) {
         view.isPlaying = false
         coordinator.handle?.creatures.setActive(false)
+        if GardenSnapshotBridge.scnView === view { GardenSnapshotBridge.scnView = nil }
     }
 
     private func applyState(view: SCNView, coordinator: Coordinator, animatedCare: Bool) {

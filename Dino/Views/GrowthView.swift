@@ -5,6 +5,7 @@
 
 import SwiftUI
 import UIKit
+import SceneKit
 
 // MARK: - File-private helpers
 
@@ -113,17 +114,18 @@ struct GrowthView: View {
                     .overlay(alignment: .topTrailing) {
                         // quiet share affordance — availability, never a nag
                         Button { shareGarden() } label: {
-                            // cream chip: the bare glyph vanished against bright
-                            // noon and night skies on device — the chip reads on
-                            // every scene without shouting
+                            // the 46pt paper share button (share-kit design)
                             Image(systemName: "square.and.arrow.up")
-                                .font(.system(size: 14, weight: .medium))
-                                .foregroundColor(Color(hex: "#3D3A35").opacity(0.70))
-                                .frame(width: 32, height: 32)
-                                .background(Circle().fill(Color(hex: "#FFFDF6").opacity(0.85)))
-                                .shadow(color: .black.opacity(0.12), radius: 3, y: 1)
+                                .font(.system(size: 20))
+                                .foregroundColor(Color(hex: "#5E8A56"))
+                                .frame(width: 46, height: 46)
+                                .background(
+                                    Circle().fill(Color(hex: "#FEFBF3"))
+                                        .overlay(Circle().stroke(Color(hex: "#A8C5A0").opacity(0.45), lineWidth: 1))
+                                )
+                                .shadow(color: .black.opacity(0.06), radius: 6, y: 4)
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(ScaleButtonStyle())
                         .accessibilityLabel(GardenShare.shareButtonLabel)
                         .padding(6)
                     }
@@ -164,15 +166,8 @@ struct GrowthView: View {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { shareGarden() }
             }
             if ProcessInfo.processInfo.arguments.contains("-gardenRenderQA") {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                    let snap = SunflowerSnapshot(
-                        stage: vm.growthStage, careState: vm.careState,
-                        sproutP: vm.sproutP, stemP: vm.stemP, leafP: vm.leafP,
-                        budP: vm.budP, bloomP: vm.bloomP, care: vm.care)
-                    // EXACT real-share scene computation
-                    let realScene = sceneKey(theme: themeManager.currentTheme, date: Date())
-                    renderDiagImage = GardenPostcardComposer.compose(
-                        snap: snap, scene: realScene, day: 30, uid: "render-diag")
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) {
+                    renderDiagImage = composeGardenStamp()
                     showRenderDiag = true
                 }
             }
@@ -187,7 +182,7 @@ struct GrowthView: View {
                     .background(Capsule().fill(Color(hex: "#FFFDF6")).shadow(color: .black.opacity(0.12), radius: 8, y: 3))
                     .transition(.opacity)
             } else if shareFailedToast {
-                Text("couldn't make your postcard just now. try again 🌱")
+                Text(GardenShare.stampFailToast)
                     .font(DinoTheme.dinoFont(size: 13))
                     .foregroundColor(DinoTheme.textPrimary)
                     .multilineTextAlignment(.center)
@@ -231,20 +226,13 @@ struct GrowthView: View {
         AnalyticsManager.shared.trackGardenShareOpened()
         HapticManager.shared.light()
         withAnimation(.easeInOut(duration: 0.2)) { composingShare = true }
-        // next runloop beat: let the composing line paint before the render
+        // next runloop beat: let the composing line paint before the capture
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-            let snap = SunflowerSnapshot(
-                stage: vm.growthStage, careState: vm.careState,
-                sproutP: vm.sproutP, stemP: vm.stemP, leafP: vm.leafP,
-                budP: vm.budP, bloomP: vm.bloomP, care: vm.care)
-            let scene = sceneKey(theme: themeManager.currentTheme, date: Date())
-            let day = GardenShare.age(firstPractice: vm.firstPracticeDate)
-            let image = GardenPostcardComposer.compose(
-                snap: snap, scene: scene, day: day, uid: GardenShare.currentUID())
+            let stamp = composeGardenStamp()
             withAnimation(.easeInOut(duration: 0.2)) { composingShare = false }
-            // never open the share sheet with a nil or black render
-            if let image, !GardenPostcardComposer.isMostlyDark(image) {
-                shareImage = image
+            // never open the share sheet with a nil or black stamp
+            if let stamp, !GardenPostcardComposer.isMostlyDark(stamp) {
+                shareImage = stamp
                 showShareSheet = true
             } else {
                 withAnimation(.easeInOut(duration: 0.2)) { shareFailedToast = true }
@@ -253,6 +241,28 @@ struct GrowthView: View {
                 }
             }
         }
+    }
+
+    /// Capture the LIVE 3D garden (SceneKit GPU snapshot — reliable on device)
+    /// and print it onto the stamp card. Nil if the garden isn't reachable or
+    /// the snapshot is blank/black (the guard then shows the gentle retry).
+    private func composeGardenStamp() -> UIImage? {
+        guard let scn = GardenSnapshotBridge.scnView else { return nil }
+        let gardenImage = scn.snapshot()
+        guard !GardenPostcardComposer.isMostlyDark(gardenImage) else { return nil }
+        let card = GardenStampCard(
+            gardenImage: gardenImage,
+            stage: GardenShare.stageCaption(vm.growthStage),
+            day: GardenShare.age(firstPractice: vm.firstPracticeDate),
+            date: Self.stampDate())
+        return GardenStampComposer.render(card)
+    }
+
+    private static func stampDate() -> String {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US")
+        f.dateFormat = "MMM d"
+        return f.string(from: Date()).lowercased()
     }
 }
 
