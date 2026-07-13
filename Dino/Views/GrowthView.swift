@@ -107,10 +107,15 @@ struct GrowthView: View {
                     .overlay(alignment: .topTrailing) {
                         // quiet share affordance — availability, never a nag
                         Button { shareGarden() } label: {
+                            // cream chip: the bare glyph vanished against bright
+                            // noon and night skies on device — the chip reads on
+                            // every scene without shouting
                             Image(systemName: "square.and.arrow.up")
-                                .font(.system(size: 15))
-                                .foregroundColor(DinoTheme.textSecondary.opacity(0.55))
-                                .padding(10)
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundColor(Color(hex: "#3D3A35").opacity(0.70))
+                                .frame(width: 32, height: 32)
+                                .background(Circle().fill(Color(hex: "#FFFDF6").opacity(0.85)))
+                                .shadow(color: .black.opacity(0.12), radius: 3, y: 1)
                         }
                         .buttonStyle(.plain)
                         .accessibilityLabel(GardenShare.shareButtonLabel)
