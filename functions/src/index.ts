@@ -17,6 +17,7 @@ setGlobalOptions({ region: "us-central1", maxInstances: 10 });
 
 const OPENAI_API_KEY = defineSecret("OPENAI_API_KEY");
 const FIRECRAWL_API_KEY = defineSecret("FIRECRAWL_API_KEY");
+const TMDB_API_TOKEN = defineSecret("TMDB_API_TOKEN");
 
 const DAILY_LIMIT = 5;
 
@@ -1755,8 +1756,51 @@ const COMFORT_REC_FLAGS = [
 ];
 const COMFORT_REC_FEELS = ["cozy", "hopeful", "quiet"];
 
+// TMDB watch providers for the film pick — PREFER FREE-TO-THEM: only
+// flatrate/free/ads surface a provider name; rent/buy NEVER do. A rent only
+// or unknown film falls back to TMDB's watch page (JustWatch data, every
+// option laid out) behind a neutral button. This helper absolutely never
+// throws — any failure returns null and the rec ships exactly as before.
+async function tmdbWatchInfo(
+  title: string, year: number, country: string, token: string
+): Promise<{ provider: string; link: string } | null> {
+  try {
+    // v4 read access tokens are JWTs (bearer header); a 32 char hex value
+    // is a v3 api key (query param). accept either shape.
+    const isV4 = token.includes(".");
+    const headers: Record<string, string> = { accept: "application/json" };
+    if (isV4) headers["Authorization"] = `Bearer ${token}`;
+    const keyParam = isV4 ? "" : `&api_key=${token}`;
+    const search = await fetch(
+      `https://api.themoviedb.org/3/search/movie?query=${encodeURIComponent(title)}&year=${year}&include_adult=false${keyParam}`,
+      { headers, signal: AbortSignal.timeout(4000) }
+    );
+    if (!search.ok) return null;
+    const movie = ((await search.json() as any)?.results ?? [])[0];
+    if (!movie?.id) return null;
+    const prov = await fetch(
+      `https://api.themoviedb.org/3/movie/${movie.id}/watch/providers?a=1${keyParam}`,
+      { headers, signal: AbortSignal.timeout(4000) }
+    );
+    if (!prov.ok) return null;
+    const region = ((await prov.json() as any)?.results ?? {})[country];
+    if (!region) return null;
+    const link = typeof region.link === "string" && region.link.startsWith("https://www.themoviedb.org/")
+      ? region.link : "";
+    const freeToThem = [...(region.flatrate ?? []), ...(region.free ?? []), ...(region.ads ?? [])];
+    const name = freeToThem[0]?.provider_name;
+    if (name && link) {
+      return { provider: String(name).toLowerCase().replace(/[–—-]/g, " ").slice(0, 40).trim(), link };
+    }
+    if (link) return { provider: "", link };   // rent only / no free tier → neutral watch page
+    return null;
+  } catch {
+    return null;   // timeout, network, parse — never break the rec
+  }
+}
+
 export const generateComfortRecs = onCall(
-  { secrets: [OPENAI_API_KEY], timeoutSeconds: 30, memory: "256MiB" },
+  { secrets: [OPENAI_API_KEY, TMDB_API_TOKEN], timeoutSeconds: 30, memory: "256MiB" },
   async (request) => {
     if (!request.auth) {
       throw new HttpsError("unauthenticated", "sign in required");
@@ -1885,6 +1929,16 @@ export const generateComfortRecs = onCall(
         .slice(0, 3);
       if (recs.length === 0) {
         throw new HttpsError("internal", "no valid recs");
+      }
+      // One TMDB lookup per batch (a batch carries one film) — additive only;
+      // any failure leaves the rec untouched.
+      const film = recs.find((r: any) => r && r.type === "film") as any;
+      if (film && userCountry) {
+        const w = await tmdbWatchInfo(film.title, film.year, userCountry, TMDB_API_TOKEN.value());
+        if (w) {
+          film.watchProvider = w.provider;
+          film.watchLink = w.link;
+        }
       }
       return { recs };
     } catch (err) {

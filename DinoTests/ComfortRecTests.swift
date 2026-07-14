@@ -86,6 +86,51 @@ final class ComfortRecTests: XCTestCase {
         XCTAssertEqual(ComfortRecTrend.bucket(heavyDaysInLastWeek: 7), "heavy")
     }
 
+    // MARK: - Watch providers (free to them, never a paywall)
+
+    private func filmRec(provider: String?, link: String?) -> RichRec {
+        RichRec(type: "film", title: "my neighbor totoro", creator: "hayao miyazaki", year: 1988,
+                why: "w", flags: ["not graphic"], feel: "cozy", length: "about 86 minutes",
+                watchProvider: provider, watchLink: link)
+    }
+
+    func testFilmWithFreeProviderGetsNamedButton() {
+        let links = filmRec(provider: "netflix",
+                            link: "https://www.themoviedb.org/movie/8392/watch?locale=PH").searchLinks
+        XCTAssertEqual(links.map(\.label), ["watch on netflix"])
+        XCTAssertEqual(links.first?.url.host, "www.themoviedb.org")
+    }
+
+    func testRentOnlyFilmGetsTheNeutralPageNeverAPaywall() {
+        let links = filmRec(provider: nil,
+                            link: "https://www.themoviedb.org/movie/8392/watch?locale=US").searchLinks
+        XCTAssertEqual(links.map(\.label), [ComfortRecVoice.whereToWatch])
+    }
+
+    func testNoTmdbDataKeepsTheOldSearchDoor() {
+        XCTAssertEqual(filmRec(provider: nil, link: nil).searchLinks.first?.url.host, "tv.apple.com")
+    }
+
+    func testSanitizerRejectsForeignWatchLinks() {
+        var d = sampleDict()
+        d["type"] = "film"
+        d["watchProvider"] = "netflix"
+        d["watchLink"] = "https://evil.example.com/watch"
+        let rec = ComfortRecSanitizer.rec(from: d)
+        XCTAssertNil(rec?.watchLink, "non tmdb links never survive")
+        XCTAssertNil(rec?.watchProvider)
+        XCTAssertEqual(rec?.searchLinks.first?.url.host, "tv.apple.com")
+    }
+
+    func testWatchInfoSurvivesTheCacheRoundTrip() {
+        let now = Date()
+        let film = filmRec(provider: "netflix", link: "https://www.themoviedb.org/movie/8392/watch")
+        RichRecStore.save(RichRecBatch(recs: [film], fetchedAt: now), defaults: defaults)
+        let back = RichRecStore.consumeOne(defaults: defaults, now: now)
+        XCTAssertEqual(back?.watchProvider, "netflix")
+        XCTAssertEqual(back?.watchLink, "https://www.themoviedb.org/movie/8392/watch")
+    }
+
     // MARK: - Country bucket (relevance, never location)
 
     func testCountryCodeFromLocale() {

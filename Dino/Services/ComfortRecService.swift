@@ -30,6 +30,11 @@ struct RichRec: Codable, Equatable {
     let flags: [String]     // content flags from the fixed allowlist
     let feel: String        // cozy | hopeful | quiet
     let length: String      // honest time commitment, "about 2 hours"
+    // films only (tmdb watch providers, cached with the rec): a provider
+    // that is FREE TO THEM (flatrate/free/ads, never rent or buy), and the
+    // tmdb watch page. both optional — old cached recs decode unchanged.
+    var watchProvider: String? = nil
+    var watchLink: String? = nil
 }
 
 /// A plain search link — no APIs, no tracking, just where to look.
@@ -54,6 +59,9 @@ enum ComfortRecVoice {
     // feature 2: the one time ask, then dino remembers their place
     static let askWhich = "listen on apple music or spotify?"
     static let orPrefix = "or"
+    // films: free to them, or the neutral every option page
+    static let watchOnPrefix = "watch on"
+    static let whereToWatch = "see where to watch"
     // feature 3: the little shelf
     static let shelfTitle = "your little shelf"
     static let shelfEmpty = "nothing here yet"
@@ -101,6 +109,7 @@ enum ComfortRecVoice {
         [whyLabel, feelPrefix, lengthPrefix, openAppleMusic, openSpotify,
          openBooks, openTV, fallbackWhy, fallbackLength, askWhich, orPrefix,
          shelfTitle, shelfEmpty, shelfEmptySub, shelfRowLine(3),
+         watchOnPrefix, whereToWatch,
          header(hour: 13), header(hour: 21)]
             + allowedFlags + allowedFeels
     }
@@ -147,6 +156,10 @@ enum ComfortRecSanitizer {
             .compactMap { ($0 as? String)?.lowercased() }
             .filter { ComfortRecVoice.allowedFlags.contains($0) }
         let length = voiceLine((dict["length"] as? String) ?? "", cap: 40)
+        // tmdb extras (film only, optional) — link must be tmdb's own domain
+        let provider = voiceLine((dict["watchProvider"] as? String) ?? "", cap: 40)
+        let rawLink = (dict["watchLink"] as? String) ?? ""
+        let watchLink = rawLink.hasPrefix("https://www.themoviedb.org/") ? rawLink : ""
         return RichRec(
             type: type,
             title: String(rawTitle.lowercased().trimmingCharacters(in: .whitespacesAndNewlines).prefix(80)),
@@ -155,7 +168,9 @@ enum ComfortRecSanitizer {
             why: why.isEmpty ? ComfortRecVoice.fallbackWhy : why,
             flags: flags.isEmpty ? ["a soft one"] : flags,
             feel: ComfortRecVoice.allowedFeels.contains(feelRaw) ? feelRaw : "quiet",
-            length: length.isEmpty ? ComfortRecVoice.fallbackLength : length)
+            length: length.isEmpty ? ComfortRecVoice.fallbackLength : length,
+            watchProvider: (type == "film" && !provider.isEmpty && !watchLink.isEmpty) ? provider : nil,
+            watchLink: (type == "film" && !watchLink.isEmpty) ? watchLink : nil)
     }
 }
 
@@ -217,6 +232,15 @@ extension RichRec {
                     link(ComfortRecVoice.openSpotify, "https://open.spotify.com/search/\(query)")]
                 .compactMap { $0 }
         case "film":
+            // free to them beats a paywall: a known provider gets its name on
+            // the button; rent only gets the neutral every option page; no
+            // tmdb data at all keeps the old search door.
+            if let raw = watchLink, let url = URL(string: raw) {
+                let label = (watchProvider?.isEmpty == false)
+                    ? "\(ComfortRecVoice.watchOnPrefix) \(watchProvider ?? "")"
+                    : ComfortRecVoice.whereToWatch
+                return [RecLink(label: label, url: url)]
+            }
             return [link(ComfortRecVoice.openTV, "https://tv.apple.com/search?term=\(query)")]
                 .compactMap { $0 }
         default:
