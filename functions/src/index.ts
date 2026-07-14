@@ -1816,7 +1816,7 @@ export const generateComfortRecs = onCall(
       'respond only with valid json of the form {"recs":[{"type":"music","title":"...","creator":"...","year":1994,"why":"...","flags":["not graphic"],"feel":"cozy","length":"about 2 hours"}]} with exactly 3 recs. ' +
       "rules: " +
       "type is exactly one of music, book, film; use three different types unless a type is listed as quiet, and never use a quiet type. " +
-      "every pick must be a real, published, well loved work. never invent titles or creators. " +
+      "every pick must be a real, published, well loved work. never invent titles or creators. only recommend widely known works you are certain exist exactly as titled, with the correct creator: the album's primary artist, the book's author, or the film's director, never a company or label. never recommend generic compilations or various artists albums. if you are unsure of any detail, pick a more famous work you know cold; famous local beats obscure local. " +
       "only inherently gentle content: nothing graphic, violent, frightening, grief centered, or otherwise distressing. " +
       "films must be widely streamable at home in the listener's country, never current theatrical releases. " +
       "the listener's country may be given. let where they live inform relevance and availability, never the theme: mix it up so some picks carry local or regional resonance (their region's beloved music, books, films) and some are universal; never stereotype a country or reach for its cliches. every pick must be genuinely accessible where they live: in their language or with widely available subtitles or translations, and easy to stream or buy there. when no country is given, pick globally beloved works. " +
@@ -1841,9 +1841,12 @@ export const generateComfortRecs = onCall(
     try {
       const openai = new OpenAI({ apiKey: OPENAI_API_KEY.value() });
       const resp = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
+        // mid tier for the pick step: regional attributions must be RIGHT —
+        // a misattributed beloved work reads as dino not knowing them.
+        // ~$0.0007/call, ~$0.002/user/month — inside the owner's cap.
+        model: "gpt-4.1-mini",
         max_tokens: 500,
-        temperature: 0.8,
+        temperature: 0.5,   // factual recall over flourish — the why still varies
         response_format: { type: "json_object" },
         messages: [
           { role: "system", content: systemPrompt },
