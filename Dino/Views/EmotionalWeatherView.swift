@@ -41,6 +41,10 @@ struct EmotionalWeatherView: View {
     // silent fallback. Only one of the two ever shows.
     @State private var pendingRichRec: RichRec?
     @State private var shownRichRec: RichRec?
+    // Rec keepsakes (2.1 feature 3): the little shelf, shown only when
+    // something rests on it.
+    @State private var showRecShelf = false
+    @State private var keepsakeCount = 0
     // Tiered support: quiet glyph always; the row only on a heavy stretch
     // (StretchSignal). Support beats the gentle rec when both are eligible.
     @State private var showResources = false
@@ -456,6 +460,33 @@ struct EmotionalWeatherView: View {
                     WeeklyMoodTrend(viewModel: viewModel)
                         .padding(.horizontal, DinoTheme.padding)
 
+                    // The little shelf (2.1 feature 3) — past picks, kept.
+                    if keepsakeCount > 0 {
+                        Button {
+                            AnalyticsManager.shared.trackScreen("rec_shelf")
+                            showRecShelf = true
+                        } label: {
+                            HStack {
+                                Text(ComfortRecVoice.shelfRowLine(keepsakeCount))
+                                    .font(DinoTheme.dinoFont(size: 14))
+                                    .foregroundColor(Color(hex: "#7A7266"))
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 11, weight: .semibold))
+                                    .foregroundColor(Color(hex: "#A8A29A"))
+                            }
+                            .padding(14)
+                            .background(
+                                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                    .fill(Color(hex: "#FFFDF6"))
+                                    .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                        .stroke(Color(hex: "#EFE7D2"), lineWidth: 1))
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .padding(.horizontal, DinoTheme.padding)
+                    }
+
                     // Dino World card — a glowing glimpse of everyone's weather.
                     WorldMoodCard(bucket: worldBucket) {
                         AnalyticsManager.shared.trackWorldCardTapped()
@@ -494,6 +525,7 @@ struct EmotionalWeatherView: View {
             .onAppear {
                 AnalyticsManager.shared.trackMoodScreenOpened()
                 AnalyticsManager.shared.trackScreen("mood")
+                keepsakeCount = RichRecStore.keepsakes().count
                 #if DEBUG
                 if ProcessInfo.processInfo.arguments.contains("-richRecQA") {
                     RecOpenMemory.forget()   // deterministic first ask state
@@ -502,6 +534,11 @@ struct EmotionalWeatherView: View {
                 if ProcessInfo.processInfo.arguments.contains("-richRecQA2") {
                     RecOpenMemory.remember(RecOpenMemory.spotify)   // remembered state
                     presentRichRec(.qaSample)
+                }
+                if ProcessInfo.processInfo.arguments.contains("-richRecQA3") {
+                    RichRecStore.seedQAKeepsakes()   // a full shelf
+                    keepsakeCount = RichRecStore.keepsakes().count
+                    showRecShelf = true
                 }
                 if ProcessInfo.processInfo.arguments.contains("-moodStepsQA") {
                     sleepData = HealthService.SleepData(durationHours: 7.2,
@@ -573,6 +610,9 @@ struct EmotionalWeatherView: View {
                 }
             }) {
                 BreakSuggestionCard(mood: breakMood, onDismiss: { showBreakCard = false })
+            }
+            .sheet(isPresented: $showRecShelf) {
+                RecKeepsakesView()
             }
             .fullScreenCover(isPresented: $showWorld) {
                 WorldView()

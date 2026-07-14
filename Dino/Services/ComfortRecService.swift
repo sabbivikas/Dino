@@ -54,6 +54,13 @@ enum ComfortRecVoice {
     // feature 2: the one time ask, then dino remembers their place
     static let askWhich = "listen on apple music or spotify?"
     static let orPrefix = "or"
+    // feature 3: the little shelf
+    static let shelfTitle = "your little shelf"
+    static let shelfEmpty = "nothing here yet"
+    static let shelfEmptySub = "when dino picks something for you, it rests here"
+
+    static func shelfKept(_ n: Int) -> String { "\(n) kept" }
+    static func shelfRowLine(_ n: Int) -> String { "\(shelfTitle) \u{00B7} \(shelfKept(n))" }
 
     static let allowedTypes = ["music", "book", "film"]
     static let allowedFeels = ["cozy", "hopeful", "quiet"]
@@ -93,6 +100,7 @@ enum ComfortRecVoice {
     static var allFixedStrings: [String] {
         [whyLabel, feelPrefix, lengthPrefix, openAppleMusic, openSpotify,
          openBooks, openTV, fallbackWhy, fallbackLength, askWhich, orPrefix,
+         shelfTitle, shelfEmpty, shelfEmptySub, shelfRowLine(3),
          header(hour: 13), header(hour: 21)]
             + allowedFlags + allowedFeels
     }
@@ -186,6 +194,15 @@ extension RichRec {
         let label = app == RecOpenMemory.spotify ? ComfortRecVoice.openSpotify
                                                  : ComfortRecVoice.openAppleMusic
         return searchLinks.first { $0.label == label }
+    }
+
+    /// The link a shelf tap re opens (feature 3): the remembered music app
+    /// when there is one, otherwise the single door for the type.
+    func reopenLink(defaults: UserDefaults = .standard) -> RecLink? {
+        if type == "music" {
+            return musicLink(for: RecOpenMemory.remembered(defaults: defaults) ?? RecOpenMemory.appleMusic)
+        }
+        return searchLinks.first
     }
 
     /// plain search URLs only — NO APIs (owner decision).
@@ -364,6 +381,24 @@ enum ComfortRecCoordinator {
 }
 
 #if DEBUG
+extension RichRecStore {
+    /// -richRecQA3 seed — a shelf worth of picks for screenshot verification.
+    static func seedQAKeepsakes(defaults: UserDefaults = .standard) {
+        defaults.removeObject(forKey: keepsakesKey)
+        let samples: [RichRec] = [
+            RichRec(type: "music", title: "clair de lune", creator: "claude debussy", year: 1905,
+                    why: "w", flags: ["a soft one"], feel: "quiet", length: "about 5 minutes"),
+            RichRec(type: "film", title: "my neighbor totoro", creator: "hayao miyazaki", year: 1988,
+                    why: "w", flags: ["not graphic"], feel: "hopeful", length: "about 86 minutes"),
+            RichRec(type: "book", title: "the wind in the willows", creator: "kenneth grahame", year: 1908,
+                    why: "w", flags: ["no distressing themes"], feel: "cozy", length: "a slow weekend read"),
+            RichRec(type: "music", title: "music for airports", creator: "brian eno", year: 1978,
+                    why: "w", flags: ["a soft one"], feel: "quiet", length: "about 48 minutes"),
+        ]
+        for r in samples { recordKeepsake(r, defaults: defaults) }
+    }
+}
+
 extension RichRec {
     /// -richRecQA sample — screenshot verification only, never ships a path.
     static let qaSample = RichRec(

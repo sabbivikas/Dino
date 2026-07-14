@@ -158,6 +158,23 @@ final class ComfortRecTests: XCTestCase {
         XCTAssertNil(RichRecStore.consumeOne(defaults: defaults))
     }
 
+    // MARK: - The little shelf (feature 3: strings + re open)
+
+    func testShelfRowLineComposes() {
+        XCTAssertEqual(ComfortRecVoice.shelfRowLine(3), "your little shelf \u{00B7} 3 kept")
+        XCTAssertEqual(ComfortRecVoice.shelfKept(1), "1 kept")
+    }
+
+    func testReopenLinkRespectsTheRememberedApp() {
+        let music = rec(type: "music")
+        XCTAssertEqual(music.reopenLink(defaults: defaults)?.url.host, "music.apple.com",
+                       "no memory falls back to apple music")
+        RecOpenMemory.remember(RecOpenMemory.spotify, defaults: defaults)
+        XCTAssertEqual(music.reopenLink(defaults: defaults)?.url.host, "open.spotify.com")
+        XCTAssertEqual(rec(type: "book").reopenLink(defaults: defaults)?.url.host, "books.apple.com")
+        XCTAssertEqual(rec(type: "film").reopenLink(defaults: defaults)?.url.host, "tv.apple.com")
+    }
+
     // MARK: - Keepsakes (feature 3's shelf starts honest)
 
     func testKeepsakesNewestFirstAndCapped() {
