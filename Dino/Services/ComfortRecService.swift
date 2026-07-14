@@ -343,6 +343,7 @@ enum ComfortRecCoordinator {
             // classic "cozy" has no rich analog yet — music/film carry over
             "quietTypes": offer.quietTypes.filter { $0 != "cozy" },
             "userLocale": Locale.current.language.languageCode?.identifier ?? "en",
+            "userCountry": countryCode(),
             "excludeTitles": RichRecStore.excludeTitles(),
         ]
         if !heavyMoodValue.isEmpty { payload["mood"] = heavyMoodValue }
@@ -364,6 +365,13 @@ enum ComfortRecCoordinator {
             #endif
             return nil
         }
+    }
+
+    /// The device locale's region code — the same privacy bucket as the
+    /// language code (a store setting, never a location reading).
+    nonisolated static func countryCode(locale: Locale = .current) -> String {
+        let raw = locale.region?.identifier ?? ""
+        return (raw.count == 2 && raw.allSatisfy { $0.isLetter }) ? raw.uppercased() : ""
     }
 
     /// Heavy days across the last 7 — feeds the 3 bucket trend, on device only.

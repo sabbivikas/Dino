@@ -1765,7 +1765,7 @@ export const generateComfortRecs = onCall(
 
     const d = (request.data ?? {}) as Record<string, unknown>;
     const ALLOWED_KEYS = [
-      "mood", "timeOfDay", "moodTrend", "recentThemes", "quietTypes", "userLocale", "excludeTitles",
+      "mood", "timeOfDay", "moodTrend", "recentThemes", "quietTypes", "userLocale", "userCountry", "excludeTitles",
     ];
     for (const k of Object.keys(d)) {
       if (!ALLOWED_KEYS.includes(k)) {
@@ -1783,6 +1783,16 @@ export const generateComfortRecs = onCall(
     const userLocale = typeof d.userLocale === "string" ? d.userLocale : "en";
     const excludeTitles = (Array.isArray(d.excludeTitles) ? d.excludeTitles : [])
       .map((t) => String(t).slice(0, 80)).slice(0, 10);
+    // Country awareness: an ISO region code only (device locale bucket — the
+    // same privacy class as userLocale, never a location reading).
+    const userCountry = typeof d.userCountry === "string" && /^[A-Za-z]{2}$/.test(d.userCountry)
+      ? d.userCountry.toUpperCase() : "";
+    let countryName = "";
+    if (userCountry) {
+      try {
+        countryName = (new Intl.DisplayNames(["en"], { type: "region" }).of(userCountry) ?? "").toLowerCase();
+      } catch { countryName = ""; }
+    }
 
     // Rate limit — house pattern: per-UID daily counter, refund on failure.
     const db = admin.firestore();
@@ -1808,7 +1818,8 @@ export const generateComfortRecs = onCall(
       "type is exactly one of music, book, film; use three different types unless a type is listed as quiet, and never use a quiet type. " +
       "every pick must be a real, published, well loved work. never invent titles or creators. " +
       "only inherently gentle content: nothing graphic, violent, frightening, grief centered, or otherwise distressing. " +
-      "films must be widely streamable at home, never current theatrical releases. " +
+      "films must be widely streamable at home in the listener's country, never current theatrical releases. " +
+      "the listener's country may be given. let where they live inform relevance and availability, never the theme: mix it up so some picks carry local or regional resonance (their region's beloved music, books, films) and some are universal; never stereotype a country or reach for its cliches. every pick must be genuinely accessible where they live: in their language or with widely available subtitles or translations, and easy to stream or buy there. when no country is given, pick globally beloved works. " +
       "why: one warm lowercase sentence spoken directly to them, tied to the specific shape of their day. write it freshly every time: vary the rhythm and the opening word between recs, never reuse stock phrases like 'this fits your day' or 'perfect for a heavy day', and never repeat their mood word back clinically. 18 words max. no dashes. " +
       'flags: 1 to 3 chosen from exactly this list: "not graphic", "no distressing themes", "a soft one", "gentle pacing", "some bittersweet moments". ' +
       "feel: exactly one of cozy, hopeful, quiet. " +
@@ -1820,6 +1831,7 @@ export const generateComfortRecs = onCall(
       mood ? `their day: feeling ${mood}.` : "their day: a quiet heaviness.",
       `time of day: ${timeOfDay}.`,
       `their recent trend: ${moodTrend}.`,
+      countryName ? `they live in ${countryName}.` : "",
       recentThemes.length ? `themes lately: ${recentThemes.join(", ")}.` : "",
       quietTypes.length ? `quiet types, do not use: ${quietTypes.join(", ")}.` : "",
       excludeTitles.length ? `do not repeat these titles: ${excludeTitles.join("; ")}.` : "",

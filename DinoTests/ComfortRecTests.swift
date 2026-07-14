@@ -86,6 +86,15 @@ final class ComfortRecTests: XCTestCase {
         XCTAssertEqual(ComfortRecTrend.bucket(heavyDaysInLastWeek: 7), "heavy")
     }
 
+    // MARK: - Country bucket (relevance, never location)
+
+    func testCountryCodeFromLocale() {
+        XCTAssertEqual(ComfortRecCoordinator.countryCode(locale: Locale(identifier: "fil_PH")), "PH")
+        XCTAssertEqual(ComfortRecCoordinator.countryCode(locale: Locale(identifier: "de_DE")), "DE")
+        XCTAssertEqual(ComfortRecCoordinator.countryCode(locale: Locale(identifier: "ja_JP")), "JP")
+        XCTAssertEqual(ComfortRecCoordinator.countryCode(locale: Locale(identifier: "pt_BR")), "BR")
+    }
+
     // MARK: - Search links (plain URLs, no APIs)
 
     private func rec(type: String, title: String = "music for airports") -> RichRec {
