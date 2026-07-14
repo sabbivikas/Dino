@@ -496,6 +496,11 @@ struct EmotionalWeatherView: View {
                 AnalyticsManager.shared.trackScreen("mood")
                 #if DEBUG
                 if ProcessInfo.processInfo.arguments.contains("-richRecQA") {
+                    RecOpenMemory.forget()   // deterministic first ask state
+                    presentRichRec(.qaSample)
+                }
+                if ProcessInfo.processInfo.arguments.contains("-richRecQA2") {
+                    RecOpenMemory.remember(RecOpenMemory.spotify)   // remembered state
                     presentRichRec(.qaSample)
                 }
                 if ProcessInfo.processInfo.arguments.contains("-moodStepsQA") {

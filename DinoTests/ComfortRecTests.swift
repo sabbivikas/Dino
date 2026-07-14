@@ -114,6 +114,31 @@ final class ComfortRecTests: XCTestCase {
         XCTAssertTrue(url.contains("music%20for%20airports"))
     }
 
+    // MARK: - Open it flow (feature 2: ask once, remember, switchable)
+
+    func testOpenMemoryRoundTrip() {
+        XCTAssertNil(RecOpenMemory.remembered(defaults: defaults))
+        RecOpenMemory.remember(RecOpenMemory.spotify, defaults: defaults)
+        XCTAssertEqual(RecOpenMemory.remembered(defaults: defaults), RecOpenMemory.spotify)
+        RecOpenMemory.remember("winamp", defaults: defaults)   // garbage never sticks
+        XCTAssertEqual(RecOpenMemory.remembered(defaults: defaults), RecOpenMemory.spotify)
+        RecOpenMemory.forget(defaults: defaults)
+        XCTAssertNil(RecOpenMemory.remembered(defaults: defaults))
+    }
+
+    func testOtherFlipsTheChoice() {
+        XCTAssertEqual(RecOpenMemory.other(than: RecOpenMemory.spotify), RecOpenMemory.appleMusic)
+        XCTAssertEqual(RecOpenMemory.other(than: RecOpenMemory.appleMusic), RecOpenMemory.spotify)
+    }
+
+    func testMusicLinkForChoice() {
+        let music = rec(type: "music")
+        XCTAssertEqual(music.musicLink(for: RecOpenMemory.spotify)?.url.host, "open.spotify.com")
+        XCTAssertEqual(music.musicLink(for: RecOpenMemory.appleMusic)?.url.host, "music.apple.com")
+        // off music there is nothing to choose between
+        XCTAssertNil(rec(type: "book").musicLink(for: RecOpenMemory.spotify))
+    }
+
     // MARK: - Cache (show one, keep two, never keep stale)
 
     func testCacheConsumesInOrder() {

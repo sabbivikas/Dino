@@ -15,6 +15,8 @@ struct RichRecCard: View {
     var hour: Int = Calendar.current.component(.hour, from: Date())
     let onOpen: (URL) -> Void
     let onNotTonight: () -> Void
+    // feature 2: ask once which music app, then default to their place
+    @State private var rememberedApp: String? = RecOpenMemory.remembered()
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -76,18 +78,12 @@ struct RichRecCard: View {
                 .padding(.top, 4)
 
             VStack(spacing: 10) {
-                ForEach(rec.searchLinks) { link in
-                    Button(action: { onOpen(link.url) }) {
-                        Text(link.label)
-                            .font(.system(size: 15, weight: .semibold, design: .rounded))
-                            .foregroundColor(.white)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 13)
-                            .background(RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                .fill(Color(hex: "#7BA872")))
-                            .shadow(color: Color(hex: "#7BA872").opacity(0.30), radius: 7, y: 4)
+                if rec.type == "music" {
+                    musicButtons
+                } else {
+                    ForEach(rec.searchLinks) { link in
+                        filledButton(link.label) { onOpen(link.url) }
                     }
-                    .buttonStyle(ScaleButtonStyle())
                 }
                 Button(action: onNotTonight) {
                     Text(ComfortSlip.notTonight)
@@ -111,6 +107,59 @@ struct RichRecCard: View {
                 .shadow(color: Color(red: 40/255, green: 30/255, blue: 15/255).opacity(0.10), radius: 13, y: 10)
         )
         .rotationEffect(.degrees(-1.1))
+    }
+
+    // MARK: - Feature 2: the open it flow
+
+    /// No memory yet → dino asks which app (two equal doors). A choice is
+    /// remembered and becomes the single default next time, with a quiet
+    /// switch underneath that re remembers.
+    @ViewBuilder private var musicButtons: some View {
+        if let app = rememberedApp, let link = rec.musicLink(for: app) {
+            filledButton(link.label) { choose(app: app, link: link) }
+            let other = RecOpenMemory.other(than: app)
+            if let otherLink = rec.musicLink(for: other) {
+                Button(action: { choose(app: other, link: otherLink) }) {
+                    Text("\(ComfortRecVoice.orPrefix) \(otherLink.label)")
+                        .font(.system(size: 13, weight: .medium, design: .rounded))
+                        .foregroundColor(Color(hex: "#7A7266"))
+                        .padding(.vertical, 2)
+                }
+                .buttonStyle(.plain)
+            }
+        } else {
+            Text(ComfortRecVoice.askWhich)
+                .font(.system(size: 12, design: .rounded))
+                .foregroundColor(Color(hex: "#A8A29A"))
+                .frame(maxWidth: .infinity)
+            ForEach(rec.searchLinks) { link in
+                filledButton(link.label) {
+                    let app = link.label == ComfortRecVoice.openSpotify
+                        ? RecOpenMemory.spotify : RecOpenMemory.appleMusic
+                    choose(app: app, link: link)
+                }
+            }
+        }
+    }
+
+    private func choose(app: String, link: RecLink) {
+        RecOpenMemory.remember(app)
+        rememberedApp = app
+        onOpen(link.url)
+    }
+
+    private func filledButton(_ label: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(label)
+                .font(.system(size: 15, weight: .semibold, design: .rounded))
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 13)
+                .background(RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(Color(hex: "#7BA872")))
+                .shadow(color: Color(hex: "#7BA872").opacity(0.30), radius: 7, y: 4)
+        }
+        .buttonStyle(ScaleButtonStyle())
     }
 }
 

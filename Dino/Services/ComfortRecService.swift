@@ -51,6 +51,9 @@ enum ComfortRecVoice {
     static let fallbackWhy = "it felt like a soft match for today"
     static let fallbackLength = "no rush at all"
     static let flagSeparator = " \u{00B7} "
+    // feature 2: the one time ask, then dino remembers their place
+    static let askWhich = "listen on apple music or spotify?"
+    static let orPrefix = "or"
 
     static let allowedTypes = ["music", "book", "film"]
     static let allowedFeels = ["cozy", "hopeful", "quiet"]
@@ -89,7 +92,7 @@ enum ComfortRecVoice {
 
     static var allFixedStrings: [String] {
         [whyLabel, feelPrefix, lengthPrefix, openAppleMusic, openSpotify,
-         openBooks, openTV, fallbackWhy, fallbackLength,
+         openBooks, openTV, fallbackWhy, fallbackLength, askWhich, orPrefix,
          header(hour: 13), header(hour: 21)]
             + allowedFlags + allowedFeels
     }
@@ -148,8 +151,42 @@ enum ComfortRecSanitizer {
     }
 }
 
+/// Feature 2: remembers which music app they chose last time — the ask
+/// happens once, then dino defaults to their place. Local only, switchable
+/// from the card any time.
+enum RecOpenMemory {
+    static let key = "dino.recs.musicAppChoice"
+    static let appleMusic = "apple music"
+    static let spotify = "spotify"
+
+    static func remembered(defaults: UserDefaults = .standard) -> String? {
+        let v = defaults.string(forKey: key)
+        return (v == appleMusic || v == spotify) ? v : nil
+    }
+
+    static func remember(_ choice: String, defaults: UserDefaults = .standard) {
+        guard choice == appleMusic || choice == spotify else { return }
+        defaults.set(choice, forKey: key)
+    }
+
+    static func forget(defaults: UserDefaults = .standard) {
+        defaults.removeObject(forKey: key)
+    }
+
+    static func other(than choice: String) -> String {
+        choice == spotify ? appleMusic : spotify
+    }
+}
+
 extension RichRec {
     var searchTerm: String { "\(title) \(creator)" }
+
+    /// The search link for a remembered music app choice; nil off music.
+    func musicLink(for app: String) -> RecLink? {
+        let label = app == RecOpenMemory.spotify ? ComfortRecVoice.openSpotify
+                                                 : ComfortRecVoice.openAppleMusic
+        return searchLinks.first { $0.label == label }
+    }
 
     /// plain search URLs only — NO APIs (owner decision).
     var searchLinks: [RecLink] {
