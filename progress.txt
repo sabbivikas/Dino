@@ -1,0 +1,3 @@
+# 2.1 comfort-recs arc — progress ledger
+
+[2026-07-13 23:18] iteration 1: read GentleRecEngine/GentleRecService/EmotionalWeatherView/functions. FEATURE 1 PLAN POSTED — awaiting owner approval. No code built.
