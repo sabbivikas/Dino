@@ -1739,4 +1739,150 @@ export const processEmailQueue = onSchedule(
   }
 );
 
+// Personalized comfort recs (2.1, feature 1) — three real, gentle picks
+// written for this person's day, in dino's voice. The client shows one and
+// caches two locally, so with the 3 day scarcity gate one call covers ~9
+// days. PRIVACY: receives ONLY enum buckets (mood, timeOfDay, moodTrend,
+// themes, quietTypes, locale) plus titles of PRIOR AI RECS (model output,
+// not user content). No journal text, no free text, no counts. Unknown keys
+// are rejected (defense in depth, same as generateRhythmsLetter).
+// Rate limit: COMFORT_REC_DAILY_LIMIT per uid per UTC day, refund on failure.
+const COMFORT_REC_DAILY_LIMIT = 2;
+const COMFORT_REC_TYPES = ["music", "book", "film"];
+const COMFORT_REC_FLAGS = [
+  "not graphic", "no distressing themes", "a soft one",
+  "gentle pacing", "some bittersweet moments",
+];
+const COMFORT_REC_FEELS = ["cozy", "hopeful", "quiet"];
+
+export const generateComfortRecs = onCall(
+  { secrets: [OPENAI_API_KEY], timeoutSeconds: 30, memory: "256MiB" },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "sign in required");
+    }
+    const uid = request.auth.uid;
+
+    const d = (request.data ?? {}) as Record<string, unknown>;
+    const ALLOWED_KEYS = [
+      "mood", "timeOfDay", "moodTrend", "recentThemes", "quietTypes", "userLocale", "excludeTitles",
+    ];
+    for (const k of Object.keys(d)) {
+      if (!ALLOWED_KEYS.includes(k)) {
+        throw new HttpsError("invalid-argument", `unexpected field: ${k}`);
+      }
+    }
+    const mood = ["drained", "overwhelmed"].includes(String(d.mood)) ? String(d.mood) : "";
+    const timeOfDay = ["midday", "evening"].includes(String(d.timeOfDay)) ? String(d.timeOfDay) : "evening";
+    const moodTrend = ["steady", "wobbly", "heavy"].includes(String(d.moodTrend)) ? String(d.moodTrend) : "steady";
+    const REC_THEMES = ["work", "sleep", "relationships", "health", "money", "self"];
+    const recentThemes = (Array.isArray(d.recentThemes) ? d.recentThemes : [])
+      .map((t) => String(t)).filter((t) => REC_THEMES.includes(t)).slice(0, 3);
+    const quietTypes = (Array.isArray(d.quietTypes) ? d.quietTypes : [])
+      .map((t) => String(t)).filter((t) => COMFORT_REC_TYPES.includes(t));
+    const userLocale = typeof d.userLocale === "string" ? d.userLocale : "en";
+    const excludeTitles = (Array.isArray(d.excludeTitles) ? d.excludeTitles : [])
+      .map((t) => String(t).slice(0, 80)).slice(0, 10);
+
+    // Rate limit — house pattern: per-UID daily counter, refund on failure.
+    const db = admin.firestore();
+    const dayKey = new Date().toISOString().slice(0, 10);
+    const counterRef = db.collection("comfortRecLimits").doc(uid);
+    await db.runTransaction(async (tx) => {
+      const snap = await tx.get(counterRef);
+      const current = ((snap.data() ?? {})[dayKey] as number | undefined) ?? 0;
+      if (current >= COMFORT_REC_DAILY_LIMIT) {
+        throw new HttpsError("resource-exhausted", "daily comfort rec limit reached");
+      }
+      tx.set(
+        counterRef,
+        { [dayKey]: current + 1, updatedAt: admin.firestore.FieldValue.serverTimestamp() },
+        { merge: true }
+      );
+    });
+
+    const systemPrompt =
+      "you are dino, a gentle wellness companion picking comfort media for someone having a heavy day. " +
+      'respond only with valid json of the form {"recs":[{"type":"music","title":"...","creator":"...","year":1994,"why":"...","flags":["not graphic"],"feel":"cozy","length":"about 2 hours"}]} with exactly 3 recs. ' +
+      "rules: " +
+      "type is exactly one of music, book, film; use three different types unless a type is listed as quiet, and never use a quiet type. " +
+      "every pick must be a real, published, well loved work. never invent titles or creators. " +
+      "only inherently gentle content: nothing graphic, violent, frightening, grief centered, or otherwise distressing. " +
+      "films must be widely streamable at home, never current theatrical releases. " +
+      "why: one warm lowercase sentence spoken directly to them, tied to the specific shape of their day. write it freshly every time: vary the rhythm and the opening word between recs, never reuse stock phrases like 'this fits your day' or 'perfect for a heavy day', and never repeat their mood word back clinically. 18 words max. no dashes. " +
+      'flags: 1 to 3 chosen from exactly this list: "not graphic", "no distressing themes", "a soft one", "gentle pacing", "some bittersweet moments". ' +
+      "feel: exactly one of cozy, hopeful, quiet. " +
+      "length: a short honest time phrase like 'about 2 hours' or 'a slow weekend read'. no dashes. " +
+      "all text lowercase." +
+      getLanguageInstruction(userLocale);
+
+    const userPrompt = [
+      mood ? `their day: feeling ${mood}.` : "their day: a quiet heaviness.",
+      `time of day: ${timeOfDay}.`,
+      `their recent trend: ${moodTrend}.`,
+      recentThemes.length ? `themes lately: ${recentThemes.join(", ")}.` : "",
+      quietTypes.length ? `quiet types, do not use: ${quietTypes.join(", ")}.` : "",
+      excludeTitles.length ? `do not repeat these titles: ${excludeTitles.join("; ")}.` : "",
+      "write 3 picks for this person.",
+    ].filter(Boolean).join(" ");
+
+    try {
+      const openai = new OpenAI({ apiKey: OPENAI_API_KEY.value() });
+      const resp = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        max_tokens: 500,
+        temperature: 0.8,
+        response_format: { type: "json_object" },
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+      });
+      const content = resp.choices[0]?.message?.content ?? "";
+      const parsed = JSON.parse(content) as { recs?: unknown }; // throws → refund + client fallback
+      const rawRecs = Array.isArray(parsed.recs) ? parsed.recs : [];
+      // Never trust raw model output — validate or drop every rec.
+      const clean = (s: unknown, cap: number) =>
+        String(s ?? "").toLowerCase().replace(/[–—-]/g, " ").replace(/\s+/g, " ").trim().slice(0, cap);
+      const nowYear = new Date().getUTCFullYear();
+      const recs = rawRecs
+        .map((r: any) => {
+          const type = String(r?.type ?? "").toLowerCase();
+          const title = String(r?.title ?? "").toLowerCase().trim().slice(0, 80);
+          const creator = String(r?.creator ?? "").toLowerCase().trim().slice(0, 80);
+          const year = Number(r?.year);
+          const why = clean(r?.why, 140);
+          const flags = (Array.isArray(r?.flags) ? r.flags : [])
+            .map((f: unknown) => String(f).toLowerCase())
+            .filter((f: string) => COMFORT_REC_FLAGS.includes(f))
+            .slice(0, 3);
+          const feel = COMFORT_REC_FEELS.includes(String(r?.feel)) ? String(r?.feel) : "quiet";
+          const length = clean(r?.length, 40) || "no rush at all";
+          if (!COMFORT_REC_TYPES.includes(type) || quietTypes.includes(type)) return null;
+          if (!title || !creator || !why) return null;
+          if (!Number.isFinite(year) || year < 1900 || year > nowYear) return null;
+          return {
+            type, title, creator, year: Math.trunc(year), why,
+            flags: flags.length ? flags : ["a soft one"], feel, length,
+          };
+        })
+        .filter((r: unknown) => r !== null)
+        .slice(0, 3);
+      if (recs.length === 0) {
+        throw new HttpsError("internal", "no valid recs");
+      }
+      return { recs };
+    } catch (err) {
+      // Refund — a failure never burns the user's daily cap.
+      await counterRef.set(
+        { [dayKey]: admin.firestore.FieldValue.increment(-1) },
+        { merge: true }
+      );
+      if (err instanceof HttpsError) throw err;
+      const message = err instanceof Error ? err.message : "OpenAI request failed";
+      throw new HttpsError("internal", message);
+    }
+  }
+);
+
 

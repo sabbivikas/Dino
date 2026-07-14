@@ -9,7 +9,13 @@ struct MainTabView: View {
     @EnvironmentObject var dataManager: SharedDataManager
     @ObservedObject private var themeManager = ThemeManager.shared
     @StateObject private var updateService = AppUpdateService.shared
+    #if DEBUG
+    // QA runs land on the mood tab directly (screenshot verification only)
+    @State private var selectedTab: Int =
+        ProcessInfo.processInfo.arguments.contains("-richRecQA") ? 2 : 0
+    #else
     @State private var selectedTab: Int = 0
+    #endif
 
     var body: some View {
         ZStack(alignment: .bottom) {

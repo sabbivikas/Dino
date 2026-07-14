@@ -37,6 +37,10 @@ struct EmotionalWeatherView: View {
     @State private var pendingRec: GentleRec?
     @State private var shownRec: GentleRec?
     @State private var recWasTapped = false
+    // Rich rec (2.1): the personalized pick; the classic pool above is the
+    // silent fallback. Only one of the two ever shows.
+    @State private var pendingRichRec: RichRec?
+    @State private var shownRichRec: RichRec?
     // Tiered support: quiet glyph always; the row only on a heavy stretch
     // (StretchSignal). Support beats the gentle rec when both are eligible.
     @State private var showResources = false
@@ -198,8 +202,13 @@ struct EmotionalWeatherView: View {
                                 // And — rarely — a gentle recommendation for
                                 // after the break card. Gates run locally first.
                                 Task {
-                                    pendingRec = await GentleRecCoordinator.fetchIfMomentIsRight(
-                                        dataManager: dataManager, freshHeavyMood: w)
+                                    if let rich = await ComfortRecCoordinator.fetchIfMomentIsRight(
+                                        dataManager: dataManager, freshHeavyMood: w) {
+                                        pendingRichRec = rich
+                                    } else {
+                                        pendingRec = await GentleRecCoordinator.fetchIfMomentIsRight(
+                                            dataManager: dataManager, freshHeavyMood: w)
+                                    }
                                 }
                             }
                             // The ceremony is the headliner when a lantern is
@@ -375,6 +384,25 @@ struct EmotionalWeatherView: View {
                         .transition(.opacity)
                     }
 
+                    // Rich comfort rec (2.1) — dino's personalized pick.
+                    // Same signals as the slip: tap teaches, ignore teaches.
+                    if let rich = shownRichRec {
+                        RichRecCard(rec: rich, onOpen: { url in
+                            recWasTapped = true
+                            GentleRecStore.recordTapped(type: rich.type)
+                            AnalyticsManager.shared.trackRecTapped()
+                            UIApplication.shared.open(url)
+                        }, onNotTonight: {
+                            recWasTapped = true   // consumed — no double count on disappear
+                            GentleRecStore.recordIgnored(type: rich.type)
+                            AnalyticsManager.shared.trackRecIgnored()
+                            withAnimation(.easeInOut(duration: 0.35)) { shownRichRec = nil }
+                        })
+                        .padding(.horizontal, DinoTheme.padding)
+                        .padding(.top, 12)
+                        .transition(.opacity.combined(with: .move(edge: .bottom)))
+                    }
+
                     // Comfort slip (concept 3a) — the gentle rec's new body.
                     // "not tonight" feeds the exact ignore signal leaving did;
                     // every GentleRecEngine gate is unchanged.
@@ -455,14 +483,21 @@ struct EmotionalWeatherView: View {
                 if stretchSignalFires() {
                     presentSupportRow()
                 } else if shownRec == nil, pendingRec == nil,
-                          let rec = await GentleRecCoordinator.fetchIfMomentIsRight(dataManager: dataManager) {
-                    presentRec(rec)
+                          shownRichRec == nil, pendingRichRec == nil {
+                    if let rich = await ComfortRecCoordinator.fetchIfMomentIsRight(dataManager: dataManager) {
+                        presentRichRec(rich)
+                    } else if let rec = await GentleRecCoordinator.fetchIfMomentIsRight(dataManager: dataManager) {
+                        presentRec(rec)
+                    }
                 }
             }
             .onAppear {
                 AnalyticsManager.shared.trackMoodScreenOpened()
                 AnalyticsManager.shared.trackScreen("mood")
                 #if DEBUG
+                if ProcessInfo.processInfo.arguments.contains("-richRecQA") {
+                    presentRichRec(.qaSample)
+                }
                 if ProcessInfo.processInfo.arguments.contains("-moodStepsQA") {
                     sleepData = HealthService.SleepData(durationHours: 7.2,
                         startTime: Date(), endTime: Date())
@@ -507,6 +542,11 @@ struct EmotionalWeatherView: View {
                     AnalyticsManager.shared.trackRecIgnored()
                     shownRec = nil
                 }
+                if let rich = shownRichRec, !recWasTapped {
+                    GentleRecStore.recordIgnored(type: rich.type)
+                    AnalyticsManager.shared.trackRecIgnored()
+                    shownRichRec = nil
+                }
             }
             .sheet(isPresented: $showBreakCard, onDismiss: {
                 // The break card finished (confirmed or dismissed) — the world
@@ -519,6 +559,9 @@ struct EmotionalWeatherView: View {
                 if pendingSupportRow {
                     pendingSupportRow = false
                     presentSupportRow()
+                } else if let rich = pendingRichRec {
+                    pendingRichRec = nil
+                    presentRichRec(rich)
                 } else if let rec = pendingRec {
                     pendingRec = nil
                     presentRec(rec)
@@ -644,6 +687,14 @@ struct EmotionalWeatherView: View {
         AnalyticsManager.shared.trackRecShown(type: rec.type)
         recWasTapped = false
         withAnimation(.easeInOut(duration: 0.35)) { shownRec = rec }
+    }
+
+    private func presentRichRec(_ rec: RichRec) {
+        GentleRecStore.recordShown()   // same scarcity clock as the classic path
+        RichRecStore.recordKeepsake(rec)
+        AnalyticsManager.shared.trackRecShown(type: rec.type)
+        recWasTapped = false
+        withAnimation(.easeInOut(duration: 0.35)) { shownRichRec = rec }
     }
 }
 
