@@ -37,6 +37,14 @@ struct EmotionalWeatherView: View {
     @State private var pendingRec: GentleRec?
     @State private var shownRec: GentleRec?
     @State private var recWasTapped = false
+    // Rich rec (2.1): the personalized pick; the classic pool above is the
+    // silent fallback. Only one of the two ever shows.
+    @State private var pendingRichRec: RichRec?
+    @State private var shownRichRec: RichRec?
+    // Rec keepsakes (2.1 feature 3): the little shelf, shown only when
+    // something rests on it.
+    @State private var showRecShelf = false
+    @State private var keepsakeCount = 0
     // Tiered support: quiet glyph always; the row only on a heavy stretch
     // (StretchSignal). Support beats the gentle rec when both are eligible.
     @State private var showResources = false
@@ -198,8 +206,13 @@ struct EmotionalWeatherView: View {
                                 // And — rarely — a gentle recommendation for
                                 // after the break card. Gates run locally first.
                                 Task {
-                                    pendingRec = await GentleRecCoordinator.fetchIfMomentIsRight(
-                                        dataManager: dataManager, freshHeavyMood: w)
+                                    if let rich = await ComfortRecCoordinator.fetchIfMomentIsRight(
+                                        dataManager: dataManager, freshHeavyMood: w) {
+                                        pendingRichRec = rich
+                                    } else {
+                                        pendingRec = await GentleRecCoordinator.fetchIfMomentIsRight(
+                                            dataManager: dataManager, freshHeavyMood: w)
+                                    }
                                 }
                             }
                             // The ceremony is the headliner when a lantern is
@@ -375,6 +388,25 @@ struct EmotionalWeatherView: View {
                         .transition(.opacity)
                     }
 
+                    // Rich comfort rec (2.1) — dino's personalized pick.
+                    // Same signals as the slip: tap teaches, ignore teaches.
+                    if let rich = shownRichRec {
+                        RichRecCard(rec: rich, onOpen: { url in
+                            recWasTapped = true
+                            GentleRecStore.recordTapped(type: rich.type)
+                            AnalyticsManager.shared.trackRecTapped()
+                            UIApplication.shared.open(url)
+                        }, onNotTonight: {
+                            recWasTapped = true   // consumed — no double count on disappear
+                            GentleRecStore.recordIgnored(type: rich.type)
+                            AnalyticsManager.shared.trackRecIgnored()
+                            withAnimation(.easeInOut(duration: 0.35)) { shownRichRec = nil }
+                        })
+                        .padding(.horizontal, DinoTheme.padding)
+                        .padding(.top, 12)
+                        .transition(.opacity.combined(with: .move(edge: .bottom)))
+                    }
+
                     // Comfort slip (concept 3a) — the gentle rec's new body.
                     // "not tonight" feeds the exact ignore signal leaving did;
                     // every GentleRecEngine gate is unchanged.
@@ -428,6 +460,33 @@ struct EmotionalWeatherView: View {
                     WeeklyMoodTrend(viewModel: viewModel)
                         .padding(.horizontal, DinoTheme.padding)
 
+                    // The little shelf (2.1 feature 3) — past picks, kept.
+                    if keepsakeCount > 0 {
+                        Button {
+                            AnalyticsManager.shared.trackScreen("rec_shelf")
+                            showRecShelf = true
+                        } label: {
+                            HStack {
+                                Text(ComfortRecVoice.shelfRowLine(keepsakeCount))
+                                    .font(DinoTheme.dinoFont(size: 14))
+                                    .foregroundColor(Color(hex: "#7A7266"))
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 11, weight: .semibold))
+                                    .foregroundColor(Color(hex: "#A8A29A"))
+                            }
+                            .padding(14)
+                            .background(
+                                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                    .fill(Color(hex: "#FFFDF6"))
+                                    .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                        .stroke(Color(hex: "#EFE7D2"), lineWidth: 1))
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .padding(.horizontal, DinoTheme.padding)
+                    }
+
                     // Dino World card — a glowing glimpse of everyone's weather.
                     WorldMoodCard(bucket: worldBucket) {
                         AnalyticsManager.shared.trackWorldCardTapped()
@@ -455,14 +514,32 @@ struct EmotionalWeatherView: View {
                 if stretchSignalFires() {
                     presentSupportRow()
                 } else if shownRec == nil, pendingRec == nil,
-                          let rec = await GentleRecCoordinator.fetchIfMomentIsRight(dataManager: dataManager) {
-                    presentRec(rec)
+                          shownRichRec == nil, pendingRichRec == nil {
+                    if let rich = await ComfortRecCoordinator.fetchIfMomentIsRight(dataManager: dataManager) {
+                        presentRichRec(rich)
+                    } else if let rec = await GentleRecCoordinator.fetchIfMomentIsRight(dataManager: dataManager) {
+                        presentRec(rec)
+                    }
                 }
             }
             .onAppear {
                 AnalyticsManager.shared.trackMoodScreenOpened()
                 AnalyticsManager.shared.trackScreen("mood")
+                keepsakeCount = RichRecStore.keepsakes().count
                 #if DEBUG
+                if ProcessInfo.processInfo.arguments.contains("-richRecQA") {
+                    RecOpenMemory.forget()   // deterministic first ask state
+                    presentRichRec(.qaSample)
+                }
+                if ProcessInfo.processInfo.arguments.contains("-richRecQA2") {
+                    RecOpenMemory.remember(RecOpenMemory.spotify)   // remembered state
+                    presentRichRec(.qaSample)
+                }
+                if ProcessInfo.processInfo.arguments.contains("-richRecQA3") {
+                    RichRecStore.seedQAKeepsakes()   // a full shelf
+                    keepsakeCount = RichRecStore.keepsakes().count
+                    showRecShelf = true
+                }
                 if ProcessInfo.processInfo.arguments.contains("-moodStepsQA") {
                     sleepData = HealthService.SleepData(durationHours: 7.2,
                         startTime: Date(), endTime: Date())
@@ -507,6 +584,11 @@ struct EmotionalWeatherView: View {
                     AnalyticsManager.shared.trackRecIgnored()
                     shownRec = nil
                 }
+                if let rich = shownRichRec, !recWasTapped {
+                    GentleRecStore.recordIgnored(type: rich.type)
+                    AnalyticsManager.shared.trackRecIgnored()
+                    shownRichRec = nil
+                }
             }
             .sheet(isPresented: $showBreakCard, onDismiss: {
                 // The break card finished (confirmed or dismissed) — the world
@@ -519,12 +601,18 @@ struct EmotionalWeatherView: View {
                 if pendingSupportRow {
                     pendingSupportRow = false
                     presentSupportRow()
+                } else if let rich = pendingRichRec {
+                    pendingRichRec = nil
+                    presentRichRec(rich)
                 } else if let rec = pendingRec {
                     pendingRec = nil
                     presentRec(rec)
                 }
             }) {
                 BreakSuggestionCard(mood: breakMood, onDismiss: { showBreakCard = false })
+            }
+            .sheet(isPresented: $showRecShelf) {
+                RecKeepsakesView()
             }
             .fullScreenCover(isPresented: $showWorld) {
                 WorldView()
@@ -644,6 +732,14 @@ struct EmotionalWeatherView: View {
         AnalyticsManager.shared.trackRecShown(type: rec.type)
         recWasTapped = false
         withAnimation(.easeInOut(duration: 0.35)) { shownRec = rec }
+    }
+
+    private func presentRichRec(_ rec: RichRec) {
+        GentleRecStore.recordShown()   // same scarcity clock as the classic path
+        RichRecStore.recordKeepsake(rec)
+        AnalyticsManager.shared.trackRecShown(type: rec.type)
+        recWasTapped = false
+        withAnimation(.easeInOut(duration: 0.35)) { shownRichRec = rec }
     }
 }
 

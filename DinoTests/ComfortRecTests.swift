@@ -1,0 +1,249 @@
+//
+//  ComfortRecTests.swift
+//  DinoTests
+//
+//  Feature 1's pure parts: the voice contract, the daypart header, the
+//  sanitizer (never trust the server), trend buckets, plain search links,
+//  and the local cache + keepsakes store.
+//
+
+import XCTest
+@testable import Dino
+
+final class ComfortRecTests: XCTestCase {
+
+    private let suite = "comfort-rec-tests"
+    private var defaults: UserDefaults!
+
+    override func setUp() {
+        super.setUp()
+        defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+    }
+
+    // MARK: - Voice contract (lowercase, zero dashes)
+
+    func testVoiceObeysTheContract() {
+        for s in ComfortRecVoice.allFixedStrings {
+            XCTAssertEqual(s, s.lowercased(), "'\(s)' breaks lowercase")
+            for dash in ["-", "\u{2013}", "\u{2014}"] {
+                XCTAssertFalse(s.contains(dash), "'\(s)' contains a dash")
+            }
+        }
+    }
+
+    func testHeaderFollowsTheHour() {
+        // owner tweak: no forced moon at midday
+        XCTAssertNotEqual(ComfortRecVoice.header(hour: 13), ComfortRecVoice.header(hour: 21))
+        XCTAssertFalse(ComfortRecVoice.header(hour: 13).contains("🌙"))
+        XCTAssertTrue(ComfortRecVoice.header(hour: 21).contains("🌙"))
+    }
+
+    // MARK: - Sanitizer (never trust the server)
+
+    private func sampleDict() -> [String: Any] {
+        ["type": "Music", "title": "Music for Airports", "creator": "Brian Eno",
+         "year": 1978, "why": "A Soft — Landing", "flags": ["not graphic", "chainsaws"],
+         "feel": "QUIET", "length": "about 48 minutes"]
+    }
+
+    func testSanitizerCleansAndLowercases() {
+        let rec = ComfortRecSanitizer.rec(from: sampleDict())
+        XCTAssertEqual(rec?.title, "music for airports")
+        XCTAssertEqual(rec?.creator, "brian eno")
+        XCTAssertEqual(rec?.why, "a soft landing")     // dash gone, spaces collapsed
+        XCTAssertEqual(rec?.feel, "quiet")
+        XCTAssertEqual(rec?.flags, ["not graphic"])    // allowlist only
+    }
+
+    func testSanitizerRejectsBrokenRecs() {
+        var d = sampleDict(); d["type"] = "podcast"
+        XCTAssertNil(ComfortRecSanitizer.rec(from: d))
+        d = sampleDict(); d["title"] = ""
+        XCTAssertNil(ComfortRecSanitizer.rec(from: d))
+        d = sampleDict(); d["year"] = 1850
+        XCTAssertNil(ComfortRecSanitizer.rec(from: d))
+    }
+
+    func testEmptyWhyGetsTheFallbackNeverBlank() {
+        var d = sampleDict(); d["why"] = ""
+        XCTAssertEqual(ComfortRecSanitizer.rec(from: d)?.why, ComfortRecVoice.fallbackWhy)
+    }
+
+    func testEmptyFlagsGetTheSoftDefault() {
+        var d = sampleDict(); d["flags"] = ["gore"]
+        XCTAssertEqual(ComfortRecSanitizer.rec(from: d)?.flags, ["a soft one"])
+    }
+
+    // MARK: - Trend buckets (privacy: the word travels, never the count)
+
+    func testTrendBuckets() {
+        XCTAssertEqual(ComfortRecTrend.bucket(heavyDaysInLastWeek: 0), "steady")
+        XCTAssertEqual(ComfortRecTrend.bucket(heavyDaysInLastWeek: 1), "steady")
+        XCTAssertEqual(ComfortRecTrend.bucket(heavyDaysInLastWeek: 2), "wobbly")
+        XCTAssertEqual(ComfortRecTrend.bucket(heavyDaysInLastWeek: 3), "wobbly")
+        XCTAssertEqual(ComfortRecTrend.bucket(heavyDaysInLastWeek: 4), "heavy")
+        XCTAssertEqual(ComfortRecTrend.bucket(heavyDaysInLastWeek: 7), "heavy")
+    }
+
+    // MARK: - Watch providers (free to them, never a paywall)
+
+    private func filmRec(provider: String?, link: String?) -> RichRec {
+        RichRec(type: "film", title: "my neighbor totoro", creator: "hayao miyazaki", year: 1988,
+                why: "w", flags: ["not graphic"], feel: "cozy", length: "about 86 minutes",
+                watchProvider: provider, watchLink: link)
+    }
+
+    func testFilmWithFreeProviderGetsNamedButton() {
+        let links = filmRec(provider: "netflix",
+                            link: "https://www.themoviedb.org/movie/8392/watch?locale=PH").searchLinks
+        XCTAssertEqual(links.map(\.label), ["watch on netflix"])
+        XCTAssertEqual(links.first?.url.host, "www.themoviedb.org")
+    }
+
+    func testRentOnlyFilmGetsTheNeutralPageNeverAPaywall() {
+        let links = filmRec(provider: nil,
+                            link: "https://www.themoviedb.org/movie/8392/watch?locale=US").searchLinks
+        XCTAssertEqual(links.map(\.label), [ComfortRecVoice.whereToWatch])
+    }
+
+    func testNoTmdbDataKeepsTheOldSearchDoor() {
+        XCTAssertEqual(filmRec(provider: nil, link: nil).searchLinks.first?.url.host, "tv.apple.com")
+    }
+
+    func testSanitizerRejectsForeignWatchLinks() {
+        var d = sampleDict()
+        d["type"] = "film"
+        d["watchProvider"] = "netflix"
+        d["watchLink"] = "https://evil.example.com/watch"
+        let rec = ComfortRecSanitizer.rec(from: d)
+        XCTAssertNil(rec?.watchLink, "non tmdb links never survive")
+        XCTAssertNil(rec?.watchProvider)
+        XCTAssertEqual(rec?.searchLinks.first?.url.host, "tv.apple.com")
+    }
+
+    func testWatchInfoSurvivesTheCacheRoundTrip() {
+        let now = Date()
+        let film = filmRec(provider: "netflix", link: "https://www.themoviedb.org/movie/8392/watch")
+        RichRecStore.save(RichRecBatch(recs: [film], fetchedAt: now), defaults: defaults)
+        let back = RichRecStore.consumeOne(defaults: defaults, now: now)
+        XCTAssertEqual(back?.watchProvider, "netflix")
+        XCTAssertEqual(back?.watchLink, "https://www.themoviedb.org/movie/8392/watch")
+    }
+
+    // MARK: - Country bucket (relevance, never location)
+
+    func testCountryCodeFromLocale() {
+        XCTAssertEqual(ComfortRecCoordinator.countryCode(locale: Locale(identifier: "fil_PH")), "PH")
+        XCTAssertEqual(ComfortRecCoordinator.countryCode(locale: Locale(identifier: "de_DE")), "DE")
+        XCTAssertEqual(ComfortRecCoordinator.countryCode(locale: Locale(identifier: "ja_JP")), "JP")
+        XCTAssertEqual(ComfortRecCoordinator.countryCode(locale: Locale(identifier: "pt_BR")), "BR")
+    }
+
+    // MARK: - Search links (plain URLs, no APIs)
+
+    private func rec(type: String, title: String = "music for airports") -> RichRec {
+        RichRec(type: type, title: title, creator: "brian eno", year: 1978,
+                why: "w", flags: ["a soft one"], feel: "quiet", length: "about 48 minutes")
+    }
+
+    func testMusicGetsBothStores() {
+        let links = rec(type: "music").searchLinks
+        XCTAssertEqual(links.map(\.label),
+                       [ComfortRecVoice.openAppleMusic, ComfortRecVoice.openSpotify])
+        XCTAssertEqual(links[0].url.host, "music.apple.com")
+        XCTAssertEqual(links[1].url.host, "open.spotify.com")
+    }
+
+    func testBookAndFilmLinks() {
+        XCTAssertEqual(rec(type: "book").searchLinks.map(\.label), [ComfortRecVoice.openBooks])
+        XCTAssertEqual(rec(type: "book").searchLinks.first?.url.host, "books.apple.com")
+        XCTAssertEqual(rec(type: "film").searchLinks.map(\.label), [ComfortRecVoice.openTV])
+        XCTAssertEqual(rec(type: "film").searchLinks.first?.url.host, "tv.apple.com")
+    }
+
+    func testSearchTermIsPercentEncoded() {
+        let url = rec(type: "music").searchLinks[0].url.absoluteString
+        XCTAssertFalse(url.contains(" "), "spaces must be encoded")
+        XCTAssertTrue(url.contains("music%20for%20airports"))
+    }
+
+    // MARK: - Open it flow (feature 2: ask once, remember, switchable)
+
+    func testOpenMemoryRoundTrip() {
+        XCTAssertNil(RecOpenMemory.remembered(defaults: defaults))
+        RecOpenMemory.remember(RecOpenMemory.spotify, defaults: defaults)
+        XCTAssertEqual(RecOpenMemory.remembered(defaults: defaults), RecOpenMemory.spotify)
+        RecOpenMemory.remember("winamp", defaults: defaults)   // garbage never sticks
+        XCTAssertEqual(RecOpenMemory.remembered(defaults: defaults), RecOpenMemory.spotify)
+        RecOpenMemory.forget(defaults: defaults)
+        XCTAssertNil(RecOpenMemory.remembered(defaults: defaults))
+    }
+
+    func testOtherFlipsTheChoice() {
+        XCTAssertEqual(RecOpenMemory.other(than: RecOpenMemory.spotify), RecOpenMemory.appleMusic)
+        XCTAssertEqual(RecOpenMemory.other(than: RecOpenMemory.appleMusic), RecOpenMemory.spotify)
+    }
+
+    func testMusicLinkForChoice() {
+        let music = rec(type: "music")
+        XCTAssertEqual(music.musicLink(for: RecOpenMemory.spotify)?.url.host, "open.spotify.com")
+        XCTAssertEqual(music.musicLink(for: RecOpenMemory.appleMusic)?.url.host, "music.apple.com")
+        // off music there is nothing to choose between
+        XCTAssertNil(rec(type: "book").musicLink(for: RecOpenMemory.spotify))
+    }
+
+    // MARK: - Cache (show one, keep two, never keep stale)
+
+    func testCacheConsumesInOrder() {
+        let now = Date()
+        RichRecStore.save(RichRecBatch(recs: [rec(type: "music"), rec(type: "book")],
+                                       fetchedAt: now), defaults: defaults)
+        XCTAssertEqual(RichRecStore.consumeOne(defaults: defaults, now: now)?.type, "music")
+        XCTAssertEqual(RichRecStore.loadCache(defaults: defaults, now: now)?.recs.count, 1)
+        XCTAssertEqual(RichRecStore.consumeOne(defaults: defaults, now: now)?.type, "book")
+        XCTAssertNil(RichRecStore.consumeOne(defaults: defaults, now: now))
+    }
+
+    func testStaleCacheIsDiscarded() {
+        let old = Calendar.current.date(byAdding: .day, value: -46, to: Date())!
+        RichRecStore.save(RichRecBatch(recs: [rec(type: "music")], fetchedAt: old),
+                          defaults: defaults)
+        XCTAssertNil(RichRecStore.consumeOne(defaults: defaults))
+    }
+
+    // MARK: - The little shelf (feature 3: strings + re open)
+
+    func testShelfRowLineComposes() {
+        XCTAssertEqual(ComfortRecVoice.shelfRowLine(3), "your little shelf \u{00B7} 3 kept")
+        XCTAssertEqual(ComfortRecVoice.shelfKept(1), "1 kept")
+    }
+
+    func testReopenLinkRespectsTheRememberedApp() {
+        let music = rec(type: "music")
+        XCTAssertEqual(music.reopenLink(defaults: defaults)?.url.host, "music.apple.com",
+                       "no memory falls back to apple music")
+        RecOpenMemory.remember(RecOpenMemory.spotify, defaults: defaults)
+        XCTAssertEqual(music.reopenLink(defaults: defaults)?.url.host, "open.spotify.com")
+        XCTAssertEqual(rec(type: "book").reopenLink(defaults: defaults)?.url.host, "books.apple.com")
+        XCTAssertEqual(rec(type: "film").reopenLink(defaults: defaults)?.url.host, "tv.apple.com")
+    }
+
+    // MARK: - Keepsakes (feature 3's shelf starts honest)
+
+    func testKeepsakesNewestFirstAndCapped() {
+        for i in 0..<30 {
+            RichRecStore.recordKeepsake(rec(type: "music", title: "t\(i)"), defaults: defaults)
+        }
+        let kept = RichRecStore.keepsakes(defaults: defaults)
+        XCTAssertEqual(kept.count, RichRecStore.keepsakeCap)
+        XCTAssertEqual(kept.first?.rec.title, "t29")
+    }
+
+    func testExcludeTitlesCapsAtTen() {
+        for i in 0..<12 {
+            RichRecStore.recordKeepsake(rec(type: "music", title: "t\(i)"), defaults: defaults)
+        }
+        XCTAssertEqual(RichRecStore.excludeTitles(defaults: defaults).count, 10)
+    }
+}

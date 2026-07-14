@@ -17,6 +17,7 @@ setGlobalOptions({ region: "us-central1", maxInstances: 10 });
 
 const OPENAI_API_KEY = defineSecret("OPENAI_API_KEY");
 const FIRECRAWL_API_KEY = defineSecret("FIRECRAWL_API_KEY");
+const TMDB_API_TOKEN = defineSecret("TMDB_API_TOKEN");
 
 const DAILY_LIMIT = 5;
 
@@ -1736,6 +1737,221 @@ export const processEmailQueue = onSchedule(
       }
     }
     functions.logger.info(`processEmailQueue: sent=${sent} failed=${failed} batch=${snap.docs.length}`);
+  }
+);
+
+// Personalized comfort recs (2.1, feature 1) — three real, gentle picks
+// written for this person's day, in dino's voice. The client shows one and
+// caches two locally, so with the 3 day scarcity gate one call covers ~9
+// days. PRIVACY: receives ONLY enum buckets (mood, timeOfDay, moodTrend,
+// themes, quietTypes, locale) plus titles of PRIOR AI RECS (model output,
+// not user content). No journal text, no free text, no counts. Unknown keys
+// are rejected (defense in depth, same as generateRhythmsLetter).
+// Rate limit: COMFORT_REC_DAILY_LIMIT per uid per UTC day, refund on failure.
+const COMFORT_REC_DAILY_LIMIT = 2;
+const COMFORT_REC_TYPES = ["music", "book", "film"];
+const COMFORT_REC_FLAGS = [
+  "not graphic", "no distressing themes", "a soft one",
+  "gentle pacing", "some bittersweet moments",
+];
+const COMFORT_REC_FEELS = ["cozy", "hopeful", "quiet"];
+
+// TMDB watch providers for the film pick — PREFER FREE-TO-THEM: only
+// flatrate/free/ads surface a provider name; rent/buy NEVER do. A rent only
+// or unknown film falls back to TMDB's watch page (JustWatch data, every
+// option laid out) behind a neutral button. This helper absolutely never
+// throws — any failure returns null and the rec ships exactly as before.
+async function tmdbWatchInfo(
+  title: string, year: number, country: string, token: string
+): Promise<{ provider: string; link: string } | null> {
+  try {
+    // v4 read access tokens are JWTs (bearer header); a 32 char hex value
+    // is a v3 api key (query param). accept either shape.
+    const isV4 = token.includes(".");
+    const headers: Record<string, string> = { accept: "application/json" };
+    if (isV4) headers["Authorization"] = `Bearer ${token}`;
+    const keyParam = isV4 ? "" : `&api_key=${token}`;
+    const search = await fetch(
+      `https://api.themoviedb.org/3/search/movie?query=${encodeURIComponent(title)}&year=${year}&include_adult=false${keyParam}`,
+      { headers, signal: AbortSignal.timeout(4000) }
+    );
+    if (!search.ok) return null;
+    const movie = ((await search.json() as any)?.results ?? [])[0];
+    if (!movie?.id) return null;
+    const prov = await fetch(
+      `https://api.themoviedb.org/3/movie/${movie.id}/watch/providers?a=1${keyParam}`,
+      { headers, signal: AbortSignal.timeout(4000) }
+    );
+    if (!prov.ok) return null;
+    const region = ((await prov.json() as any)?.results ?? {})[country];
+    if (!region) return null;
+    const link = typeof region.link === "string" && region.link.startsWith("https://www.themoviedb.org/")
+      ? region.link : "";
+    const freeToThem = [...(region.flatrate ?? []), ...(region.free ?? []), ...(region.ads ?? [])];
+    const name = freeToThem[0]?.provider_name;
+    if (name && link) {
+      return { provider: String(name).toLowerCase().replace(/[–—-]/g, " ").slice(0, 40).trim(), link };
+    }
+    if (link) return { provider: "", link };   // rent only / no free tier → neutral watch page
+    return null;
+  } catch {
+    return null;   // timeout, network, parse — never break the rec
+  }
+}
+
+export const generateComfortRecs = onCall(
+  { secrets: [OPENAI_API_KEY, TMDB_API_TOKEN], timeoutSeconds: 30, memory: "256MiB" },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "sign in required");
+    }
+    const uid = request.auth.uid;
+
+    const d = (request.data ?? {}) as Record<string, unknown>;
+    const ALLOWED_KEYS = [
+      "mood", "timeOfDay", "moodTrend", "recentThemes", "quietTypes", "userLocale", "userCountry", "excludeTitles",
+    ];
+    for (const k of Object.keys(d)) {
+      if (!ALLOWED_KEYS.includes(k)) {
+        throw new HttpsError("invalid-argument", `unexpected field: ${k}`);
+      }
+    }
+    const mood = ["drained", "overwhelmed"].includes(String(d.mood)) ? String(d.mood) : "";
+    const timeOfDay = ["midday", "evening"].includes(String(d.timeOfDay)) ? String(d.timeOfDay) : "evening";
+    const moodTrend = ["steady", "wobbly", "heavy"].includes(String(d.moodTrend)) ? String(d.moodTrend) : "steady";
+    const REC_THEMES = ["work", "sleep", "relationships", "health", "money", "self"];
+    const recentThemes = (Array.isArray(d.recentThemes) ? d.recentThemes : [])
+      .map((t) => String(t)).filter((t) => REC_THEMES.includes(t)).slice(0, 3);
+    const quietTypes = (Array.isArray(d.quietTypes) ? d.quietTypes : [])
+      .map((t) => String(t)).filter((t) => COMFORT_REC_TYPES.includes(t));
+    const userLocale = typeof d.userLocale === "string" ? d.userLocale : "en";
+    const excludeTitles = (Array.isArray(d.excludeTitles) ? d.excludeTitles : [])
+      .map((t) => String(t).slice(0, 80)).slice(0, 10);
+    // Country awareness: an ISO region code only (device locale bucket — the
+    // same privacy class as userLocale, never a location reading).
+    const userCountry = typeof d.userCountry === "string" && /^[A-Za-z]{2}$/.test(d.userCountry)
+      ? d.userCountry.toUpperCase() : "";
+    let countryName = "";
+    if (userCountry) {
+      try {
+        countryName = (new Intl.DisplayNames(["en"], { type: "region" }).of(userCountry) ?? "").toLowerCase();
+      } catch { countryName = ""; }
+    }
+
+    // Rate limit — house pattern: per-UID daily counter, refund on failure.
+    const db = admin.firestore();
+    const dayKey = new Date().toISOString().slice(0, 10);
+    const counterRef = db.collection("comfortRecLimits").doc(uid);
+    await db.runTransaction(async (tx) => {
+      const snap = await tx.get(counterRef);
+      const current = ((snap.data() ?? {})[dayKey] as number | undefined) ?? 0;
+      if (current >= COMFORT_REC_DAILY_LIMIT) {
+        throw new HttpsError("resource-exhausted", "daily comfort rec limit reached");
+      }
+      tx.set(
+        counterRef,
+        { [dayKey]: current + 1, updatedAt: admin.firestore.FieldValue.serverTimestamp() },
+        { merge: true }
+      );
+    });
+
+    const systemPrompt =
+      "you are dino, a gentle wellness companion picking comfort media for someone having a heavy day. " +
+      'respond only with valid json of the form {"recs":[{"type":"music","title":"...","creator":"...","year":1994,"why":"...","flags":["not graphic"],"feel":"cozy","length":"about 2 hours"}]} with exactly 3 recs. ' +
+      "rules: " +
+      "type is exactly one of music, book, film; use three different types unless a type is listed as quiet, and never use a quiet type. " +
+      "every pick must be a real, published, well loved work. never invent titles or creators. only recommend widely known works you are certain exist exactly as titled, with the correct creator: the album's primary artist, the book's author, or the film's director, never a company or label. never recommend generic compilations or various artists albums. if you are unsure of any detail, pick a more famous work you know cold; famous local beats obscure local. " +
+      "vary your picks between listeners: the world holds many beloved gentle works, so reach widely across artists, eras, and countries instead of defaulting to the same few obvious choices. " +
+      "only inherently gentle content: nothing graphic, violent, frightening, grief centered, or otherwise distressing. never clinical or academic works, and never books or films about mental illness, therapy, self help, sleep science, or psychological distress; comfort means escape and warmth, not a mirror of what they are feeling. " +
+      "films must be widely streamable at home in the listener's country, never current theatrical releases. " +
+      "the listener's country may be given. let where they live inform relevance and availability, never the theme: mix it up so some picks carry local or regional resonance (their region's beloved music, books, films) and some are universal; never stereotype a country or reach for its cliches. every pick must be genuinely accessible where they live: in their language or with widely available subtitles or translations, and easy to stream or buy there. when no country is given, pick globally beloved works. " +
+      "why: one warm lowercase sentence spoken directly to them, tied to the specific shape of their day. write it freshly every time: vary the rhythm and the opening word between recs, never reuse stock phrases like 'this fits your day' or 'perfect for a heavy day', and never repeat their mood word back clinically. 18 words max. no dashes. " +
+      'flags: 1 to 3 chosen from exactly this list: "not graphic", "no distressing themes", "a soft one", "gentle pacing", "some bittersweet moments". ' +
+      "feel: exactly one of cozy, hopeful, quiet. " +
+      "length: a short honest time phrase like 'about 2 hours' or 'a slow weekend read'. no dashes. " +
+      "all text lowercase." +
+      getLanguageInstruction(userLocale);
+
+    const userPrompt = [
+      mood ? `their day: feeling ${mood}.` : "their day: a quiet heaviness.",
+      `time of day: ${timeOfDay}.`,
+      `their recent trend: ${moodTrend}.`,
+      countryName ? `they live in ${countryName}.` : "",
+      recentThemes.length ? `themes lately: ${recentThemes.join(", ")}.` : "",
+      quietTypes.length ? `quiet types, do not use: ${quietTypes.join(", ")}.` : "",
+      excludeTitles.length ? `do not repeat these titles: ${excludeTitles.join("; ")}.` : "",
+      "write 3 picks for this person.",
+    ].filter(Boolean).join(" ");
+
+    try {
+      const openai = new OpenAI({ apiKey: OPENAI_API_KEY.value() });
+      const resp = await openai.chat.completions.create({
+        // mid tier for the pick step: regional attributions must be RIGHT —
+        // a misattributed beloved work reads as dino not knowing them.
+        // ~$0.0007/call, ~$0.002/user/month — inside the owner's cap.
+        model: "gpt-4.1-mini",
+        max_tokens: 500,
+        temperature: 0.5,   // factual recall over flourish — the why still varies
+        response_format: { type: "json_object" },
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+      });
+      const content = resp.choices[0]?.message?.content ?? "";
+      const parsed = JSON.parse(content) as { recs?: unknown }; // throws → refund + client fallback
+      const rawRecs = Array.isArray(parsed.recs) ? parsed.recs : [];
+      // Never trust raw model output — validate or drop every rec.
+      const clean = (s: unknown, cap: number) =>
+        String(s ?? "").toLowerCase().replace(/[–—-]/g, " ").replace(/\s+/g, " ").trim().slice(0, cap);
+      const nowYear = new Date().getUTCFullYear();
+      const recs = rawRecs
+        .map((r: any) => {
+          const type = String(r?.type ?? "").toLowerCase();
+          const title = String(r?.title ?? "").toLowerCase().trim().slice(0, 80);
+          const creator = String(r?.creator ?? "").toLowerCase().trim().slice(0, 80);
+          const year = Number(r?.year);
+          const why = clean(r?.why, 140);
+          const flags = (Array.isArray(r?.flags) ? r.flags : [])
+            .map((f: unknown) => String(f).toLowerCase())
+            .filter((f: string) => COMFORT_REC_FLAGS.includes(f))
+            .slice(0, 3);
+          const feel = COMFORT_REC_FEELS.includes(String(r?.feel)) ? String(r?.feel) : "quiet";
+          const length = clean(r?.length, 40) || "no rush at all";
+          if (!COMFORT_REC_TYPES.includes(type) || quietTypes.includes(type)) return null;
+          if (!title || !creator || !why) return null;
+          if (!Number.isFinite(year) || year < 1900 || year > nowYear) return null;
+          return {
+            type, title, creator, year: Math.trunc(year), why,
+            flags: flags.length ? flags : ["a soft one"], feel, length,
+          };
+        })
+        .filter((r: unknown) => r !== null)
+        .slice(0, 3);
+      if (recs.length === 0) {
+        throw new HttpsError("internal", "no valid recs");
+      }
+      // One TMDB lookup per batch (a batch carries one film) — additive only;
+      // any failure leaves the rec untouched.
+      const film = recs.find((r: any) => r && r.type === "film") as any;
+      if (film && userCountry) {
+        const w = await tmdbWatchInfo(film.title, film.year, userCountry, TMDB_API_TOKEN.value());
+        if (w) {
+          film.watchProvider = w.provider;
+          film.watchLink = w.link;
+        }
+      }
+      return { recs };
+    } catch (err) {
+      // Refund — a failure never burns the user's daily cap.
+      await counterRef.set(
+        { [dayKey]: admin.firestore.FieldValue.increment(-1) },
+        { merge: true }
+      );
+      if (err instanceof HttpsError) throw err;
+      const message = err instanceof Error ? err.message : "OpenAI request failed";
+      throw new HttpsError("internal", message);
+    }
   }
 );
 
