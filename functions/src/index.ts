@@ -3,12 +3,13 @@ import * as functions from "firebase-functions/v1";
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { onDocumentCreated } from "firebase-functions/v2/firestore";
-import { defineSecret } from "firebase-functions/params";
+import { defineSecret, defineString } from "firebase-functions/params";
 import { setGlobalOptions } from "firebase-functions/v2";
 import OpenAI from "openai";
 import { createHash } from "node:crypto";
 import { seasonForMonth, isSeasonEligible, isSlotActive, REC_SEASON_VALUES } from "./season";
 import { route as aiRoute, clientFor as aiClientFor } from "./modelRouter";
+import { validateGift } from "./mission";
 import { capSources, shouldRun, monthKey, creditSummary, REC_MAX_SOURCES_PER_RUN, REC_MIN_RUN_INTERVAL_DAYS } from "./credits";
 import { WORLD_PRIVACY_FLOOR, normalizeCountry, foldPulseCountry } from "./world";
 
@@ -19,6 +20,10 @@ setGlobalOptions({ region: "us-central1", maxInstances: 10 });
 const OPENAI_API_KEY = defineSecret("OPENAI_API_KEY");
 const FIRECRAWL_API_KEY = defineSecret("FIRECRAWL_API_KEY");
 const TMDB_API_TOKEN = defineSecret("TMDB_API_TOKEN");
+const META_MODEL_API_KEY = defineSecret("META_MODEL_API_KEY");
+// base url for meta's openai compatible endpoint — set when the owner
+// provides it; an empty value means missions quietly do not run.
+const META_API_BASE = defineString("META_API_BASE", { default: "" });
 
 const DAILY_LIMIT = 5;
 
@@ -1772,8 +1777,183 @@ const LUNA_WATCHER_PROMPT =
   'a quiet need the buckets make obvious. respond only with json {"act":false,"needKind":"none","confidence":0.0}. ' +
   "needKind is exactly one of rest, beauty, hope, wonder, connection, none. when in doubt, stay quiet.";
 
+// F2 THE MISSION: when luna acts, muse spark (via the router — hard rule:
+// never luna) hunts the real web for ONE small genuine thing. Budget is
+// enforced in the LOOP, not the prompt: max 6 tool steps, max 3 page reads,
+// 60s wall clock, per user 2 missions/month, global 500/month hard stop.
+// The gift's url must be one the tools actually visited. Any failure at any
+// point = silence.
+const MISSION_MAX_TOOL_STEPS = 6;
+const MISSION_MAX_READS = 3;
+const MISSION_TIMEOUT_MS = 60_000;
+const MISSION_MONTHLY_GLOBAL_CAP = 500;
+const MISSION_MONTHLY_PER_USER_CAP = 2;
+
+const MISSION_TOOLS: OpenAI.Chat.ChatCompletionTool[] = [
+  { type: "function", function: {
+    name: "searchWeb",
+    description: "search the web, returns titles, urls and descriptions",
+    parameters: { type: "object", properties: { query: { type: "string" } }, required: ["query"] },
+  } },
+  { type: "function", function: {
+    name: "readPage",
+    description: "read one page as plain text",
+    parameters: { type: "object", properties: { url: { type: "string" } }, required: ["url"] },
+  } },
+];
+
+function missionPrompt(needKind: string): string {
+  return "you are dino on a small expedition. someone is having a " + needKind +
+    " kind of stretch. search the real web and find ONE small genuine thing for them: " +
+    "a short poem, a piece of quietly good news, a small wonder of the world, a gentle idea. " +
+    "rules: nothing clinical, nothing about mental illness or therapy or self help, no distressing " +
+    "news, nothing graphic, nothing behind a paywall. it must be real and reachable at its url — " +
+    "only give a url you actually searched or read. copyright: a short excerpt of at most 40 words " +
+    "plus the link, never a full work. when you have read enough to be sure, respond only with json " +
+    '{"title":"...","source":"...","excerpt":"...","url":"https://...","whyOneLine":"..."} — ' +
+    "all lowercase, no dashes, whyOneLine spoken softly to them in 14 words or fewer.";
+}
+
+async function firecrawlSearch(query: string, key: string): Promise<{ text: string; urls: string[] }> {
+  const resp = await fetch("https://api.firecrawl.dev/v1/search", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
+    body: JSON.stringify({ query: query.slice(0, 200), limit: 5 }),
+    signal: AbortSignal.timeout(10_000),
+  });
+  if (!resp.ok) return { text: "search failed", urls: [] };
+  const data = (await resp.json() as any)?.data ?? [];
+  const items = (Array.isArray(data) ? data : []).slice(0, 5).map((d: any) => ({
+    title: String(d?.title ?? "").slice(0, 120),
+    url: String(d?.url ?? ""),
+    description: String(d?.description ?? "").slice(0, 200),
+  }));
+  return { text: JSON.stringify(items), urls: items.map((i: any) => i.url).filter(Boolean) };
+}
+
+async function firecrawlRead(url: string, key: string): Promise<string> {
+  const resp = await fetch("https://api.firecrawl.dev/v1/scrape", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
+    body: JSON.stringify({ url, formats: ["markdown"], onlyMainContent: true }),
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (!resp.ok) return "read failed";
+  const md = (await resp.json() as any)?.data?.markdown ?? "";
+  return String(md).slice(0, 4000);
+}
+
+/** Spend caps as a transaction; true = budget granted. */
+async function grantMissionBudget(db: admin.firestore.Firestore, uid: string): Promise<boolean> {
+  const mk = monthKey(new Date());
+  const ref = db.collection("expeditionSpend").doc(mk);
+  return db.runTransaction(async (tx) => {
+    const data = (await tx.get(ref)).data() ?? {};
+    const missions = (data.missions as number | undefined) ?? 0;
+    const mine = ((data.byUser as Record<string, number> | undefined) ?? {})[uid] ?? 0;
+    if (missions >= MISSION_MONTHLY_GLOBAL_CAP) return false;
+    if (mine >= MISSION_MONTHLY_PER_USER_CAP) return false;
+    tx.set(ref, {
+      missions: missions + 1,
+      [`byUser.${uid}`]: mine + 1,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
+    return true;
+  });
+}
+
+/** Runs one mission. Every failure path returns without writing a gift —
+ *  silence is the contract. */
+async function runExpeditionMission(db: admin.firestore.Firestore, uid: string, needKind: string): Promise<boolean> {
+  const metaBase = META_API_BASE.value();
+  if (!metaBase) return false;                       // meta api not configured yet → quiet
+  if (!(await grantMissionBudget(db, uid))) return false;
+  const deadline = Date.now() + MISSION_TIMEOUT_MS;
+  const r = aiRoute("mission");
+  const client = aiClientFor(r, { metaKey: META_MODEL_API_KEY.value(), metaBase });
+  const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
+    { role: "system", content: missionPrompt(needKind) },
+    { role: "user", content: `go find one small ${needKind} thing. respond with the json when sure.` },
+  ];
+  const seenUrls: string[] = [];
+  let reads = 0;
+  try {
+    for (let step = 0; step < MISSION_MAX_TOOL_STEPS; step++) {
+      if (Date.now() > deadline) return false;
+      const resp = await client.chat.completions.create({
+        model: r.model, max_tokens: r.maxTokens, temperature: r.temperature,
+        messages, tools: MISSION_TOOLS,
+      });
+      const msg = resp.choices[0]?.message;
+      if (!msg) return false;
+      messages.push(msg as OpenAI.Chat.ChatCompletionMessageParam);
+      if (msg.tool_calls && msg.tool_calls.length > 0) {
+        for (const tc of msg.tool_calls) {
+          if (Date.now() > deadline) return false;
+          let result = "tool unavailable";
+          try {
+            const args = JSON.parse(tc.function.arguments ?? "{}") as Record<string, unknown>;
+            if (tc.function.name === "searchWeb") {
+              const s = await firecrawlSearch(String(args.query ?? ""), FIRECRAWL_API_KEY.value());
+              seenUrls.push(...s.urls);
+              result = s.text;
+            } else if (tc.function.name === "readPage") {
+              const url = String(args.url ?? "");
+              if (reads >= MISSION_MAX_READS || !url.startsWith("https://")) {
+                result = "read budget spent";
+              } else {
+                reads++;
+                seenUrls.push(url);
+                result = await firecrawlRead(url, FIRECRAWL_API_KEY.value());
+              }
+            }
+          } catch {
+            result = "tool error";
+          }
+          messages.push({ role: "tool", tool_call_id: tc.id, content: result });
+        }
+        continue;
+      }
+      // no tool calls → this should be the gift
+      let parsed: unknown = null;
+      try { parsed = JSON.parse(msg.content ?? ""); } catch { return false; }
+      const gift = validateGift(parsed, seenUrls);
+      if (!gift) return false;
+      // delivered words — the one warm line the user reads (router: 4.1 mini)
+      let dinoLine = "dino went looking tonight and this glimmered";
+      try {
+        const dw = aiRoute("deliveredWords");
+        const dwClient = aiClientFor(dw, { openai: OPENAI_API_KEY.value() });
+        const dwResp = await dwClient.chat.completions.create({
+          model: dw.model, max_tokens: dw.maxTokens, temperature: dw.temperature,
+          messages: [
+            { role: "system", content:
+              "you are dino. write ONE warm lowercase line, no dashes, 14 words or fewer, " +
+              "to hand someone a small gift you found for them. never clinical, never salesy." },
+            { role: "user", content: `the gift is a ${needKind} kind of thing called "${gift.title}".` },
+          ],
+        });
+        const line = String(dwResp.choices[0]?.message?.content ?? "")
+          .toLowerCase().replace(/[–—-]/g, " ").replace(/\s+/g, " ").trim().slice(0, 120);
+        if (line && line.split(/\s+/).length <= 14) dinoLine = line;
+      } catch { /* fixed fallback line stands */ }
+      await db.collection("expeditions").doc(uid).set({
+        gift: { ...gift, dinoLine },
+        needKind,
+        lastAt: admin.firestore.FieldValue.serverTimestamp(),
+        deliveredAt: null,
+        pendingNeed: admin.firestore.FieldValue.delete(),
+      }, { merge: true });
+      return true;
+    }
+    return false;   // tool budget exhausted without a gift → silence
+  } catch {
+    return false;   // any api failure → silence
+  }
+}
+
 export const nightlyExpeditionWatch = onSchedule(
-  { schedule: "7 4 * * *", secrets: [OPENAI_API_KEY], timeoutSeconds: 540, memory: "256MiB" },
+  { schedule: "7 4 * * *", secrets: [OPENAI_API_KEY, META_MODEL_API_KEY, FIRECRAWL_API_KEY], timeoutSeconds: 540, memory: "256MiB" },
   async () => {
     const db = admin.firestore();
     const cutoff = admin.firestore.Timestamp.fromMillis(Date.now() - 48 * 3600 * 1000);
@@ -1835,7 +2015,7 @@ export const nightlyExpeditionWatch = onSchedule(
             pendingNeed: needKind,
             watchedAt: admin.firestore.FieldValue.serverTimestamp(),
           }, { merge: true });
-          // F2 runs the mission from pendingNeed.
+          await runExpeditionMission(db, doc.id, needKind);   // F2 — silence on any failure
         }
       } catch {
         // luna failure = a quiet night; no attempt recorded → tomorrow may retry
