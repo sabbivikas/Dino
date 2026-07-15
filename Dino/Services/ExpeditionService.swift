@@ -28,13 +28,14 @@ enum ExpeditionVoice {
     static let fromPrefix = "from"
     static let openLink = "see where it lives"
     static let keepIt = "keep this"
+    static let driftedAway = "this one has drifted away"
     static let settingsTitle = "little expeditions"
     static let settingsBody = "dino sometimes goes looking for small things for you, using only your weather patterns, never your words."
     static let fallbackLine = "dino went looking tonight and this glimmered"
     static let needKinds = ["rest", "beauty", "hope", "wonder", "connection"]
 
     static var allFixedStrings: [String] {
-        [cardHeader, fromPrefix, openLink, keepIt,
+        [cardHeader, fromPrefix, openLink, keepIt, driftedAway,
          settingsTitle, settingsBody, fallbackLine] + needKinds
     }
 }
@@ -89,6 +90,23 @@ extension ExpeditionGift {
                 year: Calendar.current.component(.year, from: foundAt),
                 why: dinoLine, flags: ["a soft one"], feel: needKind, length: "",
                 watchProvider: nil, watchLink: url)
+    }
+}
+
+enum ExpeditionReader {
+    /// A gentle probe before re opening a kept gift — alive means reachable
+    /// and not clearly gone. 405 (head not allowed) still counts as alive;
+    /// timeouts and 4xx/5xx do not.
+    static func pageAlive(url: URL, timeout: TimeInterval = 5) async -> Bool {
+        var req = URLRequest(url: url, timeoutInterval: timeout)
+        req.httpMethod = "HEAD"
+        do {
+            let (_, resp) = try await URLSession.shared.data(for: req)
+            guard let http = resp as? HTTPURLResponse else { return false }
+            return http.statusCode < 400 || http.statusCode == 405
+        } catch {
+            return false
+        }
     }
 }
 

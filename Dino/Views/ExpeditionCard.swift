@@ -38,13 +38,16 @@ struct ExpeditionCard: View {
             }
             .padding(.top, 14)
 
-            // the found thing — a short excerpt; the link carries the rest
+            // the found thing — a short excerpt; the link carries the rest.
+            // tapping the clipping itself opens the in app reader.
             Text("\u{201C}\(gift.excerpt)\u{201D}")
                 .font(DinoTheme.dinoFont(size: 15.5))
                 .lineSpacing(5)
                 .foregroundColor(Color(hex: "#57524A"))
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, 12)
+                .contentShape(Rectangle())
+                .onTapGesture(perform: onOpen)
 
             // dino's one warm line
             HStack(alignment: .top, spacing: 10) {

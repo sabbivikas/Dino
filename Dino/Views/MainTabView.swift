@@ -13,7 +13,7 @@ struct MainTabView: View {
     // QA runs land on the mood tab directly (screenshot verification only)
     @State private var selectedTab: Int =
         ProcessInfo.processInfo.arguments.contains(where: {
-            $0.hasPrefix("-richRecQA") || $0.hasPrefix("-expeditionQA")
+            $0.hasPrefix("-richRecQA") || $0.hasPrefix("-expeditionQA") || $0.hasPrefix("-giftReaderQA")
         }) ? 2 : 0
     #else
     @State private var selectedTab: Int = 0

@@ -47,6 +47,8 @@ struct EmotionalWeatherView: View {
     @State private var keepsakeCount = 0
     // Expedition gift (agentic v1 F3): the dove waits here, never a push.
     @State private var expeditionGift: ExpeditionGift?
+    // Read inside dino: the gift's source in an in app reader sheet.
+    @State private var expeditionReaderLink: ReaderLink?
     // Tiered support: quiet glyph always; the row only on a heavy stretch
     // (StretchSignal). Support beats the gentle rec when both are eligible.
     @State private var showResources = false
@@ -394,7 +396,8 @@ struct EmotionalWeatherView: View {
                     // delivery. Opacity only transition: reduce motion safe.
                     if let gift = expeditionGift {
                         ExpeditionCard(gift: gift, onOpen: {
-                            if let url = URL(string: gift.url) { UIApplication.shared.open(url) }
+                            // read inside dino — never bounced out to safari
+                            if let url = URL(string: gift.url) { expeditionReaderLink = ReaderLink(url: url) }
                         }, onKeep: {
                             ExpeditionStore.keep(gift)
                             keepsakeCount = RichRecStore.keepsakes().count
@@ -565,6 +568,10 @@ struct EmotionalWeatherView: View {
                 if ProcessInfo.processInfo.arguments.contains("-expeditionQA") {
                     presentExpedition(.qaSample)
                 }
+                if ProcessInfo.processInfo.arguments.contains("-giftReaderQA"),
+                   let url = URL(string: ExpeditionGift.qaSample.url) {
+                    expeditionReaderLink = ReaderLink(url: url)
+                }
                 if ProcessInfo.processInfo.arguments.contains("-richRecQA3") {
                     RichRecStore.seedQAKeepsakes()   // a full shelf
                     keepsakeCount = RichRecStore.keepsakes().count
@@ -643,6 +650,10 @@ struct EmotionalWeatherView: View {
             }
             .sheet(isPresented: $showRecShelf) {
                 RecKeepsakesView()
+            }
+            .sheet(item: $expeditionReaderLink) { link in
+                GiftReaderView(url: link.url)
+                    .ignoresSafeArea()
             }
             .fullScreenCover(isPresented: $showWorld) {
                 WorldView()
