@@ -8,6 +8,7 @@ import { setGlobalOptions } from "firebase-functions/v2";
 import OpenAI from "openai";
 import { createHash } from "node:crypto";
 import { seasonForMonth, isSeasonEligible, isSlotActive, REC_SEASON_VALUES } from "./season";
+import { route as aiRoute, clientFor as aiClientFor } from "./modelRouter";
 import { capSources, shouldRun, monthKey, creditSummary, REC_MAX_SOURCES_PER_RUN, REC_MIN_RUN_INTERVAL_DAYS } from "./credits";
 import { WORLD_PRIVACY_FLOOR, normalizeCountry, foldPulseCountry } from "./world";
 
@@ -1737,6 +1738,110 @@ export const processEmailQueue = onSchedule(
       }
     }
     functions.logger.info(`processEmailQueue: sent=${sent} failed=${failed} batch=${snap.docs.length}`);
+  }
+);
+
+// ── DINO EXPEDITIONS (agentic layer v1) ─────────────────────────────
+// F1 THE WATCHER: a nightly run where Luna (via the ModelRouter) makes an
+// act or quiet decision per cohort user from ENUM BUCKETS ONLY — no text,
+// no names, no raw numbers ever reach the model. DEFAULT IS QUIET.
+// Gate order: crisis window (ON DEVICE, absolute — an in window user is
+// excluded from the cohort before the server sees anything; ineligible
+// looks identical to a calm week) → cohort eligibility (heavy signal in
+// last 7 days, on device) → 14 day server gate (server owned timestamp) →
+// rec spacing bucket → luna act + confidence ≥ 0.7.
+const EXPEDITION_MIN_DAYS = 14;
+const EXPEDITION_LUNA_NIGHTLY_CAP = 2000;   // global watcher cost bound
+const EXPEDITION_NEEDS = ["rest", "beauty", "hope", "wonder", "connection", "none"];
+const EXPEDITION_SIGNAL_ALLOW: Record<string, string[]> = {
+  moodTrend: ["steady", "wobbly", "heavy"],
+  heavyDays7: ["0", "1", "2to3", "4plus"],
+  sleepBucket: ["none", "short", "ok", "long"],
+  stepsBucket: ["none", "low", "mid", "high"],
+  sinceLastRec: ["0to2", "3to7", "8to13", "14plus"],
+  sinceLastExpedition: ["0to2", "3to7", "8to13", "14plus"],
+};
+const EXPEDITION_THEME_ALLOW = ["work", "sleep", "relationships", "health", "money", "self"];
+
+const LUNA_WATCHER_PROMPT =
+  "you are dino's night watcher. you receive a handful of coarse weather buckets about one person: " +
+  "their mood trend, heavy days, themes, sleep and movement buckets, and how long since dino last " +
+  "brought them anything. decide whether dino should go on a small expedition to find them one tiny " +
+  "gift. be quiet by default: an expedition is a rare event, not a feed. most nights, for most people, " +
+  "the answer is no. only act when the pattern truly asks for it: a stretch that is heavy and long, or " +
+  'a quiet need the buckets make obvious. respond only with json {"act":false,"needKind":"none","confidence":0.0}. ' +
+  "needKind is exactly one of rest, beauty, hope, wonder, connection, none. when in doubt, stay quiet.";
+
+export const nightlyExpeditionWatch = onSchedule(
+  { schedule: "7 4 * * *", secrets: [OPENAI_API_KEY], timeoutSeconds: 540, memory: "256MiB" },
+  async () => {
+    const db = admin.firestore();
+    const cutoff = admin.firestore.Timestamp.fromMillis(Date.now() - 48 * 3600 * 1000);
+    const snap = await db.collection("expeditionSignals")
+      .where("eligible", "==", true)
+      .where("updatedAt", ">=", cutoff)
+      .limit(EXPEDITION_LUNA_NIGHTLY_CAP)
+      .get();
+    let watched = 0;
+    let acted = 0;
+    for (const doc of snap.docs) {
+      const d = doc.data() ?? {};
+      // strict bucket validation — anything off shape is skipped silently
+      const buckets: Record<string, string> = {};
+      let valid = true;
+      for (const [k, allowed] of Object.entries(EXPEDITION_SIGNAL_ALLOW)) {
+        const v = String(d[k] ?? "");
+        if (!allowed.includes(v)) { valid = false; break; }
+        buckets[k] = v;
+      }
+      if (!valid) continue;
+      const themes = (Array.isArray(d.themes) ? d.themes : [])
+        .map((t: unknown) => String(t))
+        .filter((t: string) => EXPEDITION_THEME_ALLOW.includes(t))
+        .slice(0, 3);
+      // server gates (the unfakeable ones — server owned timestamps)
+      const expRef = db.collection("expeditions").doc(doc.id);
+      const exp = (await expRef.get()).data() ?? {};
+      const lastAt = exp.lastAt instanceof admin.firestore.Timestamp ? exp.lastAt.toMillis() : 0;
+      if (Date.now() - lastAt < EXPEDITION_MIN_DAYS * 86400 * 1000) continue;
+      const attemptedAt = exp.attemptedAt instanceof admin.firestore.Timestamp ? exp.attemptedAt.toMillis() : 0;
+      if (Date.now() - attemptedAt < 20 * 3600 * 1000) continue;   // one attempt per night
+      if (buckets.sinceLastRec === "0to2") continue;               // never within 3 days of a rec
+      watched++;
+      try {
+        const r = aiRoute("watching");
+        const client = aiClientFor(r, { openai: OPENAI_API_KEY.value() });
+        const resp = await client.chat.completions.create({
+          model: r.model,
+          max_tokens: r.maxTokens,
+          temperature: r.temperature,
+          response_format: { type: "json_object" },
+          messages: [
+            { role: "system", content: LUNA_WATCHER_PROMPT },
+            { role: "user", content:
+              `buckets: mood trend ${buckets.moodTrend}, heavy days this week ${buckets.heavyDays7}, ` +
+              `themes ${themes.join(", ") || "none"}, sleep ${buckets.sleepBucket}, movement ${buckets.stepsBucket}, ` +
+              `since last gift ${buckets.sinceLastExpedition}, since last rec ${buckets.sinceLastRec}.` },
+          ],
+        });
+        const parsed = JSON.parse(resp.choices[0]?.message?.content ?? "{}") as Record<string, unknown>;
+        const act = parsed.act === true;
+        const needKind = EXPEDITION_NEEDS.includes(String(parsed.needKind)) ? String(parsed.needKind) : "none";
+        const confidence = Number(parsed.confidence);
+        await expRef.set({ attemptedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
+        if (act && needKind !== "none" && Number.isFinite(confidence) && confidence >= 0.7) {
+          acted++;
+          await expRef.set({
+            pendingNeed: needKind,
+            watchedAt: admin.firestore.FieldValue.serverTimestamp(),
+          }, { merge: true });
+          // F2 runs the mission from pendingNeed.
+        }
+      } catch {
+        // luna failure = a quiet night; no attempt recorded → tomorrow may retry
+      }
+    }
+    functions.logger.info(`nightlyExpeditionWatch: cohort=${snap.docs.length} watched=${watched} acted=${acted}`);
   }
 );
 

@@ -507,6 +507,10 @@ struct EmotionalWeatherView: View {
                 }
                 if let s = await HealthService.shared.lastNightSleep() { sleepData = s }
                 await loadSteps()
+                // Expedition watcher signal — enum buckets only, once a day.
+                await ExpeditionSignals.syncIfNeeded(dataManager: dataManager,
+                    sleepHours: sleepData.map { $0.durationHours },
+                    steps: stepsToday.map { Int($0) })
                 if let agg = await WorldMoodService.fetchAggregate() {
                     worldBucket = agg.bucket(for: WorldMoodService.todayKey())
                 }
