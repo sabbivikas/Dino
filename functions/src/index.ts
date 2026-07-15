@@ -9,7 +9,7 @@ import OpenAI from "openai";
 import { createHash } from "node:crypto";
 import { seasonForMonth, isSeasonEligible, isSlotActive, REC_SEASON_VALUES } from "./season";
 import { route as aiRoute, routeChain as aiRouteChain, logRoute as aiLogRoute, clientFor as aiClientFor, type AiRoute } from "./modelRouter";
-import { validateGiftWithReason } from "./mission";
+import { validateGiftWithReason, trustedSourcesFor } from "./mission";
 import { capSources, shouldRun, monthKey, creditSummary, REC_MAX_SOURCES_PER_RUN, REC_MIN_RUN_INTERVAL_DAYS } from "./credits";
 import { WORLD_PRIVACY_FLOOR, normalizeCountry, foldPulseCountry } from "./world";
 
@@ -1783,8 +1783,12 @@ const LUNA_WATCHER_PROMPT =
 // 60s wall clock, per user 2 missions/month, global 500/month hard stop.
 // The gift's url must be one the tools actually visited. Any failure at any
 // point = silence.
-const MISSION_MAX_TOOL_STEPS = 6;
-const MISSION_MAX_READS = 3;
+// trusted-source-first tightened the budget: the mission starts inside
+// curated homes, so it needs fewer swings. 2 trusted searches + 1 wide,
+// 2 reads, 5 steps.
+const MISSION_MAX_TOOL_STEPS = 5;
+const MISSION_MAX_READS = 2;
+const MISSION_MAX_SEARCHES = 3;
 const MISSION_TIMEOUT_MS = 60_000;
 const MISSION_MONTHLY_GLOBAL_CAP = 500;
 const MISSION_MONTHLY_PER_USER_CAP = 2;
@@ -1802,10 +1806,16 @@ const MISSION_TOOLS: OpenAI.Chat.ChatCompletionTool[] = [
   } },
 ];
 
-function missionPrompt(needKind: string): string {
+function missionPrompt(needKind: string, sources: string[]): string {
+  const scoped = sources.map((s) => `site:${s}`).join(" or ");
   return "you are dino on a small expedition. someone is having a " + needKind +
     " kind of stretch. search the real web and find ONE small genuine thing for them: " +
     "a short poem, a piece of quietly good news, a small wonder of the world, a gentle idea. " +
+    `start inside dino's trusted places, in this order of preference: ${scoped}. ` +
+    "use site scoped searchWeb queries there first. only if nothing suitable lives there, " +
+    "make ONE wider search with the same rules. " +
+    "prefer the small and human over the institutional, and the living world over the abstract: " +
+    "one person's kindness beats a policy win, a bird doing something remarkable beats a technology story. " +
     "rules: nothing clinical, nothing about mental illness or therapy or self help, no distressing " +
     "news, nothing graphic, nothing behind a paywall. it must be real and reachable at its url — " +
     "only give a url you actually searched or read. copyright: a short excerpt of at most 40 words " +
@@ -1870,15 +1880,19 @@ type MissionOutcome = "gift" | "silence" | "retryable";
  *  get a second chance at being bad). */
 async function attemptMission(
   db: admin.firestore.Firestore, uid: string, needKind: string,
-  r: AiRoute, keys: { openai?: string; metaKey?: string; metaBase?: string }
+  r: AiRoute, keys: { openai?: string; metaKey?: string; metaBase?: string },
+  sources: string[], recentSources: string[]
 ): Promise<MissionOutcome> {
   const deadline = Date.now() + MISSION_TIMEOUT_MS;
+  let promptTokens = 0;
+  let completionTokens = 0;
   const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
-    { role: "system", content: missionPrompt(needKind) },
+    { role: "system", content: missionPrompt(needKind, sources) },
     { role: "user", content: `go find one small ${needKind} thing. respond with the json when sure.` },
   ];
   const seenUrls: string[] = [];
   let reads = 0;
+  let searches = 0;
   try {
     const client = aiClientFor(r, keys);
     for (let step = 0; step < MISSION_MAX_TOOL_STEPS; step++) {
@@ -1890,6 +1904,8 @@ async function attemptMission(
         // and affordable. openai fallback hops don't take the param.
         ...(r.provider === "meta" ? { reasoning_effort: "low" as const } : {}),
       });
+      promptTokens += resp.usage?.prompt_tokens ?? 0;
+      completionTokens += resp.usage?.completion_tokens ?? 0;
       const msg = resp.choices[0]?.message;
       if (!msg) return "retryable";
       messages.push(msg as OpenAI.Chat.ChatCompletionMessageParam);
@@ -1900,9 +1916,14 @@ async function attemptMission(
           try {
             const args = JSON.parse(tc.function.arguments ?? "{}") as Record<string, unknown>;
             if (tc.function.name === "searchWeb") {
-              const s = await firecrawlSearch(String(args.query ?? ""), FIRECRAWL_API_KEY.value());
-              seenUrls.push(...s.urls);
-              result = s.text;
+              if (searches >= MISSION_MAX_SEARCHES) {
+                result = "search budget spent";
+              } else {
+                searches++;
+                const s = await firecrawlSearch(String(args.query ?? ""), FIRECRAWL_API_KEY.value());
+                seenUrls.push(...s.urls);
+                result = s.text;
+              }
             } else if (tc.function.name === "readPage") {
               const url = String(args.url ?? "");
               if (reads >= MISSION_MAX_READS || !url.startsWith("https://")) {
@@ -1949,9 +1970,13 @@ async function attemptMission(
           .toLowerCase().replace(/[–—-]/g, " ").replace(/\s+/g, " ").trim().slice(0, 120);
         if (line && line.split(/\s+/).length <= 14) dinoLine = line;
       } catch { /* fixed fallback line stands */ }
+      const domain = new URL(gift.url).hostname.replace(/^www\./, "");
       await db.collection("expeditions").doc(uid).set({
         gift: { ...gift, dinoLine },
         needKind,
+        // source rotation: this domain moves to the front of the recent
+        // list so the next expedition prefers somewhere fresh.
+        recentSources: [domain, ...recentSources.filter((d) => d !== domain)].slice(0, 6),
         lastAt: admin.firestore.FieldValue.serverTimestamp(),
         deliveredAt: null,
         pendingNeed: admin.firestore.FieldValue.delete(),
@@ -1961,19 +1986,24 @@ async function attemptMission(
     return "retryable";   // tool budget exhausted with nothing offered
   } catch {
     return "retryable";   // provider error / timeout / quota / bad key → next hop
+  } finally {
+    // real token spend per attempt — model + counts only, never user data
+    functions.logger.info("mission_usage", { model: r.model, promptTokens, completionTokens });
   }
 }
 
 /** Runs one mission through the fallback chain. ONE budget grant covers
  *  the whole chain; the hard rules were asserted on every hop by the
  *  router. All hops fail = silence, never an error to the user. */
-async function runExpeditionMission(db: admin.firestore.Firestore, uid: string, needKind: string): Promise<boolean> {
+async function runExpeditionMission(db: admin.firestore.Firestore, uid: string, needKind: string,
+                                    recentSources: string[] = []): Promise<boolean> {
   if (!(await grantMissionBudget(db, uid))) return false;
   const keys = {
     openai: OPENAI_API_KEY.value(),
     metaKey: META_MODEL_API_KEY.value(),
     metaBase: META_API_BASE.value(),
   };
+  const sources = trustedSourcesFor(needKind, recentSources);
   const chain = aiRouteChain("mission");
   for (let i = 0; i < chain.length; i++) {
     const r = chain[i];
@@ -1982,7 +2012,7 @@ async function runExpeditionMission(db: admin.firestore.Firestore, uid: string, 
       // meta unconfigured → this hop cannot run; fall through to the next
     } else {
       aiLogRoute("mission", r);
-      outcome = await attemptMission(db, uid, needKind, r, keys);
+      outcome = await attemptMission(db, uid, needKind, r, keys, sources, recentSources);
       // outcome telemetry — model + result only, never user data
       functions.logger.info("mission_attempt", { model: r.model, outcome });
     }
@@ -2058,7 +2088,9 @@ export const nightlyExpeditionWatch = onSchedule(
             pendingNeed: needKind,
             watchedAt: admin.firestore.FieldValue.serverTimestamp(),
           }, { merge: true });
-          await runExpeditionMission(db, doc.id, needKind);   // F2 — silence on any failure
+          const recentSources = (Array.isArray(exp.recentSources) ? exp.recentSources : [])
+            .map((s: unknown) => String(s)).slice(0, 6);
+          await runExpeditionMission(db, doc.id, needKind, recentSources);   // F2 — silence on any failure
         }
       } catch {
         // luna failure = a quiet night; no attempt recorded → tomorrow may retry

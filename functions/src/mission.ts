@@ -32,6 +32,27 @@ function clean(s: unknown, cap: number): string {
     .slice(0, cap);
 }
 
+// ── Trusted sources per needKind — the expedition looks HERE FIRST —─────
+// small human stories and the living world over the institutional and the
+// abstract. connection shares hope's human warmth pool; rest gets calm,
+// human scale long form homes.
+export const TRUSTED_SOURCES: Record<string, string[]> = {
+  hope:       ["goodnewsnetwork.org", "positive.news", "reasonstobecheerful.world", "happyeconews.com"],
+  connection: ["positive.news", "goodnewsnetwork.org", "reasonstobecheerful.world", "happyeconews.com"],
+  beauty:     ["poetryfoundation.org", "poets.org", "themarginalian.org"],
+  wonder:     ["atlasobscura.com", "apod.nasa.gov", "nationalgeographic.com", "bbc.com"],
+  rest:       ["themarginalian.org", "emergencemagazine.org", "orionmagazine.org", "atlasobscura.com"],
+};
+
+/** Trusted sources for a needKind, rotated: sources NOT recently used for
+ *  this user come first, so gifts don't get samey. Pure. */
+export function trustedSourcesFor(needKind: string, recentlyUsed: string[]): string[] {
+  const base = TRUSTED_SOURCES[needKind] ?? TRUSTED_SOURCES.hope;
+  const fresh = base.filter((s) => !recentlyUsed.includes(s));
+  const used = base.filter((s) => recentlyUsed.includes(s));
+  return [...fresh, ...used];
+}
+
 export type GiftCheck = {
   gift: Gift | null;
   /** "shape" failures may fall back to another model; "gentle" failures

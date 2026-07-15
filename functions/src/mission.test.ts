@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert";
-import { validateGift, validateGiftWithReason } from "./mission";
+import { validateGift, validateGiftWithReason, TRUSTED_SOURCES, trustedSourcesFor } from "./mission";
 
 const URL = "https://example.org/a-small-poem";
 const good = {
@@ -54,4 +54,23 @@ test("shape rejections may fall back (reason shape)", () => {
   const v = validateGiftWithReason({ ...good, url: "https://invented.org/x" }, [URL]);
   assert.equal(v.gift, null);
   assert.equal(v.reason, "shape");
+});
+
+test("every needKind has a trusted source home", () => {
+  for (const kind of ["rest", "beauty", "hope", "wonder", "connection"]) {
+    assert.ok((TRUSTED_SOURCES[kind] ?? []).length >= 3, `${kind} needs sources`);
+  }
+});
+
+test("rotation puts unused sources first, drops nothing", () => {
+  const rotated = trustedSourcesFor("hope", ["goodnewsnetwork.org", "positive.news"]);
+  assert.deepEqual(rotated, [
+    "reasonstobecheerful.world", "happyeconews.com",
+    "goodnewsnetwork.org", "positive.news",
+  ]);
+  assert.equal(rotated.length, TRUSTED_SOURCES.hope.length);
+});
+
+test("unknown needKind falls back to hope's pool", () => {
+  assert.deepEqual(trustedSourcesFor("nonsense", []), TRUSTED_SOURCES.hope);
 });
