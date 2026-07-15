@@ -1996,8 +1996,8 @@ export const nightlyExpeditionWatch = onSchedule(
         const client = aiClientFor(r, { openai: OPENAI_API_KEY.value() });
         const resp = await client.chat.completions.create({
           model: r.model,
-          max_tokens: r.maxTokens,
-          temperature: r.temperature,
+          // gpt-5 family: max_completion_tokens, default temperature only
+          max_completion_tokens: r.maxTokens,
           response_format: { type: "json_object" },
           messages: [
             { role: "system", content: LUNA_WATCHER_PROMPT },

@@ -24,7 +24,10 @@ export type AiRoute = {
 };
 
 const ROUTES: Record<AiTask, AiRoute> = {
-  watching:       { provider: "openai", model: "gpt-5.6-luna",   maxTokens: 60,  temperature: 0 },
+  // luna is gpt-5 family: the call site must send max_completion_tokens
+  // and omit temperature (verified live: max_tokens/temp are 400s). the
+  // budget carries reasoning headroom.
+  watching:       { provider: "openai", model: "gpt-5.6-luna",   maxTokens: 200, temperature: 0 },
   // muse-spark-1.1 (docs exact string) is a REASONING model — reasoning
   // tokens bill as output, so the cap carries headroom; the call site pins
   // reasoning_effort low (verified live: without it, output starves).
