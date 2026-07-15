@@ -8,8 +8,8 @@ import { setGlobalOptions } from "firebase-functions/v2";
 import OpenAI from "openai";
 import { createHash } from "node:crypto";
 import { seasonForMonth, isSeasonEligible, isSlotActive, REC_SEASON_VALUES } from "./season";
-import { route as aiRoute, clientFor as aiClientFor } from "./modelRouter";
-import { validateGift } from "./mission";
+import { route as aiRoute, routeChain as aiRouteChain, logRoute as aiLogRoute, clientFor as aiClientFor, type AiRoute } from "./modelRouter";
+import { validateGiftWithReason } from "./mission";
 import { capSources, shouldRun, monthKey, creditSummary, REC_MAX_SOURCES_PER_RUN, REC_MIN_RUN_INTERVAL_DAYS } from "./credits";
 import { WORLD_PRIVACY_FLOOR, normalizeCountry, foldPulseCountry } from "./world";
 
@@ -1862,15 +1862,17 @@ async function grantMissionBudget(db: admin.firestore.Firestore, uid: string): P
   });
 }
 
-/** Runs one mission. Every failure path returns without writing a gift —
- *  silence is the contract. */
-async function runExpeditionMission(db: admin.firestore.Firestore, uid: string, needKind: string): Promise<boolean> {
-  const metaBase = META_API_BASE.value();
-  if (!metaBase) return false;                       // meta api not configured yet → quiet
-  if (!(await grantMissionBudget(db, uid))) return false;
+type MissionOutcome = "gift" | "silence" | "retryable";
+
+/** One attempt with one model. "retryable" hands the mission to the next
+ *  hop in the chain (provider error, timeout, quota, empty or invalid
+ *  output); "silence" is final (gentleness rejection — a bad gift does not
+ *  get a second chance at being bad). */
+async function attemptMission(
+  db: admin.firestore.Firestore, uid: string, needKind: string,
+  r: AiRoute, keys: { openai?: string; metaKey?: string; metaBase?: string }
+): Promise<MissionOutcome> {
   const deadline = Date.now() + MISSION_TIMEOUT_MS;
-  const r = aiRoute("mission");
-  const client = aiClientFor(r, { metaKey: META_MODEL_API_KEY.value(), metaBase });
   const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
     { role: "system", content: missionPrompt(needKind) },
     { role: "user", content: `go find one small ${needKind} thing. respond with the json when sure.` },
@@ -1878,21 +1880,22 @@ async function runExpeditionMission(db: admin.firestore.Firestore, uid: string, 
   const seenUrls: string[] = [];
   let reads = 0;
   try {
+    const client = aiClientFor(r, keys);
     for (let step = 0; step < MISSION_MAX_TOOL_STEPS; step++) {
-      if (Date.now() > deadline) return false;
+      if (Date.now() > deadline) return "retryable";
       const resp = await client.chat.completions.create({
         model: r.model, max_tokens: r.maxTokens, temperature: r.temperature,
         messages, tools: MISSION_TOOLS,
         // muse-spark-1.1 reasons before it speaks; low keeps missions fast
-        // and affordable (verified: default effort starves the output).
-        reasoning_effort: "low",
+        // and affordable. openai fallback hops don't take the param.
+        ...(r.provider === "meta" ? { reasoning_effort: "low" as const } : {}),
       });
       const msg = resp.choices[0]?.message;
-      if (!msg) return false;
+      if (!msg) return "retryable";
       messages.push(msg as OpenAI.Chat.ChatCompletionMessageParam);
       if (msg.tool_calls && msg.tool_calls.length > 0) {
         for (const tc of msg.tool_calls) {
-          if (Date.now() > deadline) return false;
+          if (Date.now() > deadline) return "retryable";
           let result = "tool unavailable";
           try {
             const args = JSON.parse(tc.function.arguments ?? "{}") as Record<string, unknown>;
@@ -1917,11 +1920,16 @@ async function runExpeditionMission(db: admin.firestore.Firestore, uid: string, 
         }
         continue;
       }
-      // no tool calls → this should be the gift
+      // no tool calls → this should be the gift. some models fence their
+      // json in markdown — strip before parsing, model agnostic.
+      const rawContent = (msg.content ?? "").trim()
+        .replace(/^```(?:json)?\s*/i, "")
+        .replace(/\s*```$/, "");
       let parsed: unknown = null;
-      try { parsed = JSON.parse(msg.content ?? ""); } catch { return false; }
-      const gift = validateGift(parsed, seenUrls);
-      if (!gift) return false;
+      try { parsed = JSON.parse(rawContent); } catch { return "retryable"; }
+      const check = validateGiftWithReason(parsed, seenUrls);
+      if (!check.gift) return check.reason === "gentle" ? "silence" : "retryable";
+      const gift = check.gift;
       // delivered words — the one warm line the user reads (router: 4.1 mini)
       let dinoLine = "dino went looking tonight and this glimmered";
       try {
@@ -1932,7 +1940,8 @@ async function runExpeditionMission(db: admin.firestore.Firestore, uid: string, 
           messages: [
             { role: "system", content:
               "you are dino. write ONE warm lowercase line, no dashes, 14 words or fewer, " +
-              "to hand someone a small gift you found for them. never clinical, never salesy." },
+              "to hand someone a small gift you found for them. never clinical, never salesy. " +
+              "never address them by any name: a name in the gift's title is not their name." },
             { role: "user", content: `the gift is a ${needKind} kind of thing called "${gift.title}".` },
           ],
         });
@@ -1947,12 +1956,43 @@ async function runExpeditionMission(db: admin.firestore.Firestore, uid: string, 
         deliveredAt: null,
         pendingNeed: admin.firestore.FieldValue.delete(),
       }, { merge: true });
-      return true;
+      return "gift";
     }
-    return false;   // tool budget exhausted without a gift → silence
+    return "retryable";   // tool budget exhausted with nothing offered
   } catch {
-    return false;   // any api failure → silence
+    return "retryable";   // provider error / timeout / quota / bad key → next hop
   }
+}
+
+/** Runs one mission through the fallback chain. ONE budget grant covers
+ *  the whole chain; the hard rules were asserted on every hop by the
+ *  router. All hops fail = silence, never an error to the user. */
+async function runExpeditionMission(db: admin.firestore.Firestore, uid: string, needKind: string): Promise<boolean> {
+  if (!(await grantMissionBudget(db, uid))) return false;
+  const keys = {
+    openai: OPENAI_API_KEY.value(),
+    metaKey: META_MODEL_API_KEY.value(),
+    metaBase: META_API_BASE.value(),
+  };
+  const chain = aiRouteChain("mission");
+  for (let i = 0; i < chain.length; i++) {
+    const r = chain[i];
+    let outcome: MissionOutcome = "retryable";
+    if (r.provider === "meta" && !keys.metaBase) {
+      // meta unconfigured → this hop cannot run; fall through to the next
+    } else {
+      aiLogRoute("mission", r);
+      outcome = await attemptMission(db, uid, needKind, r, keys);
+      // outcome telemetry — model + result only, never user data
+      functions.logger.info("mission_attempt", { model: r.model, outcome });
+    }
+    if (outcome === "gift") return true;
+    if (outcome === "silence") return false;   // gentleness is final, no second chance
+    if (i + 1 < chain.length) {
+      functions.logger.info(`mission_fallback: ${chain[i].model} → ${chain[i + 1].model}`);
+    }
+  }
+  return false;   // every model failed → silence
 }
 
 export const nightlyExpeditionWatch = onSchedule(

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert";
-import { validateGift } from "./mission";
+import { validateGift, validateGiftWithReason } from "./mission";
 
 const URL = "https://example.org/a-small-poem";
 const good = {
@@ -42,4 +42,16 @@ test("unknown fields die", () => {
 
 test("missing fields die", () => {
   assert.equal(validateGift({ ...good, source: "" }, [URL]), null);
+});
+
+test("gentleness rejections are FINAL (reason gentle, no fallback)", () => {
+  const v = validateGiftWithReason({ ...good, excerpt: "a poem about grief" }, [URL]);
+  assert.equal(v.gift, null);
+  assert.equal(v.reason, "gentle");
+});
+
+test("shape rejections may fall back (reason shape)", () => {
+  const v = validateGiftWithReason({ ...good, url: "https://invented.org/x" }, [URL]);
+  assert.equal(v.gift, null);
+  assert.equal(v.reason, "shape");
 });

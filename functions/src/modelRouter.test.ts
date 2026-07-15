@@ -2,7 +2,7 @@
 // code, so the tests are the contract.
 import { test } from "node:test";
 import assert from "node:assert";
-import { route, assertRoute } from "./modelRouter";
+import { route, routeChain, assertRoute } from "./modelRouter";
 
 test("watching routes to luna on openai", () => {
   const r = route("watching");
@@ -18,6 +18,17 @@ test("mission routes to muse spark on meta", () => {
 
 test("comfort recs stay gpt-4.1-mini", () => {
   assert.equal(route("comfortRecs").model, "gpt-4.1-mini");
+});
+
+test("mission chain: muse spark primary, 4.1 mini fallback", () => {
+  const c = routeChain("mission");
+  assert.equal(c.length, 2);
+  assert.deepEqual(c.map((r) => r.model), ["muse-spark-1.1", "gpt-4.1-mini"]);
+  assert.deepEqual(c.map((r) => r.provider), ["meta", "openai"]);
+});
+
+test("watching chain has NO fallback — silence is correct", () => {
+  assert.equal(routeChain("watching").length, 1);
 });
 
 test("hard rule: mission on luna throws", () => {

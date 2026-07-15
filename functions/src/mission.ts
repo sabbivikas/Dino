@@ -32,30 +32,42 @@ function clean(s: unknown, cap: number): string {
     .slice(0, cap);
 }
 
+export type GiftCheck = {
+  gift: Gift | null;
+  /** "shape" failures may fall back to another model; "gentle" failures
+   *  NEVER do — a bad gift does not get a second chance at being bad. */
+  reason: "ok" | "shape" | "gentle";
+};
+
 /** Validate one raw mission result against every rule. The url must be one
  *  the mission ACTUALLY SAW (search result or read page) — an invented url
- *  never survives. Returns null on any violation: silence, never a broken
- *  gift. */
-export function validateGift(raw: unknown, seenUrls: string[]): Gift | null {
-  if (typeof raw !== "object" || raw === null) return null;
+ *  never survives. */
+export function validateGiftWithReason(raw: unknown, seenUrls: string[]): GiftCheck {
+  const shape: GiftCheck = { gift: null, reason: "shape" };
+  if (typeof raw !== "object" || raw === null) return shape;
   const r = raw as Record<string, unknown>;
   const ALLOWED = ["title", "source", "excerpt", "url", "whyOneLine"];
   for (const k of Object.keys(r)) {
-    if (!ALLOWED.includes(k)) return null;
+    if (!ALLOWED.includes(k)) return shape;
   }
   const title = clean(r.title, 80);
   const source = clean(r.source, 60);
   const excerpt = clean(r.excerpt, 280);
   const whyOneLine = clean(r.whyOneLine, 120);
   const url = String(r.url ?? "").trim();
-  if (!title || !source || !excerpt || !whyOneLine) return null;
-  if (excerpt.split(/\s+/).length > 40) return null;          // copyright: short excerpt only
-  if (whyOneLine.split(/\s+/).length > 14) return null;
-  if (!url.startsWith("https://")) return null;
-  if (!seenUrls.includes(url)) return null;                    // must be a url the mission really visited
+  if (!title || !source || !excerpt || !whyOneLine) return shape;
+  if (excerpt.split(/\s+/).length > 40) return shape;          // copyright: short excerpt only
+  if (whyOneLine.split(/\s+/).length > 14) return shape;
+  if (!url.startsWith("https://")) return shape;
+  if (!seenUrls.includes(url)) return shape;                   // must be a url the mission really visited
   const combined = `${title} ${source} ${excerpt} ${whyOneLine}`;
   for (const term of GIFT_BLOCK_TERMS) {
-    if (combined.includes(term)) return null;                  // gentleness net
+    if (combined.includes(term)) return { gift: null, reason: "gentle" };   // gentleness net — final
   }
-  return { title, source, excerpt, url, whyOneLine };
+  return { gift: { title, source, excerpt, url, whyOneLine }, reason: "ok" };
+}
+
+/** Back compat shim — same contract as before (null on any violation). */
+export function validateGift(raw: unknown, seenUrls: string[]): Gift | null {
+  return validateGiftWithReason(raw, seenUrls).gift;
 }

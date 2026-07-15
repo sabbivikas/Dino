@@ -23,17 +23,32 @@ export type AiRoute = {
   temperature: number;
 };
 
-const ROUTES: Record<AiTask, AiRoute> = {
+// Routes are CHAINS: ordered fallback lists. The first entry is the
+// primary; later entries serve only on provider failure or invalid output
+// (never on gentleness rejections — those stay drop-to-silence at the call
+// site). watching deliberately has NO fallback: a missed watch night is
+// fine, silence is correct.
+const CHAINS: Record<AiTask, AiRoute[]> = {
   // luna is gpt-5 family: the call site must send max_completion_tokens
   // and omit temperature (verified live: max_tokens/temp are 400s). the
   // budget carries reasoning headroom.
-  watching:       { provider: "openai", model: "gpt-5.6-luna",   maxTokens: 200, temperature: 0 },
+  watching: [
+    { provider: "openai", model: "gpt-5.6-luna",   maxTokens: 200, temperature: 0 },
+  ],
   // muse-spark-1.1 (docs exact string) is a REASONING model — reasoning
   // tokens bill as output, so the cap carries headroom; the call site pins
   // reasoning_effort low (verified live: without it, output starves).
-  mission:        { provider: "meta",   model: "muse-spark-1.1", maxTokens: 1500, temperature: 0.6 },
-  deliveredWords: { provider: "openai", model: "gpt-4.1-mini",   maxTokens: 200, temperature: 0.7 },
-  comfortRecs:    { provider: "openai", model: "gpt-4.1-mini",   maxTokens: 500, temperature: 0.5 },
+  // fallback: gpt-4.1-mini keeps the mission alive when meta is down.
+  mission: [
+    { provider: "meta",   model: "muse-spark-1.1", maxTokens: 1500, temperature: 0.6 },
+    { provider: "openai", model: "gpt-4.1-mini",   maxTokens: 900,  temperature: 0.6 },
+  ],
+  deliveredWords: [
+    { provider: "openai", model: "gpt-4.1-mini",   maxTokens: 200, temperature: 0.7 },
+  ],
+  comfortRecs: [
+    { provider: "openai", model: "gpt-4.1-mini",   maxTokens: 500, temperature: 0.5 },
+  ],
 };
 
 export function assertRoute(task: AiTask, r: AiRoute): void {
@@ -48,10 +63,24 @@ export function assertRoute(task: AiTask, r: AiRoute): void {
   }
 }
 
-export function route(task: AiTask): AiRoute {
-  const r = ROUTES[task];
-  assertRoute(task, r);
+/** The full fallback chain for a task. EVERY hop is asserted against the
+ *  hard rules — luna can never appear anywhere in a mission chain, muse
+ *  spark never anywhere in watching. */
+export function routeChain(task: AiTask): AiRoute[] {
+  const chain = CHAINS[task];
+  for (const r of chain) assertRoute(task, r);
+  return chain;
+}
+
+/** Log one attempt (task + model only, never user data). */
+export function logRoute(task: AiTask, r: AiRoute): void {
   logger.info("model_route", { task, provider: r.provider, model: r.model });
+}
+
+/** Primary route — the single-model call sites (watching, deliveredWords). */
+export function route(task: AiTask): AiRoute {
+  const r = routeChain(task)[0];
+  logRoute(task, r);
   return r;
 }
 
