@@ -28,3 +28,6 @@
 # ── forward-port of 2.0.1 hotfix ──
 [2026-07-15 18:37] PORT: crisis fix (460f5e4) — PL (centrum wsparcia 800 70 2222 24h), TH (dmh 1323 24h), ID (sejiwa 119 ext 8 NO badge per house rule + healing119.id). Directory 27 countries. Baseline hash sha256 631317b4b47c105178a3f962a8ed6d554372eb255a3f277d0e1a5bdc05c7fc98.
 [2026-07-15 18:37] PORT: language fix (c7d7c85) — knownRegions en/Base, catalog stripped of unapproved es/ja/ko/vi, AppLanguage helper, six senders on app language, -resourcesQA hook merged into main's debug block. PLUS main-only extension: ComfortRecCoordinator userLocale → AppLanguage.current (userCountry stays region based).
+
+# ── full localization arc (es ja ko vi) ──
+[2026-07-15 18:42] branch feature/localization off main @ 758c14c (precondition passed: AppLanguage present, catalog clean 60 keys). NOTE: found stale pre port branch of the same name at 9bf9236 (the original auto localization work, likely source of the 60 unapproved translations) — archived as archive/auto-localization-pre-hotfix, not reused. EXPERIMENT RESULT: xcodebuild does NOT auto extract Text literals into the catalog (0/419; that sync is an Xcode IDE behavior) — extraction will be scripted + verified manually. PHASE 1 next: inventory user facing literals per file, extract in tranches, suite green per tranche.
