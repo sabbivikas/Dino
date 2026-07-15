@@ -27,3 +27,4 @@
 
 # ── forward-port of 2.0.1 hotfix ──
 [2026-07-15 18:37] PORT: crisis fix (460f5e4) — PL (centrum wsparcia 800 70 2222 24h), TH (dmh 1323 24h), ID (sejiwa 119 ext 8 NO badge per house rule + healing119.id). Directory 27 countries. Baseline hash sha256 631317b4b47c105178a3f962a8ed6d554372eb255a3f277d0e1a5bdc05c7fc98.
+[2026-07-15 18:37] PORT: language fix (c7d7c85) — knownRegions en/Base, catalog stripped of unapproved es/ja/ko/vi, AppLanguage helper, six senders on app language, -resourcesQA hook merged into main's debug block. PLUS main-only extension: ComfortRecCoordinator userLocale → AppLanguage.current (userCountry stays region based).

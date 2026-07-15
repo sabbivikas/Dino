@@ -1,486 +1,186 @@
 {
-  "sourceLanguage" : "en",
-  "strings" : {
-    "+ add a keepsake" : {
-      "localizations" : {
-        "es" : { "stringUnit" : { "state" : "translated", "value" : "+ añadir un recuerdo" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "+ 思い出を追加" } },
-        "ko" : { "stringUnit" : { "state" : "translated", "value" : "+ 추억 더하기" } },
-        "vi" : { "stringUnit" : { "state" : "translated", "value" : "+ thêm một kỷ niệm" } }
-      }
+  "sourceLanguage": "en",
+  "strings": {
+    "+ add a keepsake": {
+      "localizations": {}
     },
-    "a gentle note" : {
-      "localizations" : {
-        "es" : { "stringUnit" : { "state" : "translated", "value" : "una nota suave" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "やさしいメモ" } },
-        "ko" : { "stringUnit" : { "state" : "translated", "value" : "다정한 한마디" } },
-        "vi" : { "stringUnit" : { "state" : "translated", "value" : "một lời nhắn nhẹ nhàng" } }
-      }
+    "a gentle note": {
+      "localizations": {}
     },
-    "begin" : {
-      "localizations" : {
-        "es" : { "stringUnit" : { "state" : "translated", "value" : "empezar" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "はじめる" } },
-        "ko" : { "stringUnit" : { "state" : "translated", "value" : "시작하기" } },
-        "vi" : { "stringUnit" : { "state" : "translated", "value" : "bắt đầu" } }
-      }
+    "begin": {
+      "localizations": {}
     },
-    "calendar access needed" : {
-      "localizations" : {
-        "es" : { "stringUnit" : { "state" : "translated", "value" : "se necesita acceso al calendario" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "カレンダーへのアクセスが必要" } },
-        "ko" : { "stringUnit" : { "state" : "translated", "value" : "캘린더 접근이 필요해" } },
-        "vi" : { "stringUnit" : { "state" : "translated", "value" : "cần quyền truy cập lịch" } }
-      }
+    "calendar access needed": {
+      "localizations": {}
     },
-    "calendar connected 🗓️" : {
-      "localizations" : {
-        "es" : { "stringUnit" : { "state" : "translated", "value" : "calendario conectado 🗓️" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "カレンダー連携済み 🗓️" } },
-        "ko" : { "stringUnit" : { "state" : "translated", "value" : "캘린더 연결됨 🗓️" } },
-        "vi" : { "stringUnit" : { "state" : "translated", "value" : "đã kết nối lịch 🗓️" } }
-      }
+    "calendar connected 🗓️": {
+      "localizations": {}
     },
-    "cancel" : {
-      "localizations" : {
-        "es" : { "stringUnit" : { "state" : "translated", "value" : "cancelar" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "キャンセル" } },
-        "ko" : { "stringUnit" : { "state" : "translated", "value" : "취소" } },
-        "vi" : { "stringUnit" : { "state" : "translated", "value" : "hủy" } }
-      }
+    "cancel": {
+      "localizations": {}
     },
-    "choose from library" : {
-      "localizations" : {
-        "es" : { "stringUnit" : { "state" : "translated", "value" : "elegir de la galería" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "ライブラリから選ぶ" } },
-        "ko" : { "stringUnit" : { "state" : "translated", "value" : "보관함에서 고르기" } },
-        "vi" : { "stringUnit" : { "state" : "translated", "value" : "chọn từ thư viện" } }
-      }
+    "choose from library": {
+      "localizations": {}
     },
-    "close" : {
-      "localizations" : {
-        "es" : { "stringUnit" : { "state" : "translated", "value" : "cerrar" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "とじる" } },
-        "ko" : { "stringUnit" : { "state" : "translated", "value" : "닫기" } },
-        "vi" : { "stringUnit" : { "state" : "translated", "value" : "đóng" } }
-      }
+    "close": {
+      "localizations": {}
     },
-    "connect apple health" : {
-      "localizations" : {
-        "es" : { "stringUnit" : { "state" : "translated", "value" : "conectar apple health" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "apple healthを連携する" } },
-        "ko" : { "stringUnit" : { "state" : "translated", "value" : "apple health 연결하기" } },
-        "vi" : { "stringUnit" : { "state" : "translated", "value" : "kết nối apple health" } }
-      }
+    "connect apple health": {
+      "localizations": {}
     },
-    "connect your calendar" : {
-      "localizations" : {
-        "es" : { "stringUnit" : { "state" : "translated", "value" : "conecta tu calendario" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "カレンダーを連携する" } },
-        "ko" : { "stringUnit" : { "state" : "translated", "value" : "캘린더 연결하기" } },
-        "vi" : { "stringUnit" : { "state" : "translated", "value" : "kết nối lịch của bạn" } }
-      }
+    "connect your calendar": {
+      "localizations": {}
     },
-    "decent rest last night 🌿" : {
-      "localizations" : {
-        "es" : { "stringUnit" : { "state" : "translated", "value" : "buen descanso anoche 🌿" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "昨夜はそこそこ休めたね 🌿" } },
-        "ko" : { "stringUnit" : { "state" : "translated", "value" : "어제밤 꿤 잘 쉬었네 🌿" } },
-        "vi" : { "stringUnit" : { "state" : "translated", "value" : "đêm qua nghỉ ngơi ổn đấy 🌿" } }
-      }
+    "decent rest last night 🌿": {
+      "localizations": {}
     },
-    "develop" : {
-      "localizations" : {
-        "es" : { "stringUnit" : { "state" : "translated", "value" : "revelar" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "現像する" } },
-        "ko" : { "stringUnit" : { "state" : "translated", "value" : "현상하기" } },
-        "vi" : { "stringUnit" : { "state" : "translated", "value" : "rửa ảnh" } }
-      }
+    "develop": {
+      "localizations": {}
     },
-    "dino can learn from your sleep" : {
-      "localizations" : {
-        "es" : { "stringUnit" : { "state" : "translated", "value" : "dino puede aprender de tu sueño" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "dinoはあなたの睡眠から学べる" } },
-        "ko" : { "stringUnit" : { "state" : "translated", "value" : "dino가 네 수면에서 배울 수 있어" } },
-        "vi" : { "stringUnit" : { "state" : "translated", "value" : "dino có thể học từ giấc ngủ của bạn" } }
-      }
+    "dino can learn from your sleep": {
+      "localizations": {}
     },
-    "dino is learning your rhythms" : {
-      "localizations" : {
-        "es" : { "stringUnit" : { "state" : "translated", "value" : "dino está aprendiendo tus ritmos" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "dinoはあなたのリズムを学んでいる" } },
-        "ko" : { "stringUnit" : { "state" : "translated", "value" : "dino가 네 리듬을 배우고 있어" } },
-        "vi" : { "stringUnit" : { "state" : "translated", "value" : "dino đang học nhịp điệu của bạn" } }
-      }
+    "dino is learning your rhythms": {
+      "localizations": {}
     },
-    "dino is thinking…" : {
-      "localizations" : {
-        "es" : { "stringUnit" : { "state" : "translated", "value" : "dino está pensando…" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "dinoが考えてる…" } },
-        "ko" : { "stringUnit" : { "state" : "translated", "value" : "dino가 생각 중…" } },
-        "vi" : { "stringUnit" : { "state" : "translated", "value" : "dino đang suy nghĩ…" } }
-      }
+    "dino is thinking…": {
+      "localizations": {}
     },
-    "dino will help you stay on top of your tasks." : {
-      "localizations" : {
-        "es" : { "stringUnit" : { "state" : "translated", "value" : "dino te ayudará a estar al día con tus cosas." } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "dinoがやることを忘れないように手伝うよ。" } },
-        "ko" : { "stringUnit" : { "state" : "translated", "value" : "dino가 네 할 일을 챙기는 걸 도와줄게." } },
-        "vi" : { "stringUnit" : { "state" : "translated", "value" : "dino sẽ giúp bạn theo kịp mọi việc." } }
-      }
+    "dino will help you stay on top of your tasks.": {
+      "localizations": {}
     },
-    "good afternoon" : {
-      "localizations" : {
-        "es" : { "stringUnit" : { "state" : "translated", "value" : "buenas tardes" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "こんにちは" } },
-        "ko" : { "stringUnit" : { "state" : "translated", "value" : "좋은 오후" } },
-        "vi" : { "stringUnit" : { "state" : "translated", "value" : "chào buổi chiều" } }
-      }
+    "gentle reminders": {
+      "localizations": {}
     },
-    "good evening" : {
-      "localizations" : {
-        "es" : { "stringUnit" : { "state" : "translated", "value" : "buenas noches" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "こんばんは" } },
-        "ko" : { "stringUnit" : { "state" : "translated", "value" : "좋은 저녁" } },
-        "vi" : { "stringUnit" : { "state" : "translated", "value" : "chào buổi tối" } }
-      }
+    "gentle reminders?": {
+      "localizations": {}
     },
-    "good morning 🌿" : {
-      "localizations" : {
-        "es" : { "stringUnit" : { "state" : "translated", "value" : "buenos días 🌿" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "おはよう 🌿" } },
-        "ko" : { "stringUnit" : { "state" : "translated", "value" : "좋은 아침 🌿" } },
-        "vi" : { "stringUnit" : { "state" : "translated", "value" : "chào buổi sáng 🌿" } }
-      }
+    "good afternoon": {
+      "localizations": {}
     },
-    "gentle reminders" : {
-      "localizations" : {
-        "es" : { "stringUnit" : { "state" : "translated", "value" : "recordatorios suaves" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "やさしいリマインダー" } },
-        "ko" : { "stringUnit" : { "state" : "translated", "value" : "다정한 알림" } },
-        "vi" : { "stringUnit" : { "state" : "translated", "value" : "nhắc nhở nhẹ nhàng" } }
-      }
+    "good evening": {
+      "localizations": {}
     },
-    "gentle reminders?" : {
-      "localizations" : {
-        "es" : { "stringUnit" : { "state" : "translated", "value" : "¿recordatorios suaves?" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "やさしいリマインダー？" } },
-        "ko" : { "stringUnit" : { "state" : "translated", "value" : "다정한 알림 받을래?" } },
-        "vi" : { "stringUnit" : { "state" : "translated", "value" : "nhắc nhở nhẹ nhàng nhé?" } }
-      }
+    "good morning 🌿": {
+      "localizations": {}
     },
-    "gratitude jar" : {
-      "localizations" : {
-        "es" : { "stringUnit" : { "state" : "translated", "value" : "frasco de gratitud" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "感謝のびん" } },
-        "ko" : { "stringUnit" : { "state" : "translated", "value" : "감사 항아리" } },
-        "vi" : { "stringUnit" : { "state" : "translated", "value" : "lọ biết ơn" } }
-      }
+    "gratitude jar": {
+      "localizations": {}
     },
-    "health access needed" : {
-      "localizations" : {
-        "es" : { "stringUnit" : { "state" : "translated", "value" : "se necesita acceso a salud" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "ヘルスへのアクセスが必要" } },
-        "ko" : { "stringUnit" : { "state" : "translated", "value" : "건강 접근이 필요해" } },
-        "vi" : { "stringUnit" : { "state" : "translated", "value" : "cần quyền truy cập sức khỏe" } }
-      }
+    "health access needed": {
+      "localizations": {}
     },
-    "health connected 🌿" : {
-      "localizations" : {
-        "es" : { "stringUnit" : { "state" : "translated", "value" : "salud conectada 🌿" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "ヘルス連携済み 🌿" } },
-        "ko" : { "stringUnit" : { "state" : "translated", "value" : "건강 연결됨 🌿" } },
-        "vi" : { "stringUnit" : { "state" : "translated", "value" : "đã kết nối sức khỏe 🌿" } }
-      }
+    "health connected 🌿": {
+      "localizations": {}
     },
-    "health connected!" : {
-      "localizations" : {
-        "es" : { "stringUnit" : { "state" : "translated", "value" : "¡salud conectada!" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "ヘルスを連携したよ！" } },
-        "ko" : { "stringUnit" : { "state" : "translated", "value" : "건강 연결됐어!" } },
-        "vi" : { "stringUnit" : { "state" : "translated", "value" : "đã kết nối sức khỏe!" } }
-      }
+    "health connected!": {
+      "localizations": {}
     },
-    "how are you feeling lately?" : {
-      "localizations" : {
-        "es" : { "stringUnit" : { "state" : "translated", "value" : "¿cómo te has sentido últimamente?" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "最近の調子はどう？" } },
-        "ko" : { "stringUnit" : { "state" : "translated", "value" : "요즘 기분 어때?" } },
-        "vi" : { "stringUnit" : { "state" : "translated", "value" : "dạo này bạn cảm thấy thế nào?" } }
-      }
+    "how are you\nfeeling today?": {
+      "localizations": {}
     },
-    "how are you feeling?" : {
-      "localizations" : {
-        "es" : { "stringUnit" : { "state" : "translated", "value" : "¿cómo te sientes?" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "今の気分は？" } },
-        "ko" : { "stringUnit" : { "state" : "translated", "value" : "기분이 어때?" } },
-        "vi" : { "stringUnit" : { "state" : "translated", "value" : "bạn cảm thấy thế nào?" } }
-      }
+    "how are you feeling lately?": {
+      "localizations": {}
     },
-    "how are you\nfeeling today?" : {
-      "localizations" : {
-        "es" : { "stringUnit" : { "state" : "translated", "value" : "¿cómo te\nsientes hoy?" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "今日の気分は\nどう？" } },
-        "ko" : { "stringUnit" : { "state" : "translated", "value" : "오늘 기분\n어때?" } },
-        "vi" : { "stringUnit" : { "state" : "translated", "value" : "hôm nay bạn\ncảm thấy thế nào?" } }
-      }
+    "how are you feeling?": {
+      "localizations": {}
     },
-    "how did you hear about us?" : {
-      "localizations" : {
-        "es" : { "stringUnit" : { "state" : "translated", "value" : "¿cómo nos conociste?" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "どこで知ったの？" } },
-        "ko" : { "stringUnit" : { "state" : "translated", "value" : "어떻게 알게 됐어?" } },
-        "vi" : { "stringUnit" : { "state" : "translated", "value" : "bạn biết đến tụi mình từ đâu?" } }
-      }
+    "how did you hear about us?": {
+      "localizations": {}
     },
-    "how's your\ninner weather?" : {
-      "localizations" : {
-        "es" : { "stringUnit" : { "state" : "translated", "value" : "¿cómo está tu\nclima interior?" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "心の天気は\nどう？" } },
-        "ko" : { "stringUnit" : { "state" : "translated", "value" : "마음의 날씨는\n어때?" } },
-        "vi" : { "stringUnit" : { "state" : "translated", "value" : "thời tiết bên trong\nbạn thế nào?" } }
-      }
+    "how's your\ninner weather?": {
+      "localizations": {}
     },
-    "journal" : {
-      "localizations" : {
-        "es" : { "stringUnit" : { "state" : "translated", "value" : "diario" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "ジャーナル" } },
-        "ko" : { "stringUnit" : { "state" : "translated", "value" : "일기" } },
-        "vi" : { "stringUnit" : { "state" : "translated", "value" : "nhật ký" } }
-      }
+    "journal": {
+      "localizations": {}
     },
-    "keep checking in — every day adds a firefly" : {
-      "localizations" : {
-        "es" : { "stringUnit" : { "state" : "translated", "value" : "sigue registrándote — cada día añade una luciérnaga" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "毎日チェックインしよう — 1日ごとにホタルが増えていく" } },
-        "ko" : { "stringUnit" : { "state" : "translated", "value" : "계속 체크인해 — 매일 반딯불이 하나씩 늘어" } },
-        "vi" : { "stringUnit" : { "state" : "translated", "value" : "hãy tiếp tục check in — mỗi ngày thêm một con đom đóm" } }
-      }
+    "keep checking in — every day adds a firefly": {
+      "localizations": {}
     },
-    "let's begin" : {
-      "localizations" : {
-        "es" : { "stringUnit" : { "state" : "translated", "value" : "empecemos" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "はじめよう" } },
-        "ko" : { "stringUnit" : { "state" : "translated", "value" : "시작하자" } },
-        "vi" : { "stringUnit" : { "state" : "translated", "value" : "bắt đầu thôi" } }
-      }
+    "let's begin": {
+      "localizations": {}
     },
-    "lighter sleep than usual — today might feel a little heavier" : {
-      "localizations" : {
-        "es" : { "stringUnit" : { "state" : "translated", "value" : "dormiste menos que de costumbre — hoy puede sentirse un poco más pesado" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "いつもより眠りが浅いね — 今日は少し重く感じるかも" } },
-        "ko" : { "stringUnit" : { "state" : "translated", "value" : "평소보다 얇게 잔네 — 오늘은 조금 더 무거울 수 있어" } },
-        "vi" : { "stringUnit" : { "state" : "translated", "value" : "ngủ nhẹ hơn mọi khi — hôm nay có thể hơi nặng nề" } }
-      }
+    "lighter sleep than usual — today might feel a little heavier": {
+      "localizations": {}
     },
-    "maybe later" : {
-      "localizations" : {
-        "es" : { "stringUnit" : { "state" : "translated", "value" : "quizás después" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "あとで" } },
-        "ko" : { "stringUnit" : { "state" : "translated", "value" : "나중에" } },
-        "vi" : { "stringUnit" : { "state" : "translated", "value" : "để sau" } }
-      }
+    "maybe later": {
+      "localizations": {}
     },
-    "no memories yet" : {
-      "localizations" : {
-        "es" : { "stringUnit" : { "state" : "translated", "value" : "aún no hay recuerdos" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "まだ思い出がないよ" } },
-        "ko" : { "stringUnit" : { "state" : "translated", "value" : "아직 기억이 없어" } },
-        "vi" : { "stringUnit" : { "state" : "translated", "value" : "chưa có kỷ niệm nào" } }
-      }
+    "no memories yet": {
+      "localizations": {}
     },
-    "only you see this" : {
-      "localizations" : {
-        "es" : { "stringUnit" : { "state" : "translated", "value" : "solo tú ves esto" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "これはあなただけに見える" } },
-        "ko" : { "stringUnit" : { "state" : "translated", "value" : "이건 너만 볼 수 있어" } },
-        "vi" : { "stringUnit" : { "state" : "translated", "value" : "chỉ bạn mới thấy điều này" } }
-      }
+    "only you see this": {
+      "localizations": {}
     },
-    "pick a time:" : {
-      "localizations" : {
-        "es" : { "stringUnit" : { "state" : "translated", "value" : "elige un momento:" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "時間を選んで：" } },
-        "ko" : { "stringUnit" : { "state" : "translated", "value" : "시간을 골라:" } },
-        "vi" : { "stringUnit" : { "state" : "translated", "value" : "chọn một thời điểm:" } }
-      }
+    "pick a time:": {
+      "localizations": {}
     },
-    "recent memories" : {
-      "localizations" : {
-        "es" : { "stringUnit" : { "state" : "translated", "value" : "recuerdos recientes" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "最近の思い出" } },
-        "ko" : { "stringUnit" : { "state" : "translated", "value" : "최근 기억" } },
-        "vi" : { "stringUnit" : { "state" : "translated", "value" : "kỷ niệm gần đây" } }
-      }
+    "recent memories": {
+      "localizations": {}
     },
-    "reminders enabled!" : {
-      "localizations" : {
-        "es" : { "stringUnit" : { "state" : "translated", "value" : "¡recordatorios activados!" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "リマインダーをオンにしたよ！" } },
-        "ko" : { "stringUnit" : { "state" : "translated", "value" : "알림 켜졌어!" } },
-        "vi" : { "stringUnit" : { "state" : "translated", "value" : "đã bật nhắc nhở!" } }
-      }
+    "reminders enabled!": {
+      "localizations": {}
     },
-    "send →" : {
-      "localizations" : {
-        "es" : { "stringUnit" : { "state" : "translated", "value" : "enviar →" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "送る →" } },
-        "ko" : { "stringUnit" : { "state" : "translated", "value" : "보내기 →" } },
-        "vi" : { "stringUnit" : { "state" : "translated", "value" : "gửi →" } }
-      }
+    "send →": {
+      "localizations": {}
     },
-    "skip" : {
-      "localizations" : {
-        "es" : { "stringUnit" : { "state" : "translated", "value" : "saltar" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "スキップ" } },
-        "ko" : { "stringUnit" : { "state" : "translated", "value" : "건너뛰기" } },
-        "vi" : { "stringUnit" : { "state" : "translated", "value" : "bỏ qua" } }
-      }
+    "skip": {
+      "localizations": {}
     },
-    "skip →" : {
-      "localizations" : {
-        "es" : { "stringUnit" : { "state" : "translated", "value" : "saltar →" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "スキップ →" } },
-        "ko" : { "stringUnit" : { "state" : "translated", "value" : "건너뛰기 →" } },
-        "vi" : { "stringUnit" : { "state" : "translated", "value" : "bỏ qua →" } }
-      }
+    "skip →": {
+      "localizations": {}
     },
-    "tap a card to flip" : {
-      "localizations" : {
-        "es" : { "stringUnit" : { "state" : "translated", "value" : "toca una tarjeta para girarla" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "カードをタップしてめくる" } },
-        "ko" : { "stringUnit" : { "state" : "translated", "value" : "카드를 탭해서 넘겨봐" } },
-        "vi" : { "stringUnit" : { "state" : "translated", "value" : "chạm vào thẻ để lật" } }
-      }
+    "tap a card to flip": {
+      "localizations": {}
     },
-    "that's a short night — be gentle with yourself today 🌿" : {
-      "localizations" : {
-        "es" : { "stringUnit" : { "state" : "translated", "value" : "fue una noche corta — sé amable contigo hoy 🌿" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "短い夜だったね — 今日は自分にやさしくね 🌿" } },
-        "ko" : { "stringUnit" : { "state" : "translated", "value" : "짧은 밤이었네 — 오늘은 너한테 다정하게 대해줘 🌿" } },
-        "vi" : { "stringUnit" : { "state" : "translated", "value" : "đêm qua ngắn quá — hãy nhẹ nhàng với bản thân hôm nay 🌿" } }
-      }
+    "that's a short night — be gentle with yourself today 🌿": {
+      "localizations": {}
     },
-    "this week" : {
-      "localizations" : {
-        "es" : { "stringUnit" : { "state" : "translated", "value" : "esta semana" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "今週" } },
-        "ko" : { "stringUnit" : { "state" : "translated", "value" : "이번 주" } },
-        "vi" : { "stringUnit" : { "state" : "translated", "value" : "tuần này" } }
-      }
+    "this week": {
+      "localizations": {}
     },
-    "today I..." : {
-      "localizations" : {
-        "es" : { "stringUnit" : { "state" : "translated", "value" : "hoy yo..." } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "今日は…" } },
-        "ko" : { "stringUnit" : { "state" : "translated", "value" : "오늘 나는..." } },
-        "vi" : { "stringUnit" : { "state" : "translated", "value" : "hôm nay mình..." } }
-      }
+    "today I...": {
+      "localizations": {}
     },
-    "today sounds heavy 🌧️" : {
-      "localizations" : {
-        "es" : { "stringUnit" : { "state" : "translated", "value" : "hoy parece pesado 🌧️" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "今日は重たい感じがする 🌧️" } },
-        "ko" : { "stringUnit" : { "state" : "translated", "value" : "오늘은 무거운 날이네 🌧️" } },
-        "vi" : { "stringUnit" : { "state" : "translated", "value" : "hôm nay có vẻ nặng nề 🌧️" } }
-      }
+    "today sounds heavy 🌧️": {
+      "localizations": {}
     },
-    "today's focus" : {
-      "localizations" : {
-        "es" : { "stringUnit" : { "state" : "translated", "value" : "el enfoque de hoy" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "今日のフォーカス" } },
-        "ko" : { "stringUnit" : { "state" : "translated", "value" : "오늘의 집중" } },
-        "vi" : { "stringUnit" : { "state" : "translated", "value" : "trọng tâm hôm nay" } }
-      }
+    "today's focus": {
+      "localizations": {}
     },
-    "try again a little later 🌿" : {
-      "localizations" : {
-        "es" : { "stringUnit" : { "state" : "translated", "value" : "inténtalo un poco más tarde 🌿" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "もう少ししてから試してみて 🌿" } },
-        "ko" : { "stringUnit" : { "state" : "translated", "value" : "조금 있다 다시 해볼래? 🌿" } },
-        "vi" : { "stringUnit" : { "state" : "translated", "value" : "thử lại sau một chút nhé 🌿" } }
-      }
+    "try again a little later 🌿": {
+      "localizations": {}
     },
-    "want to tell me what's going on?" : {
-      "localizations" : {
-        "es" : { "stringUnit" : { "state" : "translated", "value" : "¿quieres contarme qué pasa?" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "何があったのか教えてくれる？" } },
-        "ko" : { "stringUnit" : { "state" : "translated", "value" : "무슨 일인지 말해줄래?" } },
-        "vi" : { "stringUnit" : { "state" : "translated", "value" : "muốn kể cho mình nghe chuyện gì không?" } }
-      }
+    "want to tell me what's going on?": {
+      "localizations": {}
     },
-    "what should we call you?" : {
-      "localizations" : {
-        "es" : { "stringUnit" : { "state" : "translated", "value" : "¿cómo te llamamos?" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "なんて呼べばいい？" } },
-        "ko" : { "stringUnit" : { "state" : "translated", "value" : "뭐라고 부를까?" } },
-        "vi" : { "stringUnit" : { "state" : "translated", "value" : "gọi bạn là gì nhỉ?" } }
-      }
+    "what should we call you?": {
+      "localizations": {}
     },
-    "whatever's on your mind…" : {
-      "localizations" : {
-        "es" : { "stringUnit" : { "state" : "translated", "value" : "lo que tengas en mente…" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "心にあること、なんでも…" } },
-        "ko" : { "stringUnit" : { "state" : "translated", "value" : "마음에 있는 거 뭐든…" } },
-        "vi" : { "stringUnit" : { "state" : "translated", "value" : "bất cứ điều gì trong đầu bạn…" } }
-      }
+    "whatever's on your mind…": {
+      "localizations": {}
     },
-    "yes, hold that time 🌿" : {
-      "localizations" : {
-        "es" : { "stringUnit" : { "state" : "translated", "value" : "sí, guarda ese tiempo 🌿" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "その時間を確保しよう 🌿" } },
-        "ko" : { "stringUnit" : { "state" : "translated", "value" : "그 시간 잡아줄게 🌿" } },
-        "vi" : { "stringUnit" : { "state" : "translated", "value" : "giữ khoảng thời gian đó nhé 🌿" } }
-      }
+    "yes, hold that time 🌿": {
+      "localizations": {}
     },
-    "you showed up today — and that's already something. 🌱" : {
-      "localizations" : {
-        "es" : { "stringUnit" : { "state" : "translated", "value" : "apareciste hoy — y eso ya es algo. 🌱" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "今日も来てくれた — それだけでもう十分だよ。🌱" } },
-        "ko" : { "stringUnit" : { "state" : "translated", "value" : "오늘도 와줬어 — 그것만으로 이미 충분해. 🌱" } },
-        "vi" : { "stringUnit" : { "state" : "translated", "value" : "hôm nay bạn đã xuất hiện — và điều đó đã là gì đó rồi. 🌱" } }
-      }
+    "you showed up today — and that's already something. 🌱": {
+      "localizations": {}
     },
-    "you slept well — good foundation for today 🌱" : {
-      "localizations" : {
-        "es" : { "stringUnit" : { "state" : "translated", "value" : "dormiste bien — buena base para hoy 🌱" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "よく眠れたね — 今日のいい土台だ 🌱" } },
-        "ko" : { "stringUnit" : { "state" : "translated", "value" : "잘 잔네 — 오늘의 좋은 바탕이야 🌱" } },
-        "vi" : { "stringUnit" : { "state" : "translated", "value" : "bạn ngủ ngon — nền tảng tốt cho hôm nay 🌱" } }
-      }
+    "you slept well — good foundation for today 🌱": {
+      "localizations": {}
     },
-    "you're not alone" : {
-      "localizations" : {
-        "es" : { "stringUnit" : { "state" : "translated", "value" : "no estás solo" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "あなたは一人じゃない" } },
-        "ko" : { "stringUnit" : { "state" : "translated", "value" : "너는 혼자가 아니야" } },
-        "vi" : { "stringUnit" : { "state" : "translated", "value" : "bạn không đơn độc" } }
-      }
+    "you're not alone": {
+      "localizations": {}
     },
-    "your inner weather" : {
-      "localizations" : {
-        "es" : { "stringUnit" : { "state" : "translated", "value" : "tu clima interior" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "心の天気" } },
-        "ko" : { "stringUnit" : { "state" : "translated", "value" : "마음의 날씨" } },
-        "vi" : { "stringUnit" : { "state" : "translated", "value" : "thời tiết bên trong bạn" } }
-      }
+    "your inner weather": {
+      "localizations": {}
     },
-    "your name" : {
-      "localizations" : {
-        "es" : { "stringUnit" : { "state" : "translated", "value" : "tu nombre" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "あなたの名前" } },
-        "ko" : { "stringUnit" : { "state" : "translated", "value" : "네 이름" } },
-        "vi" : { "stringUnit" : { "state" : "translated", "value" : "tên của bạn" } }
-      }
+    "your name": {
+      "localizations": {}
     },
-    "your rhythms" : {
-      "localizations" : {
-        "es" : { "stringUnit" : { "state" : "translated", "value" : "tus ritmos" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "あなたのリズム" } },
-        "ko" : { "stringUnit" : { "state" : "translated", "value" : "너의 리듬" } },
-        "vi" : { "stringUnit" : { "state" : "translated", "value" : "nhịp điệu của bạn" } }
-      }
+    "your rhythms": {
+      "localizations": {}
     }
   },
-  "version" : "1.0"
+  "version": "1.0"
 }

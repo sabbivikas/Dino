@@ -94,7 +94,7 @@ enum GentleRecCoordinator {
             "timeOfDay": timeOfDay,
             "recentThemes": recentThemes,
             "quietTypes": quietTypes,
-            "userLocale": Locale.current.language.languageCode?.identifier ?? "en",
+            "userLocale": AppLanguage.current,
         ]
         if !mood.isEmpty { payload["mood"] = mood }
         do {

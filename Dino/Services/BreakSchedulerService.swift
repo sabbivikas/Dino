@@ -227,7 +227,7 @@ final class BreakSchedulerService {
             "isAfter7pm": isAfter7pm,
             "rhythmsContext": rhythmsContext,
             "nowTime": timeLabel(now, calendar),
-            "userLocale": Locale.current.language.languageCode?.identifier ?? "en",
+            "userLocale": AppLanguage.current,
         ]
     }
 
