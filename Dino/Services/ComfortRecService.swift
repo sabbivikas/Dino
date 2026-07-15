@@ -374,7 +374,7 @@ enum ComfortRecCoordinator {
             "recentThemes": recentThemes,
             // classic "cozy" has no rich analog yet — music/film carry over
             "quietTypes": offer.quietTypes.filter { $0 != "cozy" },
-            "userLocale": Locale.current.language.languageCode?.identifier ?? "en",
+            "userLocale": AppLanguage.current,
             "userCountry": countryCode(),
             "excludeTitles": RichRecStore.excludeTitles(),
         ]

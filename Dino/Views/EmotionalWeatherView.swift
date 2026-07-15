@@ -557,6 +557,9 @@ struct EmotionalWeatherView: View {
                 AnalyticsManager.shared.trackScreen("mood")
                 keepsakeCount = RichRecStore.keepsakes().count
                 #if DEBUG
+                if ProcessInfo.processInfo.arguments.contains("-resourcesQA") {
+                    showResources = true   // screenshot hook, debug only
+                }
                 if ProcessInfo.processInfo.arguments.contains("-richRecQA") {
                     RecOpenMemory.forget()   // deterministic first ask state
                     presentRichRec(.qaSample)

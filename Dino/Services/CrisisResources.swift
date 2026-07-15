@@ -98,7 +98,8 @@ enum CrisisResources {
                          detail: "the international association for suicide prevention directory", is24h: true),
     ]
 
-    /// ISO 3166-1 alpha-2 → verified resources. Owner-reviewed 2026-07-09.
+    /// ISO 3166-1 alpha-2 → verified resources. Owner-reviewed 2026-07-09;
+    /// PL, TH, ID added by owner review 2026-07-15 (gate 1, 2.0.1 hotfix).
     static let directory: [String: [RegionalResource]] = [
         "US": [
             // source: https://988lifeline.org — call and text both official
@@ -210,6 +211,23 @@ enum CrisisResources {
             RegionalResource(name: "heal line", kind: .call, contact: "15555",
                              detail: "ministry of health support, hours vary", is24h: false),
         ],
+        "TH": [
+            // source: https://thailand.go.th/issue-focus-detail/001_07_045 (dmh 1323)
+            // portal: https://1323alltime.camri.go.th (owner verified 2026-07-15)
+            RegionalResource(name: "สายด่วนสุขภาพจิต 1323", kind: .call, contact: "1323",
+                             detail: "ฟรี ตลอด 24 ชั่วโมง", is24h: true),
+        ],
+        "ID": [
+            // source: https://kesprimkom.kemkes.go.id/konten/158/151/0/cegah-bunuh-diri-dukung-kesehatan-jiwa-kenali-layanan-healing119-id
+            // owner decision 2026-07-15: phone entry ships WITHOUT the 24h badge
+            // (house understate rule; reliability report) — tel:// cannot dial
+            // extensions, so we dial 119 and the detail carries ext 8.
+            RegionalResource(name: "sejiwa 119 ext 8", kind: .call, contact: "119",
+                             detail: "tekan ekstensi 8, gratis", is24h: false),
+            // source: https://www.healing119.id (kemenkes online service; owner verified 2026-07-15)
+            RegionalResource(name: "healing119.id", kind: .link, contact: "https://www.healing119.id",
+                             detail: "layanan daring kemenkes", is24h: true),
+        ],
         "HK": [
             // source: https://shallwetalk.hk (18111 mental health support hotline)
             RegionalResource(name: "mental health support hotline", kind: .call, contact: "18111",
@@ -260,6 +278,13 @@ enum CrisisResources {
             // source: https://mind.se/sjalvmordslinjen/
             RegionalResource(name: "mind självmordslinjen", kind: .call, contact: "90101",
                              detail: "hours vary", is24h: false),
+        ],
+        "PL": [
+            // source: https://liniawsparcia.pl (centrum wsparcia, fundacja itaka)
+            // gov corroboration: https://www.gov.pl/web/kppsp-limanowa/linia-bezposredniego-wsparcia-dla-osob-w-stanie-kryzysu-psychicznego
+            // (owner verified 2026-07-15)
+            RegionalResource(name: "centrum wsparcia", kind: .call, contact: "800 70 2222",
+                             detail: "bezpłatna, całodobowa", is24h: true),
         ],
         "BR": [
             // source: https://cvv.org.br

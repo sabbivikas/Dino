@@ -123,7 +123,7 @@ final class WeeklyNoticedService {
             "movementLift": digest.movementLift,
             "themeIsNew": digest.themeIsNew,
             "lastWeekLines": Array(lastWeekLines.prefix(3)),
-            "userLocale": Locale.current.language.languageCode?.identifier ?? "en",
+            "userLocale": AppLanguage.current,
         ]
         if let d = digest.moodDirection { payload["moodDirection"] = d.rawValue }
         if let l = digest.moodLean { payload["moodLean"] = l.rawValue }
