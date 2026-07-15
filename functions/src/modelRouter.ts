@@ -25,7 +25,10 @@ export type AiRoute = {
 
 const ROUTES: Record<AiTask, AiRoute> = {
   watching:       { provider: "openai", model: "gpt-5.6-luna",   maxTokens: 60,  temperature: 0 },
-  mission:        { provider: "meta",   model: "muse-spark-1-1", maxTokens: 900, temperature: 0.6 },
+  // muse-spark-1.1 (docs exact string) is a REASONING model — reasoning
+  // tokens bill as output, so the cap carries headroom; the call site pins
+  // reasoning_effort low (verified live: without it, output starves).
+  mission:        { provider: "meta",   model: "muse-spark-1.1", maxTokens: 1500, temperature: 0.6 },
   deliveredWords: { provider: "openai", model: "gpt-4.1-mini",   maxTokens: 200, temperature: 0.7 },
   comfortRecs:    { provider: "openai", model: "gpt-4.1-mini",   maxTokens: 500, temperature: 0.5 },
 };

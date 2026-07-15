@@ -21,9 +21,9 @@ const OPENAI_API_KEY = defineSecret("OPENAI_API_KEY");
 const FIRECRAWL_API_KEY = defineSecret("FIRECRAWL_API_KEY");
 const TMDB_API_TOKEN = defineSecret("TMDB_API_TOKEN");
 const META_MODEL_API_KEY = defineSecret("META_MODEL_API_KEY");
-// base url for meta's openai compatible endpoint — set when the owner
-// provides it; an empty value means missions quietly do not run.
-const META_API_BASE = defineString("META_API_BASE", { default: "" });
+// meta's openai compatible endpoint — base url verified live against
+// dev.meta.ai docs (200 + valid json with reasoning_effort low).
+const META_API_BASE = defineString("META_API_BASE", { default: "https://api.meta.ai/v1" });
 
 const DAILY_LIMIT = 5;
 
@@ -1883,6 +1883,9 @@ async function runExpeditionMission(db: admin.firestore.Firestore, uid: string, 
       const resp = await client.chat.completions.create({
         model: r.model, max_tokens: r.maxTokens, temperature: r.temperature,
         messages, tools: MISSION_TOOLS,
+        // muse-spark-1.1 reasons before it speaks; low keeps missions fast
+        // and affordable (verified: default effort starves the output).
+        reasoning_effort: "low",
       });
       const msg = resp.choices[0]?.message;
       if (!msg) return false;

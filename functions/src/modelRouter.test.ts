@@ -13,7 +13,7 @@ test("watching routes to luna on openai", () => {
 test("mission routes to muse spark on meta", () => {
   const r = route("mission");
   assert.equal(r.provider, "meta");
-  assert.equal(r.model, "muse-spark-1-1");
+  assert.equal(r.model, "muse-spark-1.1");
 });
 
 test("comfort recs stay gpt-4.1-mini", () => {
@@ -27,7 +27,7 @@ test("hard rule: mission on luna throws", () => {
 
 test("hard rule: watching on meta throws", () => {
   assert.throws(() => assertRoute("watching",
-    { provider: "meta", model: "muse-spark-1-1", maxTokens: 1, temperature: 0 }));
+    { provider: "meta", model: "muse-spark-1.1", maxTokens: 1, temperature: 0 }));
 });
 
 test("hard rule: comfort recs off 4.1 mini throws", () => {
