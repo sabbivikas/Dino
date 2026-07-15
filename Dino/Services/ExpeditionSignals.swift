@@ -36,15 +36,19 @@ enum ExpeditionSignals {
         }
     }
 
+    /// ABSENCE OF DATA IS NOT A SIGNAL: no health permission, no device, or
+    /// nothing recent all become "unknown" — never a real looking bucket.
+    /// (freshness is inherent: the callers query last night and today only,
+    /// so stale healthkit data arrives here as nil.)
     static func sleepBucket(hours: Double?) -> String {
-        guard let h = hours else { return "none" }
+        guard let h = hours else { return "unknown" }
         if h < 6 { return "short" }
         if h <= 9 { return "ok" }
         return "long"
     }
 
     static func stepsBucket(steps: Int?) -> String {
-        guard let s = steps else { return "none" }
+        guard let s = steps else { return "unknown" }
         if s < 3000 { return "low" }
         if s <= 8000 { return "mid" }
         return "high"

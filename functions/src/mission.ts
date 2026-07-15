@@ -32,6 +32,28 @@ function clean(s: unknown, cap: number): string {
     .slice(0, cap);
 }
 
+// ── Watcher signal contract —─────────────────────────────────────
+// ABSENCE OF DATA IS NOT A SIGNAL: sleep and steps carry an explicit
+// "unknown" for users without apple health (no watch, denied permission,
+// stale data). unknown is never conflated with a real looking bucket, and
+// luna is told to judge only from what is known.
+export const EXPEDITION_SIGNAL_ALLOW: Record<string, string[]> = {
+  moodTrend: ["steady", "wobbly", "heavy"],
+  heavyDays7: ["0", "1", "2to3", "4plus"],
+  sleepBucket: ["unknown", "short", "ok", "long"],
+  stepsBucket: ["unknown", "low", "mid", "high"],
+  sinceLastRec: ["0to2", "3to7", "8to13", "14plus"],
+  sinceLastExpedition: ["0to2", "3to7", "8to13", "14plus"],
+};
+
+/** The exact user payload luna sees — pure so tests can pin that unknown
+ *  buckets pass through verbatim and nothing fabricates a value. */
+export function buildLunaUserPrompt(buckets: Record<string, string>, themes: string[]): string {
+  return `buckets: mood trend ${buckets.moodTrend}, heavy days this week ${buckets.heavyDays7}, ` +
+    `themes ${themes.join(", ") || "none"}, sleep ${buckets.sleepBucket}, movement ${buckets.stepsBucket}, ` +
+    `since last gift ${buckets.sinceLastExpedition}, since last rec ${buckets.sinceLastRec}.`;
+}
+
 // ── Trusted sources per needKind — the expedition looks HERE FIRST —─────
 // small human stories and the living world over the institutional and the
 // abstract. connection shares hope's human warmth pool; rest gets calm,

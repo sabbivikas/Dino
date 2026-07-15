@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert";
-import { validateGift, validateGiftWithReason, TRUSTED_SOURCES, trustedSourcesFor } from "./mission";
+import { validateGift, validateGiftWithReason, TRUSTED_SOURCES, trustedSourcesFor, EXPEDITION_SIGNAL_ALLOW, buildLunaUserPrompt } from "./mission";
 
 const URL = "https://example.org/a-small-poem";
 const good = {
@@ -73,4 +73,30 @@ test("rotation puts unused sources first, drops nothing", () => {
 
 test("unknown needKind falls back to hope's pool", () => {
   assert.deepEqual(trustedSourcesFor("nonsense", []), TRUSTED_SOURCES.hope);
+});
+
+test("sleep and steps allowlists carry an explicit unknown", () => {
+  assert.ok(EXPEDITION_SIGNAL_ALLOW.sleepBucket.includes("unknown"));
+  assert.ok(EXPEDITION_SIGNAL_ALLOW.stepsBucket.includes("unknown"));
+  // and no ambiguous 'none' pretending to be data
+  assert.ok(!EXPEDITION_SIGNAL_ALLOW.sleepBucket.includes("none"));
+  assert.ok(!EXPEDITION_SIGNAL_ALLOW.stepsBucket.includes("none"));
+});
+
+test("luna payload passes unknown through verbatim, fabricates nothing", () => {
+  const prompt = buildLunaUserPrompt({
+    moodTrend: "heavy", heavyDays7: "2to3",
+    sleepBucket: "unknown", stepsBucket: "unknown",
+    sinceLastRec: "8to13", sinceLastExpedition: "14plus",
+  }, ["sleep"]);
+  assert.ok(prompt.includes("sleep unknown"));
+  assert.ok(prompt.includes("movement unknown"));
+  for (const fabricated of ["sleep short", "sleep ok", "movement low", "movement mid"]) {
+    assert.ok(!prompt.includes(fabricated), `must not fabricate: ${fabricated}`);
+  }
+});
+
+test("fabricated looking values are not in the allowlist", () => {
+  assert.ok(!EXPEDITION_SIGNAL_ALLOW.sleepBucket.includes("zero"));
+  assert.ok(!EXPEDITION_SIGNAL_ALLOW.stepsBucket.includes("0"));
 });

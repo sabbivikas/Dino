@@ -9,7 +9,7 @@ import OpenAI from "openai";
 import { createHash } from "node:crypto";
 import { seasonForMonth, isSeasonEligible, isSlotActive, REC_SEASON_VALUES } from "./season";
 import { route as aiRoute, routeChain as aiRouteChain, logRoute as aiLogRoute, clientFor as aiClientFor, type AiRoute } from "./modelRouter";
-import { validateGiftWithReason, trustedSourcesFor } from "./mission";
+import { validateGiftWithReason, trustedSourcesFor, EXPEDITION_SIGNAL_ALLOW, buildLunaUserPrompt } from "./mission";
 import { capSources, shouldRun, monthKey, creditSummary, REC_MAX_SOURCES_PER_RUN, REC_MIN_RUN_INTERVAL_DAYS } from "./credits";
 import { WORLD_PRIVACY_FLOOR, normalizeCountry, foldPulseCountry } from "./world";
 
@@ -1758,14 +1758,6 @@ export const processEmailQueue = onSchedule(
 const EXPEDITION_MIN_DAYS = 14;
 const EXPEDITION_LUNA_NIGHTLY_CAP = 2000;   // global watcher cost bound
 const EXPEDITION_NEEDS = ["rest", "beauty", "hope", "wonder", "connection", "none"];
-const EXPEDITION_SIGNAL_ALLOW: Record<string, string[]> = {
-  moodTrend: ["steady", "wobbly", "heavy"],
-  heavyDays7: ["0", "1", "2to3", "4plus"],
-  sleepBucket: ["none", "short", "ok", "long"],
-  stepsBucket: ["none", "low", "mid", "high"],
-  sinceLastRec: ["0to2", "3to7", "8to13", "14plus"],
-  sinceLastExpedition: ["0to2", "3to7", "8to13", "14plus"],
-};
 const EXPEDITION_THEME_ALLOW = ["work", "sleep", "relationships", "health", "money", "self"];
 
 const LUNA_WATCHER_PROMPT =
@@ -1774,7 +1766,10 @@ const LUNA_WATCHER_PROMPT =
   "brought them anything. decide whether dino should go on a small expedition to find them one tiny " +
   "gift. be quiet by default: an expedition is a rare event, not a feed. most nights, for most people, " +
   "the answer is no. only act when the pattern truly asks for it: a stretch that is heavy and long, or " +
-  'a quiet need the buckets make obvious. respond only with json {"act":false,"needKind":"none","confidence":0.0}. ' +
+  "a quiet need the buckets make obvious. " +
+  "some buckets may be unknown: that means no information, not a bad sign. judge only from what is " +
+  "known, and be MORE conservative about acting when you know less. " +
+  'respond only with json {"act":false,"needKind":"none","confidence":0.0}. ' +
   "needKind is exactly one of rest, beauty, hope, wonder, connection, none. when in doubt, stay quiet.";
 
 // F2 THE MISSION: when luna acts, muse spark (via the router — hard rule:
@@ -2071,10 +2066,7 @@ export const nightlyExpeditionWatch = onSchedule(
           response_format: { type: "json_object" },
           messages: [
             { role: "system", content: LUNA_WATCHER_PROMPT },
-            { role: "user", content:
-              `buckets: mood trend ${buckets.moodTrend}, heavy days this week ${buckets.heavyDays7}, ` +
-              `themes ${themes.join(", ") || "none"}, sleep ${buckets.sleepBucket}, movement ${buckets.stepsBucket}, ` +
-              `since last gift ${buckets.sinceLastExpedition}, since last rec ${buckets.sinceLastRec}.` },
+            { role: "user", content: buildLunaUserPrompt(buckets, themes) },
           ],
         });
         const parsed = JSON.parse(resp.choices[0]?.message?.content ?? "{}") as Record<string, unknown>;

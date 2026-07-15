@@ -32,17 +32,28 @@ final class ExpeditionTests: XCTestCase {
     }
 
     func testSleepBuckets() {
-        XCTAssertEqual(ExpeditionSignals.sleepBucket(hours: nil), "none")
+        XCTAssertEqual(ExpeditionSignals.sleepBucket(hours: nil), "unknown",
+                       "no health data is unknown, never a real looking bucket")
         XCTAssertEqual(ExpeditionSignals.sleepBucket(hours: 4.5), "short")
         XCTAssertEqual(ExpeditionSignals.sleepBucket(hours: 7.5), "ok")
         XCTAssertEqual(ExpeditionSignals.sleepBucket(hours: 10.0), "long")
     }
 
     func testStepsBuckets() {
-        XCTAssertEqual(ExpeditionSignals.stepsBucket(steps: nil), "none")
+        XCTAssertEqual(ExpeditionSignals.stepsBucket(steps: nil), "unknown",
+                       "no health data is unknown, never a real looking bucket")
         XCTAssertEqual(ExpeditionSignals.stepsBucket(steps: 1200), "low")
         XCTAssertEqual(ExpeditionSignals.stepsBucket(steps: 5000), "mid")
         XCTAssertEqual(ExpeditionSignals.stepsBucket(steps: 12000), "high")
+    }
+
+    func testMoodOnlyUserEntersTheCohort() {
+        // no watch, no permission, no health at all — mood signals alone
+        // carry the full experience. eligibility takes no health inputs.
+        XCTAssertTrue(ExpeditionSignals.isEligible(heavyDays: 2, crisisDate: nil,
+                                                   defaults: defaults))
+        XCTAssertEqual(ExpeditionSignals.sleepBucket(hours: nil), "unknown")
+        XCTAssertEqual(ExpeditionSignals.stepsBucket(steps: nil), "unknown")
     }
 
     func testDaysSinceBuckets() {
