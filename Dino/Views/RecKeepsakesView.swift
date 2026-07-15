@@ -13,6 +13,9 @@ import SwiftUI
 
 struct RecKeepsakesView: View {
     @Environment(\.dismiss) private var dismiss
+    // Kept gifts re open inside dino; a dead page gets the drift line.
+    @State private var readerLink: ReaderLink?
+    @State private var showDrifted = false
 
     private let palette: [Color] = [
         Color(hex: "#F5D5C0"),
@@ -56,6 +59,43 @@ struct RecKeepsakesView: View {
             }
 
             closeButton
+
+            // the drift line — a kept gift whose page has gone quiet.
+            // opacity only: reduce motion safe.
+            if showDrifted {
+                Text(ExpeditionVoice.driftedAway)
+                    .font(DinoTheme.dinoFont(size: 14))
+                    .foregroundColor(Color(hex: "#7A6F5F"))
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .background(Capsule().fill(Color(hex: "#F5F0E8")))
+                    .shadow(color: .black.opacity(0.10), radius: 6, y: 3)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+                    .padding(.bottom, 30)
+                    .transition(.opacity)
+            }
+        }
+        .sheet(item: $readerLink) { link in
+            GiftReaderView(url: link.url)
+                .ignoresSafeArea()
+        }
+    }
+
+    private func open(_ keepsake: RichRecStore.Keepsake) {
+        HapticManager.shared.light()
+        guard let link = keepsake.rec.reopenLink() else { return }
+        guard keepsake.rec.type == "gift" else {
+            UIApplication.shared.open(link.url)   // recs keep their store doors
+            return
+        }
+        Task {
+            if await ExpeditionReader.pageAlive(url: link.url) {
+                readerLink = ReaderLink(url: link.url)
+            } else {
+                withAnimation(.easeInOut(duration: 0.25)) { showDrifted = true }
+                try? await Task.sleep(nanoseconds: 2_500_000_000)
+                withAnimation(.easeInOut(duration: 0.25)) { showDrifted = false }
+            }
         }
     }
 
@@ -72,12 +112,7 @@ struct RecKeepsakesView: View {
             offsetY: dy,
             rotation: rot,
             appearDelay: appearDelay,
-            onTap: {
-                HapticManager.shared.light()
-                if let link = keepsake.rec.reopenLink() {
-                    UIApplication.shared.open(link.url)
-                }
-            }
+            onTap: { open(keepsake) }
         )
     }
 

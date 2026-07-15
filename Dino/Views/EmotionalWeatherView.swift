@@ -45,6 +45,10 @@ struct EmotionalWeatherView: View {
     // something rests on it.
     @State private var showRecShelf = false
     @State private var keepsakeCount = 0
+    // Expedition gift (agentic v1 F3): the dove waits here, never a push.
+    @State private var expeditionGift: ExpeditionGift?
+    // Read inside dino: the gift's source in an in app reader sheet.
+    @State private var expeditionReaderLink: ReaderLink?
     // Tiered support: quiet glyph always; the row only on a heavy stretch
     // (StretchSignal). Support beats the gentle rec when both are eligible.
     @State private var showResources = false
@@ -388,6 +392,25 @@ struct EmotionalWeatherView: View {
                         .transition(.opacity)
                     }
 
+                    // The expedition gift (agentic v1 F3) — the dove's small
+                    // delivery. Opacity only transition: reduce motion safe.
+                    if let gift = expeditionGift {
+                        ExpeditionCard(gift: gift, onOpen: {
+                            // read inside dino — never bounced out to safari
+                            if let url = URL(string: gift.url) { expeditionReaderLink = ReaderLink(url: url) }
+                        }, onKeep: {
+                            ExpeditionStore.keep(gift)
+                            keepsakeCount = RichRecStore.keepsakes().count
+                            withAnimation(.easeInOut(duration: 0.35)) { expeditionGift = nil }
+                        }, onNotTonight: {
+                            ExpeditionSignals.recordIgnore()
+                            withAnimation(.easeInOut(duration: 0.35)) { expeditionGift = nil }
+                        })
+                        .padding(.horizontal, DinoTheme.padding)
+                        .padding(.top, 12)
+                        .transition(.opacity)
+                    }
+
                     // Rich comfort rec (2.1) — dino's personalized pick.
                     // Same signals as the slip: tap teaches, ignore teaches.
                     if let rich = shownRichRec {
@@ -507,12 +530,19 @@ struct EmotionalWeatherView: View {
                 }
                 if let s = await HealthService.shared.lastNightSleep() { sleepData = s }
                 await loadSteps()
+                // Expedition watcher signal — enum buckets only, once a day.
+                await ExpeditionSignals.syncIfNeeded(dataManager: dataManager,
+                    sleepHours: sleepData.map { $0.durationHours },
+                    steps: stepsToday.map { Int($0) })
                 if let agg = await WorldMoodService.fetchAggregate() {
                     worldBucket = agg.bucket(for: WorldMoodService.todayKey())
                 }
                 // Journal-signal path — support beats the gentle rec here too.
                 if stretchSignalFires() {
                     presentSupportRow()
+                } else if expeditionGift == nil,
+                          let gift = await ExpeditionCoordinator.fetchPending() {
+                    presentExpedition(gift)   // the gift outranks a rec; support outranks both
                 } else if shownRec == nil, pendingRec == nil,
                           shownRichRec == nil, pendingRichRec == nil {
                     if let rich = await ComfortRecCoordinator.fetchIfMomentIsRight(dataManager: dataManager) {
@@ -534,6 +564,13 @@ struct EmotionalWeatherView: View {
                 if ProcessInfo.processInfo.arguments.contains("-richRecQA2") {
                     RecOpenMemory.remember(RecOpenMemory.spotify)   // remembered state
                     presentRichRec(.qaSample)
+                }
+                if ProcessInfo.processInfo.arguments.contains("-expeditionQA") {
+                    presentExpedition(.qaSample)
+                }
+                if ProcessInfo.processInfo.arguments.contains("-giftReaderQA"),
+                   let url = URL(string: ExpeditionGift.qaSample.url) {
+                    expeditionReaderLink = ReaderLink(url: url)
                 }
                 if ProcessInfo.processInfo.arguments.contains("-richRecQA3") {
                     RichRecStore.seedQAKeepsakes()   // a full shelf
@@ -613,6 +650,10 @@ struct EmotionalWeatherView: View {
             }
             .sheet(isPresented: $showRecShelf) {
                 RecKeepsakesView()
+            }
+            .sheet(item: $expeditionReaderLink) { link in
+                GiftReaderView(url: link.url)
+                    .ignoresSafeArea()
             }
             .fullScreenCover(isPresented: $showWorld) {
                 WorldView()
@@ -732,6 +773,11 @@ struct EmotionalWeatherView: View {
         AnalyticsManager.shared.trackRecShown(type: rec.type)
         recWasTapped = false
         withAnimation(.easeInOut(duration: 0.35)) { shownRec = rec }
+    }
+
+    private func presentExpedition(_ gift: ExpeditionGift) {
+        ExpeditionStore.markPresented(gift)   // shown once — the dove never nags
+        withAnimation(.easeInOut(duration: 0.35)) { expeditionGift = gift }
     }
 
     private func presentRichRec(_ rec: RichRec) {

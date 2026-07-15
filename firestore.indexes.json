@@ -9,6 +9,14 @@
       ]
     },
     {
+      "collectionGroup": "expeditionSignals",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "eligible", "order": "ASCENDING" },
+        { "fieldPath": "updatedAt", "order": "ASCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "lanterns",
       "queryScope": "COLLECTION",
       "fields": [
