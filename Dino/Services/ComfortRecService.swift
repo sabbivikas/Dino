@@ -93,6 +93,7 @@ enum ComfortRecVoice {
         switch type {
         case "music": return "🎧"
         case "film":  return "🎬"
+        case "gift":  return "\u{1F54A}"   // an expedition gift on the shelf
         default:      return "📖"
         }
     }
@@ -101,6 +102,7 @@ enum ComfortRecVoice {
         switch type {
         case "music": return Color(red: 196/255, green: 184/255, blue: 212/255).opacity(0.30)
         case "film":  return Color(red: 232/255, green: 136/255, blue: 154/255).opacity(0.26)
+        case "gift":  return Color(red: 240/255, green: 221/255, blue: 160/255).opacity(0.35)
         default:      return Color(red: 168/255, green: 212/255, blue: 230/255).opacity(0.32)
         }
     }
@@ -231,6 +233,12 @@ extension RichRec {
             return [link(ComfortRecVoice.openAppleMusic, "https://music.apple.com/search?term=\(query)"),
                     link(ComfortRecVoice.openSpotify, "https://open.spotify.com/search/\(query)")]
                 .compactMap { $0 }
+        case "gift":
+            // a kept expedition gift re opens where it lives
+            if let raw = watchLink, let url = URL(string: raw) {
+                return [RecLink(label: ExpeditionVoice.openLink, url: url)]
+            }
+            return []
         case "film":
             // free to them beats a paywall: a known provider gets its name on
             // the button; rent only gets the neutral every option page; no

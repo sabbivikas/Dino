@@ -148,6 +148,7 @@ struct ProfileView: View {
     @State private var showRateAlert: Bool = false
     @AppStorage("dino.showStreak") private var showStreak: Bool = true
     @AppStorage("dino.journalThemeLearningEnabled") private var journalThemeLearning: Bool = false
+    @AppStorage("dino.expeditions.enabled") private var expeditionsEnabled: Bool = true
     @AppStorage("dino.streakHintSeen") private var streakHintSeen: Bool = false
     @State private var streakBurst: Bool = false
     @State private var resumeBurst: Bool = false
@@ -867,6 +868,23 @@ struct ProfileView: View {
                 }
                 Spacer(minLength: 0)
                 Toggle("", isOn: $journalThemeLearning).labelsHidden().tint(SB.sage)
+            }
+            .padding(.vertical, 6)
+            HStack(spacing: 12) {
+                ZStack {
+                    Circle().fill(SB.sky).frame(width: 36, height: 36)
+                    Image(systemName: "bird.fill")
+                        .font(.system(size: 15, weight: .medium)).foregroundColor(.white)
+                }
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(ExpeditionVoice.settingsTitle)
+                        .font(DinoTheme.dinoFont(size: 16)).foregroundColor(SB.nearBlack)
+                    Text(ExpeditionVoice.settingsBody)
+                        .font(DinoTheme.dinoFont(size: 12)).foregroundColor(SB.sage)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 0)
+                Toggle("", isOn: $expeditionsEnabled).labelsHidden().tint(SB.sage)
             }
             .padding(.vertical, 6)
             AmbientSoundsRow {
