@@ -15,3 +15,14 @@ extension String {
         NSLocalizedString(self, comment: "")
     }
 }
+
+/// The app's RESOLVED language — not the device language. While dino ships
+/// english only this is always "en", so every surface (ui and ai written
+/// content alike) speaks one language. When dino localizes for real, this
+/// follows the app's declared localizations automatically.
+enum AppLanguage {
+    static var current: String {
+        Bundle.main.preferredLocalizations.first
+            .flatMap { Locale(identifier: $0).language.languageCode?.identifier } ?? "en"
+    }
+}

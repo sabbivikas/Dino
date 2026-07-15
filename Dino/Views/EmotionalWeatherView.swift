@@ -463,6 +463,9 @@ struct EmotionalWeatherView: View {
                 AnalyticsManager.shared.trackMoodScreenOpened()
                 AnalyticsManager.shared.trackScreen("mood")
                 #if DEBUG
+                if ProcessInfo.processInfo.arguments.contains("-resourcesQA") {
+                    showResources = true   // screenshot hook, debug only
+                }
                 if ProcessInfo.processInfo.arguments.contains("-moodStepsQA") {
                     sleepData = HealthService.SleepData(durationHours: 7.2,
                         startTime: Date(), endTime: Date())

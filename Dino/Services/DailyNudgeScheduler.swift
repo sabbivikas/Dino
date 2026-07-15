@@ -50,7 +50,7 @@ enum DailyNudgeScheduler {
             "lastMood": lastMood,
             "streakState": streakState,
             "weekday": weekday,
-            "userLocale": Locale.current.language.languageCode?.identifier ?? "en",
+            "userLocale": AppLanguage.current,
         ]
 
         // Body context: relative buckets ONLY — raw hours and step counts

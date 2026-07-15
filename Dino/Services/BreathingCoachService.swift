@@ -66,7 +66,7 @@ final class BreathingCoachService {
         let result = try await callable.call([
             "feelings": chips.map(\.rawValue),
             "text": text,
-            "userLocale": Locale.current.language.languageCode?.identifier ?? "en",
+            "userLocale": AppLanguage.current,
         ])
         guard let data = result.data as? [String: Any] else { throw TimeoutError() }
 
