@@ -1,0 +1,2 @@
+# ── 2.0.1 hotfix ledger ──
+[2026-07-15 14:55] branch hotfix/2-0-1 created off c0560f6 (2.0 build 16, the live release). Verified 2.1 recs/expedition code absent. BUG 1 investigation begins — CrisisResources untouched until gate 1.
