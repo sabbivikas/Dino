@@ -1,6 +1,81 @@
 {
   "sourceLanguage": "en",
   "strings": {
+    "%@% GROWN": {
+      "extractionState": "manual",
+      "localizations": {},
+      "shouldGenerateSymbol": false
+    },
+    "%lld": {
+      "extractionState": "manual",
+      "localizations": {},
+      "shouldGenerateSymbol": false
+    },
+    "%lld %@": {
+      "extractionState": "manual",
+      "localizations": {},
+      "shouldGenerateSymbol": false
+    },
+    "%lld / %lld xp": {
+      "extractionState": "manual",
+      "localizations": {},
+      "shouldGenerateSymbol": false
+    },
+    "%lld day": {
+      "extractionState": "manual",
+      "localizations": {},
+      "shouldGenerateSymbol": false
+    },
+    "%lld days active": {
+      "extractionState": "manual",
+      "localizations": {},
+      "shouldGenerateSymbol": false
+    },
+    "%lld keepsakes · this year": {
+      "extractionState": "manual",
+      "localizations": {},
+      "shouldGenerateSymbol": false
+    },
+    "%lld memories": {
+      "extractionState": "manual",
+      "localizations": {},
+      "shouldGenerateSymbol": false
+    },
+    "%lld notes": {
+      "extractionState": "manual",
+      "localizations": {},
+      "shouldGenerateSymbol": false
+    },
+    "%lld of %@ days gathered": {
+      "extractionState": "manual",
+      "localizations": {},
+      "shouldGenerateSymbol": false
+    },
+    "%lld of %lld": {
+      "extractionState": "manual",
+      "localizations": {},
+      "shouldGenerateSymbol": false
+    },
+    "%lld)": {
+      "extractionState": "manual",
+      "localizations": {},
+      "shouldGenerateSymbol": false
+    },
+    "%lld))/10": {
+      "extractionState": "manual",
+      "localizations": {},
+      "shouldGenerateSymbol": false
+    },
+    "%lld/%@": {
+      "extractionState": "manual",
+      "localizations": {},
+      "shouldGenerateSymbol": false
+    },
+    "%lld/150": {
+      "extractionState": "manual",
+      "localizations": {},
+      "shouldGenerateSymbol": false
+    },
     "+ add a keepsake": {
       "localizations": {},
       "shouldGenerateSymbol": false
@@ -65,7 +140,17 @@
       "localizations": {},
       "shouldGenerateSymbol": false
     },
+    "\\u{201C}%@\\u{201D}": {
+      "extractionState": "manual",
+      "localizations": {},
+      "shouldGenerateSymbol": false
+    },
     "\\u{21A9}\\u{FE0E}": {
+      "extractionState": "manual",
+      "localizations": {},
+      "shouldGenerateSymbol": false
+    },
+    "a dino in %lld) left this for you:": {
       "extractionState": "manual",
       "localizations": {},
       "shouldGenerateSymbol": false
@@ -120,6 +205,11 @@
       "shouldGenerateSymbol": false
     },
     "a soft reminder each evening": {
+      "extractionState": "manual",
+      "localizations": {},
+      "shouldGenerateSymbol": false
+    },
+    "about tomorrow — %lld)": {
       "extractionState": "manual",
       "localizations": {},
       "shouldGenerateSymbol": false
@@ -184,6 +274,11 @@
       "shouldGenerateSymbol": false
     },
     "begin check-in \\u{2192}": {
+      "extractionState": "manual",
+      "localizations": {},
+      "shouldGenerateSymbol": false
+    },
+    "begin · %lld min": {
       "extractionState": "manual",
       "localizations": {},
       "shouldGenerateSymbol": false
@@ -253,6 +348,11 @@
       "localizations": {},
       "shouldGenerateSymbol": false
     },
+    "composed %lld)x%lld) @%lld)x": {
+      "extractionState": "manual",
+      "localizations": {},
+      "shouldGenerateSymbol": false
+    },
     "confirm it's you": {
       "extractionState": "manual",
       "localizations": {},
@@ -287,6 +387,11 @@
       "shouldGenerateSymbol": false
     },
     "current streak": {
+      "extractionState": "manual",
+      "localizations": {},
+      "shouldGenerateSymbol": false
+    },
+    "cycle %@ of %lld": {
       "extractionState": "manual",
       "localizations": {},
       "shouldGenerateSymbol": false
@@ -391,6 +496,11 @@
       "shouldGenerateSymbol": false
     },
     "done": {
+      "extractionState": "manual",
+      "localizations": {},
+      "shouldGenerateSymbol": false
+    },
+    "done. i'll remind you at %@ 🌱": {
       "extractionState": "manual",
       "localizations": {},
       "shouldGenerateSymbol": false
@@ -561,6 +671,11 @@
       "localizations": {},
       "shouldGenerateSymbol": false
     },
+    "i think %@ would help —": {
+      "extractionState": "manual",
+      "localizations": {},
+      "shouldGenerateSymbol": false
+    },
     "if you miss tomorrow, it's okay. dino will wait. \\u{1F331}": {
       "extractionState": "manual",
       "localizations": {},
@@ -609,12 +724,27 @@
       "localizations": {},
       "shouldGenerateSymbol": false
     },
+    "last watered %@d ago": {
+      "extractionState": "manual",
+      "localizations": {},
+      "shouldGenerateSymbol": false
+    },
     "let dino learn from your journal": {
       "extractionState": "manual",
       "localizations": {},
       "shouldGenerateSymbol": false
     },
     "let's begin": {
+      "localizations": {},
+      "shouldGenerateSymbol": false
+    },
+    "level %lld": {
+      "extractionState": "manual",
+      "localizations": {},
+      "shouldGenerateSymbol": false
+    },
+    "lighter sleep lately tends to make %lld)s feel heavier.": {
+      "extractionState": "manual",
       "localizations": {},
       "shouldGenerateSymbol": false
     },
@@ -671,7 +801,17 @@
       "localizations": {},
       "shouldGenerateSymbol": false
     },
+    "member since %@": {
+      "extractionState": "manual",
+      "localizations": {},
+      "shouldGenerateSymbol": false
+    },
     "min": {
+      "extractionState": "manual",
+      "localizations": {},
+      "shouldGenerateSymbol": false
+    },
+    "mood: %@": {
       "extractionState": "manual",
       "localizations": {},
       "shouldGenerateSymbol": false
@@ -808,6 +948,11 @@
       "localizations": {},
       "shouldGenerateSymbol": false
     },
+    "question %@ of %lld": {
+      "extractionState": "manual",
+      "localizations": {},
+      "shouldGenerateSymbol": false
+    },
     "quick palette": {
       "extractionState": "manual",
       "localizations": {},
@@ -887,6 +1032,11 @@
       "shouldGenerateSymbol": false
     },
     "scrapbook": {
+      "extractionState": "manual",
+      "localizations": {},
+      "shouldGenerateSymbol": false
+    },
+    "see all —\n%lld memories →": {
       "extractionState": "manual",
       "localizations": {},
       "shouldGenerateSymbol": false
@@ -1003,6 +1153,11 @@
       "localizations": {},
       "shouldGenerateSymbol": false
     },
+    "step %@ of %lld": {
+      "extractionState": "manual",
+      "localizations": {},
+      "shouldGenerateSymbol": false
+    },
     "steps": {
       "extractionState": "manual",
       "localizations": {},
@@ -1106,6 +1261,11 @@
       "localizations": {},
       "shouldGenerateSymbol": false
     },
+    "theme: %@": {
+      "extractionState": "manual",
+      "localizations": {},
+      "shouldGenerateSymbol": false
+    },
     "there are no wrong answers \\u{1F33F}": {
       "extractionState": "manual",
       "localizations": {},
@@ -1192,6 +1352,11 @@
       "localizations": {},
       "shouldGenerateSymbol": false
     },
+    "tomorrow might ask a lot of you. %lld)s often do.": {
+      "extractionState": "manual",
+      "localizations": {},
+      "shouldGenerateSymbol": false
+    },
     "try again a little later 🌿": {
       "localizations": {},
       "shouldGenerateSymbol": false
@@ -1212,6 +1377,11 @@
       "shouldGenerateSymbol": false
     },
     "used by people before meetings, after hard news, during panic moments": {
+      "extractionState": "manual",
+      "localizations": {},
+      "shouldGenerateSymbol": false
+    },
+    "v%@": {
       "extractionState": "manual",
       "localizations": {},
       "shouldGenerateSymbol": false
@@ -1399,6 +1569,11 @@
       "localizations": {},
       "shouldGenerateSymbol": false
     },
+    "your %@ painting is ready \\u{2728}": {
+      "extractionState": "manual",
+      "localizations": {},
+      "shouldGenerateSymbol": false
+    },
     "your brighter days often have a little more movement in them": {
       "extractionState": "manual",
       "localizations": {},
@@ -1482,6 +1657,16 @@
       "shouldGenerateSymbol": false
     },
     "your streaks": {
+      "extractionState": "manual",
+      "localizations": {},
+      "shouldGenerateSymbol": false
+    },
+    "your sunflower is %@": {
+      "extractionState": "manual",
+      "localizations": {},
+      "shouldGenerateSymbol": false
+    },
+    "your week %lld report": {
       "extractionState": "manual",
       "localizations": {},
       "shouldGenerateSymbol": false
