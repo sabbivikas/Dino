@@ -189,9 +189,19 @@ enum BreathingCoach {
 /// the server net in functions/src/index.ts.
 enum BreathingCrisisNet {
 
+    // MULTILINGUAL SAFETY NET (owner gate 2026-07-16, crisis localization arc).
+    // Three match classes, ALL language sets always active (people code-switch):
+    //  • words      — exact tokens in space-delimited languages (en/es/vi)
+    //  • phrases    — space-bounded multi-word matches (en/es/vi)
+    //  • substrings — matched against the DE-SPACED text; carries ja/ko
+    //    (no reliable word boundaries) plus obfuscation cores for the rest.
+    // Tuned to over-trigger: a false positive only shows the support card.
+    // KEEP IN SYNC with the server net in functions/src/index.ts.
+
     /// Multi-word phrases matched against normalized text (and a de-spaced
     /// variant to catch "k i l l m y s e l f" style obfuscation).
     static let phrases: [String] = [
+        // english
         "kill myself", "killing myself", "killed myself",
         "end my life", "ending my life", "end it all", "ending it all",
         "want to die", "wanna die", "want to be dead",
@@ -205,10 +215,70 @@ enum BreathingCrisisNet {
         "cant go on", "cannot go on", "cant do this anymore",
         "want to disappear", "want to give up", "giving up on life", "ready to give up",
         "no point anymore", "no point in anything", "no point in living",
+        // español (with and without accents — keyboards often skip them)
+        "quiero matarme", "me quiero matar",
+        "quitarme la vida", "acabar con mi vida", "acabar con todo", "terminar con todo",
+        "quiero morir", "quiero morirme", "me quiero morir",
+        "no quiero vivir", "no quiero seguir viviendo",
+        "no quiero estar aquí", "no quiero estar aqui",
+        "no puedo más", "no puedo mas", "ya no puedo más", "ya no puedo mas",
+        "quiero desaparecer",
+        "hacerme daño", "hacerme dano",
+        "estarían mejor sin mí", "estarian mejor sin mi",
+        "mejor muerto", "mejor muerta",
+        "sin ganas de vivir", "nada por lo que vivir", "no tiene sentido vivir",
+        "me quiero cortar", "sin esperanza",
+        // tiếng việt (diacritic forms)
+        "muốn chết", "muốn tự tử",
+        "kết thúc cuộc đời", "kết thúc tất cả",
+        "không muốn sống", "không thiết sống", "chán sống",
+        "muốn biến mất",
+        "tự làm hại bản thân", "tự làm đau bản thân",
+        "rạch tay", "thà chết còn hơn", "chết cho xong",
+        "tốt hơn nếu không có mình",
+        "không còn lý do để sống", "sống không có ý nghĩa",
+        // ascii vietnamese (typed without diacritics)
+        "muon chet", "khong muon song",
     ]
 
     /// Single words that are unambiguous on their own in a feelings box.
-    static let words: Set<String> = ["suicide", "suicidal", "hopeless", "worthless", "kms"]
+    static let words: Set<String> = [
+        // english
+        "suicide", "suicidal", "hopeless", "worthless", "kms",
+        // español
+        "suicidio", "suicida", "matarme", "morirme",
+        "autolesión", "autolesion", "cortarme", "lastimarme",
+    ]
+
+    /// Substrings matched against the de-spaced text. Japanese and korean
+    /// live entirely here (no reliable word boundaries; korean stems stored
+    /// de-spaced so 죽고 싶어 / 죽고싶다 / any conjugation all match).
+    /// Deliberately excluded: "ㅈㅅ" (usually means sorry, not 자살).
+    static let substrings: [String] = [
+        // obfuscation cores (english/spanish)
+        "killmyself", "endmylife", "wanttodie", "selfharm",
+        "hurtmyself", "cutmyself", "suicide", "suicidal",
+        "quieromatarme", "quitarmelavida", "quieromorir", "noquierovivir", "suicid",
+        // 日本語
+        "死にたい", "しにたい", "死のう", "死んでしまいたい", "死んだほうがまし", "死なせて",
+        "消えたい", "きえたい", "消えてしまいたい", "いなくなりたい",
+        "自殺", "自傷", "リストカット", "リスカ", "手首を切", "首を吊",
+        "生きたくない", "生きていたくない", "生きるのがつらい", "生きる意味がない",
+        "終わりにしたい", "楽になりたい", "もう無理",
+        // 한국어 (de-spaced stems)
+        "죽고싶", "죽어버리", "죽었으면", "죽는게낫", "죽는것이낫",
+        "자살", "자해", "목숨을끊", "목숨끊",
+        "살고싶지않", "살기싫", "살이유가없",
+        "사라지고싶", "없어지고싶", "더는못살", "더이상못살",
+        "손목을긋", "손목긋", "그만살고싶", "희망이없",
+        // tiếng việt
+        "muốnchết", "tựtử", "tựsát", "khôngmuốnsống", "muốnbiếnmất",
+        "muonchet", "khongmuonsong",
+    ]
+
+    /// Vietnamese multiword crisis words handled as phrases above; these
+    /// short forms are tokens.
+    static let wordsVi: Set<String> = ["tự tử", "tự sát", "tự hại"]
 
     static func isConcerning(_ text: String) -> Bool {
         let normalized = BreathingCoach.normalize(text)
@@ -219,12 +289,12 @@ enum BreathingCrisisNet {
 
         let padded = " " + normalized + " "
         if phrases.contains(where: { padded.contains(" " + $0 + " ") }) { return true }
+        // vietnamese two-token words behave like short phrases
+        if wordsVi.contains(where: { padded.contains(" " + $0 + " ") }) { return true }
 
-        // de-spaced pass catches letter-spaced obfuscation
+        // de-spaced pass: ja/ko sets + letter-spaced obfuscation
         let despaced = normalized.replacingOccurrences(of: " ", with: "")
-        let despacedCore = ["killmyself", "endmylife", "wanttodie", "selfharm",
-                            "hurtmyself", "cutmyself", "suicide", "suicidal"]
-        return despacedCore.contains { despaced.contains($0) }
+        return substrings.contains { despaced.contains($0) }
     }
 }
 

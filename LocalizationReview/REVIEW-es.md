@@ -489,3 +489,18 @@ all are in `es-audit-additions.json` (key → translation). please give EXTRA at
 5. **crisis card copy** (breathing coach) — "call or text 988" block. numbers/keywords must stay exact.
 6. **widget lines** — very small screens, so shorter is better; flag anything that will overflow.
 7. **permission dialogs** (system popups asking for health/mic/camera access) — must sound trustworthy.
+
+
+## ⚠️ SAFETY-CRITICAL — crisis keyword walk (NOT optional)
+
+dino shows a support card when someone's free text sounds like a crisis. the spanish
+trigger list below was drafted by a model and MUST be confirmed by you: does it match
+how spanish speakers actually talk about this? anything missing (slang, euphemisms,
+regional phrasing MX/AR/ES)? anything that would fire on everyday talk?
+
+phrases: quiero matarme · me quiero matar · quitarme la vida · acabar con mi vida ·
+acabar con todo · terminar con todo · quiero morir(me) · me quiero morir · no quiero vivir ·
+no quiero seguir viviendo · no quiero estar aquí/aqui · no puedo más/mas · ya no puedo más/mas ·
+quiero desaparecer · hacerme daño/dano · estarían/estarian mejor sin mí/mi · mejor muerto/muerta ·
+sin ganas de vivir · nada por lo que vivir · no tiene sentido vivir · me quiero cortar · sin esperanza
+words: suicidio · suicida · matarme · morirme · autolesión/autolesion · cortarme · lastimarme

@@ -9703,6 +9703,42 @@
       },
       "shouldGenerateSymbol": false
     },
+    "call %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "call %@"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "llamar al %@"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@に電話する"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ 전화하기"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "gọi %@"
+          }
+        }
+      },
+      "shouldGenerateSymbol": false
+    },
     "call %@ at %@": {
       "localizations": {
         "en": {
@@ -11068,6 +11104,42 @@
           "stringUnit": {
             "state": "translated",
             "value": "sáng tạo"
+          }
+        }
+      },
+      "shouldGenerateSymbol": false
+    },
+    "crisis lines for over 130 countries": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "crisis lines for over 130 countries"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "líneas de crisis en más de 130 países"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "130か国以上の相談窓口"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "130개국이 넘는 위기 상담 전화"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "đường dây khủng hoảng tại hơn 130 quốc gia"
           }
         }
       },
@@ -13839,6 +13911,42 @@
           "stringUnit": {
             "state": "translated",
             "value": "sức mạnh cảm xúc không phải là không có khó khăn, mà là can đảm ngồi lại cùng cảm xúc của mình, hiểu chúng, và lớn lên từ chúng."
+          }
+        }
+      },
+      "shouldGenerateSymbol": false
+    },
+    "emotional support centres around the world": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "emotional support centres around the world"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "centros de apoyo emocional en todo el mundo"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "世界中の心のサポートセンター"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "전 세계의 정서 지원 센터"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "các trung tâm hỗ trợ tinh thần khắp thế giới"
           }
         }
       },
@@ -18231,6 +18339,42 @@
           "stringUnit": {
             "state": "translated",
             "value": "nếu dino đang giúp những ngày của bạn"
+          }
+        }
+      },
+      "shouldGenerateSymbol": false
+    },
+    "if you are in immediate danger, please call your local emergency number.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "if you are in immediate danger, please call your local emergency number."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "si estás en peligro inmediato, llama a tu número de emergencias local."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "いま危険がせまっているときは、すぐに地域の緊急番号に電話してください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "지금 당장 위험한 상황이라면, 즉시 현지 긴급 전화번호로 연락해 주세요."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "nếu bạn đang gặp nguy hiểm ngay lúc này, hãy gọi số khẩn cấp tại địa phương."
           }
         }
       },
@@ -24396,6 +24540,42 @@
           "stringUnit": {
             "state": "translated",
             "value": "chỉ mình bạn thấy điều này"
+          }
+        }
+      },
+      "shouldGenerateSymbol": false
+    },
+    "open %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "open %@"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "abrir %@"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@をひらく"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ 열기"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "mở %@"
           }
         }
       },
@@ -32198,6 +32378,114 @@
       },
       "shouldGenerateSymbol": false
     },
+    "text %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "text %@"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "enviar mensaje al %@"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@にメッセージを送る"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@로 문자 보내기"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "nhắn tin đến %@"
+          }
+        }
+      },
+      "shouldGenerateSymbol": false
+    },
+    "text %@ instead": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "text %@ instead"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "o envía un mensaje al %@"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "かわりに%@へメッセージ"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "대신 %@로 문자하기"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "hoặc nhắn tin đến %@"
+          }
+        }
+      },
+      "shouldGenerateSymbol": false
+    },
+    "text %@ to %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "text %@ to %@"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "envía %1$@ al %2$@"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%2$@に%1$@と送る"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%2$@로 %1$@ 보내기"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "nhắn %1$@ đến %2$@"
+          }
+        }
+      },
+      "shouldGenerateSymbol": false
+    },
     "text HOME to 741741": {
       "localizations": {
         "en": {
@@ -32788,6 +33076,42 @@
           "stringUnit": {
             "state": "translated",
             "value": "khu vườn uống lấy\nnhững gì bầu trời bỏ quên"
+          }
+        }
+      },
+      "shouldGenerateSymbol": false
+    },
+    "the international association for suicide prevention directory": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "the international association for suicide prevention directory"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "el directorio de la asociación internacional para la prevención del suicidio"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "国際自殺予防学会のディレクトリ"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "국제자살예방협회 디렉터리"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "danh mục của hiệp hội quốc tế phòng chống tự tử"
           }
         }
       },
@@ -37048,6 +37372,42 @@
       },
       "shouldGenerateSymbol": false
     },
+    "whatsapp %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "whatsapp %@"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "whatsapp %@"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "whatsappで%@へ"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "whatsapp %@"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "whatsapp %@"
+          }
+        }
+      },
+      "shouldGenerateSymbol": false
+    },
     "when anxiety hits": {
       "extractionState": "manual",
       "localizations": {
@@ -37168,6 +37528,42 @@
           "stringUnit": {
             "state": "translated",
             "value": "dù bạn ở đâu, luôn có sự giúp đỡ 🌍"
+          }
+        }
+      },
+      "shouldGenerateSymbol": false
+    },
+    "wherever you are, help exists. these directories can find a line close to you 🌍": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "wherever you are, help exists. these directories can find a line close to you 🌍"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "estés donde estés, la ayuda existe. estos directorios pueden encontrar una línea cerca de ti 🌍"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "どこにいても、助けはあるよ。このディレクトリで近くの相談窓口を見つけられるよ 🌍"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "어디에 있든, 도움은 존재해요. 이 디렉터리에서 가까운 상담 전화를 찾을 수 있어요 🌍"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "dù bạn ở đâu, sự giúp đỡ luôn tồn tại. các danh mục này có thể tìm một đường dây gần bạn 🌍"
           }
         }
       },

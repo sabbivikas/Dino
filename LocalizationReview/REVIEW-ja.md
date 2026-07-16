@@ -487,3 +487,20 @@ all are in `ja-audit-additions.json` (key → translation). please give EXTRA at
 5. **crisis card copy** (breathing coach) — "call or text 988" block. numbers/keywords must stay exact.
 6. **widget lines** — very small screens, so shorter is better; flag anything that will overflow.
 7. **permission dialogs** (system popups asking for health/mic/camera access) — must sound trustworthy.
+
+
+## ⚠️ SAFETY-CRITICAL — crisis keyword walk (NOT optional)
+
+dino shows a support card when free text sounds like a crisis. the japanese trigger list
+below was drafted by a model and MUST be confirmed by you — does it match how japanese
+speakers actually write about this? anything missing? anything that fires on everyday text?
+
+死にたい · しにたい · 死のう · 死んでしまいたい · 死んだほうがまし · 死なせて · 消えたい ·
+きえたい · 消えてしまいたい · いなくなりたい · 自殺 · 自傷 · リストカット · リスカ · 手首を切 ·
+首を吊 · 生きたくない · 生きていたくない · 生きるのがつらい · 生きる意味がない · 終わりにしたい ·
+楽になりたい · もう無理
+
+**named question from the owner**: 「もう無理」を入れています（意図的に広めに拾う設計）。
+ただ、日常でもよく使われる表現なので、サポートカードの意味が薄れるほど頻繁に出てしまわないか、
+あなたの感覚で判断してください — 残すべき？外すべき？「何もかももう無理」のような
+長い形だけにすべき？

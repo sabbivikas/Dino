@@ -487,3 +487,18 @@ all are in `vi-audit-additions.json` (key → translation). please give EXTRA at
 5. **crisis card copy** (breathing coach) — "call or text 988" block. numbers/keywords must stay exact.
 6. **widget lines** — very small screens, so shorter is better; flag anything that will overflow.
 7. **permission dialogs** (system popups asking for health/mic/camera access) — must sound trustworthy.
+
+
+## ⚠️ SAFETY-CRITICAL — crisis keyword walk (NOT optional)
+
+dino hiển thị thẻ hỗ trợ khi văn bản tự do nghe như một khủng hoảng. danh sách tiếng việt
+dưới đây do model soạn và BẮT BUỘC cần bạn xác nhận — có đúng cách người việt thật sự nói
+về điều này không? thiếu gì (tiếng lóng, cách nói giảm)? có cụm nào sẽ kích hoạt nhầm trong
+trò chuyện thường ngày không?
+
+cụm từ: muốn chết · muốn tự tử · kết thúc cuộc đời · kết thúc tất cả · không muốn sống ·
+không thiết sống · chán sống · muốn biến mất · tự làm hại bản thân · tự làm đau bản thân ·
+rạch tay · thà chết còn hơn · chết cho xong · tốt hơn nếu không có mình ·
+không còn lý do để sống · sống không có ý nghĩa
+từ: tự tử · tự sát · tự hại · dạng không dấu: muon chet · khong muon song
+(đã loại "tu tu" không dấu vì quá mơ hồ — bạn thấy đúng không?)

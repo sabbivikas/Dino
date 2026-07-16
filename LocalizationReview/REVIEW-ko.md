@@ -487,3 +487,16 @@ all are in `ko-audit-additions.json` (key → translation). please give EXTRA at
 5. **crisis card copy** (breathing coach) — "call or text 988" block. numbers/keywords must stay exact.
 6. **widget lines** — very small screens, so shorter is better; flag anything that will overflow.
 7. **permission dialogs** (system popups asking for health/mic/camera access) — must sound trustworthy.
+
+
+## ⚠️ SAFETY-CRITICAL — crisis keyword walk (NOT optional)
+
+dino는 자유 입력 텍스트가 위기 신호로 들리면 지원 카드를 보여줘요. 아래 한국어 트리거
+목록은 모델이 작성한 초안이며 반드시 당신의 확인이 필요해요 — 실제로 한국어에서 이렇게
+말하나요? 빠진 표현(은어, 완곡어법)이 있나요? 일상 대화에서 잘못 발동할 표현이 있나요?
+
+죽고싶 · 죽어버리 · 죽었으면 · 죽는게낫 · 죽는것이낫 · 자살 · 자해 · 목숨을끊 · 목숨끊 ·
+살고싶지않 · 살기싫 · 살이유가없 · 사라지고싶 · 없어지고싶 · 더는못살 · 더이상못살 ·
+손목을긋 · 손목긋 · 그만살고싶 · 희망이없
+(모두 띄어쓰기 무시 매칭 — 죽고 싶어 / 죽고싶다 / 어떤 활용형이든 잡혀요.
+"ㅈㅅ"는 보통 "죄송"이라 의도적으로 제외했어요 — 맞는 판단인가요?)

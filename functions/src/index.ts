@@ -572,43 +572,7 @@ const BREATHING_MINUTES = [1, 3, 5, 8, 10];
 const BREATHING_CHIPS = ["anxious", "cantSleep", "overwhelmed", "cantFocus", "panicky", "restless", "stressed", "sad"];
 const BREATHING_SAFE_REASON = "a steady breath for a heavy moment \u{1F33F}";
 
-// Server crisis net (detector #2 of 3). SAFETY NET tuned to over-trigger;
-// it can only force concern true, never suppress it. Keep the list in sync
-// with the client net in Dino/Services/BreathingCoach.swift.
-const CRISIS_PHRASES = [
-  "kill myself", "killing myself", "killed myself",
-  "end my life", "ending my life", "end it all", "ending it all",
-  "want to die", "wanna die", "want to be dead",
-  "wish i was dead", "wish i were dead",
-  "better off dead", "better off without me",
-  "self harm", "harm myself", "harming myself",
-  "hurt myself", "hurting myself",
-  "cut myself", "cutting myself",
-  "no reason to live", "nothing to live for",
-  "dont want to be here anymore", "dont want to be alive", "dont want to live",
-  "cant go on", "cannot go on", "cant do this anymore",
-  "want to disappear", "want to give up", "giving up on life", "ready to give up",
-  "no point anymore", "no point in anything", "no point in living",
-];
-const CRISIS_WORDS = new Set(["suicide", "suicidal", "hopeless", "worthless", "kms"]);
-const CRISIS_DESPACED = ["killmyself", "endmylife", "wanttodie", "selfharm", "hurtmyself", "cutmyself", "suicide", "suicidal"];
-
-function breathingCrisisNet(text: string): boolean {
-  const normalized = text
-    .toLowerCase()
-    .replace(/[’']/g, "")
-    .replace(/[^a-z0-9]+/g, " ")
-    .trim();
-  if (!normalized) return false;
-  const tokens = new Set(normalized.split(" "));
-  for (const w of CRISIS_WORDS) {
-    if (tokens.has(w)) return true;
-  }
-  const padded = ` ${normalized} `;
-  if (CRISIS_PHRASES.some((p) => padded.includes(` ${p} `))) return true;
-  const despaced = normalized.replace(/ /g, "");
-  return CRISIS_DESPACED.some((p) => despaced.includes(p));
-}
+import { breathingCrisisNet } from "./crisisNet";
 
 export const suggestBreathingSession = onCall(
   { secrets: [OPENAI_API_KEY], timeoutSeconds: 15, memory: "256MiB" },
