@@ -77,8 +77,8 @@ enum ComfortRecVoice {
 
     /// the header follows the hour — no forced moon at midday (owner tweak).
     static func header(hour: Int) -> String {
-        (5..<17).contains(hour) ? "dino picked this for you 🌿"
-                                : "dino picked this for you 🌙"
+        (5..<17).contains(hour) ? String(localized: "dino picked this for you 🌿")
+                                : String(localized: "dino picked this for you 🌙")
     }
 
     static func metaLine(_ rec: RichRec) -> String {

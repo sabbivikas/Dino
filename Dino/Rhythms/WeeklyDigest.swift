@@ -207,10 +207,10 @@ struct WeeklyDigest: Equatable {
     // MARK: - Sparse weeks (honest, rotating — never the same nag twice)
 
     static let sparseLines = [
-        "a quiet week in the log. no pressure 🌿",
-        "we didn't cross paths much this week. the door is always open 🌱",
-        "a few quiet days. dino kept the garden warm for you 🍃",
-        "not much written down this week. weeks like that happen, and that's okay",
+        String(localized: "a quiet week in the log. no pressure 🌿"),
+        String(localized: "we didn't cross paths much this week. the door is always open 🌱"),
+        String(localized: "a few quiet days. dino kept the garden warm for you 🍃"),
+        String(localized: "not much written down this week. weeks like that happen, and that's okay"),
     ]
 
     static func sparseLine(weekIndex: Int) -> String {

@@ -20,12 +20,12 @@ enum ComfortSlip {
     static func kicker(hour: Int) -> String {
         let when: String
         switch hour {
-        case 21..., ..<5: when = "for tonight"
-        case 17..<21:     when = "for this evening"
-        case 5..<12:      when = "for this morning"
-        default:          when = "for today"
+        case 21..., ..<5: when = String(localized: "for tonight")
+        case 17..<21:     when = String(localized: "for this evening")
+        case 5..<12:      when = String(localized: "for this morning")
+        default:          when = String(localized: "for today")
         }
-        return "a small comfort · \(when)"
+        return String(localized: "a small comfort · \(when)")
     }
 
     static func tapeTint(type: String) -> Color {

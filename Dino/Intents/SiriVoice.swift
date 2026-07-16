@@ -81,22 +81,22 @@ enum MoodSynonyms {
 enum SiriReplies {
 
     static let drainedLines = [
-        "kept. be gentle with yourself.",
-        "kept. rest is allowed.",
-        "kept. that took something to say.",
+        String(localized: "kept. be gentle with yourself."),
+        String(localized: "kept. rest is allowed."),
+        String(localized: "kept. that took something to say."),
     ]
     static let overwhelmedLines = [
-        "kept. one breath at a time.",
-        "kept. you don't have to hold it all.",
-        "kept. i'm here.",
+        String(localized: "kept. one breath at a time."),
+        String(localized: "kept. you don't have to hold it all."),
+        String(localized: "kept. i'm here."),
     ]
     static let partlyCloudyLines = [
-        "kept. clouds pass.",
-        "kept. thanks for checking in.",
+        String(localized: "kept. clouds pass."),
+        String(localized: "kept. thanks for checking in."),
     ]
     static let clearLines = [
-        "kept. glad the sky is clear.",
-        "kept. enjoy the light.",
+        String(localized: "kept. glad the sky is clear."),
+        String(localized: "kept. enjoy the light."),
     ]
 
     /// Deterministic rotation (log-count modulo) — never repeats twice in a row.
@@ -125,8 +125,8 @@ enum SiriReplies {
     }
 
     static let gratitudeLines = [
-        "kept. that's a good one.",
-        "kept. the jar is a little fuller.",
+        String(localized: "kept. that's a good one."),
+        String(localized: "kept. the jar is a little fuller."),
     ]
     static func gratitudeLine(rotation: Int) -> String {
         gratitudeLines[abs(rotation) % gratitudeLines.count]
