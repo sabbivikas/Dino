@@ -138,6 +138,9 @@ enum ExpeditionSignals {
         do {
             try await Firestore.firestore().collection("expeditionSignals").document(uid).setData(doc)
             defaults.set(now, forKey: lastSyncKey)
+            // outcome ledger followup rides the same daily beat (F1) — the
+            // trend bucket is already computed above, no new pipeline.
+            await OutcomeLedger.followupSweep(trendBucket: moodTrendBucket(heavyDays: heavy), now: now)
         } catch {
             #if DEBUG
             print("\u{1F54A} expedition signal sync failed: \(error.localizedDescription)")
