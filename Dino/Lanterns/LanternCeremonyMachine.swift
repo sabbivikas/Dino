@@ -192,7 +192,7 @@ enum CeremonyStrings {
 
     static func kicker(countryName: String?) -> String {
         guard let countryName, !countryName.isEmpty else { return "from a dino far away" }
-        return "from a dino in \(countryName)"
+        return String(localized: "from a dino in \(countryName)")
     }
 
     /// "4,000 miles · just for you" — km for metric locales, warm fallback

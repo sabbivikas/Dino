@@ -6,7 +6,27 @@
       "localizations": {},
       "shouldGenerateSymbol": false
     },
+    "%@ has been in my ears today 🎧": {
+      "extractionState": "manual",
+      "localizations": {},
+      "shouldGenerateSymbol": false
+    },
     "%@% GROWN": {
+      "extractionState": "manual",
+      "localizations": {},
+      "shouldGenerateSymbol": false
+    },
+    "%@, and a little wandering 🌿": {
+      "extractionState": "manual",
+      "localizations": {},
+      "shouldGenerateSymbol": false
+    },
+    "%@, this %@ 🌿": {
+      "extractionState": "manual",
+      "localizations": {},
+      "shouldGenerateSymbol": false
+    },
+    "%@, today 🌿": {
       "extractionState": "manual",
       "localizations": {},
       "shouldGenerateSymbol": false
@@ -125,32 +145,7 @@
       "localizations": {},
       "shouldGenerateSymbol": false
     },
-    "\\u{00B7}": {
-      "extractionState": "manual",
-      "localizations": {},
-      "shouldGenerateSymbol": false
-    },
-    "\\u{1F525}": {
-      "extractionState": "manual",
-      "localizations": {},
-      "shouldGenerateSymbol": false
-    },
-    "\\u{1F995}": {
-      "extractionState": "manual",
-      "localizations": {},
-      "shouldGenerateSymbol": false
-    },
-    "\\u{201C}%@\\u{201D}": {
-      "extractionState": "manual",
-      "localizations": {},
-      "shouldGenerateSymbol": false
-    },
-    "\\u{21A9}\\u{FE0E}": {
-      "extractionState": "manual",
-      "localizations": {},
-      "shouldGenerateSymbol": false
-    },
-    "a dino in %lld left this for you:": {
+    "a dino in %@ left this for you:": {
       "extractionState": "manual",
       "localizations": {},
       "shouldGenerateSymbol": false
@@ -229,7 +224,7 @@
       "localizations": {},
       "shouldGenerateSymbol": false
     },
-    "about tomorrow — %lld": {
+    "about tomorrow — %@": {
       "extractionState": "manual",
       "localizations": {},
       "shouldGenerateSymbol": false
@@ -313,7 +308,7 @@
       "localizations": {},
       "shouldGenerateSymbol": false
     },
-    "begin check-in \\u{2192}": {
+    "begin check-in →": {
       "extractionState": "manual",
       "localizations": {},
       "shouldGenerateSymbol": false
@@ -740,6 +735,11 @@
       "localizations": {},
       "shouldGenerateSymbol": false
     },
+    "from a dino in %@": {
+      "extractionState": "manual",
+      "localizations": {},
+      "shouldGenerateSymbol": false
+    },
     "from dino": {
       "extractionState": "manual",
       "localizations": {},
@@ -871,7 +871,7 @@
       "localizations": {},
       "shouldGenerateSymbol": false
     },
-    "if you miss tomorrow, it's okay. dino will wait. \\u{1F331}": {
+    "if you miss tomorrow, it's okay. dino will wait. 🌱": {
       "extractionState": "manual",
       "localizations": {},
       "shouldGenerateSymbol": false
@@ -896,7 +896,7 @@
       "localizations": {},
       "shouldGenerateSymbol": false
     },
-    "i’ll be here before it starts. you don’t have to do anything tonight. \\u{1F319}": {
+    "i’ll be here before it starts. you don’t have to do anything tonight. 🌙": {
       "extractionState": "manual",
       "localizations": {},
       "shouldGenerateSymbol": false
@@ -909,7 +909,7 @@
       "localizations": {},
       "shouldGenerateSymbol": false
     },
-    "keep checking in — every day adds a firefly. once i’ve watched you for three weeks, i’ll start to see your patterns. \\u{1F331}": {
+    "keep checking in — every day adds a firefly. once i’ve watched you for three weeks, i’ll start to see your patterns. 🌱": {
       "extractionState": "manual",
       "localizations": {},
       "shouldGenerateSymbol": false
@@ -1067,6 +1067,11 @@
       "localizations": {},
       "shouldGenerateSymbol": false
     },
+    "listened to %@ today 🎧": {
+      "extractionState": "manual",
+      "localizations": {},
+      "shouldGenerateSymbol": false
+    },
     "little expeditions": {
       "extractionState": "manual",
       "localizations": {},
@@ -1152,6 +1157,11 @@
       "shouldGenerateSymbol": false
     },
     "music carried a bit of today 🎧": {
+      "extractionState": "manual",
+      "localizations": {},
+      "shouldGenerateSymbol": false
+    },
+    "my body did some %@ today 🌿": {
       "extractionState": "manual",
       "localizations": {},
       "shouldGenerateSymbol": false
@@ -1436,7 +1446,7 @@
       "localizations": {},
       "shouldGenerateSymbol": false
     },
-    "save to jar \\u{1FAD9}": {
+    "save to jar 🫙": {
       "extractionState": "manual",
       "localizations": {},
       "shouldGenerateSymbol": false
@@ -1751,7 +1761,7 @@
       "localizations": {},
       "shouldGenerateSymbol": false
     },
-    "the forest is writing\\u{2026}": {
+    "the forest is writing…": {
       "extractionState": "manual",
       "localizations": {},
       "shouldGenerateSymbol": false
@@ -1781,7 +1791,7 @@
       "localizations": {},
       "shouldGenerateSymbol": false
     },
-    "there are no wrong answers \\u{1F33F}": {
+    "there are no wrong answers 🌿": {
       "extractionState": "manual",
       "localizations": {},
       "shouldGenerateSymbol": false
@@ -1831,6 +1841,11 @@
       "shouldGenerateSymbol": false
     },
     "time": {
+      "extractionState": "manual",
+      "localizations": {},
+      "shouldGenerateSymbol": false
+    },
+    "time with %@ today": {
       "extractionState": "manual",
       "localizations": {},
       "shouldGenerateSymbol": false
@@ -1887,7 +1902,7 @@
       "localizations": {},
       "shouldGenerateSymbol": false
     },
-    "tomorrow might ask a lot of you. %llds often do.": {
+    "tomorrow might ask a lot of you. %@s often do.": {
       "extractionState": "manual",
       "localizations": {},
       "shouldGenerateSymbol": false
@@ -2082,7 +2097,7 @@
       "localizations": {},
       "shouldGenerateSymbol": false
     },
-    "you completed this week \\u{2713}": {
+    "you completed this week ✓": {
       "extractionState": "manual",
       "localizations": {},
       "shouldGenerateSymbol": false
@@ -2125,17 +2140,12 @@
       "localizations": {},
       "shouldGenerateSymbol": false
     },
-    "you're already part of something beautiful \\u{1F331}": {
+    "you're already part of something beautiful 🌱": {
       "extractionState": "manual",
       "localizations": {},
       "shouldGenerateSymbol": false
     },
     "you're not alone": {
-      "localizations": {},
-      "shouldGenerateSymbol": false
-    },
-    "your %@ painting is ready \\u{2728}": {
-      "extractionState": "manual",
       "localizations": {},
       "shouldGenerateSymbol": false
     },
@@ -2164,7 +2174,7 @@
       "localizations": {},
       "shouldGenerateSymbol": false
     },
-    "your first painting generates at the end of this month \\u{1F3A8}": {
+    "your first painting generates at the end of this month 🎨": {
       "extractionState": "manual",
       "localizations": {},
       "shouldGenerateSymbol": false
@@ -2266,6 +2276,11 @@
       "localizations": {},
       "shouldGenerateSymbol": false
     },
+    "·": {
+      "extractionState": "manual",
+      "localizations": {},
+      "shouldGenerateSymbol": false
+    },
     "· the dino garden ·": {
       "extractionState": "manual",
       "localizations": {},
@@ -2281,12 +2296,32 @@
       "localizations": {},
       "shouldGenerateSymbol": false
     },
+    "“%@”": {
+      "extractionState": "manual",
+      "localizations": {},
+      "shouldGenerateSymbol": false
+    },
+    "↩︎": {
+      "extractionState": "manual",
+      "localizations": {},
+      "shouldGenerateSymbol": false
+    },
     "✦ still forming": {
       "extractionState": "manual",
       "localizations": {},
       "shouldGenerateSymbol": false
     },
     "✦ suggested": {
+      "extractionState": "manual",
+      "localizations": {},
+      "shouldGenerateSymbol": false
+    },
+    "🔥": {
+      "extractionState": "manual",
+      "localizations": {},
+      "shouldGenerateSymbol": false
+    },
+    "🦕": {
       "extractionState": "manual",
       "localizations": {},
       "shouldGenerateSymbol": false

@@ -1,0 +1,630 @@
+{
+ "a dino in %@ left this for you:": {
+  "back": "a dino in %@ left this for you:",
+  "es": "un dino en %@ te dejó esto:"
+ },
+ "a few quiet days. dino kept the garden warm for you 🍃": {
+  "back": "a few quiet days. dino kept the garden warm for you",
+  "es": "unos días tranquilos. dino mantuvo el jardín cálido para ti 🍃"
+ },
+ "a lot of motion in today 🌿": {
+  "back": "today there was a lot of movement",
+  "es": "hoy hubo mucho movimiento 🌿"
+ },
+ "a note from the forest": {
+  "back": "a note from the forest",
+  "es": "una nota del bosque"
+ },
+ "a quieter body day. rest is okay too 🌱": {
+  "back": "a quieter body day. resting is also okay",
+  "es": "un día de cuerpo más tranquilo. descansar también está bien 🌱"
+ },
+ "a short night. be gentle with yourself today 🌿": {
+  "back": "a short night. be kind to yourself today",
+  "es": "una noche corta. sé amable contigo hoy 🌿"
+ },
+ "a small comfort · %@": {
+  "back": "a small comfort · %@",
+  "es": "un pequeño consuelo · %@"
+ },
+ "a voice kept me company today 🎧": {
+  "back": "a voice kept me company today",
+  "es": "una voz me acompañó hoy 🎧"
+ },
+ "about tomorrow — %@": {
+  "back": "about tomorrow, %@",
+  "es": "sobre mañana, %@"
+ },
+ "add your first little joy": {
+  "back": "add your first little joy",
+  "es": "añade tu primera pequeña alegría"
+ },
+ "and a few from elsewhere": {
+  "back": "and some from other places",
+  "es": "y algunas de otros lugares"
+ },
+ "anonymous always. just moods and countries, never names or places.": {
+  "back": "always anonymous. only moods and countries, never names or places.",
+  "es": "siempre anónimo. solo ánimos y países, nunca nombres ni lugares."
+ },
+ "asks for": {
+  "back": "asks of you",
+  "es": "te pide"
+ },
+ "couldn't make your postcard just now. try again 🌱": {
+  "back": "i could not make your postcard just now. try again",
+  "es": "no pude hacer tu postal ahora. inténtalo de nuevo 🌱"
+ },
+ "dear friend,": {
+  "back": "dear friend,",
+  "es": "querido amigo,"
+ },
+ "decent rest last night 🌿": {
+  "back": "good rest last night",
+  "es": "buen descanso anoche 🌿"
+ },
+ "dino already helped you find a break today": {
+  "back": "dino already helped you find a break today",
+  "es": "dino ya te ayudó a encontrar una pausa hoy"
+ },
+ "dino got an update": {
+  "back": "dino got an update",
+  "es": "dino recibió una actualización"
+ },
+ "dino is learning\nyour rhythms": {
+  "back": "dino is learning your rhythms",
+  "es": "dino está aprendiendo\ntus ritmos"
+ },
+ "dino is learning your rhythms": {
+  "back": "dino is learning your rhythms",
+  "es": "dino está aprendiendo tus ritmos"
+ },
+ "dino is thinking…": {
+  "back": "dino is thinking…",
+  "es": "dino está pensando…"
+ },
+ "dino picked this for you 🌙": {
+  "back": "dino chose this for you",
+  "es": "dino eligió esto para ti 🌙"
+ },
+ "dino picked this for you 🌿": {
+  "back": "dino chose this for you",
+  "es": "dino eligió esto para ti 🌿"
+ },
+ "dino post": {
+  "back": "dino mail",
+  "es": "correo dino"
+ },
+ "dino reads every lantern before it flies. only kind ones travel.": {
+  "back": "dino reads every little lantern before it flies. only the kind ones travel.",
+  "es": "dino lee cada farolito antes de volar. solo viajan los amables."
+ },
+ "dino sometimes goes looking for small things for you, using only your weather patterns, never your words.": {
+  "back": "sometimes dino goes looking for little things for you, using only your weather patterns, never your words.",
+  "es": "a veces dino sale a buscar cositas para ti, usando solo tus patrones de clima, nunca tus palabras."
+ },
+ "dino went looking and found this for you 🕊": {
+  "back": "dino went out looking and found this for you",
+  "es": "dino salió a buscar y encontró esto para ti 🕊"
+ },
+ "dino went looking tonight and this glimmered": {
+  "back": "dino went looking tonight and this glimmered",
+  "es": "dino salió a buscar esta noche y esto brilló"
+ },
+ "dino will take a look and keep the skies kind": {
+  "back": "dino will take a look and keep the skies kind",
+  "es": "dino echará un vistazo y mantendrá los cielos amables"
+ },
+ "dino will write when something's worth saying.": {
+  "back": "dino will write when there is something worth saying.",
+  "es": "dino escribirá cuando haya algo que valga la pena decir."
+ },
+ "done. i'll remind you at %@ 🌱": {
+  "back": "done. i will remind you at %@",
+  "es": "listo. te lo recordaré a las %@ 🌱"
+ },
+ "feels": {
+  "back": "feels",
+  "es": "se siente"
+ },
+ "for this evening": {
+  "back": "for this evening",
+  "es": "para esta tarde"
+ },
+ "for this morning": {
+  "back": "for this morning",
+  "es": "para esta mañana"
+ },
+ "for today": {
+  "back": "for today",
+  "es": "para hoy"
+ },
+ "for tonight": {
+  "back": "for tonight",
+  "es": "para esta noche"
+ },
+ "forest post": {
+  "back": "forest mail",
+  "es": "correo del bosque"
+ },
+ "from dino": {
+  "back": "from dino",
+  "es": "de dino"
+ },
+ "glad the sky is kind today": {
+  "back": "good that the sky is kind today",
+  "es": "qué bueno que el cielo está amable hoy"
+ },
+ "good afternoon": {
+  "back": "good afternoon",
+  "es": "buenas tardes"
+ },
+ "good evening": {
+  "back": "good evening",
+  "es": "buenas noches"
+ },
+ "good morning 🌿": {
+  "back": "good morning",
+  "es": "buenos días 🌿"
+ },
+ "grown with dino 🦕": {
+  "back": "grown with dino",
+  "es": "cultivado con dino 🦕"
+ },
+ "how are you\nfeeling today?": {
+  "back": "how do you feel today?",
+  "es": "¿cómo te\nsientes hoy?"
+ },
+ "how are you feeling lately?": {
+  "back": "how have you been feeling lately?",
+  "es": "¿cómo te has sentido últimamente?"
+ },
+ "how are you feeling right now?": {
+  "back": "how do you feel right now?",
+  "es": "¿cómo te sientes ahora mismo?"
+ },
+ "how are you feeling?": {
+  "back": "how do you feel?",
+  "es": "¿cómo te sientes?"
+ },
+ "how's your\ninner weather?": {
+  "back": "how is your inner weather?",
+  "es": "¿cómo está tu\nclima interior?"
+ },
+ "however it is, it counts": {
+  "back": "however it is, it counts",
+  "es": "sea como sea, cuenta"
+ },
+ "i think %@ would help —": {
+  "back": "i think %@ would help you,",
+  "es": "creo que %@ te ayudaría,"
+ },
+ "if you miss tomorrow, it's okay. dino will wait. 🌱": {
+  "back": "if you do not come tomorrow, it is okay. dino will wait.",
+  "es": "si mañana no vienes, está bien. dino esperará. 🌱"
+ },
+ "it drifted a long way": {
+  "back": "it floated from very far",
+  "es": "flotó desde muy lejos"
+ },
+ "it felt like a soft match for today": {
+  "back": "it felt like something soft for today",
+  "es": "se sintió como algo suave para hoy"
+ },
+ "it's good to see you": {
+  "back": "good to see you",
+  "es": "qué bueno verte"
+ },
+ "i’ll be here before it starts. you don’t have to do anything tonight. 🌙": {
+  "back": "i will be here before it starts. you do not have to do anything tonight.",
+  "es": "estaré aquí antes de que empiece. no tienes que hacer nada esta noche. 🌙"
+ },
+ "keep checking in — every day adds a firefly": {
+  "back": "keep stopping by, each day adds a firefly",
+  "es": "sigue pasando por aquí, cada día suma una luciérnaga"
+ },
+ "keep checking in — every day adds a firefly. once i’ve watched you for three weeks, i’ll start to see your patterns. 🌱": {
+  "back": "keep stopping by, each day adds a firefly. once i have accompanied you for three weeks, i will start to see your patterns.",
+  "es": "sigue pasando por aquí, cada día suma una luciérnaga. cuando te haya acompañado tres semanas, empezaré a ver tus patrones. 🌱"
+ },
+ "keep reading": {
+  "back": "keep reading",
+  "es": "seguir leyendo"
+ },
+ "keep this": {
+  "back": "keep this",
+  "es": "guardar esto"
+ },
+ "kept in your jar · warm things stay": {
+  "back": "kept in your jar · warm things stay",
+  "es": "guardado en tu frasco · lo cálido se queda"
+ },
+ "kept. be gentle with yourself.": {
+  "back": "kept. be kind to yourself.",
+  "es": "guardado. sé amable contigo."
+ },
+ "kept. clouds pass.": {
+  "back": "kept. the clouds pass.",
+  "es": "guardado. las nubes pasan."
+ },
+ "kept. enjoy the light.": {
+  "back": "kept. enjoy the light.",
+  "es": "guardado. disfruta la luz."
+ },
+ "kept. glad the sky is clear.": {
+  "back": "kept. good that the sky is clear.",
+  "es": "guardado. qué bueno que el cielo está despejado."
+ },
+ "kept. i'm here.": {
+  "back": "kept. here i am.",
+  "es": "guardado. aquí estoy."
+ },
+ "kept. one breath at a time.": {
+  "back": "kept. one breath at a time.",
+  "es": "guardado. una respiración a la vez."
+ },
+ "kept. rest is allowed.": {
+  "back": "kept. resting is allowed.",
+  "es": "guardado. descansar está permitido."
+ },
+ "kept. thanks for checking in.": {
+  "back": "kept. thanks for stopping by.",
+  "es": "guardado. gracias por pasar."
+ },
+ "kept. that took something to say.": {
+  "back": "kept. saying that took something.",
+  "es": "guardado. decir eso costó algo."
+ },
+ "kept. that's a good one.": {
+  "back": "kept. that is a good one.",
+  "es": "guardado. ese es bueno."
+ },
+ "kept. the jar is a little fuller.": {
+  "back": "kept. the jar is a little fuller.",
+  "es": "guardado. el frasco está un poco más lleno."
+ },
+ "kept. you don't have to hold it all.": {
+  "back": "kept. you do not have to carry it all.",
+  "es": "guardado. no tienes que cargarlo todo."
+ },
+ "kindness that drifted to you from around the world": {
+  "back": "kindness that floated to you from around the world",
+  "es": "amabilidad que llegó flotando hasta ti desde todo el mundo"
+ },
+ "last watered %@d ago": {
+  "back": "watered %@d ago",
+  "es": "regado hace %@d"
+ },
+ "lighter sleep than usual — today might feel a little heavier": {
+  "back": "you slept lighter than usual, today may feel a bit heavier",
+  "es": "dormiste más ligero de lo habitual, hoy puede sentirse un poco más pesado"
+ },
+ "lighter sleep than usual. today might feel a little heavier": {
+  "back": "lighter sleep than usual. today may feel a bit heavier",
+  "es": "sueño más ligero de lo habitual. hoy puede sentirse un poco más pesado"
+ },
+ "lights around the world": {
+  "back": "lights around the world",
+  "es": "luces alrededor del mundo"
+ },
+ "likely a tender day": {
+  "back": "probably a tender day",
+  "es": "probablemente un día sensible"
+ },
+ "listen on apple music": {
+  "back": "listen on apple music",
+  "es": "escuchar en apple music"
+ },
+ "listen on apple music or spotify?": {
+  "back": "listen on apple music or spotify?",
+  "es": "¿escuchar en apple music o spotify?"
+ },
+ "listen on spotify": {
+  "back": "listen on spotify",
+  "es": "escuchar en spotify"
+ },
+ "listened to %@ today 🎧": {
+  "back": "i listened to %@ today",
+  "es": "escuché %@ hoy 🎧"
+ },
+ "little expeditions": {
+  "back": "little expeditions",
+  "es": "pequeñas expediciones"
+ },
+ "little moments": {
+  "back": "little moments",
+  "es": "pequeños momentos"
+ },
+ "moments from your day": {
+  "back": "moments from your day",
+  "es": "momentos de tu día"
+ },
+ "moving through the day at your own pace 🍃": {
+  "back": "you move through the day at your own pace",
+  "es": "vas por el día a tu propio ritmo 🍃"
+ },
+ "music carried a bit of today 🎧": {
+  "back": "music carried a bit of the day",
+  "es": "la música llevó un poco del día 🎧"
+ },
+ "my body did some %@ today 🌿": {
+  "back": "my body did %@ today",
+  "es": "mi cuerpo hizo %@ hoy 🌿"
+ },
+ "my body did something good today 🌿": {
+  "back": "my body did something good today",
+  "es": "mi cuerpo hizo algo bueno hoy 🌿"
+ },
+ "my little garden is growing 🌱 i keep it in dino, a tiny gentle companion": {
+  "back": "my little garden is growing, i tend it in dino, a small gentle companion",
+  "es": "mi jardincito está creciendo 🌱 lo cuido en dino, un compañero pequeño y gentil"
+ },
+ "no rush at all": {
+  "back": "no rush at all",
+  "es": "sin ninguna prisa"
+ },
+ "not tonight": {
+  "back": "not tonight",
+  "es": "esta noche no"
+ },
+ "nothing here yet": {
+  "back": "nothing here yet",
+  "es": "aún no hay nada aquí"
+ },
+ "on hard days, dropping one moment into your jar shifts something. it doesn't have to be big.": {
+  "back": "on hard days, dropping one moment in your jar changes something. it does not have to be big.",
+  "es": "en los días difíciles, dejar un momento en tu frasco cambia algo. no tiene que ser grande."
+ },
+ "one small good thing": {
+  "back": "one small good thing",
+  "es": "una pequeña cosa buena"
+ },
+ "only you see this": {
+  "back": "only you see this",
+  "es": "solo tú ves esto"
+ },
+ "read it on apple books": {
+  "back": "read it on apple books",
+  "es": "leerlo en apple books"
+ },
+ "real people, ready to listen. any hour, any reason.": {
+  "back": "real people, ready to listen. at any hour, for any reason.",
+  "es": "personas reales, listas para escuchar. a cualquier hora, por cualquier motivo."
+ },
+ "save to jar 🫙": {
+  "back": "save in the jar",
+  "es": "guardar en el frasco 🫙"
+ },
+ "saved to your jar": {
+  "back": "saved in your jar",
+  "es": "guardado en tu frasco"
+ },
+ "see where it lives": {
+  "back": "see where it lives",
+  "es": "ver dónde vive"
+ },
+ "see where to watch": {
+  "back": "see where to watch it",
+  "es": "ver dónde verlo"
+ },
+ "send a lantern to someone having a hard day": {
+  "back": "send a little lantern to someone having a hard day",
+  "es": "envía un farolito a alguien que tiene un día difícil"
+ },
+ "share my garden": {
+  "back": "share my garden",
+  "es": "compartir mi jardín"
+ },
+ "she left your letter for later 🌿": {
+  "back": "she left your letter for later",
+  "es": "dejó tu carta para más tarde 🌿"
+ },
+ "slow down, you're safe here": {
+  "back": "slow down, here you are safe",
+  "es": "ve más despacio, aquí estás a salvo"
+ },
+ "someone far away left it for you": {
+  "back": "someone far away left it for you",
+  "es": "alguien muy lejos lo dejó para ti"
+ },
+ "something i watched stayed with me today": {
+  "back": "something i watched stayed with me today",
+  "es": "algo que vi se quedó conmigo hoy"
+ },
+ "something is drifting in": {
+  "back": "something is floating in",
+  "es": "algo se acerca flotando"
+ },
+ "something kind…": {
+  "back": "something kind…",
+  "es": "algo amable…"
+ },
+ "somewhere that held today 🌿": {
+  "back": "a place that held the day",
+  "es": "un lugar que sostuvo el día 🌿"
+ },
+ "still getting to know your rhythm 🌱": {
+  "back": "still getting to know your rhythm",
+  "es": "todavía conociendo tu ritmo 🌱"
+ },
+ "support is always close 🌿": {
+  "back": "support is always close",
+  "es": "el apoyo siempre está cerca 🌿"
+ },
+ "take a look": {
+  "back": "take a look",
+  "es": "echa un vistazo"
+ },
+ "that's a short night — be gentle with yourself today 🌿": {
+  "back": "it was a short night, be kind to yourself today",
+  "es": "fue una noche corta, sé amable contigo hoy 🌿"
+ },
+ "the forest is writing…": {
+  "back": "the forest is writing…",
+  "es": "el bosque está escribiendo…"
+ },
+ "the quieter lights": {
+  "back": "the quieter lights",
+  "es": "las luces más tranquilas"
+ },
+ "the world's inner weather": {
+  "back": "the world's inner weather",
+  "es": "el clima interior del mundo"
+ },
+ "these directories can find a line close to you, in your language.": {
+  "back": "these directories can find a line close to you, in your language.",
+  "es": "estos directorios pueden encontrar una línea cercana a ti, en tu idioma."
+ },
+ "this one has drifted away": {
+  "back": "this one has drifted away",
+  "es": "este se ha ido a la deriva"
+ },
+ "time with %@ today": {
+  "back": "time with %@ today",
+  "es": "tiempo con %@ hoy"
+ },
+ "today I'm grateful for…": {
+  "back": "today i am grateful for…",
+  "es": "hoy agradezco…"
+ },
+ "today had a walk in it 🌿": {
+  "back": "today there was a walk",
+  "es": "hoy hubo un paseo 🌿"
+ },
+ "today sounds heavy 🌧️": {
+  "back": "today sounds heavy",
+  "es": "hoy suena pesado 🌧️"
+ },
+ "tomorrow brings fresh time. your calendar break is still there 🌱": {
+  "back": "tomorrow brings new time. your calendar break is still there",
+  "es": "mañana trae tiempo nuevo. tu pausa del calendario sigue ahí 🌱"
+ },
+ "tomorrow might ask a lot of you. %@s often do.": {
+  "back": "tomorrow may ask a lot of you. %@s tend to.",
+  "es": "mañana puede pedirte mucho. los %@ suelen hacerlo."
+ },
+ "tonight's lantern is in your jar": {
+  "back": "tonight's little lantern is in your jar",
+  "es": "el farolito de esta noche está en tu frasco"
+ },
+ "waiting to be watered": {
+  "back": "waiting to be watered",
+  "es": "esperando ser regado"
+ },
+ "watch it on apple tv": {
+  "back": "watch it on apple tv",
+  "es": "verlo en apple tv"
+ },
+ "watch on": {
+  "back": "watch on",
+  "es": "ver en"
+ },
+ "watered today 💧": {
+  "back": "watered today",
+  "es": "regado hoy 💧"
+ },
+ "what i’ve noticed": {
+  "back": "what i have noticed",
+  "es": "lo que he notado"
+ },
+ "what made you smile?": {
+  "back": "what made you smile?",
+  "es": "¿qué te hizo sonreír?"
+ },
+ "when dino picks something for you, it rests here": {
+  "back": "when dino chooses something for you, it rests here",
+  "es": "cuando dino elige algo para ti, descansa aquí"
+ },
+ "wherever you are, help exists 🌍": {
+  "back": "wherever you are, help exists",
+  "es": "estés donde estés, la ayuda existe 🌍"
+ },
+ "why this fits your day": {
+  "back": "why it fits your day",
+  "es": "por qué encaja con tu día"
+ },
+ "with love,": {
+  "back": "with affection,",
+  "es": "con cariño,"
+ },
+ "write back →": {
+  "back": "reply",
+  "es": "responder →"
+ },
+ "xo, dino": {
+  "back": "a hug, dino",
+  "es": "un abrazo, dino"
+ },
+ "you showed up today — and that's already something. 🌱": {
+  "back": "today you showed up, and that is already something.",
+  "es": "hoy apareciste, y eso ya es algo. 🌱"
+ },
+ "you slept well — good foundation for today 🌱": {
+  "back": "you slept well, a good foundation for today",
+  "es": "dormiste bien, buena base para hoy 🌱"
+ },
+ "you slept well. good foundation for today 🌱": {
+  "back": "you slept well. good foundation for today",
+  "es": "dormiste bien. buena base para hoy 🌱"
+ },
+ "you're already part of something beautiful 🌱": {
+  "back": "you are already part of something beautiful",
+  "es": "ya eres parte de algo hermoso 🌱"
+ },
+ "you're not alone": {
+  "back": "you are not alone",
+  "es": "no estás solo"
+ },
+ "your brighter days often have a little more movement in them": {
+  "back": "your brighter days usually have a little more movement",
+  "es": "tus días más luminosos suelen tener un poco más de movimiento"
+ },
+ "your garden 🌻": {
+  "back": "your garden",
+  "es": "tu jardín 🌻"
+ },
+ "your inner weather": {
+  "back": "your inner weather",
+  "es": "tu clima interior"
+ },
+ "your jar is empty 🫙": {
+  "back": "your jar is empty",
+  "es": "tu frasco está vacío 🫙"
+ },
+ "your keepsakes": {
+  "back": "your keepsakes",
+  "es": "tus recuerdos"
+ },
+ "your lanterns": {
+  "back": "your little lanterns",
+  "es": "tus farolitos"
+ },
+ "your letter arrives with the morning 🌅": {
+  "back": "your letter arrives with the morning",
+  "es": "tu carta llega con la mañana 🌅"
+ },
+ "your little shelf": {
+  "back": "your little shelf",
+  "es": "tu pequeña repisa"
+ },
+ "your sunflower is %@": {
+  "back": "your sunflower is %@",
+  "es": "tu girasol está %@"
+ },
+ "yours alone — never leaves this device": {
+  "back": "yours alone, it never leaves this device",
+  "es": "solo tuyo, nunca sale de este dispositivo"
+ },
+ "· the dino garden ·": {
+  "back": "the dino garden",
+  "es": "· el jardín de dino ·"
+ },
+ "— dino": {
+  "back": "— dino",
+  "es": "— dino"
+ },
+ "— end of letters —": {
+  "back": "— end of the letters —",
+  "es": "— fin de las cartas —"
+ }
+}

@@ -1,5 +1,9 @@
  · 
+%@ has been in my ears today 🎧
 %@% GROWN
+%@, and a little wandering 🌿
+%@, this %@ 🌿
+%@, today 🌿
 %lld
 %lld %@
 %lld / %lld xp
@@ -23,12 +27,7 @@
 Apple Weather
 DINO
 THIS SEASON
-\u{00B7}
-\u{1F525}
-\u{1F995}
-\u{201C}%@\u{201D}
-\u{21A9}\u{FE0E}
-a dino in %lld left this for you:
+a dino in %@ left this for you:
 a few gentle nudges
 a few questions to understand how you've been
 a few quiet days. dino kept the garden warm for you 🍃
@@ -44,7 +43,7 @@ a small comfort · %@
 a small paragraph of body text showing how it reads at this size. kindness grows in quiet minutes.
 a soft reminder each evening
 a voice kept me company today 🎧
-about tomorrow — %lld
+about tomorrow — %@
 about you
 add a little something about yourself
 add your first little joy
@@ -61,7 +60,7 @@ avg energy
 back
 backdate entry
 begin
-begin check-in \u{2192}
+begin check-in →
 begin · %lld min
 bloom
 breathe
@@ -181,15 +180,15 @@ how's your
 inner weather?
 however it is, it counts
 i think %@ would help —
-if you miss tomorrow, it's okay. dino will wait. \u{1F331}
+if you miss tomorrow, it's okay. dino will wait. 🌱
 include routines
 it drifted a long way
 it felt like a soft match for today
 it's good to see you
-i’ll be here before it starts. you don’t have to do anything tonight. \u{1F319}
+i’ll be here before it starts. you don’t have to do anything tonight. 🌙
 journal
 keep checking in — every day adds a firefly
-keep checking in — every day adds a firefly. once i’ve watched you for three weeks, i’ll start to see your patterns. \u{1F331}
+keep checking in — every day adds a firefly. once i’ve watched you for three weeks, i’ll start to see your patterns. 🌱
 keep it close 🌱
 keep reading
 keep this
@@ -221,6 +220,7 @@ likely a tender day
 listen on apple music
 listen on apple music or spotify?
 listen on spotify
+listened to %@ today 🎧
 little expeditions
 little moments
 location access needed
@@ -239,6 +239,7 @@ morning
 move this memory
 moving through the day at your own pace 🍃
 music carried a bit of today 🎧
+my body did some %@ today 🌿
 my body did something good today 🌿
 my little
 my little garden is growing 🌱 i keep it in dino, a tiny gentle companion
@@ -296,7 +297,7 @@ report this lantern
 report this lantern?
 reset to default
 save
-save to jar \u{1FAD9}
+save to jar 🫙
 saved
 saved to camera roll ✨
 saved to your jar
@@ -363,13 +364,13 @@ thank you for being honest/brave. i know it isn't easy to talk about your strugg
 that's a short night — be gentle with yourself today 🌿
 the evening is arriving early
 the forest
-the forest is writing\u{2026}
+the forest is writing…
 the quieter lights
 the world's inner weather
 theme is controlled by weather. switch to manual to choose your own.
 theme mode
 theme: %@
-there are no wrong answers \u{1F33F}
+there are no wrong answers 🌿
 these directories can find a line close to you, in your language.
 this can't be undone.
 this is a reflection tool, not a clinical diagnosis.
@@ -380,6 +381,7 @@ this week's reflection
 this will delete all your moods, journals and gratitude. are you sure?
 this will permanently delete your account, all your data from the cloud, and sign you out. this cannot be undone. are you sure?
 time
+time with %@ today
 to enable notifications, go to Settings → Dino → Notifications and turn them on
 to permanently delete your account, please verify your identity.
 to receive self-care reminders, enable notifications for Dino in iPhone Settings → Notifications → Dino
@@ -391,7 +393,7 @@ today had a walk in it 🌿
 today sounds heavy 🌧️
 today's focus
 tomorrow brings fresh time. your calendar break is still there 🌱
-tomorrow might ask a lot of you. %llds often do.
+tomorrow might ask a lot of you. %@s often do.
 tonight's lantern is in your jar
 try again a little later 🌿
 update
@@ -431,7 +433,7 @@ write back →
 xo, dino
 yes, hold that time 🌿
 you
-you completed this week \u{2713}
+you completed this week ✓
 you showed up 
 you showed up every single day.
 now go stick your notes on your real mirror
@@ -442,15 +444,14 @@ you slept well. good foundation for today 🌱
 you took time for yourself.
 you'll be asked to sign in with apple again.
 you'll be asked to sign in with google again.
-you're already part of something beautiful \u{1F331}
+you're already part of something beautiful 🌱
 you're not alone
-your %@ painting is ready \u{2728}
 your %@ painting is ready ✨
 your brighter days often have a little more movement in them
 your busiest day this week 🌿
 your calendar looks full for now.
 your emotional gallery
-your first painting generates at the end of this month \u{1F3A8}
+your first painting generates at the end of this month 🎨
 your garden 🌻
 your inner weather
 your iphone can gather little moments privately. a photo you took, a place you visited, a song you played. your iphone shows them only to you first. dino sees just the one moment you choose to write about, and only then. nothing is shared or sent anywhere.
@@ -471,8 +472,13 @@ your sunflower is %@
 your week %lld report
 your wellness journey
 yours alone — never leaves this device
+·
 · the dino garden ·
 — dino
 — end of letters —
+“%@”
+↩︎
 ✦ still forming
 ✦ suggested
+🔥
+🦕
