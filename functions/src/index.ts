@@ -2222,7 +2222,10 @@ export const generateComfortRecs = onCall(
       "feel: exactly one of cozy, hopeful, quiet. " +
       "length: a short honest time phrase like 'about 2 hours' or 'a slow weekend read'. no dashes. " +
       "all text lowercase." +
-      getLanguageInstruction(userLocale);
+      getLanguageInstruction(userLocale) +
+      (getLanguageInstruction(userLocale)
+        ? " the why and length fields MUST be written in that language, never english. titles and creators stay exactly in their original language."
+        : "");
 
     const userPrompt = [
       mood ? `their day: feeling ${mood}.` : "their day: a quiet heaviness.",
