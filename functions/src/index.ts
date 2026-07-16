@@ -572,43 +572,9 @@ const BREATHING_MINUTES = [1, 3, 5, 8, 10];
 const BREATHING_CHIPS = ["anxious", "cantSleep", "overwhelmed", "cantFocus", "panicky", "restless", "stressed", "sad"];
 const BREATHING_SAFE_REASON = "a steady breath for a heavy moment \u{1F33F}";
 
-// Server crisis net (detector #2 of 3). SAFETY NET tuned to over-trigger;
-// it can only force concern true, never suppress it. Keep the list in sync
-// with the client net in Dino/Services/BreathingCoach.swift.
-const CRISIS_PHRASES = [
-  "kill myself", "killing myself", "killed myself",
-  "end my life", "ending my life", "end it all", "ending it all",
-  "want to die", "wanna die", "want to be dead",
-  "wish i was dead", "wish i were dead",
-  "better off dead", "better off without me",
-  "self harm", "harm myself", "harming myself",
-  "hurt myself", "hurting myself",
-  "cut myself", "cutting myself",
-  "no reason to live", "nothing to live for",
-  "dont want to be here anymore", "dont want to be alive", "dont want to live",
-  "cant go on", "cannot go on", "cant do this anymore",
-  "want to disappear", "want to give up", "giving up on life", "ready to give up",
-  "no point anymore", "no point in anything", "no point in living",
-];
-const CRISIS_WORDS = new Set(["suicide", "suicidal", "hopeless", "worthless", "kms"]);
-const CRISIS_DESPACED = ["killmyself", "endmylife", "wanttodie", "selfharm", "hurtmyself", "cutmyself", "suicide", "suicidal"];
-
-function breathingCrisisNet(text: string): boolean {
-  const normalized = text
-    .toLowerCase()
-    .replace(/[’']/g, "")
-    .replace(/[^a-z0-9]+/g, " ")
-    .trim();
-  if (!normalized) return false;
-  const tokens = new Set(normalized.split(" "));
-  for (const w of CRISIS_WORDS) {
-    if (tokens.has(w)) return true;
-  }
-  const padded = ` ${normalized} `;
-  if (CRISIS_PHRASES.some((p) => padded.includes(` ${p} `))) return true;
-  const despaced = normalized.replace(/ /g, "");
-  return CRISIS_DESPACED.some((p) => despaced.includes(p));
-}
+import { breathingCrisisNet } from "./crisisNet";
+import { DISTILLER_PROMPT, buildDistillerInput, validatePrefs, LedgerEntry,
+         PREF_MIN_OUTCOMES, PREF_MAX_ENTRIES } from "./preferences";
 
 export const suggestBreathingSession = onCall(
   { secrets: [OPENAI_API_KEY], timeoutSeconds: 15, memory: "256MiB" },
@@ -1873,10 +1839,18 @@ type MissionOutcome = "gift" | "silence" | "retryable";
  *  hop in the chain (provider error, timeout, quota, empty or invalid
  *  output); "silence" is final (gentleness rejection — a bad gift does not
  *  get a second chance at being bad). */
+const FALLBACK_DINO_LINE: Record<string, string> = {
+  en: "dino went looking tonight and this glimmered",
+  es: "dino salió a buscar esta noche y esto brillaba",
+  ja: "dinoが今夜さがしにいって、これがきらっとひかっていたよ",
+  ko: "dino가 오늘 밤 찾으러 나갔다가 이게 반짝이고 있었어",
+  vi: "dino đi tìm tối nay và thấy điều này lấp lánh",
+};
+
 async function attemptMission(
   db: admin.firestore.Firestore, uid: string, needKind: string,
   r: AiRoute, keys: { openai?: string; metaKey?: string; metaBase?: string },
-  sources: string[], recentSources: string[]
+  sources: string[], recentSources: string[], userLocale = "en"
 ): Promise<MissionOutcome> {
   const deadline = Date.now() + MISSION_TIMEOUT_MS;
   let promptTokens = 0;
@@ -1947,7 +1921,7 @@ async function attemptMission(
       if (!check.gift) return check.reason === "gentle" ? "silence" : "retryable";
       const gift = check.gift;
       // delivered words — the one warm line the user reads (router: 4.1 mini)
-      let dinoLine = "dino went looking tonight and this glimmered";
+      let dinoLine = FALLBACK_DINO_LINE[userLocale] ?? FALLBACK_DINO_LINE.en;
       try {
         const dw = aiRoute("deliveredWords");
         const dwClient = aiClientFor(dw, { openai: OPENAI_API_KEY.value() });
@@ -1957,7 +1931,8 @@ async function attemptMission(
             { role: "system", content:
               "you are dino. write ONE warm lowercase line, no dashes, 14 words or fewer, " +
               "to hand someone a small gift you found for them. never clinical, never salesy. " +
-              "never address them by any name: a name in the gift's title is not their name." },
+              "never address them by any name: a name in the gift's title is not their name." +
+              getLanguageInstruction(userLocale) },
             { role: "user", content: `the gift is a ${needKind} kind of thing called "${gift.title}".` },
           ],
         });
@@ -1991,7 +1966,7 @@ async function attemptMission(
  *  the whole chain; the hard rules were asserted on every hop by the
  *  router. All hops fail = silence, never an error to the user. */
 async function runExpeditionMission(db: admin.firestore.Firestore, uid: string, needKind: string,
-                                    recentSources: string[] = []): Promise<boolean> {
+                                    recentSources: string[] = [], userLocale = "en"): Promise<boolean> {
   if (!(await grantMissionBudget(db, uid))) return false;
   const keys = {
     openai: OPENAI_API_KEY.value(),
@@ -2007,7 +1982,7 @@ async function runExpeditionMission(db: admin.firestore.Firestore, uid: string, 
       // meta unconfigured → this hop cannot run; fall through to the next
     } else {
       aiLogRoute("mission", r);
-      outcome = await attemptMission(db, uid, needKind, r, keys, sources, recentSources);
+      outcome = await attemptMission(db, uid, needKind, r, keys, sources, recentSources, userLocale);
       // outcome telemetry — model + result only, never user data
       functions.logger.info("mission_attempt", { model: r.model, outcome });
     }
@@ -2082,7 +2057,9 @@ export const nightlyExpeditionWatch = onSchedule(
           }, { merge: true });
           const recentSources = (Array.isArray(exp.recentSources) ? exp.recentSources : [])
             .map((s: unknown) => String(s)).slice(0, 6);
-          await runExpeditionMission(db, doc.id, needKind, recentSources);   // F2 — silence on any failure
+          const userLocale = ["en", "es", "ja", "ko", "vi"].includes(String(d.userLocale))
+            ? String(d.userLocale) : "en";
+          await runExpeditionMission(db, doc.id, needKind, recentSources, userLocale);   // F2 — silence on any failure
         }
       } catch {
         // luna failure = a quiet night; no attempt recorded → tomorrow may retry
@@ -2222,7 +2199,10 @@ export const generateComfortRecs = onCall(
       "feel: exactly one of cozy, hopeful, quiet. " +
       "length: a short honest time phrase like 'about 2 hours' or 'a slow weekend read'. no dashes. " +
       "all text lowercase." +
-      getLanguageInstruction(userLocale);
+      getLanguageInstruction(userLocale) +
+      (getLanguageInstruction(userLocale)
+        ? " the why and length fields MUST be written in that language, never english. titles and creators stay exactly in their original language."
+        : "");
 
     const userPrompt = [
       mood ? `their day: feeling ${mood}.` : "their day: a quiet heaviness.",
@@ -2307,4 +2287,108 @@ export const generateComfortRecs = onCall(
   }
 );
 
+// ---------------------------------------------------------------------------
+// Preference distillation (memory + shelf arc F2)
+// Reads a user's outcome ledger (enum tuples only), asks luna to classify it
+// into preference buckets, clamps the answer, writes prefs/{uid}. Runs only
+// for users with new outcomes in the last day and >= PREF_MIN_OUTCOMES total.
+// ---------------------------------------------------------------------------
+
+const DISTILL_NIGHTLY_CAP = 50;                 // users per night
+const DISTILL_MONTHLY_GLOBAL_CAP = 2000;        // runs per month
+
+async function grantDistillBudget(db: admin.firestore.Firestore): Promise<boolean> {
+  const mk = monthKey(new Date());
+  const ref = db.collection("prefsSpend").doc(mk);
+  return db.runTransaction(async (tx) => {
+    const runs = ((await tx.get(ref)).data()?.runs as number | undefined) ?? 0;
+    if (runs >= DISTILL_MONTHLY_GLOBAL_CAP) return false;
+    tx.set(ref, { runs: runs + 1,
+                  updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
+    return true;
+  });
+}
+
+export const nightlyPreferenceDistill = onSchedule(
+  { schedule: "23 4 * * *", secrets: [OPENAI_API_KEY], timeoutSeconds: 540, memory: "256MiB" },
+  async () => {
+    const db = admin.firestore();
+    const cutoff = admin.firestore.Timestamp.fromMillis(Date.now() - 26 * 3600 * 1000);
+    // users with fresh outcomes — collection-group sweep, deduped client-side
+    const fresh = await db.collectionGroup("entries")
+      .where("shownAt", ">=", cutoff)
+      .limit(500)
+      .get();
+    const uids: string[] = [];
+    for (const doc of fresh.docs) {
+      // path: outcomes/{uid}/entries/{id} — only ledger entries qualify
+      const parent = doc.ref.parent.parent;   // outcomes/{uid}
+      if (!parent || parent.parent.id !== "outcomes") continue;
+      if (!uids.includes(parent.id)) uids.push(parent.id);
+      if (uids.length >= DISTILL_NIGHTLY_CAP) break;
+    }
+
+    let distilled = 0;
+    for (const uid of uids) {
+      try {
+        const entriesSnap = await db.collection("outcomes").doc(uid).collection("entries")
+          .orderBy("shownAt", "desc")
+          .limit(PREF_MAX_ENTRIES + 50)
+          .get();
+        if (entriesSnap.size < PREF_MIN_OUTCOMES) continue;
+
+        // retention: prune anything beyond the newest cap (F1 contract)
+        const extras = entriesSnap.docs.slice(PREF_MAX_ENTRIES);
+        if (extras.length > 0) {
+          const batch = db.batch();
+          extras.forEach((d) => batch.delete(d.ref));
+          await batch.commit();
+        }
+
+        const entries: LedgerEntry[] = entriesSnap.docs.slice(0, PREF_MAX_ENTRIES).map((d) => {
+          const x = d.data();
+          return {
+            kind: String(x.kind ?? ""), itemType: String(x.itemType ?? ""),
+            sourceDomain: typeof x.sourceDomain === "string" ? x.sourceDomain : undefined,
+            moodContext: String(x.moodContext ?? "none"), daypart: String(x.daypart ?? "night"),
+            action: String(x.action ?? "shown"),
+            followupTrend: typeof x.followupTrend === "string" ? x.followupTrend : undefined,
+          };
+        });
+
+        if (!(await grantDistillBudget(db))) break;   // monthly cap reached — quiet stop
+
+        const r = aiRoute("preferences");
+        const client = aiClientFor(r, { openai: OPENAI_API_KEY.value() });
+        const resp = await client.chat.completions.create({
+          model: r.model,
+          // gpt-5 family: max_completion_tokens, default temperature only
+          max_completion_tokens: r.maxTokens,
+          response_format: { type: "json_object" },
+          messages: [
+            { role: "system", content: DISTILLER_PROMPT },
+            { role: "user", content: buildDistillerInput(entries) },
+          ],
+        });
+        functions.logger.info("prefs_usage", {
+          model: r.model,
+          promptTokens: resp.usage?.prompt_tokens ?? 0,
+          completionTokens: resp.usage?.completion_tokens ?? 0,
+        });
+        let parsed: unknown = null;
+        try { parsed = JSON.parse(resp.choices[0]?.message?.content ?? ""); } catch { /* falls through */ }
+        const prefs = validatePrefs(parsed, entries);
+        if (!prefs) { functions.logger.info("prefs_invalid", { model: r.model, count: entries.length }); continue; }
+
+        await db.collection("prefs").doc(uid).set({
+          ...prefs,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        }, { merge: false });
+        distilled++;
+      } catch {
+        // one user's trouble never stops the sweep
+      }
+    }
+    functions.logger.info("prefs_nightly", { candidates: uids.length, distilled });
+  });
 

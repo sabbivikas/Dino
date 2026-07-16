@@ -15,7 +15,7 @@
 import OpenAI from "openai";
 import * as logger from "firebase-functions/logger";
 
-export type AiTask = "watching" | "mission" | "deliveredWords" | "comfortRecs";
+export type AiTask = "watching" | "mission" | "deliveredWords" | "comfortRecs" | "preferences";
 export type AiRoute = {
   provider: "openai" | "meta";
   model: string;
@@ -49,6 +49,13 @@ const CHAINS: Record<AiTask, AiRoute[]> = {
   comfortRecs: [
     { provider: "openai", model: "gpt-4.1-mini",   maxTokens: 500, temperature: 0.5 },
   ],
+  // preference distillation (memory + shelf F2) is CLASSIFICATION — luna
+  // territory. gpt-5 family: call site sends max_completion_tokens only,
+  // and reasoning tokens bill as output — the budget carries headroom
+  // (verified live: 300 truncated the json mid-stream).
+  preferences: [
+    { provider: "openai", model: "gpt-5.6-luna", maxTokens: 1000, temperature: 0 },
+  ],
 };
 
 export function assertRoute(task: AiTask, r: AiRoute): void {
@@ -60,6 +67,9 @@ export function assertRoute(task: AiTask, r: AiRoute): void {
   }
   if (task === "comfortRecs" && r.model !== "gpt-4.1-mini") {
     throw new Error("hard rule: comfort recs stay gpt-4.1-mini");
+  }
+  if (task === "preferences" && (r.provider === "meta" || r.model.toLowerCase().includes("spark"))) {
+    throw new Error("hard rule: preferences never route to muse spark or any mission model");
   }
 }
 
