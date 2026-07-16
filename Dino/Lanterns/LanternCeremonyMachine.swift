@@ -179,16 +179,16 @@ enum CeremonyLayout {
 // MARK: - Ceremony copy (owner-approved verbatim; lowercase, zero dashes)
 
 enum CeremonyStrings {
-    static let loggedLine = "logged 🌱"
-    static let hoverTitle = "it drifted a long way"
-    static let hoverSub = "someone far away left it for you"
-    static let tapToOpen = "tap to open"
-    static let keepButton = "keep it close 🌱"
-    static let reportLink = "report this lantern"
-    static let keptCaption = "kept in your jar · warm things stay"
-    static let jarStackLine = "tonight's lantern is in your jar"
-    static let voHush = "the evening is arriving early"
-    static let voDrift = "something is drifting in"
+    static let loggedLine = String(localized: "logged 🌱")
+    static let hoverTitle = String(localized: "it drifted a long way")
+    static let hoverSub = String(localized: "someone far away left it for you")
+    static let tapToOpen = String(localized: "tap to open")
+    static let keepButton = String(localized: "keep it close 🌱")
+    static let reportLink = String(localized: "report this lantern")
+    static let keptCaption = String(localized: "kept in your jar · warm things stay")
+    static let jarStackLine = String(localized: "tonight's lantern is in your jar")
+    static let voHush = String(localized: "the evening is arriving early")
+    static let voDrift = String(localized: "something is drifting in")
 
     static func kicker(countryName: String?) -> String {
         guard let countryName, !countryName.isEmpty else { return "from a dino far away" }

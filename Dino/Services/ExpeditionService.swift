@@ -24,14 +24,14 @@ struct ExpeditionGift: Codable, Equatable {
 
 enum ExpeditionVoice {
     // fixed strings (lowercase, zero dashes — voice tested)
-    static let cardHeader = "dino went looking and found this for you \u{1F54A}"
-    static let fromPrefix = "from"
-    static let openLink = "see where it lives"
-    static let keepIt = "keep this"
-    static let driftedAway = "this one has drifted away"
-    static let settingsTitle = "little expeditions"
-    static let settingsBody = "dino sometimes goes looking for small things for you, using only your weather patterns, never your words."
-    static let fallbackLine = "dino went looking tonight and this glimmered"
+    static let cardHeader = String(localized: "dino went looking and found this for you \u{1F54A}")
+    static let fromPrefix = String(localized: "from")
+    static let openLink = String(localized: "see where it lives")
+    static let keepIt = String(localized: "keep this")
+    static let driftedAway = String(localized: "this one has drifted away")
+    static let settingsTitle = String(localized: "little expeditions")
+    static let settingsBody = String(localized: "dino sometimes goes looking for small things for you, using only your weather patterns, never your words.")
+    static let fallbackLine = String(localized: "dino went looking tonight and this glimmered")
     static let needKinds = ["rest", "beauty", "hope", "wonder", "connection"]
 
     static var allFixedStrings: [String] {

@@ -13,8 +13,8 @@ import SwiftUI
 
 enum ComfortSlip {
     // strings (owner-approved verbatim; lowercase, zero dashes)
-    static let takeALook = "take a look"
-    static let notTonight = "not tonight"
+    static let takeALook = String(localized: "take a look")
+    static let notTonight = String(localized: "not tonight")
 
     /// "a small comfort · for tonight" — daypart by hour.
     static func kicker(hour: Int) -> String {

@@ -46,26 +46,26 @@ struct RecLink: Equatable, Identifiable {
 
 enum ComfortRecVoice {
     // fixed strings (lowercase, zero dashes — voice tested)
-    static let whyLabel = "why this fits your day"
-    static let feelPrefix = "feels"
-    static let lengthPrefix = "asks for"
-    static let openAppleMusic = "listen on apple music"
-    static let openSpotify = "listen on spotify"
-    static let openBooks = "read it on apple books"
-    static let openTV = "watch it on apple tv"
-    static let fallbackWhy = "it felt like a soft match for today"
-    static let fallbackLength = "no rush at all"
-    static let flagSeparator = " \u{00B7} "
+    static let whyLabel = String(localized: "why this fits your day")
+    static let feelPrefix = String(localized: "feels")
+    static let lengthPrefix = String(localized: "asks for")
+    static let openAppleMusic = String(localized: "listen on apple music")
+    static let openSpotify = String(localized: "listen on spotify")
+    static let openBooks = String(localized: "read it on apple books")
+    static let openTV = String(localized: "watch it on apple tv")
+    static let fallbackWhy = String(localized: "it felt like a soft match for today")
+    static let fallbackLength = String(localized: "no rush at all")
+    static let flagSeparator = String(localized: " \u{00B7} ")
     // feature 2: the one time ask, then dino remembers their place
-    static let askWhich = "listen on apple music or spotify?"
-    static let orPrefix = "or"
+    static let askWhich = String(localized: "listen on apple music or spotify?")
+    static let orPrefix = String(localized: "or")
     // films: free to them, or the neutral every option page
-    static let watchOnPrefix = "watch on"
-    static let whereToWatch = "see where to watch"
+    static let watchOnPrefix = String(localized: "watch on")
+    static let whereToWatch = String(localized: "see where to watch")
     // feature 3: the little shelf
-    static let shelfTitle = "your little shelf"
-    static let shelfEmpty = "nothing here yet"
-    static let shelfEmptySub = "when dino picks something for you, it rests here"
+    static let shelfTitle = String(localized: "your little shelf")
+    static let shelfEmpty = String(localized: "nothing here yet")
+    static let shelfEmptySub = String(localized: "when dino picks something for you, it rests here")
 
     static func shelfKept(_ n: Int) -> String { "\(n) kept" }
     static func shelfRowLine(_ n: Int) -> String { "\(shelfTitle) \u{00B7} \(shelfKept(n))" }

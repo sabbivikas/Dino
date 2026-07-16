@@ -37,13 +37,13 @@ enum WorldRedesignVoice {
         "\(country), \(rowCount(count, isToday: isToday))"
     }
 
-    static let expanderCollapsed = "and a few from elsewhere"
-    static let expanderExpanded = "the quieter lights"
+    static let expanderCollapsed = String(localized: "and a few from elsewhere")
+    static let expanderExpanded = String(localized: "the quieter lights")
 
     // MARK: - Lanterns
 
-    static let lanternHeader = "your lanterns"
-    static let lanternSubline = "kindness that drifted to you from around the world"
+    static let lanternHeader = String(localized: "your lanterns")
+    static let lanternSubline = String(localized: "kindness that drifted to you from around the world")
     static func seeAll(_ total: Int) -> String { "see all \(total) \u{203A}" }
 
     /// "{country} · {date}" — the card's quiet footer
@@ -51,7 +51,7 @@ enum WorldRedesignVoice {
 
     // MARK: - The gallery screen
 
-    static let galleryHeader = "your lanterns"
+    static let galleryHeader = String(localized: "your lanterns")
 
     static func gallerySubline(total: Int, countries: Int) -> String {
         let kept = total == 1 ? "1 kindness kept" : "\(total) kindnesses kept"

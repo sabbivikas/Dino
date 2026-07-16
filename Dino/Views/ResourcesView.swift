@@ -18,12 +18,12 @@ import UIKit
 // MARK: - Screen model (pure → unit-tested)
 
 enum ResourceScreen {
-    static let regionalHeader = "support is always close 🌿"
-    static let regionalSub = "real people, ready to listen. any hour, any reason."
-    static let fallbackHeader = "wherever you are, help exists 🌍"
-    static let fallbackSub = "these directories can find a line close to you, in your language."
+    static let regionalHeader = String(localized: "support is always close 🌿")
+    static let regionalSub = String(localized: "real people, ready to listen. any hour, any reason.")
+    static let fallbackHeader = String(localized: "wherever you are, help exists 🌍")
+    static let fallbackSub = String(localized: "these directories can find a line close to you, in your language.")
     static let badge247 = "24/7"
-    static let badgeVaries = "hours vary"
+    static let badgeVaries = String(localized: "hours vary")
 
     /// Every tilt stays under 1.2°, alternating down the list — paper warmth
     /// without wobbling the eye's path.
