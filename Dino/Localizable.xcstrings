@@ -11,26 +11,6 @@
       "localizations": {},
       "shouldGenerateSymbol": false
     },
-    "%@) has been in my ears today 🎧": {
-      "extractionState": "manual",
-      "localizations": {},
-      "shouldGenerateSymbol": false
-    },
-    "%@), and a little wandering 🌿": {
-      "extractionState": "manual",
-      "localizations": {},
-      "shouldGenerateSymbol": false
-    },
-    "%@), this %@ 🌿": {
-      "extractionState": "manual",
-      "localizations": {},
-      "shouldGenerateSymbol": false
-    },
-    "%@), today 🌿": {
-      "extractionState": "manual",
-      "localizations": {},
-      "shouldGenerateSymbol": false
-    },
     "%lld": {
       "extractionState": "manual",
       "localizations": {},
@@ -81,17 +61,12 @@
       "localizations": {},
       "shouldGenerateSymbol": false
     },
-    "%lld)": {
-      "extractionState": "manual",
-      "localizations": {},
-      "shouldGenerateSymbol": false
-    },
-    "%lld))/10": {
-      "extractionState": "manual",
-      "localizations": {},
-      "shouldGenerateSymbol": false
-    },
     "%lld/%@": {
+      "extractionState": "manual",
+      "localizations": {},
+      "shouldGenerateSymbol": false
+    },
+    "%lld/10": {
       "extractionState": "manual",
       "localizations": {},
       "shouldGenerateSymbol": false
@@ -135,32 +110,12 @@
       "localizations": {},
       "shouldGenerateSymbol": false
     },
-    "A": {
-      "extractionState": "manual",
-      "localizations": {},
-      "shouldGenerateSymbol": false
-    },
     "Apple Weather": {
       "extractionState": "manual",
       "localizations": {},
       "shouldGenerateSymbol": false
     },
-    "D": {
-      "extractionState": "manual",
-      "localizations": {},
-      "shouldGenerateSymbol": false
-    },
     "DINO": {
-      "extractionState": "manual",
-      "localizations": {},
-      "shouldGenerateSymbol": false
-    },
-    "G": {
-      "extractionState": "manual",
-      "localizations": {},
-      "shouldGenerateSymbol": false
-    },
-    "RENDER RETURNED NIL": {
       "extractionState": "manual",
       "localizations": {},
       "shouldGenerateSymbol": false
@@ -195,7 +150,7 @@
       "localizations": {},
       "shouldGenerateSymbol": false
     },
-    "a dino in %lld) left this for you:": {
+    "a dino in %lld left this for you:": {
       "extractionState": "manual",
       "localizations": {},
       "shouldGenerateSymbol": false
@@ -274,7 +229,7 @@
       "localizations": {},
       "shouldGenerateSymbol": false
     },
-    "about tomorrow — %lld)": {
+    "about tomorrow — %lld": {
       "extractionState": "manual",
       "localizations": {},
       "shouldGenerateSymbol": false
@@ -458,7 +413,7 @@
       "localizations": {},
       "shouldGenerateSymbol": false
     },
-    "composed %lld)x%lld) @%lld)x": {
+    "composed %lldx%lld @%lldx": {
       "extractionState": "manual",
       "localizations": {},
       "shouldGenerateSymbol": false
@@ -522,11 +477,6 @@
       "shouldGenerateSymbol": false
     },
     "days": {
-      "extractionState": "manual",
-      "localizations": {},
-      "shouldGenerateSymbol": false
-    },
-    "dead": {
       "extractionState": "manual",
       "localizations": {},
       "shouldGenerateSymbol": false
@@ -1078,7 +1028,7 @@
       "localizations": {},
       "shouldGenerateSymbol": false
     },
-    "lighter sleep lately tends to make %lld)s feel heavier.": {
+    "lighter sleep lately tends to make %llds feel heavier.": {
       "extractionState": "manual",
       "localizations": {},
       "shouldGenerateSymbol": false
@@ -1113,11 +1063,6 @@
       "shouldGenerateSymbol": false
     },
     "listen on spotify": {
-      "extractionState": "manual",
-      "localizations": {},
-      "shouldGenerateSymbol": false
-    },
-    "listened to %@) today 🎧": {
       "extractionState": "manual",
       "localizations": {},
       "shouldGenerateSymbol": false
@@ -1207,11 +1152,6 @@
       "shouldGenerateSymbol": false
     },
     "music carried a bit of today 🎧": {
-      "extractionState": "manual",
-      "localizations": {},
-      "shouldGenerateSymbol": false
-    },
-    "my body did some %@) today 🌿": {
       "extractionState": "manual",
       "localizations": {},
       "shouldGenerateSymbol": false
@@ -1344,11 +1284,6 @@
       "localizations": {},
       "shouldGenerateSymbol": false
     },
-    "page 1": {
-      "extractionState": "manual",
-      "localizations": {},
-      "shouldGenerateSymbol": false
-    },
     "painting will be ready soon 🎨": {
       "extractionState": "manual",
       "localizations": {},
@@ -1384,11 +1319,6 @@
       "shouldGenerateSymbol": false
     },
     "picking the best light...": {
-      "extractionState": "manual",
-      "localizations": {},
-      "shouldGenerateSymbol": false
-    },
-    "postcard qa": {
       "extractionState": "manual",
       "localizations": {},
       "shouldGenerateSymbol": false
@@ -1497,11 +1427,6 @@
       "shouldGenerateSymbol": false
     },
     "reset to default": {
-      "extractionState": "manual",
-      "localizations": {},
-      "shouldGenerateSymbol": false
-    },
-    "same uid above · different uids below": {
       "extractionState": "manual",
       "localizations": {},
       "shouldGenerateSymbol": false
@@ -1910,11 +1835,6 @@
       "localizations": {},
       "shouldGenerateSymbol": false
     },
-    "time with %@) today": {
-      "extractionState": "manual",
-      "localizations": {},
-      "shouldGenerateSymbol": false
-    },
     "to enable notifications, go to Settings → Dino → Notifications and turn them on": {
       "extractionState": "manual",
       "localizations": {},
@@ -1967,7 +1887,7 @@
       "localizations": {},
       "shouldGenerateSymbol": false
     },
-    "tomorrow might ask a lot of you. %lld)s often do.": {
+    "tomorrow might ask a lot of you. %llds often do.": {
       "extractionState": "manual",
       "localizations": {},
       "shouldGenerateSymbol": false
@@ -1978,16 +1898,6 @@
       "shouldGenerateSymbol": false
     },
     "try again a little later 🌿": {
-      "localizations": {},
-      "shouldGenerateSymbol": false
-    },
-    "uid a": {
-      "extractionState": "manual",
-      "localizations": {},
-      "shouldGenerateSymbol": false
-    },
-    "uid b": {
-      "extractionState": "manual",
       "localizations": {},
       "shouldGenerateSymbol": false
     },
@@ -2225,6 +2135,11 @@
       "shouldGenerateSymbol": false
     },
     "your %@ painting is ready \\u{2728}": {
+      "extractionState": "manual",
+      "localizations": {},
+      "shouldGenerateSymbol": false
+    },
+    "your %@ painting is ready ✨": {
       "extractionState": "manual",
       "localizations": {},
       "shouldGenerateSymbol": false
