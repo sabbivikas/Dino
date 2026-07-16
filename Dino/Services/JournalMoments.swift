@@ -29,13 +29,13 @@ enum JournalMoments {
 
     // MARK: - Copy (owner-approved 2026-07-09; lowercase, no dashes)
 
-    static let inviteLine = "want to write about your day?"   // short: the row is single-line
-    static let inviteAction = "show me"
+    static let inviteLine = String(localized: "want to write about your day?")   // short: the row is single-line
+    static let inviteAction = String(localized: "show me")
 
-    static let consentTitle = "moments from your day"
-    static let consentBody = "your iphone can gather little moments privately. a photo you took, a place you visited, a song you played. your iphone shows them only to you first. dino sees just the one moment you choose to write about, and only then. nothing is shared or sent anywhere."
-    static let consentPrimary = "show my moments"
-    static let consentSecondary = "maybe later"
+    static let consentTitle = String(localized: "moments from your day")
+    static let consentBody = String(localized: "your iphone can gather little moments privately. a photo you took, a place you visited, a song you played. your iphone shows them only to you first. dino sees just the one moment you choose to write about, and only then. nothing is shared or sent anywhere.")
+    static let consentPrimary = String(localized: "show my moments")
+    static let consentSecondary = String(localized: "maybe later")
 
     // MARK: - Storage keys
 
@@ -63,9 +63,9 @@ enum JournalMoments {
     /// morning 5–11, afternoon 12–17, evening 18–22, else nil (→ "today").
     static func daypart(hour: Int) -> String? {
         switch hour {
-        case 5..<12:  return "morning"
-        case 12..<18: return "afternoon"
-        case 18..<23: return "evening"
+        case 5..<12:  return String(localized: "morning")
+        case 12..<18: return String(localized: "afternoon")
+        case 18..<23: return String(localized: "evening")
         default:      return nil
         }
     }
@@ -73,29 +73,29 @@ enum JournalMoments {
     static func seedLine(for kind: MomentKind) -> String {
         switch kind {
         case .location(let place, let daypart):
-            guard let place, !place.isEmpty else { return "somewhere that held today 🌿" }
-            if let daypart { return "\(place.lowercased()), this \(daypart) 🌿" }
-            return "\(place.lowercased()), today 🌿"
+            guard let place, !place.isEmpty else { return String(localized: "somewhere that held today 🌿") }
+            if let daypart { return String(localized: "\(place.lowercased()), this \(daypart) 🌿") }
+            return String(localized: "\(place.lowercased()), today 🌿")
         case .locationGroup(let firstPlace):
-            guard let firstPlace, !firstPlace.isEmpty else { return "somewhere that held today 🌿" }
-            return "\(firstPlace.lowercased()), and a little wandering 🌿"
+            guard let firstPlace, !firstPlace.isEmpty else { return String(localized: "somewhere that held today 🌿") }
+            return String(localized: "\(firstPlace.lowercased()), and a little wandering 🌿")
         case .workout(let activity):
-            guard let activity, !activity.isEmpty else { return "my body did something good today 🌿" }
-            return "my body did some \(activity.lowercased()) today 🌿"
+            guard let activity, !activity.isEmpty else { return String(localized: "my body did something good today 🌿") }
+            return String(localized: "my body did some \(activity.lowercased()) today 🌿")
         case .motion:
-            return "today had a walk in it 🌿"
+            return String(localized: "today had a walk in it 🌿")
         case .song(let title):
-            guard let title, !title.isEmpty else { return "music carried a bit of today 🎧" }
-            return "\(title.lowercased()) has been in my ears today 🎧"
+            guard let title, !title.isEmpty else { return String(localized: "music carried a bit of today 🎧") }
+            return String(localized: "\(title.lowercased()) has been in my ears today 🎧")
         case .podcast(let show):
-            guard let show, !show.isEmpty else { return "a voice kept me company today 🎧" }
-            return "listened to \(show.lowercased()) today 🎧"
+            guard let show, !show.isEmpty else { return String(localized: "a voice kept me company today 🎧") }
+            return String(localized: "listened to \(show.lowercased()) today 🎧")
         case .contact(let name):
             // neutral by owner decision: time with a person isn't always warm;
             // the writer brings the feeling
-            return "time with \(name.lowercased()) today"
+            return String(localized: "time with \(name.lowercased()) today")
         case .genericMedia:
-            return "something i watched stayed with me today"
+            return String(localized: "something i watched stayed with me today")
         }
     }
 

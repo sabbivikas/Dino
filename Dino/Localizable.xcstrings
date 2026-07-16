@@ -11,6 +11,26 @@
       "localizations": {},
       "shouldGenerateSymbol": false
     },
+    "%@) has been in my ears today 🎧": {
+      "extractionState": "manual",
+      "localizations": {},
+      "shouldGenerateSymbol": false
+    },
+    "%@), and a little wandering 🌿": {
+      "extractionState": "manual",
+      "localizations": {},
+      "shouldGenerateSymbol": false
+    },
+    "%@), this %@ 🌿": {
+      "extractionState": "manual",
+      "localizations": {},
+      "shouldGenerateSymbol": false
+    },
+    "%@), today 🌿": {
+      "extractionState": "manual",
+      "localizations": {},
+      "shouldGenerateSymbol": false
+    },
     "%lld": {
       "extractionState": "manual",
       "localizations": {},
@@ -85,12 +105,32 @@
       "localizations": {},
       "shouldGenerateSymbol": false
     },
+    "10d": {
+      "extractionState": "manual",
+      "localizations": {},
+      "shouldGenerateSymbol": false
+    },
+    "14d+": {
+      "extractionState": "manual",
+      "localizations": {},
+      "shouldGenerateSymbol": false
+    },
     "30 notes milestone!": {
       "extractionState": "manual",
       "localizations": {},
       "shouldGenerateSymbol": false
     },
+    "3d": {
+      "extractionState": "manual",
+      "localizations": {},
+      "shouldGenerateSymbol": false
+    },
     "4 minutes of breathing activates your body's calm response. dino will guide you through it.": {
+      "extractionState": "manual",
+      "localizations": {},
+      "shouldGenerateSymbol": false
+    },
+    "7d": {
       "extractionState": "manual",
       "localizations": {},
       "shouldGenerateSymbol": false
@@ -229,6 +269,11 @@
       "localizations": {},
       "shouldGenerateSymbol": false
     },
+    "a voice kept me company today 🎧": {
+      "extractionState": "manual",
+      "localizations": {},
+      "shouldGenerateSymbol": false
+    },
     "about tomorrow — %lld)": {
       "extractionState": "manual",
       "localizations": {},
@@ -245,6 +290,11 @@
       "shouldGenerateSymbol": false
     },
     "add your first little joy": {
+      "extractionState": "manual",
+      "localizations": {},
+      "shouldGenerateSymbol": false
+    },
+    "afternoon": {
       "extractionState": "manual",
       "localizations": {},
       "shouldGenerateSymbol": false
@@ -270,6 +320,11 @@
       "shouldGenerateSymbol": false
     },
     "anonymous always. just moods and countries, never names or places.": {
+      "extractionState": "manual",
+      "localizations": {},
+      "shouldGenerateSymbol": false
+    },
+    "appearance": {
       "extractionState": "manual",
       "localizations": {},
       "shouldGenerateSymbol": false
@@ -313,12 +368,22 @@
       "localizations": {},
       "shouldGenerateSymbol": false
     },
+    "bloom": {
+      "extractionState": "manual",
+      "localizations": {},
+      "shouldGenerateSymbol": false
+    },
     "breathe": {
       "extractionState": "manual",
       "localizations": {},
       "shouldGenerateSymbol": false
     },
     "breathe again": {
+      "extractionState": "manual",
+      "localizations": {},
+      "shouldGenerateSymbol": false
+    },
+    "budding": {
       "extractionState": "manual",
       "localizations": {},
       "shouldGenerateSymbol": false
@@ -364,7 +429,22 @@
       "localizations": {},
       "shouldGenerateSymbol": false
     },
+    "clear": {
+      "extractionState": "manual",
+      "localizations": {},
+      "shouldGenerateSymbol": false
+    },
     "clear all": {
+      "extractionState": "manual",
+      "localizations": {},
+      "shouldGenerateSymbol": false
+    },
+    "clear all notifications?": {
+      "extractionState": "manual",
+      "localizations": {},
+      "shouldGenerateSymbol": false
+    },
+    "clear everything": {
       "extractionState": "manual",
       "localizations": {},
       "shouldGenerateSymbol": false
@@ -407,6 +487,11 @@
       "shouldGenerateSymbol": false
     },
     "continue with google": {
+      "extractionState": "manual",
+      "localizations": {},
+      "shouldGenerateSymbol": false
+    },
+    "couldn't delete account": {
       "extractionState": "manual",
       "localizations": {},
       "shouldGenerateSymbol": false
@@ -460,6 +545,21 @@
       "localizations": {},
       "shouldGenerateSymbol": false
     },
+    "delete": {
+      "extractionState": "manual",
+      "localizations": {},
+      "shouldGenerateSymbol": false
+    },
+    "delete forever": {
+      "extractionState": "manual",
+      "localizations": {},
+      "shouldGenerateSymbol": false
+    },
+    "delete this entry?": {
+      "extractionState": "manual",
+      "localizations": {},
+      "shouldGenerateSymbol": false
+    },
     "develop": {
       "localizations": {},
       "shouldGenerateSymbol": false
@@ -503,6 +603,11 @@
       "shouldGenerateSymbol": false
     },
     "dino is thinking…": {
+      "localizations": {},
+      "shouldGenerateSymbol": false
+    },
+    "dino now gently understands your sleep, your movement, and your moments. it learns your rhythms, only ever compares you to you, and knows when to speak and when to just be there": {
+      "extractionState": "manual",
       "localizations": {},
       "shouldGenerateSymbol": false
     },
@@ -590,6 +695,11 @@
       "localizations": {},
       "shouldGenerateSymbol": false
     },
+    "enable notifications": {
+      "extractionState": "manual",
+      "localizations": {},
+      "shouldGenerateSymbol": false
+    },
     "enable wind down": {
       "extractionState": "manual",
       "localizations": {},
@@ -606,6 +716,11 @@
       "shouldGenerateSymbol": false
     },
     "enter the forest →": {
+      "extractionState": "manual",
+      "localizations": {},
+      "shouldGenerateSymbol": false
+    },
+    "evening": {
       "extractionState": "manual",
       "localizations": {},
       "shouldGenerateSymbol": false
@@ -693,6 +808,11 @@
       "localizations": {},
       "shouldGenerateSymbol": false
     },
+    "gentle suggestions": {
+      "extractionState": "manual",
+      "localizations": {},
+      "shouldGenerateSymbol": false
+    },
     "glad the sky is kind today": {
       "extractionState": "manual",
       "localizations": {},
@@ -721,6 +841,11 @@
       "shouldGenerateSymbol": false
     },
     "gratitude jar": {
+      "localizations": {},
+      "shouldGenerateSymbol": false
+    },
+    "growing": {
+      "extractionState": "manual",
       "localizations": {},
       "shouldGenerateSymbol": false
     },
@@ -840,6 +965,11 @@
       "shouldGenerateSymbol": false
     },
     "keep it close 🌱": {
+      "extractionState": "manual",
+      "localizations": {},
+      "shouldGenerateSymbol": false
+    },
+    "keep reading": {
       "extractionState": "manual",
       "localizations": {},
       "shouldGenerateSymbol": false
@@ -987,6 +1117,11 @@
       "localizations": {},
       "shouldGenerateSymbol": false
     },
+    "listened to %@) today 🎧": {
+      "extractionState": "manual",
+      "localizations": {},
+      "shouldGenerateSymbol": false
+    },
     "little expeditions": {
       "extractionState": "manual",
       "localizations": {},
@@ -1046,7 +1181,17 @@
       "localizations": {},
       "shouldGenerateSymbol": false
     },
+    "moments from your day": {
+      "extractionState": "manual",
+      "localizations": {},
+      "shouldGenerateSymbol": false
+    },
     "mood: %@": {
+      "extractionState": "manual",
+      "localizations": {},
+      "shouldGenerateSymbol": false
+    },
+    "morning": {
       "extractionState": "manual",
       "localizations": {},
       "shouldGenerateSymbol": false
@@ -1057,6 +1202,21 @@
       "shouldGenerateSymbol": false
     },
     "moving through the day at your own pace 🍃": {
+      "extractionState": "manual",
+      "localizations": {},
+      "shouldGenerateSymbol": false
+    },
+    "music carried a bit of today 🎧": {
+      "extractionState": "manual",
+      "localizations": {},
+      "shouldGenerateSymbol": false
+    },
+    "my body did some %@) today 🌿": {
+      "extractionState": "manual",
+      "localizations": {},
+      "shouldGenerateSymbol": false
+    },
+    "my body did something good today 🌿": {
       "extractionState": "manual",
       "localizations": {},
       "shouldGenerateSymbol": false
@@ -1095,6 +1255,11 @@
       "localizations": {},
       "shouldGenerateSymbol": false
     },
+    "not now": {
+      "extractionState": "manual",
+      "localizations": {},
+      "shouldGenerateSymbol": false
+    },
     "not tonight": {
       "extractionState": "manual",
       "localizations": {},
@@ -1106,6 +1271,11 @@
       "shouldGenerateSymbol": false
     },
     "notifications": {
+      "extractionState": "manual",
+      "localizations": {},
+      "shouldGenerateSymbol": false
+    },
+    "notifications are off": {
       "extractionState": "manual",
       "localizations": {},
       "shouldGenerateSymbol": false
@@ -1125,7 +1295,17 @@
       "localizations": {},
       "shouldGenerateSymbol": false
     },
+    "ok": {
+      "extractionState": "manual",
+      "localizations": {},
+      "shouldGenerateSymbol": false
+    },
     "okay": {
+      "extractionState": "manual",
+      "localizations": {},
+      "shouldGenerateSymbol": false
+    },
+    "on a heavy day, once in a while, dino offers one soft thing. a playlist, a comfort film, a cozy game. never a feed, always a friend": {
       "extractionState": "manual",
       "localizations": {},
       "shouldGenerateSymbol": false
@@ -1184,6 +1364,11 @@
       "localizations": {},
       "shouldGenerateSymbol": false
     },
+    "personal intelligence": {
+      "extractionState": "manual",
+      "localizations": {},
+      "shouldGenerateSymbol": false
+    },
     "pick a time:": {
       "localizations": {},
       "shouldGenerateSymbol": false
@@ -1218,6 +1403,11 @@
       "localizations": {},
       "shouldGenerateSymbol": false
     },
+    "profile details": {
+      "extractionState": "manual",
+      "localizations": {},
+      "shouldGenerateSymbol": false
+    },
     "question %@ of %lld": {
       "extractionState": "manual",
       "localizations": {},
@@ -1233,7 +1423,22 @@
       "localizations": {},
       "shouldGenerateSymbol": false
     },
+    "quieter care": {
+      "extractionState": "manual",
+      "localizations": {},
+      "shouldGenerateSymbol": false
+    },
+    "rain outside your window means rain in the garden now. dino's world breathes with yours": {
+      "extractionState": "manual",
+      "localizations": {},
+      "shouldGenerateSymbol": false
+    },
     "rain, forest, soft piano": {
+      "extractionState": "manual",
+      "localizations": {},
+      "shouldGenerateSymbol": false
+    },
+    "rate now": {
       "extractionState": "manual",
       "localizations": {},
       "shouldGenerateSymbol": false
@@ -1258,6 +1463,11 @@
       "localizations": {},
       "shouldGenerateSymbol": false
     },
+    "real weather in dino's world": {
+      "extractionState": "manual",
+      "localizations": {},
+      "shouldGenerateSymbol": false
+    },
     "recent memories": {
       "localizations": {},
       "shouldGenerateSymbol": false
@@ -1271,7 +1481,17 @@
       "localizations": {},
       "shouldGenerateSymbol": false
     },
+    "report": {
+      "extractionState": "manual",
+      "localizations": {},
+      "shouldGenerateSymbol": false
+    },
     "report this lantern": {
+      "extractionState": "manual",
+      "localizations": {},
+      "shouldGenerateSymbol": false
+    },
+    "report this lantern?": {
       "extractionState": "manual",
       "localizations": {},
       "shouldGenerateSymbol": false
@@ -1336,6 +1556,11 @@
       "localizations": {},
       "shouldGenerateSymbol": false
     },
+    "seed": {
+      "extractionState": "manual",
+      "localizations": {},
+      "shouldGenerateSymbol": false
+    },
     "self-care": {
       "extractionState": "manual",
       "localizations": {},
@@ -1375,6 +1600,11 @@
       "localizations": {},
       "shouldGenerateSymbol": false
     },
+    "settings": {
+      "extractionState": "manual",
+      "localizations": {},
+      "shouldGenerateSymbol": false
+    },
     "share": {
       "extractionState": "manual",
       "localizations": {},
@@ -1386,6 +1616,16 @@
       "shouldGenerateSymbol": false
     },
     "she left your letter for later 🌿": {
+      "extractionState": "manual",
+      "localizations": {},
+      "shouldGenerateSymbol": false
+    },
+    "show me": {
+      "extractionState": "manual",
+      "localizations": {},
+      "shouldGenerateSymbol": false
+    },
+    "show my moments": {
       "extractionState": "manual",
       "localizations": {},
       "shouldGenerateSymbol": false
@@ -1428,7 +1668,17 @@
       "localizations": {},
       "shouldGenerateSymbol": false
     },
+    "smarter check ins that know when you slept short, and nudges that lean gentler on heavy days": {
+      "extractionState": "manual",
+      "localizations": {},
+      "shouldGenerateSymbol": false
+    },
     "someone far away left it for you": {
+      "extractionState": "manual",
+      "localizations": {},
+      "shouldGenerateSymbol": false
+    },
+    "something i watched stayed with me today": {
       "extractionState": "manual",
       "localizations": {},
       "shouldGenerateSymbol": false
@@ -1443,7 +1693,17 @@
       "localizations": {},
       "shouldGenerateSymbol": false
     },
+    "somewhere that held today 🌿": {
+      "extractionState": "manual",
+      "localizations": {},
+      "shouldGenerateSymbol": false
+    },
     "sorry to hear what's going on. what's been weighing on you most?": {
+      "extractionState": "manual",
+      "localizations": {},
+      "shouldGenerateSymbol": false
+    },
+    "sprout": {
       "extractionState": "manual",
       "localizations": {},
       "shouldGenerateSymbol": false
@@ -1484,6 +1744,11 @@
       "shouldGenerateSymbol": false
     },
     "support is always close 🌿": {
+      "extractionState": "manual",
+      "localizations": {},
+      "shouldGenerateSymbol": false
+    },
+    "support resources": {
       "extractionState": "manual",
       "localizations": {},
       "shouldGenerateSymbol": false
@@ -1645,6 +1910,11 @@
       "localizations": {},
       "shouldGenerateSymbol": false
     },
+    "time with %@) today": {
+      "extractionState": "manual",
+      "localizations": {},
+      "shouldGenerateSymbol": false
+    },
     "to enable notifications, go to Settings → Dino → Notifications and turn them on": {
       "extractionState": "manual",
       "localizations": {},
@@ -1665,12 +1935,22 @@
       "localizations": {},
       "shouldGenerateSymbol": false
     },
+    "today": {
+      "extractionState": "manual",
+      "localizations": {},
+      "shouldGenerateSymbol": false
+    },
     "today I'm grateful for…": {
       "extractionState": "manual",
       "localizations": {},
       "shouldGenerateSymbol": false
     },
     "today I...": {
+      "localizations": {},
+      "shouldGenerateSymbol": false
+    },
+    "today had a walk in it 🌿": {
+      "extractionState": "manual",
       "localizations": {},
       "shouldGenerateSymbol": false
     },
@@ -1747,6 +2027,11 @@
       "shouldGenerateSymbol": false
     },
     "want to tell me what's going on?": {
+      "localizations": {},
+      "shouldGenerateSymbol": false
+    },
+    "want to write about your day?": {
+      "extractionState": "manual",
       "localizations": {},
       "shouldGenerateSymbol": false
     },
@@ -1975,6 +2260,11 @@
       "shouldGenerateSymbol": false
     },
     "your inner weather": {
+      "localizations": {},
+      "shouldGenerateSymbol": false
+    },
+    "your iphone can gather little moments privately. a photo you took, a place you visited, a song you played. your iphone shows them only to you first. dino sees just the one moment you choose to write about, and only then. nothing is shared or sent anywhere.": {
+      "extractionState": "manual",
       "localizations": {},
       "shouldGenerateSymbol": false
     },
