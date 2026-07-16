@@ -260,4 +260,62 @@ final class KoreanWalkUITests: XCTestCase {
             app.terminate()
         }
     }
+
+    // MARK: - 07 residuals — ceremony timing, notification center, step02 layout
+    func test07Residuals() throws {
+        // ceremony: the choreography takes a while — capture a timeline
+        let cer = makeApp(["-ceremonyQA"])
+        cer.launch()
+        settle(3)
+        let pred = NSPredicate(format: "label CONTAINS %@", "기분")
+        (cer.buttons.matching(pred).allElementsBoundByIndex
+         + cer.staticTexts.matching(pred).allElementsBoundByIndex)
+            .filter { $0.isHittable }
+            .max(by: { $0.frame.midY < $1.frame.midY })?.tap()
+        for t in [4, 8, 14, 20] {
+            settle(UInt32(t <= 4 ? 4 : 6))
+            snap(cer, "ceremony-t\(t)")
+        }
+        cer.terminate()
+
+        // notification center: tap the actual bell button by frame (top strip,
+        // right side) instead of a blind coordinate
+        let app = makeApp()
+        app.launch()
+        settle(4)
+        let topRight = app.buttons.allElementsBoundByIndex.filter {
+            $0.isHittable && $0.frame.midY < app.frame.height * 0.12
+                          && $0.frame.midX > app.frame.width * 0.6
+        }
+        if let bell = topRight.max(by: { $0.frame.midX < $1.frame.midX }) {
+            bell.tap()
+        } else {
+            app.coordinate(withNormalizedOffset: CGVector(dx: 0.88, dy: 0.075)).tap()
+        }
+        settle(3)
+        snap(app, "notification-center-2")
+        app.swipeUp()
+        settle(1)
+        snap(app, "notification-center-2-scrolled")
+        app.terminate()
+
+        // onboarding step02 (doing-great message) — recheck the left-edge clip
+        // after animations settle
+        let ob = makeApp(["-onboardingQA", "-hasSeenLetter", "YES", "-hasPassedAuth", "YES"])
+        ob.launch()
+        settle(4)
+        tapBottomButton(ob)          // begin
+        settle(2)
+        // step 1: pick the first feeling pill (doing great) then advance
+        let pills = ob.buttons.allElementsBoundByIndex.filter {
+            $0.isHittable && $0.frame.midY > ob.frame.height * 0.25
+                && $0.frame.midY < ob.frame.height * 0.75
+        }
+        pills.first?.tap()
+        settle(1)
+        tapBottomButton(ob)
+        settle(6)                    // let the entrance animation fully settle
+        snap(ob, "step02-settled")
+        ob.terminate()
+    }
 }

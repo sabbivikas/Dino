@@ -688,6 +688,8 @@ private struct JournalComposerCard: View {
                         HStack(spacing: 6) {
                             Text("develop".localized)
                                 .font(.system(size: 14, weight: .semibold))
+                                .lineLimit(1)
+                                .fixedSize(horizontal: true, vertical: false)
                             Image(systemName: "arrow.down")
                                 .font(.system(size: 12, weight: .semibold))
                         }
