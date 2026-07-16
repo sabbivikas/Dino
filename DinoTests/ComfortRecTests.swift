@@ -215,7 +215,11 @@ final class ComfortRecTests: XCTestCase {
     // MARK: - The little shelf (feature 3: strings + re open)
 
     func testShelfRowLineComposes() {
-        XCTAssertEqual(ComfortRecVoice.shelfRowLine(3), "your little shelf \u{00B7} 3 kept")
+        // F4: the chip counts everything dino ever brought, not just keeps
+        XCTAssertEqual(ComfortRecVoice.shelfRowLine(3),
+                       "your little shelf \u{00B7} 3 things dino has brought you")
+        XCTAssertEqual(ComfortRecVoice.shelfRowLine(1),
+                       "your little shelf \u{00B7} 1 thing dino has brought you")
         XCTAssertEqual(ComfortRecVoice.shelfKept(1), "1 kept")
     }
 
@@ -232,12 +236,25 @@ final class ComfortRecTests: XCTestCase {
     // MARK: - Keepsakes (feature 3's shelf starts honest)
 
     func testKeepsakesNewestFirstAndCapped() {
-        for i in 0..<30 {
+        // F4: full archive — the cap is 200 and everything shown lands here
+        XCTAssertEqual(RichRecStore.keepsakeCap, 200)
+        for i in 0..<(RichRecStore.keepsakeCap + 10) {
             RichRecStore.recordKeepsake(rec(type: "music", title: "t\(i)"), defaults: defaults)
         }
-        let kept = RichRecStore.keepsakes(defaults: defaults)
-        XCTAssertEqual(kept.count, RichRecStore.keepsakeCap)
-        XCTAssertEqual(kept.first?.rec.title, "t29")
+        let all = RichRecStore.keepsakes(defaults: defaults)
+        XCTAssertEqual(all.count, RichRecStore.keepsakeCap)
+        XCTAssertEqual(all.first?.rec.title, "t209")
+        XCTAssertFalse(all.first?.kept ?? true, "new entries arrive unkept")
+    }
+
+    func testMarkKeptFlagsEntryAndReturnsLedgerId() {
+        RichRecStore.recordKeepsake(rec(type: "music", title: "a"), ledgerId: "L1", defaults: defaults)
+        RichRecStore.recordKeepsake(rec(type: "book", title: "b"), defaults: defaults)
+        XCTAssertEqual(RichRecStore.markKept(title: "a", defaults: defaults), "L1")
+        XCTAssertNil(RichRecStore.markKept(title: "missing", defaults: defaults))
+        let all = RichRecStore.keepsakes(defaults: defaults)
+        XCTAssertTrue(all.first(where: { $0.rec.title == "a" })?.kept ?? false)
+        XCTAssertFalse(all.first(where: { $0.rec.title == "b" })?.kept ?? true)
     }
 
     func testExcludeTitlesCapsAtTen() {

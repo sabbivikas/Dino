@@ -76,9 +76,13 @@ enum ExpeditionStore {
         defaults.set(gift.foundAt, forKey: ExpeditionSignals.lastDeliveredKey)
     }
 
-    /// "keep this" → the little shelf, riding the keepsake store as a gift.
+    /// "keep this" — the delivery already sits on the shelf (F4 archives at
+    /// display time); keeping marks that entry rather than inserting again.
+    /// Falls back to an insert if the entry is somehow missing.
     static func keep(_ gift: ExpeditionGift, now: Date = Date(), defaults: UserDefaults = .standard) {
-        RichRecStore.recordKeepsake(gift.asKeepsakeRec, now: now, defaults: defaults)
+        if RichRecStore.markKept(title: gift.title, now: now, defaults: defaults) == nil {
+            RichRecStore.recordKeepsake(gift.asKeepsakeRec, kept: true, now: now, defaults: defaults)
+        }
     }
 }
 

@@ -786,17 +786,20 @@ struct EmotionalWeatherView: View {
 
     private func presentExpedition(_ gift: ExpeditionGift) {
         ExpeditionStore.markPresented(gift)   // shown once — the dove never nags
-        OutcomeLedger.recordShown(kind: "gift", itemType: gift.needKind,
-                                  sourceDomain: OutcomeLedger.sourceDomain(from: gift.url),
-                                  moodEntries: dataManager.moodEntries)
+        let ledgerId = OutcomeLedger.recordShown(kind: "gift", itemType: gift.needKind,
+                                                 sourceDomain: OutcomeLedger.sourceDomain(from: gift.url),
+                                                 moodEntries: dataManager.moodEntries)
+        // the shelf archives every delivery now, kept or not (F4)
+        RichRecStore.recordKeepsake(gift.asKeepsakeRec, ledgerId: ledgerId)
+        keepsakeCount = RichRecStore.keepsakes().count
         withAnimation(.easeInOut(duration: 0.35)) { expeditionGift = gift }
     }
 
     private func presentRichRec(_ rec: RichRec) {
         GentleRecStore.recordShown()   // same scarcity clock as the classic path
-        RichRecStore.recordKeepsake(rec)
-        OutcomeLedger.recordShown(kind: "rec", itemType: rec.type,
-                                  moodEntries: dataManager.moodEntries)
+        let ledgerId = OutcomeLedger.recordShown(kind: "rec", itemType: rec.type,
+                                                 moodEntries: dataManager.moodEntries)
+        RichRecStore.recordKeepsake(rec, ledgerId: ledgerId)   // one event, two faces
         AnalyticsManager.shared.trackRecShown(type: rec.type)
         recWasTapped = false
         withAnimation(.easeInOut(duration: 0.35)) { shownRichRec = rec }

@@ -38,6 +38,16 @@
                ReferencedContainer = "container:Dino.xcodeproj">
             </BuildableReference>
          </TestableReference>
+         <TestableReference
+            skipped = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "E1CF60452F73C55D008D5746"
+               BuildableName = "DinoUITests.xctest"
+               BlueprintName = "DinoUITests"
+               ReferencedContainer = "container:Dino.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
       </Testables>
    </TestAction>
    <LaunchAction
