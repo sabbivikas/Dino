@@ -1,0 +1,325 @@
+ · 
+%@ has been in my ears today 🎧
+%@% GROWN
+%@, and a little wandering 🌿
+%@, this %@ 🌿
+%@, today 🌿
+%lld
+%lld %@
+%lld / %lld xp
+%lld day
+%lld days active
+%lld keepsakes · this year
+%lld memories
+%lld notes
+%lld of %@ days gathered
+%lld of %lld
+%lld/%@
+%lld/10
+%lld/150
++ add a keepsake
+10d
+14d+
+30 notes milestone!
+3d
+4 minutes of breathing activates your body's calm response. dino will guide you through it.
+7d
+Apple Weather
+DINO
+THIS SEASON
+a few gentle nudges
+a few questions to understand how you've been
+a gentle companion travels well
+a gentle note
+a gentle nudge, not a scoreboard
+a quiet week in the log. no pressure 🌿
+a small paragraph of body text showing how it reads at this size. kindness grows in quiet minutes.
+a soft reminder each evening
+about you
+add a little something about yourself
+afternoon
+all quiet here
+allow location access so dino can match its theme to the weather around you.
+ambient sounds
+appearance
+apply theme
+avg energy
+back
+backdate entry
+begin
+begin check-in →
+begin · %lld min
+bloom
+breathe
+breathe again
+budding
+calendar access needed
+calendar connected 🗓️
+cancel
+change the words
+check-in time
+checking weather...
+choose a rhythm
+choose a theme
+choose from library
+clear
+clear all
+clear all notifications?
+clear everything
+close
+coming soon
+composed %lldx%lld @%lldx
+confirm it's you
+connect apple health
+connect your calendar
+continue
+continue with apple
+continue with google
+couldn't delete account
+current build
+current streak
+cycle %@ of %lld
+day
+days
+deep work done. take a breath.
+delete
+delete forever
+delete this entry?
+develop
+dino
+dino can learn from your sleep
+dino can notice your movement too
+dino is painting your month...
+dino now gently understands your sleep, your movement, and your moments. it learns your rhythms, only ever compares you to you, and knows when to speak and when to just be there
+dino will help you stay on top of your tasks.
+dino world
+dino · v1.2.0
+done
+drop it in ↓
+each painting is a month of your inner world
+emotional dna
+enable notifications
+enable wind down
+end your day with kindness
+enjoying dino?
+enter the forest →
+evening
+find my breath 🌿
+find my light 🦕
+finding the right breath for you…
+finds gentle patterns · off by default
+focus
+focus again
+from
+from a dino in %@
+from: 
+gentle reminders
+gentle reminders?
+gentle suggestions
+good to hear that! Dino will help you keep things up.
+got it! we'll be in touch 🌿
+gratitude jar
+growing
+health access needed
+health connected 🌿
+health connected!
+hello,
+hold to pause 🌿
+hours vary
+how did you hear about us?
+how you've been feeling over time
+include routines
+journal
+keep it close 🌱
+last 8 weeks of mood + assessments
+last updated: april 2026
+let dino learn from your journal
+let's begin
+level %lld
+lighter sleep lately tends to make %llds feel heavier.
+location access needed
+log this feeling
+logged 🌱
+make it comfortable to read
+mark all read
+maybe later
+meditate
+meditate again
+member since %@
+min
+mood: %@
+morning
+move this memory
+my little
+new features waiting for you
+next
+no memories yet
+not much written down this week. weeks like that happen, and that's okay
+not now
+notifications
+notifications are off
+nudge me at
+off
+offline summary
+ok
+okay
+on a heavy day, once in a while, dino offers one soft thing. a playlist, a comfort film, a cozy game. never a feed, always a friend
+open settings
+or
+or tell dino in your words…
+out of 100
+painting will be ready soon 🎨
+paused
+people who do this 3x a week report feeling more grounded
+personal intelligence
+pick a time:
+pick the day it belongs to
+pick the day you want this memory to belong to
+picking the best light...
+preview
+privacy policy
+profile details
+question %@ of %lld
+quick palette
+quiet skies so far. check back soon 🌿
+quieter care
+rain outside your window means rain in the garden now. dino's world breathes with yours
+rain, forest, soft piano
+rate now
+rate on the app store
+ready
+real weather in dino's world
+recent memories
+reminders enabled!
+remove
+report
+report this lantern
+report this lantern?
+reset to default
+save
+saved
+saved to camera roll ✨
+scrapbook
+see all —
+%lld memories →
+see your wellness trend
+seed
+self-care
+self-care reminders
+send it →
+send us a note 🦕
+send →
+session complete
+session length
+settings
+share
+show me
+show my moments
+sign in
+sign out
+sign up
+size
+skip
+skip →
+sleep affects how you feel more than almost anything else. if you share it, dino can factor it into your patterns and give you a heads up before rough days.
+
+your health data never leaves your device.
+smarter check ins that know when you slept short, and nudges that lean gentler on heavy days
+sorry to hear what's going on. what's been weighing on you most?
+sprout
+start logging your mood to see your journey
+start over
+step %@ of %lld
+steps
+steps today
+stillness found.
+support resources
+take photo
+tap a card to flip
+tap refresh to load weather
+tap the mic to record your first
+tap to change photo
+tap to open
+tap to rate
+test notifications
+text entry
+text size
+thank you for being honest/brave. i know it isn't easy to talk about your struggles. let's get started!
+the evening is arriving early
+the forest
+theme is controlled by weather. switch to manual to choose your own.
+theme mode
+theme: %@
+there are no wrong answers 🌿
+this can't be undone.
+this is a reflection tool, not a clinical diagnosis.
+this takes about 3 minutes
+this week
+this week's reflection
+this will delete all your moods, journals and gratitude. are you sure?
+this will permanently delete your account, all your data from the cloud, and sign you out. this cannot be undone. are you sure?
+time
+to enable notifications, go to Settings → Dino → Notifications and turn them on
+to permanently delete your account, please verify your identity.
+to receive self-care reminders, enable notifications for Dino in iPhone Settings → Notifications → Dino
+to: 
+today
+today I...
+today's focus
+try again a little later 🌿
+update
+used by people before meetings, after hard news, during panic moments
+v%@
+version
+view report
+waiting on sleep data 🌙
+want to tell me what's going on?
+want to write about your day?
+water, food
+we didn't cross paths much this week. the door is always open 🌱
+we read every message
+weather themes
+weekly check-in
+well done
+what others are saying
+what should we call you?
+what's new in dino
+what's on your mind?
+whatever's on your mind…
+when anxiety hits
+while receiving professional care is important, small habits and lifestyle changes can make a stark difference.
+wind down
+wind-down
+yes, hold that time 🌿
+you
+you completed this week ✓
+you showed up 
+you showed up every single day.
+now go stick your notes on your real mirror
+and take a picture 🪞
+you took time for yourself.
+you'll be asked to sign in with apple again.
+you'll be asked to sign in with google again.
+your %@ painting is ready ✨
+your busiest day this week 🌿
+your calendar looks full for now.
+your emotional gallery
+your first painting generates at the end of this month 🎨
+your iphone can gather little moments privately. a photo you took, a place you visited, a song you played. your iphone shows them only to you first. dino sees just the one moment you choose to write about, and only then. nothing is shared or sent anywhere.
+your journal entries will live here once you start writing.
+your mirror
+your mirror is full ✨
+your name
+your one stop mental wellness app ❤️
+your rating helps us reach more people 🌿
+your rhythms
+your streaks
+your week %lld report
+your wellness journey
+·
+“%@”
+↩︎
+✦ still forming
+✦ suggested
+🔥
+🦕
