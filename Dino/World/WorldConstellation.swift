@@ -17,25 +17,25 @@ import SwiftUI
 enum WorldConstellationVoice {
     static func totalLine(total: Int, isToday: Bool) -> String {
         switch (total == 1, isToday) {
-        case (true, true):   return "1 feeling shared today"
-        case (false, true):  return "\(total) feelings shared today"
-        case (true, false):  return "1 feeling shared this day"
-        case (false, false): return "\(total) feelings shared this day"
+        case (true, true):   return String(localized: "1 feeling shared today")
+        case (false, true):  return String(localized: "\(total) feelings shared today")
+        case (true, false):  return String(localized: "1 feeling shared this day")
+        case (false, false): return String(localized: "\(total) feelings shared this day")
         }
     }
 
     static func subLine(countries: Int) -> String {
         countries == 1
-            ? "across 1 country, under one sky \u{1F30D}"
-            : "across \(countries) countries, under one sky \u{1F30D}"
+            ? String(localized: "across 1 country, under one sky \u{1F30D}")
+            : String(localized: "across \(countries) countries, under one sky \u{1F30D}")
     }
 
     static func bubbleLine(count: Int, isToday: Bool) -> String {
         switch (count == 1, isToday) {
-        case (true, true):   return "1 dino under this sky tonight"
-        case (false, true):  return "\(count) dinos under this sky tonight"
-        case (true, false):  return "1 dino was under this sky"
-        case (false, false): return "\(count) dinos were under this sky"
+        case (true, true):   return String(localized: "1 dino under this sky tonight")
+        case (false, true):  return String(localized: "\(count) dinos under this sky tonight")
+        case (true, false):  return String(localized: "1 dino was under this sky")
+        case (false, false): return String(localized: "\(count) dinos were under this sky")
         }
     }
 

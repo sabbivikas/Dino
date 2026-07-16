@@ -65,7 +65,7 @@ struct RichRecCard: View {
             }
 
             // content flags — wellness critical, always visible
-            Text(rec.flags.joined(separator: ComfortRecVoice.flagSeparator))
+            Text(rec.flags.map(\.localized).joined(separator: ComfortRecVoice.flagSeparator))
                 .font(.system(size: 11, weight: .semibold, design: .rounded))
                 .tracking(0.6)
                 .foregroundColor(Color(hex: "#7BA872"))

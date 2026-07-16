@@ -21,10 +21,10 @@ enum HelixShape: String, CaseIterable, Identifiable {
     var id: String { rawValue }
     var label: String {
         switch self {
-        case .helix: return "strand"
-        case .wave:  return "wave"
-        case .tree:  return "tree"
-        case .heart: return "heart"
+        case .helix: return String(localized: "strand")
+        case .wave:  return String(localized: "wave")
+        case .tree:  return String(localized: "tree")
+        case .heart: return String(localized: "heart")
         }
     }
 }

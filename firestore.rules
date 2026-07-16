@@ -74,7 +74,7 @@ service cloud.firestore {
     // text, no numbers). The expedition result doc is server-written only.
     match /expeditionSignals/{uid} {
       allow write: if request.auth != null && request.auth.uid == uid
-        && request.resource.data.keys().hasOnly(['eligible','moodTrend','heavyDays7','themes','sleepBucket','stepsBucket','sinceLastRec','sinceLastExpedition','updatedAt'])
+        && request.resource.data.keys().hasOnly(['eligible','moodTrend','heavyDays7','themes','sleepBucket','stepsBucket','sinceLastRec','sinceLastExpedition','userLocale','updatedAt'])
         && request.resource.data.eligible is bool
         && request.resource.data.moodTrend in ['steady','wobbly','heavy']
         && request.resource.data.heavyDays7 in ['0','1','2to3','4plus']
@@ -84,6 +84,8 @@ service cloud.firestore {
         && request.resource.data.sinceLastExpedition in ['0to2','3to7','8to13','14plus']
         && request.resource.data.themes is list
         && request.resource.data.themes.size() <= 3
+        && (!request.resource.data.keys().hasAny(['userLocale'])
+            || request.resource.data.userLocale in ['en','es','ja','ko','vi'])
         && request.resource.data.updatedAt == request.time;
       allow read: if request.auth != null && request.auth.uid == uid;
     }

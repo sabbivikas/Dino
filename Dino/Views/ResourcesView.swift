@@ -53,7 +53,7 @@ enum ResourceScreen {
     static func rowTilt(index: Int) -> Double { rowTilts[index % rowTilts.count] }
 
     static func voCallLabel(name: String, contact: String) -> String {
-        "call \(name) at \(contact)"
+        String(localized: "call \(name) at \(contact)")
     }
 
     static func emoji(for kind: RegionalResource.Kind) -> String {

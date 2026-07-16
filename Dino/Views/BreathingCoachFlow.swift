@@ -207,7 +207,7 @@ struct BreathingCoachFlow: View {
             Button {
                 withAnimation { showAlternatives.toggle() }
             } label: {
-                Text(showAlternatives ? "keep dino's pick" : "try a different rhythm")
+                Text(showAlternatives ? String(localized: "keep dino's pick") : String(localized: "try a different rhythm"))
                     .font(DinoTheme.captionFont())
                     .foregroundColor(DinoTheme.textSecondary)
             }

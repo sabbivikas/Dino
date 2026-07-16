@@ -573,8 +573,8 @@ private struct CelebrationOverlay: View {
                     .foregroundColor(Color(hex: "#6B5040"))
                     .multilineTextAlignment(.center)
                 HStack(spacing: 12) {
-                    CelebrationButton(title: "mirror pic 🪞", action: onMirrorPic)
-                    CelebrationButton(title: "selfie 🤳", action: onSelfie)
+                    CelebrationButton(title: String(localized: "mirror pic 🪞"), action: onMirrorPic)
+                    CelebrationButton(title: String(localized: "selfie 🤳"), action: onSelfie)
                 }
                 Button("maybe later", action: onClose)
                     .font(DinoTheme.dinoFont(size: 12))

@@ -133,6 +133,8 @@ enum ExpeditionSignals {
             "stepsBucket": stepsBucket(steps: steps),
             "sinceLastRec": daysSinceBucket(lastRecDays),
             "sinceLastExpedition": daysSinceBucket(lastExpeditionDays(now: now, calendar: calendar)),
+            // app-resolved language so dino's delivered line arrives in the user's language
+            "userLocale": AppLanguage.current,
             "updatedAt": FieldValue.serverTimestamp(),
         ]
         do {

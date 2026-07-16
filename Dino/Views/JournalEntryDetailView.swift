@@ -47,11 +47,11 @@ struct JournalEntryDetailView: View {
     private var bodyText: String {
         // live entry, not the frozen init copy — reflects text edits instantly
         let t = current.summary.trimmingCharacters(in: .whitespacesAndNewlines)
-        return t.isEmpty ? "voice note recorded" : t
+        return t.isEmpty ? String(localized: "voice note recorded") : t
     }
     private var warmDate: String {
         let df = DateFormatter()
-        df.locale = Locale(identifier: "en_US")
+        df.locale = Locale.current
         df.dateFormat = "EEEE, MMMM d"
         return df.string(from: current.date).lowercased()   // live — reflects date edits
     }
@@ -77,8 +77,8 @@ struct JournalEntryDetailView: View {
                                 Text(photoMissing ? "🌫️" : "🌤️")
                                     .font(.system(size: 30))
                                 Text(photoMissing
-                                     ? "this photo stayed on an old device"
-                                     : "finding this photo…")
+                                     ? String(localized: "this photo stayed on an old device")
+                                     : String(localized: "finding this photo…"))
                                     .font(DinoTheme.dinoFont(size: 13))
                                     .foregroundColor(ink3)
                             }
@@ -171,7 +171,7 @@ struct JournalEntryDetailView: View {
                         .font(DinoTheme.dinoHeaderFont(size: 22))
                         .foregroundColor(ink)
                         .padding(.top, 22)
-                    Text(hasAudio ? "your recording stays as it is" : "your entry, your words")
+                    Text(hasAudio ? String(localized: "your recording stays as it is") : String(localized: "your entry, your words"))
                         .font(DinoTheme.dinoFont(size: 13))
                         .foregroundColor(ink3)
                     TextEditor(text: $editedText)
@@ -260,7 +260,7 @@ struct JournalEntryDetailView: View {
                 .buttonStyle(.plain)
             }
 
-            Text(entry.moodTag.lowercased())
+            Text(entry.moodTag.lowercased().localized)
                 .font(DinoTheme.dinoFont(size: 13))
                 .foregroundColor(.white)
                 .padding(.horizontal, 12)
@@ -348,7 +348,7 @@ struct JournalEntryDetailView: View {
     // MARK: - Helpers
 
     private var shareItems: [Any] {
-        var items: [Any] = ["\(bodyText)\n\n— dino journal, \(warmDate)"]
+        var items: [Any] = [String(localized: "\(bodyText)\n\n— dino journal, \(warmDate)")]
         if let photo = loadedPhoto { items.append(photo) }
         return items
     }

@@ -16,7 +16,7 @@ enum StretchSignal {
     static let overwhelmedPairHours: Double = 48   // trigger b: overwhelmed twice within 48h
     static let cooldownDays = 7            // at most once per 7 days
 
-    static let supportLine = "it's been a heavy stretch. support is always close 🌿"
+    static let supportLine = String(localized: "it's been a heavy stretch. support is always close 🌿")
 
     private static func isHeavy(_ w: EmotionalWeather) -> Bool {
         w == .drained || w == .overwhelmed

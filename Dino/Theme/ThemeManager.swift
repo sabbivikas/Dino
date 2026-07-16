@@ -16,8 +16,8 @@ enum ThemeMode: String, Codable, CaseIterable {
 
     var displayName: String {
         switch self {
-        case .manual: return "manual"
-        case .weather: return "match local weather"
+        case .manual: return String(localized: "manual")
+        case .weather: return String(localized: "match local weather")
         }
     }
 }
@@ -65,14 +65,14 @@ enum DinoAppTheme: String, Codable, CaseIterable, Identifiable {
     var displayName: String {
         switch self {
         case .defaultDino:   return "dino"
-        case .sunny:         return "sunny"
-        case .rainy:         return "rainy"
-        case .cloudy:        return "cloudy"
-        case .night:         return "night"
-        case .forest:        return "forest"
-        case .lavenderCalm:  return "lavender"
-        case .snow:          return "snow"
-        case .storm:         return "storm"
+        case .sunny:         return String(localized: "sunny")
+        case .rainy:         return String(localized: "rainy")
+        case .cloudy:        return String(localized: "cloudy")
+        case .night:         return String(localized: "night")
+        case .forest:        return String(localized: "forest")
+        case .lavenderCalm:  return String(localized: "lavender")
+        case .snow:          return String(localized: "snow")
+        case .storm:         return String(localized: "storm")
         }
     }
 

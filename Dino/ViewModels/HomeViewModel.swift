@@ -31,9 +31,9 @@ class HomeViewModel: ObservableObject {
     var greeting: String {
         let hour = Calendar.current.component(.hour, from: Date())
         switch hour {
-        case 5..<12: return "good morning"
-        case 12..<17: return "good afternoon"
-        default: return "good evening"
+        case 5..<12: return String(localized: "good morning")
+        case 12..<17: return String(localized: "good afternoon")
+        default: return String(localized: "good evening")
         }
     }
 
@@ -42,16 +42,16 @@ class HomeViewModel: ObservableObject {
         // whether the array is newest-first or insertion-order.
         if let lastMood = dataManager.moodEntries.max(by: { $0.date < $1.date }) {
             switch lastMood.weatherType {
-            case .clear: return "Productivity"
-            case .partlyCloudy: return "Balance"
-            case .overwhelmed: return "Calm"
-            case .drained: return "Healing"
+            case .clear: return String(localized: "Productivity")
+            case .partlyCloudy: return String(localized: "Balance")
+            case .overwhelmed: return String(localized: "Calm")
+            case .drained: return String(localized: "Healing")
             }
         }
         if let firstIntention = dataManager.userIntentions.first {
             return firstIntention.capitalized
         }
-        return "Wellness"
+        return String(localized: "Wellness")
     }
 
     var todaysFocusEmoji: String {
@@ -68,7 +68,7 @@ class HomeViewModel: ObservableObject {
         let weekday = calendar.component(.weekday, from: today) // 1=Sun, 7=Sat
         let startOfWeek = calendar.date(byAdding: .day, value: -(weekday - 1), to: today) ?? today
 
-        let labels = ["S", "M", "T", "W", "T", "F", "S"]
+        let labels = calendar.veryShortStandaloneWeekdaySymbols   // Sun-first, locale-aware
 
         return (0..<7).map { offset in
             let day = calendar.date(byAdding: .day, value: offset, to: startOfWeek) ?? startOfWeek

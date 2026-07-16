@@ -20,14 +20,14 @@ enum BreathingFeeling: String, CaseIterable, Identifiable {
 
     var label: String {
         switch self {
-        case .anxious: return "anxious"
-        case .cantSleep: return "can't sleep"
-        case .overwhelmed: return "overwhelmed"
-        case .cantFocus: return "can't focus"
-        case .panicky: return "panicky"
-        case .restless: return "restless"
-        case .stressed: return "stressed"
-        case .sad: return "sad"
+        case .anxious: return String(localized: "anxious")
+        case .cantSleep: return String(localized: "can't sleep")
+        case .overwhelmed: return String(localized: "overwhelmed")
+        case .cantFocus: return String(localized: "can't focus")
+        case .panicky: return String(localized: "panicky")
+        case .restless: return String(localized: "restless")
+        case .stressed: return String(localized: "stressed")
+        case .sad: return String(localized: "sad")
         }
     }
 
@@ -86,7 +86,7 @@ struct BreathingRecommendation: Equatable, Codable {
 enum BreathingCoach {
 
     static let allowedMinutes = [1, 3, 5, 8, 10]
-    static let fallbackReason = "a steady breath for a heavy moment 🌿"
+    static let fallbackReason = String(localized: "a steady breath for a heavy moment 🌿")
 
     /// Coach wire format ("bigSigh") → library pattern. nil for anything else.
     static func pattern(forCoachID id: String) -> BreathingPattern? {
@@ -122,15 +122,15 @@ enum BreathingCoach {
         let t = normalize(text)
         let route: (BreathingPattern, Int, String)
         if contains(t, ["sleep", "insomnia", "awake", "3am", "wind down", "bed"]) {
-            route = (.sleepyCloud, 8, "let's slow everything down for sleep 🌙")
+            route = (.sleepyCloud, 8, String(localized: "let's slow everything down for sleep 🌙"))
         } else if contains(t, ["panic", "racing", "heart", "attack", "shaking"]) {
-            route = (.steadySquare, 3, "four steady sides to hold on to 💚")
+            route = (.steadySquare, 3, String(localized: "four steady sides to hold on to 💚"))
         } else if contains(t, ["focus", "scattered", "foggy", "distracted", "concentrate"]) {
-            route = (.calmCurrent, 5, "slow waves to gather your attention 🌊")
+            route = (.calmCurrent, 5, String(localized: "slow waves to gather your attention 🌊"))
         } else if contains(t, ["overwhelmed", "too much", "heavy", "crying", "drained", "exhausted"]) {
-            route = (.bigSigh, 3, "two sips of air, one long letting go 🌿")
+            route = (.bigSigh, 3, String(localized: "two sips of air, one long letting go 🌿"))
         } else {
-            route = (.bigSigh, 5, "a steady breath to soften the day 🌿")
+            route = (.bigSigh, 5, String(localized: "a steady breath to soften the day 🌿"))
         }
         return BreathingRecommendation(patternID: route.0.id, minutes: route.1,
                                        reason: route.2, concern: concern, fromAI: false)
@@ -138,14 +138,14 @@ enum BreathingCoach {
 
     private static func localReason(for chip: BreathingFeeling) -> String {
         switch chip {
-        case .panicky:     return "four steady sides to hold on to 💚"
-        case .cantSleep:   return "let's slow everything down for sleep 🌙"
-        case .overwhelmed: return "two sips of air, one long letting go 🌿"
-        case .sad:         return "a long soft exhale for a heavy heart 🌿"
-        case .anxious:     return "the big sigh settles an anxious body 🌿"
-        case .stressed:    return "let the exhale carry some of it away 🌿"
-        case .cantFocus:   return "slow waves to gather your attention 🌊"
-        case .restless:    return "steady water for restless energy 🌊"
+        case .panicky:     return String(localized: "four steady sides to hold on to 💚")
+        case .cantSleep:   return String(localized: "let's slow everything down for sleep 🌙")
+        case .overwhelmed: return String(localized: "two sips of air, one long letting go 🌿")
+        case .sad:         return String(localized: "a long soft exhale for a heavy heart 🌿")
+        case .anxious:     return String(localized: "the big sigh settles an anxious body 🌿")
+        case .stressed:    return String(localized: "let the exhale carry some of it away 🌿")
+        case .cantFocus:   return String(localized: "slow waves to gather your attention 🌊")
+        case .restless:    return String(localized: "steady water for restless energy 🌊")
         }
     }
 
@@ -242,21 +242,21 @@ struct CrisisResource: Identifiable {
     static let usDefaults: [CrisisResource] = [
         CrisisResource(
             id: "lifeline-988",
-            title: "call or text 988",
-            subtitle: "suicide and crisis lifeline, free, any time",
-            actions: [("call", "tel:988"), ("text", "sms:988")]
+            title: String(localized: "call or text 988"),
+            subtitle: String(localized: "suicide and crisis lifeline, free, any time"),
+            actions: [(String(localized: "call"), "tel:988"), (String(localized: "text"), "sms:988")]
         ),
         CrisisResource(
             id: "crisis-text-line",
-            title: "text HOME to 741741",
-            subtitle: "crisis text line, a real human answers",
-            actions: [("text", "sms:741741&body=HOME")]
+            title: String(localized: "text HOME to 741741"),
+            subtitle: String(localized: "crisis text line, a real human answers"),
+            actions: [(String(localized: "text"), "sms:741741&body=HOME")]
         ),
     ]
 }
 
 enum BreathingCrisisCopy {
-    static let heading = "it sounds like you're carrying something really heavy right now. you don't have to hold it alone."
-    static let listeners = "people who care are ready to listen, any hour:"
-    static let breathOffer = "and when you're ready, a gentle breath is here. no pressure. it will wait for you."
+    static let heading = String(localized: "it sounds like you're carrying something really heavy right now. you don't have to hold it alone.")
+    static let listeners = String(localized: "people who care are ready to listen, any hour:")
+    static let breathOffer = String(localized: "and when you're ready, a gentle breath is here. no pressure. it will wait for you.")
 }

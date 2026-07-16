@@ -14,36 +14,36 @@ import SwiftUI
 // MARK: - Affirmations
 
 private let affirmations: [String] = [
-    "I am enough, exactly as I am.",
-    "Each breath brings me closer to peace.",
-    "I choose calm over chaos.",
-    "My feelings are valid and worth honoring.",
-    "I give myself permission to rest.",
-    "Growth happens one small step at a time.",
-    "I am worthy of love and kindness.",
-    "Today I choose to be gentle with myself.",
-    "I trust the process of my own journey.",
-    "My presence is a gift to the world.",
-    "I release what I cannot control.",
-    "I am stronger than I think.",
-    "Stillness is my superpower.",
-    "I deserve joy, even in small moments.",
-    "I am becoming the best version of myself.",
-    "My mind is calm, my heart is open.",
-    "I welcome new beginnings with ease.",
-    "I am grateful for this moment.",
-    "Every day is a fresh start.",
-    "I radiate warmth and compassion.",
-    "I honor my need for rest and renewal.",
-    "I am exactly where I need to be.",
-    "My inner peace is unshakeable.",
-    "I attract what I put into the world.",
-    "I am learning and that is enough.",
-    "Small steps forward still move me forward.",
-    "I choose kindness — starting with myself.",
-    "This too shall pass, and I am okay.",
-    "I embrace the beauty of today.",
-    "I am rooted, resilient, and at peace."
+    String(localized: "I am enough, exactly as I am."),
+    String(localized: "Each breath brings me closer to peace."),
+    String(localized: "I choose calm over chaos."),
+    String(localized: "My feelings are valid and worth honoring."),
+    String(localized: "I give myself permission to rest."),
+    String(localized: "Growth happens one small step at a time."),
+    String(localized: "I am worthy of love and kindness."),
+    String(localized: "Today I choose to be gentle with myself."),
+    String(localized: "I trust the process of my own journey."),
+    String(localized: "My presence is a gift to the world."),
+    String(localized: "I release what I cannot control."),
+    String(localized: "I am stronger than I think."),
+    String(localized: "Stillness is my superpower."),
+    String(localized: "I deserve joy, even in small moments."),
+    String(localized: "I am becoming the best version of myself."),
+    String(localized: "My mind is calm, my heart is open."),
+    String(localized: "I welcome new beginnings with ease."),
+    String(localized: "I am grateful for this moment."),
+    String(localized: "Every day is a fresh start."),
+    String(localized: "I radiate warmth and compassion."),
+    String(localized: "I honor my need for rest and renewal."),
+    String(localized: "I am exactly where I need to be."),
+    String(localized: "My inner peace is unshakeable."),
+    String(localized: "I attract what I put into the world."),
+    String(localized: "I am learning and that is enough."),
+    String(localized: "Small steps forward still move me forward."),
+    String(localized: "I choose kindness — starting with myself."),
+    String(localized: "This too shall pass, and I am okay."),
+    String(localized: "I embrace the beauty of today."),
+    String(localized: "I am rooted, resilient, and at peace.")
 ]
 
 private func todayAffirmation() -> String {
@@ -63,7 +63,7 @@ struct DailyAffirmationEntry: TimelineEntry {
 
 struct DailyAffirmationProvider: TimelineProvider {
     func placeholder(in context: Context) -> DailyAffirmationEntry {
-        DailyAffirmationEntry(date: Date(), affirmation: "I am enough, exactly as I am.")
+        DailyAffirmationEntry(date: Date(), affirmation: String(localized: "I am enough, exactly as I am."))
     }
 
     func getSnapshot(in context: Context, completion: @escaping (DailyAffirmationEntry) -> Void) {

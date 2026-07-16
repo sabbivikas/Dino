@@ -32,7 +32,7 @@ struct BreathingView: View {
 
     private var stepsCaption: String {
         viewModel.selectedPattern.steps
-            .map { "\($0.seconds)s \($0.shortLabel)" }
+            .map { String(localized: "\($0.seconds)s \($0.shortLabel)") }
             .joined(separator: " · ")
     }
 
@@ -60,7 +60,7 @@ struct BreathingView: View {
                                     .padding(10)
                             }
                             .buttonStyle(.plain)
-                            .accessibilityLabel(hapticsOn ? "breathing haptics on" : "breathing haptics off")
+                            .accessibilityLabel(hapticsOn ? String(localized: "breathing haptics on") : String(localized: "breathing haptics off"))
                         }
                         Spacer()
                     }
@@ -139,7 +139,7 @@ struct BreathingView: View {
                                     }
                                 }
                             }) {
-                                Text(viewModel.isRunning ? "stop" : "begin")
+                                Text(viewModel.isRunning ? String(localized: "stop") : String(localized: "begin"))
                                     .font(DinoTheme.headlineFont())
                                     .foregroundColor(.white)
                                     .frame(maxWidth: .infinity)
@@ -161,7 +161,7 @@ struct BreathingView: View {
                                         }
                                     }
                                 }) {
-                                    Text(viewModel.isPaused ? "resume" : "pause")
+                                    Text(viewModel.isPaused ? String(localized: "resume") : String(localized: "pause"))
                                         .font(DinoTheme.headlineFont())
                                         .foregroundColor(DinoTheme.sageGreen)
                                         .frame(maxWidth: .infinity)
@@ -479,9 +479,9 @@ struct DoneScreen: View {
 
             // Stats
             HStack(spacing: 20) {
-                StatPill(label: "session", value: viewModel.formattedElapsed, color: DinoTheme.sageGreen)
-                StatPill(label: "pattern", value: viewModel.selectedPattern.shortName, color: DinoTheme.skyBlue)
-                StatPill(label: "xp earned", value: "+\(viewModel.xpEarned)", color: DinoTheme.peach)
+                StatPill(label: String(localized: "session"), value: viewModel.formattedElapsed, color: DinoTheme.sageGreen)
+                StatPill(label: String(localized: "pattern"), value: viewModel.selectedPattern.shortName, color: DinoTheme.skyBlue)
+                StatPill(label: String(localized: "xp earned"), value: "+\(viewModel.xpEarned)", color: DinoTheme.peach)
             }
 
             Text(viewModel.selectedPattern.closingLine)

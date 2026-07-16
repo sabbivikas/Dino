@@ -32,7 +32,7 @@ struct FocusView: View {
                             Text("focus")
                                 .font(DinoTheme.dinoDisplayFont(size: 28))
                                 .foregroundColor(DinoTheme.textPrimary)
-                            Text(viewModel.isRunning ? viewModel.currentMessage : "single-task. breathe. flow.")
+                            Text(viewModel.isRunning ? viewModel.currentMessage : String(localized: "single-task. breathe. flow."))
                                 .font(DinoTheme.subheadlineFont())
                                 .foregroundColor(DinoTheme.textSecondary)
                                 .animation(.easeInOut, value: viewModel.currentMessage)
@@ -100,7 +100,7 @@ struct FocusView: View {
                                     }
                                 }
                             }) {
-                                Text(viewModel.isRunning ? "end session" : "start focus")
+                                Text(viewModel.isRunning ? String(localized: "end session") : String(localized: "start focus"))
                                     .font(DinoTheme.headlineFont())
                                     .foregroundColor(.white)
                                     .frame(maxWidth: .infinity)
@@ -120,7 +120,7 @@ struct FocusView: View {
                                         }
                                     }
                                 }) {
-                                    Text(viewModel.isPaused ? "resume" : "pause")
+                                    Text(viewModel.isPaused ? String(localized: "resume") : String(localized: "pause"))
                                         .font(DinoTheme.headlineFont())
                                         .foregroundColor(DinoTheme.skyBlue)
                                         .frame(maxWidth: .infinity)
@@ -265,8 +265,8 @@ struct FocusDoneScreen: View {
             }
 
             HStack(spacing: 20) {
-                StatPill(label: "focused", value: viewModel.formattedElapsed, color: DinoTheme.skyBlue)
-                StatPill(label: "xp earned", value: "+25", color: DinoTheme.peach)
+                StatPill(label: String(localized: "focused"), value: viewModel.formattedElapsed, color: DinoTheme.skyBlue)
+                StatPill(label: String(localized: "xp earned"), value: "+25", color: DinoTheme.peach)
             }
 
             Spacer()
@@ -314,7 +314,7 @@ class FocusViewModel: ObservableObject {
     @Published var isPaused: Bool = false
     @Published var isDone: Bool = false
     @Published var totalElapsed: Int = 0
-    @Published var currentMessage: String = "stay focused"
+    @Published var currentMessage: String = String(localized: "stay focused")
 
     private var mainTimer: Timer?
     private var messageTimer: Timer?
@@ -324,10 +324,10 @@ class FocusViewModel: ObservableObject {
     private var lastPauseDate: Date?
 
     let durationOptions: [(label: String, seconds: Int)] = [
-        ("15 min", 900),
-        ("25 min", 1500),
-        ("45 min", 2700),
-        ("60 min", 3600)
+        (String(localized: "15 min"), 900),
+        (String(localized: "25 min"), 1500),
+        (String(localized: "45 min"), 2700),
+        (String(localized: "60 min"), 3600)
     ]
 
     private let messages = DinoLiveActivityManager.focusMessages
@@ -353,14 +353,14 @@ class FocusViewModel: ObservableObject {
     var formattedElapsed: String {
         let m = totalElapsed / 60
         let s = totalElapsed % 60
-        return String(format: "%d min %02d sec", m, s)
+        return String(format: String(localized: "%d min %02d sec"), m, s)
     }
 
     func start() {
         timeRemaining = selectedDuration
         totalElapsed = 0
         messageIndex = 0
-        currentMessage = messages.first ?? "stay focused"
+        currentMessage = messages.first ?? String(localized: "stay focused")
         isPaused = false
         isDone = false
         isRunning = true

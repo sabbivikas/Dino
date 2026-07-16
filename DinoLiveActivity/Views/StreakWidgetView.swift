@@ -59,13 +59,13 @@ struct StreakMediumView: View {
 
     private var encouragement: String {
         switch entry.currentStreak {
-        case 0:        return "every journey\nstarts today"
-        case 1...3:    return "you've started\nsomething"
-        case 4...6:    return "almost a week\nkeep going"
-        case 7...13:   return "one week\nstrong"
-        case 14...20:  return "two weeks\nin"
-        case 21...29:  return "three weeks\nshowing up"
-        default:       return "unstoppable\n\(entry.currentStreak) days"
+        case 0:        return String(localized: "every journey\nstarts today")
+        case 1...3:    return String(localized: "you've started\nsomething")
+        case 4...6:    return String(localized: "almost a week\nkeep going")
+        case 7...13:   return String(localized: "one week\nstrong")
+        case 14...20:  return String(localized: "two weeks\nin")
+        case 21...29:  return String(localized: "three weeks\nshowing up")
+        default:       return String(localized: "unstoppable\n\(entry.currentStreak) days")
         }
     }
 

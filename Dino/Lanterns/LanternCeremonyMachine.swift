@@ -191,26 +191,26 @@ enum CeremonyStrings {
     static let voDrift = String(localized: "something is drifting in")
 
     static func kicker(countryName: String?) -> String {
-        guard let countryName, !countryName.isEmpty else { return "from a dino far away" }
+        guard let countryName, !countryName.isEmpty else { return String(localized: "from a dino far away") }
         return String(localized: "from a dino in \(countryName)")
     }
 
     /// "4,000 miles · just for you" — km for metric locales, warm fallback
     /// when the distance is unknowable.
     static func distanceLine(kilometers: Double?, metric: Bool) -> String {
-        guard let km = kilometers, km > 0 else { return "a long way · just for you" }
+        guard let km = kilometers, km > 0 else { return String(localized: "a long way · just for you") }
         let formatter = NumberFormatter()
         formatter.numberStyle = .decimal
         formatter.maximumFractionDigits = 0
         if metric {
             let rounded = (km / 100).rounded() * 100
             let n = formatter.string(from: NSNumber(value: rounded)) ?? "\(Int(rounded))"
-            return "\(n) km · just for you"
+            return String(localized: "\(n) km · just for you")
         } else {
             let miles = km * 0.621371
             let rounded = (miles / 100).rounded() * 100
             let n = formatter.string(from: NSNumber(value: rounded)) ?? "\(Int(rounded))"
-            return "\(n) miles · just for you"
+            return String(localized: "\(n) miles · just for you")
         }
     }
 

@@ -21,13 +21,13 @@ struct AssessmentResult: Codable, Identifiable {
     var supportiveMessage: String {
         switch score {
         case 20...25:
-            return "you're doing really well — keep nurturing yourself. 🌟"
+            return String(localized: "you're doing really well — keep nurturing yourself. 🌟")
         case 15...19:
-            return "you're in a good place. keep building those healthy habits."
+            return String(localized: "you're in a good place. keep building those healthy habits.")
         case 10...14:
-            return "things feel a bit mixed. small steps forward still count."
+            return String(localized: "things feel a bit mixed. small steps forward still count.")
         default:
-            return "this week felt heavy. be extra gentle with yourself. 💙"
+            return String(localized: "this week felt heavy. be extra gentle with yourself. 💙")
         }
     }
 }

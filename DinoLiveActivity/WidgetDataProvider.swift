@@ -142,13 +142,13 @@ struct WidgetDataProvider {
         }
         let todaySessions = sessions.filter { Calendar.current.isDateInToday($0.date) }
         let totalMins = todaySessions.reduce(0) { $0 + $1.durationSeconds } / 60
-        return "\(totalMins) min focused today"
+        return String(localized: "\(totalMins) min focused today")
     }
 
     var latestAffirmation: String {
         guard let affirmations = load([SavedAffirmationW].self, key: "savedAffirmations"),
               let latest = affirmations.max(by: { $0.savedAt < $1.savedAt }) else {
-            return "you are enough, exactly as you are."
+            return String(localized: "you are enough, exactly as you are.")
         }
         return latest.text
     }

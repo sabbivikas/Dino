@@ -428,6 +428,7 @@
 				DEVELOPMENT_TEAM = BA9NL64C62;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = DinoLiveActivity/Info.plist;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -452,6 +453,7 @@
 				DEVELOPMENT_TEAM = BA9NL64C62;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = DinoLiveActivity/Info.plist;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -712,11 +714,11 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				MARKETING_VERSION = 2.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.vikassabbi.dino.DinoUITests;
+				TEST_TARGET_NAME = Dino;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Dino.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Dino";
 			};
 			name = Debug;
 		};
@@ -729,11 +731,11 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				MARKETING_VERSION = 2.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.vikassabbi.dino.DinoUITests;
+				TEST_TARGET_NAME = Dino;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Dino.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Dino";
 			};
 			name = Release;
 		};

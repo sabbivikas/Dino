@@ -29,7 +29,7 @@ struct ContentView: View {
                     }
                 } else if !hasPassedAuth || authQA {
                     SignInView()
-                } else if !dataManager.onboardingComplete {
+                } else if !dataManager.onboardingComplete || onboardingQA {
                     OnboardingView()
                 } else {
                     MainTabView()
@@ -70,6 +70,16 @@ struct ContentView: View {
     private var authQA: Bool {
         #if DEBUG
         return ProcessInfo.processInfo.arguments.contains("-authQA")
+        #else
+        return false
+        #endif
+    }
+
+    // QA-only: force the onboarding flow on an already-onboarded install
+    // (screenshot verification of localized onboarding, DEBUG builds only).
+    private var onboardingQA: Bool {
+        #if DEBUG
+        return ProcessInfo.processInfo.arguments.contains("-onboardingQA")
         #else
         return false
         #endif

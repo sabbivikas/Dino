@@ -473,3 +473,17 @@ voice brief: dino is warm, gentle, small; never clinical, never corporate. lower
 ## not translated on purpose (24)
 
 ` · `, `%lld`, `%lld %@`, `%lld / %lld xp`, `%lld of %lld`, `%lld/%@`, `%lld/10`, `%lld/150`, `10d`, `14d+`, `3d`, `7d`, `Apple Weather`, `DINO`, `composed %lldx%lld @%lldx`, `dino`, `dino · v1.2.0`, `min`, `ok`, `v%@`, `·`, `↩︎`, `🔥`, `🦕`
+
+## audit additions — 2026-07-15 english-leak audit (round 2)
+
+a full systematic audit found ~840 MORE strings that bypassed the first extraction
+(strings in variables, notification bodies, siri replies, widgets, permission dialogs).
+all are in `vi-audit-additions.json` (key → translation). please give EXTRA attention to:
+
+1. **the first-launch typewriter letter** ("hey, you. …") — dino's very first words. read it out loud.
+2. **the two onboarding quotes** (emotional strength / peaceful mind).
+3. **notification nudges** (65 lines) — these appear on the lock screen, tone matters most here.
+4. **siri trigger phrases** (`AppShortcuts`) — would you actually SAY this to siri? if not, propose what you would say.
+5. **crisis card copy** (breathing coach) — "call or text 988" block. numbers/keywords must stay exact.
+6. **widget lines** — very small screens, so shorter is better; flag anything that will overflow.
+7. **permission dialogs** (system popups asking for health/mic/camera access) — must sound trustworthy.

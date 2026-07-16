@@ -122,7 +122,7 @@ struct WorldView: View {
 
     private var headline: String? {
         guard let b = selectedBucket, b.global.total > 0 else {
-            return loading ? "the world is waking up…" : "no lights yet today. yours could be the first \u{1F331}"
+            return loading ? String(localized: "the world is waking up…") : String(localized: "no lights yet today. yours could be the first \u{1F331}")
         }
         return nil   // deduped by owner call — the warm total is the headline now
     }
@@ -140,14 +140,14 @@ struct WorldView: View {
                            localEchoCountry: WorldMoodService.countryCode(from: Locale.current.region?.identifier),
                            findMyLightTrigger: $findTrigger,
                            onFoundLight: { found in
-                showToast(found ? "that's you 🦕" : "your light is glowing with the world 🌱")
+                showToast(found ? String(localized: "that's you 🦕") : String(localized: "your light is glowing with the world 🌱"))
             },
                            onGlowTap: { hit in
                 guard let hit else { toast = nil; return }   // tap elsewhere dismisses
                 if hit.isLocalEcho {
-                    showToast("your light in \(countryName(hit.countryCode)) \(hit.mood.emoji)")
+                    showToast(String(localized: "your light in \(countryName(hit.countryCode)) \(hit.mood.emoji)"))
                 } else {
-                    showToast("dinos in \(countryName(hit.countryCode)) \(hit.mood.emoji)")
+                    showToast(String(localized: "dinos in \(countryName(hit.countryCode)) \(hit.mood.emoji)"))
                 }
             })
             .frame(height: 340)
@@ -217,13 +217,15 @@ struct WorldView: View {
     }
 
     private func chipLabel(_ dayKey: String) -> String {
-        if dayKey == todayKey { return "today" }
+        if dayKey == todayKey { return String(localized: "today") }
         let df = DateFormatter()
         df.locale = Locale(identifier: "en_US_POSIX")
         df.dateFormat = "yyyy-MM-dd"
         guard let date = df.date(from: dayKey) else { return dayKey }
-        df.dateFormat = "EEE"
-        return df.string(from: date).lowercased()
+        let out = DateFormatter()
+        out.locale = Locale.current
+        out.setLocalizedDateFormatFromTemplate("EEE")
+        return out.string(from: date).lowercased()
     }
 
     // MARK: - Percentages
@@ -307,7 +309,7 @@ struct WorldView: View {
     }
 
     private func countryName(_ code: String) -> String {
-        if code == "elsewhere" { return "elsewhere 🌎" }
+        if code == "elsewhere" { return String(localized: "elsewhere 🌎") }
         return (Locale.current.localizedString(forRegionCode: code) ?? code).lowercased()
     }
 
@@ -336,7 +338,9 @@ struct WorldView: View {
                 }
 
                 if dm.sentLanternCount > 0 {
-                    Text("you've sent \(dm.sentLanternCount) lantern\(dm.sentLanternCount == 1 ? "" : "s") into the world")
+                    Text(dm.sentLanternCount == 1
+                         ? String(localized: "you've sent \(dm.sentLanternCount) lantern into the world")
+                         : String(localized: "you've sent \(dm.sentLanternCount) lanterns into the world"))
                         .font(DinoTheme.dinoFont(size: 12))
                         .foregroundColor(ink2)
                         .padding(.horizontal, 16)
@@ -346,7 +350,9 @@ struct WorldView: View {
                 LanternGalleryView(lanterns: lanterns)
             }
         } else if dm.sentLanternCount > 0 {
-            Text("you've sent \(dm.sentLanternCount) lantern\(dm.sentLanternCount == 1 ? "" : "s") into the world")
+            Text(dm.sentLanternCount == 1
+                 ? String(localized: "you've sent \(dm.sentLanternCount) lantern into the world")
+                 : String(localized: "you've sent \(dm.sentLanternCount) lanterns into the world"))
                 .font(DinoTheme.dinoFont(size: 12))
                 .foregroundColor(ink2)
                 .padding(.horizontal, 16)

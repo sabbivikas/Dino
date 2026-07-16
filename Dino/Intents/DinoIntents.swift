@@ -102,7 +102,7 @@ struct JournalThoughtIntent: AppIntent {
         df.dateStyle = .medium
         let entry = JournalEntry(
             audioFileName: "",
-            title: "journal entry \u{2014} \(df.string(from: Date()))",   // matches the composer's title convention
+            title: String(localized: "journal entry \u{2014} \(df.string(from: Date()))"),   // matches the composer's title convention
             summary: trimmed,
             moodTag: "reflective"
         )

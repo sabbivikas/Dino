@@ -207,7 +207,7 @@ private struct RecSlipView: View {
                 .foregroundColor(Color(hex: "#2E2A24").opacity(0.6))
             Spacer(minLength: 0)
             HStack {
-                Text(keepsake.rec.feel)
+                Text(keepsake.rec.feel.localized)
                     .font(DinoTheme.dinoFont(size: 11))
                     .italic()
                     .foregroundColor(Color(hex: "#2E2A24").opacity(0.55))

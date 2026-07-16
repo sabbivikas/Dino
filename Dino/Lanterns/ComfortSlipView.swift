@@ -53,8 +53,8 @@ enum ComfortSlip {
     }
 
     static func source(link: String) -> String {
-        guard let host = URL(string: link)?.host else { return "from somewhere gentle" }
-        return "from \(host.hasPrefix("www.") ? String(host.dropFirst(4)) : host)"
+        guard let host = URL(string: link)?.host else { return String(localized: "from somewhere gentle") }
+        return String(localized: "from \(host.hasPrefix("www.") ? String(host.dropFirst(4)) : host)")
     }
 
     static var allFixedStrings: [String] {

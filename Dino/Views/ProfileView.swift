@@ -176,8 +176,8 @@ struct ProfileView: View {
         // Read from SharedDataManager (per-user, namespaced) rather than the
         // bare UserDefaults "userName" key, which used to bleed across accounts.
         let trimmed = dataManager.userName.trimmingCharacters(in: .whitespacesAndNewlines)
-        if trimmed.isEmpty { return "friend" }
-        return trimmed.split(separator: " ").first.map(String.init) ?? "friend"
+        if trimmed.isEmpty { return String(localized: "friend") }
+        return trimmed.split(separator: " ").first.map(String.init) ?? String(localized: "friend")
     }
 
     private var joinDateLabel: String {
@@ -221,15 +221,15 @@ struct ProfileView: View {
 
     private var moodQuote: String {
         switch themeManager.currentTheme {
-        case .sunny:        return "little suns bloom\neven on quiet days"
-        case .rainy:        return "the garden drinks\nwhat the sky forgets"
-        case .cloudy:       return "soft skies hold you\nwithout asking why"
-        case .night:        return "rest is a kind\nof tending too"
-        case .forest:       return "grow slow.\nthe woods aren't in a rush"
-        case .lavenderCalm: return "you smell like\nsomething gentle"
-        case .snow:         return "even stillness\nkeeps you alive"
-        case .storm:        return "the tree still stands\nafter the wind"
-        case .defaultDino:  return "little you\nis doing enough"
+        case .sunny:        return String(localized: "little suns bloom\neven on quiet days")
+        case .rainy:        return String(localized: "the garden drinks\nwhat the sky forgets")
+        case .cloudy:       return String(localized: "soft skies hold you\nwithout asking why")
+        case .night:        return String(localized: "rest is a kind\nof tending too")
+        case .forest:       return String(localized: "grow slow.\nthe woods aren't in a rush")
+        case .lavenderCalm: return String(localized: "you smell like\nsomething gentle")
+        case .snow:         return String(localized: "even stillness\nkeeps you alive")
+        case .storm:        return String(localized: "the tree still stands\nafter the wind")
+        case .defaultDino:  return String(localized: "little you\nis doing enough")
         }
     }
 
@@ -384,7 +384,7 @@ struct ProfileView: View {
         )) {
             Button("ok", role: .cancel) {}
         } message: {
-            Text(accountDeletionErrorMessage ?? "please try again.")
+            Text(accountDeletionErrorMessage ?? String(localized: "please try again."))
         }
         .sheet(isPresented: $showReauthSheet) {
             ReauthSheet(
@@ -487,12 +487,12 @@ struct ProfileView: View {
             SBRow(icon: "calendar",
                   iconColor: SB.sage,
                   title: "calendar connected 🗓️".localized,
-                  subtitle: "dino can find quiet moments for you") { }
+                  subtitle: "dino can find quiet moments for you".localized) { }
         case .notDetermined:
             SBRow(icon: "calendar.badge.plus",
                   iconColor: SB.sage,
                   title: "connect your calendar".localized,
-                  subtitle: "for gentle break suggestions") {
+                  subtitle: "for gentle break suggestions".localized) {
                 Task {
                     _ = await CalendarService.shared.ensureAccess()
                     refreshCalendarAccess()
@@ -502,7 +502,7 @@ struct ProfileView: View {
             SBRow(icon: "calendar.badge.exclamationmark",
                   iconColor: SB.rose,
                   title: "calendar access needed".localized,
-                  subtitle: "tap to open settings") {
+                  subtitle: "tap to open settings".localized) {
                 if let url = URL(string: UIApplication.openSettingsURLString) {
                     UIApplication.shared.open(url)
                 }
@@ -522,7 +522,7 @@ struct ProfileView: View {
             SBRow(icon: "heart.fill",
                   iconColor: SB.sage,
                   title: "health connected 🌿".localized,
-                  subtitle: "dino learns from your sleep") { }
+                  subtitle: "dino learns from your sleep".localized) { }
         case .awaitingData:
             // asked, but no readable sleep yet — could be denied, could be an
             // empty night. HealthKit won't say which; be honest, link the
@@ -531,7 +531,7 @@ struct ProfileView: View {
             SBRow(icon: "heart.text.square",
                   iconColor: SB.sage,
                   title: "waiting on sleep data 🌙".localized,
-                  subtitle: "if you meant to allow it, check the health app") {
+                  subtitle: "if you meant to allow it, check the health app".localized) {
                 Task {
                     // re-ask first — free if ios still considers it undecided
                     _ = await HealthService.shared.requestSleepPermission()
@@ -545,7 +545,7 @@ struct ProfileView: View {
             SBRow(icon: "heart",
                   iconColor: SB.sage,
                   title: "connect apple health".localized,
-                  subtitle: "factor sleep and movement into your patterns") {
+                  subtitle: "factor sleep and movement into your patterns".localized) {
                 Task {
                     _ = await HealthService.shared.requestHealthPermissions()
                     refreshHealthAccess()
@@ -629,7 +629,7 @@ struct ProfileView: View {
                 ZStack {
                     StickerCircle(
                         number: "\(unionStreak)",
-                        label: "day streak",
+                        label: "day streak".localized,
                         innerRing: SB.peach,
                         tilt: 3,
                         paused: !showStreak,
@@ -679,7 +679,7 @@ struct ProfileView: View {
             } label: {
                 StickerCircle(
                     number: "\(dataManager.gratitudeNotes.count)",
-                    label: "slips saved",
+                    label: "slips saved".localized,
                     innerRing: SB.sky,
                     tilt: -4
                 )
@@ -805,7 +805,7 @@ struct ProfileView: View {
 
     private var sectionJourney: some View {
         PaperSection(
-            label: "your journey \u{1F4C8}",
+            label: "your journey \u{1F4C8}".localized,
             tapeColor: SB.peach,
             tilt: 0.5
         ) {
@@ -840,7 +840,7 @@ struct ProfileView: View {
 
     private var sectionPractice: some View {
         PaperSection(
-            label: "practice",
+            label: "practice".localized,
             tapeColor: SB.peach,
             tilt: -0.8
         ) {
@@ -848,7 +848,7 @@ struct ProfileView: View {
                 icon: "bell.fill",
                 iconColor: SB.sage,
                 title: "gentle reminders".localized,
-                subtitle: "nudges from your dino"
+                subtitle: "nudges from your dino".localized
             ) {
                 activeSheet = .gentleReminders
             }
@@ -893,8 +893,8 @@ struct ProfileView: View {
             SBRow(
                 icon: "moon.stars.fill",
                 iconColor: SB.lavender,
-                title: "wind down",
-                subtitle: "a quiet end to the day"
+                title: "wind down".localized,
+                subtitle: "a quiet end to the day".localized
             ) {
                 activeSheet = .windDown
             }
@@ -903,23 +903,23 @@ struct ProfileView: View {
 
     private var sectionAppearance: some View {
         PaperSection(
-            label: "appearance",
+            label: "appearance".localized,
             tapeColor: SB.sage.opacity(0.35),
             tilt: 1.0
         ) {
             SBRow(
                 icon: "paintpalette.fill",
                 iconColor: SB.rose,
-                title: "theme & weather",
-                subtitle: "current: \(themeManager.currentTheme.displayName)"
+                title: "theme & weather".localized,
+                subtitle: String(localized: "current: \(themeManager.currentTheme.displayName)")
             ) {
                 activeSheet = .themeSettings
             }
             SBRow(
                 icon: "textformat.size",
                 iconColor: SB.sky,
-                title: "text size",
-                subtitle: "make reading gentle"
+                title: "text size".localized,
+                subtitle: "make reading gentle".localized
             ) {
                 activeSheet = .textSize
             }
@@ -957,39 +957,39 @@ struct ProfileView: View {
 
     private var sectionAccount: some View {
         PaperSection(
-            label: "account",
+            label: "account".localized,
             tapeColor: SB.sky,
             tilt: -1.0
         ) {
             SBRow(
                 icon: "person.fill",
                 iconColor: SB.sage,
-                title: "profile details",
-                subtitle: "name, avatar"
+                title: "profile details".localized,
+                subtitle: "name, avatar".localized
             ) {
                 activeSheet = .profileDetails
             }
             SBRow(
                 icon: "lock.shield.fill",
                 iconColor: SB.lavender,
-                title: "privacy & data",
-                subtitle: "your data, your garden"
+                title: "privacy & data".localized,
+                subtitle: "your data, your garden".localized
             ) {
                 activeSheet = .privacyPolicy
             }
             SBRow(
                 icon: "trash",
                 iconColor: SB.rose,
-                title: "clear all data",
-                subtitle: "start with a fresh page"
+                title: "clear all data".localized,
+                subtitle: "start with a fresh page".localized
             ) {
                 showClearDataConfirm = true
             }
             SBRow(
                 icon: "person.slash",
                 iconColor: Color.red,
-                title: "delete account",
-                subtitle: "permanently remove everything"
+                title: "delete account".localized,
+                subtitle: "permanently remove everything".localized
             ) {
                 showDeleteAccountConfirm = true
             }
@@ -998,15 +998,15 @@ struct ProfileView: View {
 
     private var sectionWellness: some View {
         PaperSection(
-            label: "wellness",
+            label: "wellness".localized,
             tapeColor: SB.lavender,
             tilt: 0.8
         ) {
             SBRow(
                 icon: "brain.head.profile",
                 iconColor: SB.lavender,
-                title: "weekly check-in",
-                subtitle: "5 gentle questions"
+                title: "weekly check-in".localized,
+                subtitle: "5 gentle questions".localized
             ) {
                 activeSheet = .assessment
             }
@@ -1014,8 +1014,8 @@ struct ProfileView: View {
             SBRow(
                 icon: "exclamationmark.bubble.fill",
                 iconColor: SB.rose,
-                title: "need help now?",
-                subtitle: "someone will answer, always"
+                title: "need help now?".localized,
+                subtitle: "someone will answer, always".localized
             ) {
                 activeSheet = .resources
             }
@@ -1024,23 +1024,23 @@ struct ProfileView: View {
 
     private var sectionAbout: some View {
         PaperSection(
-            label: "about",
+            label: "about".localized,
             tapeColor: SB.rose,
             tilt: -0.6
         ) {
             SBRow(
                 icon: "questionmark.circle.fill",
                 iconColor: SB.sky,
-                title: "help & feedback",
-                subtitle: "tell us what's growing"
+                title: "help & feedback".localized,
+                subtitle: "tell us what's growing".localized
             ) {
                 activeSheet = .feedback
             }
             SBRow(
                 icon: "heart.fill",
                 iconColor: SB.rose,
-                title: "rate dino",
-                subtitle: "if it's helping your days"
+                title: "rate dino".localized,
+                subtitle: "if it's helping your days".localized
             ) {
                 showRateAlert = true
             }

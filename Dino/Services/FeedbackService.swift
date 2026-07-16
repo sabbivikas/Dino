@@ -15,8 +15,8 @@ enum FeedbackError: Error, LocalizedError {
     case submissionFailed
     var errorDescription: String? {
         switch self {
-        case .notAuthenticated: return "you need to be signed in to send feedback"
-        case .submissionFailed: return "couldn't send — try again"
+        case .notAuthenticated: return String(localized: "you need to be signed in to send feedback")
+        case .submissionFailed: return String(localized: "couldn't send — try again")
         }
     }
 }

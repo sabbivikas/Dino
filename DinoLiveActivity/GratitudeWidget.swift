@@ -158,7 +158,7 @@ struct GratitudeSmallView: View {
                 .font(.custom("DinoInitiativeFont-Regular", size: 32))
                 .foregroundColor(Color(hex: "#C26A1E"))
 
-            Text(todayCount == 1 ? "gratitude today" : "gratitudes today")
+            Text(todayCount == 1 ? String(localized: "gratitude today") : String(localized: "gratitudes today"))
                 .font(.custom("DinoInitiativeFont-Regular", size: 10))
                 .foregroundColor(Color(hex: "#8A4A1A"))
                 .multilineTextAlignment(.center)
@@ -179,10 +179,10 @@ struct GratitudeMediumView: View {
 
     private var encouragement: String {
         switch todayCount {
-        case 0:  return "what are you grateful\nfor today?"
-        case 1:  return "a great start —\nwhat else?"
-        case 2:  return "almost there —\none more slip?"
-        default: return "your jar is full of\ngood things ✨"
+        case 0:  return String(localized: "what are you grateful\nfor today?")
+        case 1:  return String(localized: "a great start —\nwhat else?")
+        case 2:  return String(localized: "almost there —\none more slip?")
+        default: return String(localized: "your jar is full of\ngood things ✨")
         }
     }
 
@@ -235,10 +235,10 @@ struct GratitudeLargeView: View {
 
     private var encouragement: String {
         switch todayCount {
-        case 0:  return "what are you grateful for today?"
-        case 1:  return "a great start — what else?"
-        case 2:  return "almost there — one more slip?"
-        default: return "your jar is full of good things ✨"
+        case 0:  return String(localized: "what are you grateful for today?")
+        case 1:  return String(localized: "a great start — what else?")
+        case 2:  return String(localized: "almost there — one more slip?")
+        default: return String(localized: "your jar is full of good things ✨")
         }
     }
 

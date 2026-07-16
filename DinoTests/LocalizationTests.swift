@@ -51,4 +51,37 @@ final class LocalizationTests: XCTestCase {
             }
         }
     }
+// audit sentinels
+    // audit sentinels — one key per newly-audited surface; if any of these
+    // resolves to its english key in a shipped language, the audit regressed.
+    // (values with dashes are checked dash-free like all voice strings.)
+    private let auditSentinels = [
+        "hey, you.\n\nthe fact that you're here means something.\nmaybe things feel heavy. maybe you're just curious.\neither way, you showed up. that matters.\n\ndino is your space.\nno pressure. no judgment.\njust a place to breathe, reflect, and grow.\n\nlet's take this one step at a time.",
+        "hey, how are you feeling today? take a sec to check in 🌱",
+        "you are enough, exactly as you are.",
+        "the big sigh",
+        "%lld feelings shared today",
+        "welcome to dino",
+        "good morning",
+        "kept. sleep well.",
+        "over the past week, how often have you felt down, depressed, or hopeless?",
+        "what dino collects",
+    ]
+
+    func testAuditSentinelsResolveInEveryLanguage() throws {
+        for lang in langs {
+            guard let path = Bundle.main.path(forResource: lang, ofType: "lproj"),
+                  let bundle = Bundle(path: path) else {
+                XCTFail("missing \(lang).lproj"); continue
+            }
+            for key in auditSentinels {
+                let resolved = bundle.localizedString(forKey: key, value: "⟂MISSING⟂", table: nil)
+                XCTAssertNotEqual(resolved, "⟂MISSING⟂", "\(lang): sentinel not in catalog: \(key.prefix(40))")
+                XCTAssertNotEqual(resolved, key, "\(lang): sentinel resolves to english: \(key.prefix(40))")
+                XCTAssertFalse(resolved.contains("—") || resolved.contains("–"),
+                               "\(lang): dash in translation of \(key.prefix(40))")
+            }
+        }
+    }
+
 }

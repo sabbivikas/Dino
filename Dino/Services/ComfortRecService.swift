@@ -67,7 +67,7 @@ enum ComfortRecVoice {
     static let shelfEmpty = String(localized: "nothing here yet")
     static let shelfEmptySub = String(localized: "when dino picks something for you, it rests here")
 
-    static func shelfKept(_ n: Int) -> String { "\(n) kept" }
+    static func shelfKept(_ n: Int) -> String { String(localized: "\(n) kept") }
     static func shelfRowLine(_ n: Int) -> String { "\(shelfTitle) \u{00B7} \(shelfKept(n))" }
 
     static let allowedTypes = ["music", "book", "film"]
@@ -82,11 +82,11 @@ enum ComfortRecVoice {
     }
 
     static func metaLine(_ rec: RichRec) -> String {
-        "\(rec.creator) \u{00B7} \(rec.type) \u{00B7} \(String(rec.year))"
+        "\(rec.creator) \u{00B7} \(rec.type.localized) \u{00B7} \(String(rec.year))"
     }
 
     static func feelLine(_ rec: RichRec) -> String {
-        "\(feelPrefix) \(rec.feel) \u{00B7} \(lengthPrefix) \(rec.length)"
+        "\(feelPrefix) \(rec.feel.localized) \u{00B7} \(lengthPrefix) \(rec.length)"
     }
 
     static func icon(type: String) -> String {

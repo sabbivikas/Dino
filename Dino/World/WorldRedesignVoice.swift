@@ -18,10 +18,10 @@ enum WorldRedesignVoice {
 
     static func totalSuffix(total: Int, isToday: Bool) -> String {
         switch (total == 1, isToday) {
-        case (true, true):   return " feeling shared today"
-        case (false, true):  return " feelings shared today"
-        case (true, false):  return " feeling shared this day"
-        case (false, false): return " feelings shared this day"
+        case (true, true):   return String(localized: " feeling shared today")
+        case (false, true):  return String(localized: " feelings shared today")
+        case (true, false):  return String(localized: " feeling shared this day")
+        case (false, false): return String(localized: " feelings shared this day")
         }
     }
 
@@ -29,7 +29,7 @@ enum WorldRedesignVoice {
 
     /// inline count that fades in on tap
     static func rowCount(_ n: Int, isToday: Bool) -> String {
-        isToday ? "\(n) tonight" : "\(n) that day"
+        isToday ? String(localized: "\(n) tonight") : String(localized: "\(n) that day")
     }
 
     /// a11y row label always carries the count, revealed or not
@@ -44,7 +44,7 @@ enum WorldRedesignVoice {
 
     static let lanternHeader = String(localized: "your lanterns")
     static let lanternSubline = String(localized: "kindness that drifted to you from around the world")
-    static func seeAll(_ total: Int) -> String { "see all \(total) \u{203A}" }
+    static func seeAll(_ total: Int) -> String { String(localized: "see all \(total) \u{203A}") }
 
     /// "{country} · {date}" — the card's quiet footer
     static func cardMeta(country: String, date: String) -> String { "\(country) \u{00B7} \(date)" }
@@ -54,8 +54,8 @@ enum WorldRedesignVoice {
     static let galleryHeader = String(localized: "your lanterns")
 
     static func gallerySubline(total: Int, countries: Int) -> String {
-        let kept = total == 1 ? "1 kindness kept" : "\(total) kindnesses kept"
-        let from = countries == 1 ? "from 1 country" : "from \(countries) countries"
+        let kept = total == 1 ? String(localized: "1 kindness kept") : String(localized: "\(total) kindnesses kept")
+        let from = countries == 1 ? String(localized: "from 1 country") : String(localized: "from \(countries) countries")
         return "\(kept), \(from)"
     }
 

@@ -112,8 +112,8 @@ enum SiriReplies {
     }
 
     // journal — the 2am whisper is the north star: soft, final, no follow-ups
-    static let journalNightLine = "kept. sleep well."
-    static let journalDayLine = "kept. it's safe here."   // owner tweak: no self-reference
+    static let journalNightLine = String(localized: "kept. sleep well.")
+    static let journalDayLine = String(localized: "kept. it's safe here.")   // owner tweak: no self-reference
 
     /// night = 21:00 through 04:59
     static func isNight(hour: Int) -> Bool {
@@ -133,14 +133,14 @@ enum SiriReplies {
     }
 
     static let disambiguationPrompt =
-        "how's the weather inside? clear, partly cloudy, overwhelmed, or drained?"
+        String(localized: "how's the weather inside? clear, partly cloudy, overwhelmed, or drained?")
 
     /// Soft failure when the captured text is empty — final, never a question.
-    static let emptyCaptureLine = "i didn't catch anything to keep."
+    static let emptyCaptureLine = String(localized: "i didn't catch anything to keep.")
 
     /// Next app open after a siri-logged mood.
     static func returnLine(weekday: String) -> String {
-        "while you were away, i kept your \(weekday.lowercased()) 🌿"
+        String(localized: "while you were away, i kept your \(weekday.lowercased()) 🌿")
     }
 }
 
@@ -160,7 +160,7 @@ enum SiriReturnMoment {
         guard let at = UserDefaults.standard.object(forKey: key) as? Date else { return nil }
         UserDefaults.standard.removeObject(forKey: key)
         let df = DateFormatter()
-        df.locale = Locale(identifier: "en_US_POSIX")
+        df.locale = Locale.current
         df.calendar = calendar
         df.dateFormat = "EEEE"
         return SiriReplies.returnLine(weekday: df.string(from: at))

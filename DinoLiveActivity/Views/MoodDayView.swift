@@ -45,8 +45,8 @@ struct MoodDaySmallView: View {
                 Spacer()
 
                 HStack(spacing: 5) {
-                    MoodPill(label: "calm")
-                    MoodPill(label: "okay")
+                    MoodPill(label: String(localized: "calm"))
+                    MoodPill(label: String(localized: "okay"))
                 }
             }
             .padding(12)
@@ -60,7 +60,7 @@ struct MoodDaySmallView: View {
 struct MoodDayLargeView: View {
     let entry: MoodSnapshot
 
-    private let pills = ["calm", "happy", "okay", "low"]
+    private let pills = [String(localized: "calm"), String(localized: "happy"), String(localized: "okay"), String(localized: "low")]
 
     var body: some View {
         ZStack {
@@ -120,7 +120,7 @@ struct MoodDayLargeView: View {
 struct MoodDayMediumView: View {
     let entry: MoodSnapshot
 
-    private let pills = ["calm", "happy", "okay", "low"]
+    private let pills = [String(localized: "calm"), String(localized: "happy"), String(localized: "okay"), String(localized: "low")]
 
     var body: some View {
         ZStack {

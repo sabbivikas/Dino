@@ -156,7 +156,7 @@ struct WhatsNewView: View {
                         withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) { index += 1 }
                     }
                 } label: {
-                    Text(isLast ? "start exploring 🦕" : "next")
+                    Text(isLast ? String(localized: "start exploring 🦕") : String(localized: "next"))
                         .font(DinoTheme.dinoFont(size: 17))
                         .foregroundColor(.white)
                         .frame(maxWidth: .infinity)

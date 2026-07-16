@@ -28,8 +28,8 @@ private struct OnboardingColors {
 }
 
 // MARK: - Swappable quote constants
-private let welcomeQuote = "emotional strength is not the absence of struggle, but the courage to sit with your feelings, understand them, and grow through them."
-private let navyQuote = "a peaceful mind is the soil where joy, strength and purpose grows"
+private let welcomeQuote = String(localized: "emotional strength is not the absence of struggle, but the courage to sit with your feelings, understand them, and grow through them.")
+private let navyQuote = String(localized: "a peaceful mind is the soil where joy, strength and purpose grows")
 
 // MARK: - Feeling options
 private let feelingOptions = [
@@ -399,17 +399,17 @@ private struct StepFeelingPage: View {
 
             VStack(spacing: 12) {
                 pill(
-                    label: "doing great",
+                    label: String(localized: "doing great"),
                     option: "doing great!",
                     index: 0
                 )
                 pill(
-                    label: "it's a challenge",
+                    label: String(localized: "it's a challenge"),
                     option: "ongoing mental health challenges",
                     index: 1
                 )
                 pill(
-                    label: "somewhere in between",
+                    label: String(localized: "somewhere in between"),
                     option: "having a hard time getting over something",
                     index: 2
                 )
@@ -530,7 +530,7 @@ private struct StepChallengePickerPage: View {
                 VStack(spacing: 10) {
                     ForEach(options, id: \.self) { option in
                         ChallengePillButton(
-                            label: option,
+                            label: option.localized,
                             isSelected: selectedChallenge == option,
                             onTap: { selectedChallenge = option }
                         )
@@ -696,7 +696,7 @@ private struct StepReferralPage: View {
                 VStack(spacing: 12) {
                     ForEach(referralOptions, id: \.self) { option in
                         RadioRow(
-                            label: option,
+                            label: option.localized,
                             isSelected: selectedReferral == option,
                             onTap: { selectedReferral = option }
                         )
@@ -1065,7 +1065,7 @@ private struct StepAnxietyUseCasePage: View {
             }
             .frame(height: 220)
 
-            Text(breathPhase)
+            Text(breathPhase.localized)
                 .font(DinoTheme.dinoFont(size: 14))
                 .foregroundColor(OnboardingColors.sage)
                 .id(breathPhase)
@@ -1135,11 +1135,11 @@ private struct GratitudeSlipSpec {
 }
 
 private let gratitudeSlips: [GratitudeSlipSpec] = [
-    GratitudeSlipSpec(label: "quiet morning", color: Color(hex: "#FDDCB5"), rotation: -10),
-    GratitudeSlipSpec(label: "good tea",      color: Color(hex: "#E8E0F5"), rotation: 6),
-    GratitudeSlipSpec(label: "kind words",    color: Color(hex: "#C8E6F5"), rotation: -4),
-    GratitudeSlipSpec(label: "sunshine",      color: Color(hex: "#C8E0C4"), rotation: 8),
-    GratitudeSlipSpec(label: "deep breath",   color: Color(hex: "#F5D0D0"), rotation: -7)
+    GratitudeSlipSpec(label: String(localized: "quiet morning"), color: Color(hex: "#FDDCB5"), rotation: -10),
+    GratitudeSlipSpec(label: String(localized: "good tea"),      color: Color(hex: "#E8E0F5"), rotation: 6),
+    GratitudeSlipSpec(label: String(localized: "kind words"),    color: Color(hex: "#C8E6F5"), rotation: -4),
+    GratitudeSlipSpec(label: String(localized: "sunshine"),      color: Color(hex: "#C8E0C4"), rotation: 8),
+    GratitudeSlipSpec(label: String(localized: "deep breath"),   color: Color(hex: "#F5D0D0"), rotation: -7)
 ]
 
 private struct StepRoughDayUseCasePage: View {
@@ -1302,19 +1302,19 @@ private struct TestimonialData {
 
 private let ratingTestimonials: [TestimonialData] = [
     TestimonialData(
-        quote: "your little dino has saved my day many times.",
+        quote: String(localized: "your little dino has saved my day many times."),
         name: "patricia b.",
-        tag: "rn, icu nurse \u{00B7} finland"
+        tag: String(localized: "rn, icu nurse \u{00B7} finland")
     ),
     TestimonialData(
-        quote: "it feels so friendly and natural, not like i'm being pressured to keep up with my good habits.",
+        quote: String(localized: "it feels so friendly and natural, not like i'm being pressured to keep up with my good habits."),
         name: "mikhale m.",
-        tag: "dino user"
+        tag: String(localized: "dino user")
     ),
     TestimonialData(
-        quote: "the app helps me remember the good parts of life.",
+        quote: String(localized: "the app helps me remember the good parts of life."),
         name: "luan",
-        tag: "dino community"
+        tag: String(localized: "dino community")
     )
 ]
 

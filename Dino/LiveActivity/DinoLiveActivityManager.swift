@@ -24,22 +24,22 @@ class DinoLiveActivityManager: ObservableObject {
     // MARK: - Message Banks
 
     static let calmingMessages: [String] = [
-        "breathe and let go",
-        "you are at peace",
-        "this moment is yours",
-        "just be",
-        "nothing to do, nowhere to go",
-        "gentle awareness",
-        "stillness within"
+        String(localized: "breathe and let go"),
+        String(localized: "you are at peace"),
+        String(localized: "this moment is yours"),
+        String(localized: "just be"),
+        String(localized: "nothing to do, nowhere to go"),
+        String(localized: "gentle awareness"),
+        String(localized: "stillness within")
     ]
 
     static let focusMessages: [String] = [
-        "stay focused",
-        "you're doing great",
-        "one thing at a time",
-        "deep work mode",
-        "almost there",
-        "keep going"
+        String(localized: "stay focused"),
+        String(localized: "you're doing great"),
+        String(localized: "one thing at a time"),
+        String(localized: "deep work mode"),
+        String(localized: "almost there"),
+        String(localized: "keep going")
     ]
 
     private init() {}
@@ -142,7 +142,7 @@ class DinoLiveActivityManager: ObservableObject {
 
         let initialState = MeditationActivityAttributes.ContentState(
             secondsRemaining: totalDuration,
-            calmMessage: DinoLiveActivityManager.calmingMessages.first ?? "breathe and let go",
+            calmMessage: DinoLiveActivityManager.calmingMessages.first ?? String(localized: "breathe and let go"),
             isPaused: false,
             progress: 0.0
         )
@@ -209,7 +209,7 @@ class DinoLiveActivityManager: ObservableObject {
             secondsRemaining: totalDuration,
             progress: 0.0,
             isPaused: false,
-            motivationMessage: DinoLiveActivityManager.focusMessages.first ?? "stay focused"
+            motivationMessage: DinoLiveActivityManager.focusMessages.first ?? String(localized: "stay focused")
         )
 
         print("[Dino] Starting focus Live Activity...")

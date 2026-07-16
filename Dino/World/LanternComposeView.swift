@@ -113,7 +113,7 @@ struct LanternComposeView: View {
                     } label: {
                         HStack(spacing: 8) {
                             if stage == .sending { ProgressView().tint(.white) }
-                            Text(stage == .sending ? "dino is reading it…" : "let it fly 🏮")
+                            Text(stage == .sending ? String(localized: "dino is reading it…") : String(localized: "let it fly 🏮"))
                         }
                         .font(DinoTheme.dinoFont(size: 16)).foregroundColor(.white)
                         .frame(maxWidth: .infinity).padding(.vertical, 15)
@@ -156,14 +156,14 @@ struct LanternComposeView: View {
         case .rejected:
             stage = .compose
             withAnimation {
-                notice = "dino couldn't carry this one 🦕 lanterns only travel when they're gentle. want to rewrite it?"
+                notice = String(localized: "dino couldn't carry this one 🦕 lanterns only travel when they're gentle. want to rewrite it?")
             }
         case .limitReached:
             stage = .compose
-            withAnimation { notice = "dino's pouch is empty for today. three lanterns a day 🏮" }
+            withAnimation { notice = String(localized: "dino's pouch is empty for today. three lanterns a day 🏮") }
         case .failed:
             stage = .compose
-            withAnimation { notice = "the wind isn't right just now. try again in a moment 🌬️" }
+            withAnimation { notice = String(localized: "the wind isn't right just now. try again in a moment 🌬️") }
         }
     }
 }

@@ -67,7 +67,7 @@ struct MoodMorningSmallView: View {
 struct MoodMorningLargeView: View {
     let entry: MoodSnapshot
 
-    private let pills = ["calm", "happy", "okay", "low"]
+    private let pills = [String(localized: "calm"), String(localized: "happy"), String(localized: "okay"), String(localized: "low")]
 
     var body: some View {
         ZStack {

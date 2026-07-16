@@ -67,11 +67,11 @@ private func meditationTrailingText(_ secondsRemaining: Int) -> String {
     // Current minute of the session — compact trailing display.
     let clamped = max(0, secondsRemaining)
     let minute = clamped / 60
-    return "\(minute)m"
+    return String(localized: "\(minute)m")
 }
 
 private func sessionTitle(isPaused: Bool) -> String {
-    isPaused ? "paused" : "meditating"
+    isPaused ? String(localized: "paused") : String(localized: "meditating")
 }
 
 // MARK: - Dino on Moon (scene composite)
@@ -200,7 +200,7 @@ struct MeditationLockScreenView: View {
                         Circle()
                             .fill(Color(hex: "#BAA9DB"))
                             .frame(width: 5, height: 5)
-                        Text(context.state.isPaused ? "paused" : "meditating")
+                        Text(context.state.isPaused ? String(localized: "paused") : String(localized: "meditating"))
                             .font(.custom("DinoInitiativeFont-Regular", size: 12))
                             .foregroundColor(Color(hex: "#F5E9C4"))
                             .lineLimit(1)

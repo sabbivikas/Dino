@@ -56,8 +56,8 @@ struct BreakSuggestionCard: View {
 
     private var introHeadline: String {
         if let s = sleepData {
-            if s.isVeryShort { return "you slept \(s.displayString) last night and today sounds heavy 🌧️" }
-            if s.isShort { return "today sounds heavy — a lighter night doesn't help 🌧️" }
+            if s.isVeryShort { return String(localized: "you slept \(s.displayString) last night and today sounds heavy 🌧️") }
+            if s.isShort { return String(localized: "today sounds heavy — a lighter night doesn't help 🌧️") }
         }
         return "want to tell me what's going on?".localized
     }
@@ -160,7 +160,7 @@ struct BreakSuggestionCard: View {
                 if s.slots.isEmpty {
                     emptySlotsView
                 } else {
-                    Text("i think \(s.suggestedActivity) would help —")
+                    Text("i think \(s.suggestedActivity.localized) would help —")
                         .font(DinoTheme.dinoFont(size: 16)).foregroundColor(ink)
                         .multilineTextAlignment(.center)
                     Text(s.reason)

@@ -39,7 +39,7 @@ struct MeditationView: View {
                             Text("meditate")
                                 .font(DinoTheme.dinoDisplayFont(size: 28))
                                 .foregroundColor(.white)
-                            Text(viewModel.isRunning ? viewModel.currentMessage : "be still. be here.")
+                            Text(viewModel.isRunning ? viewModel.currentMessage : String(localized: "be still. be here."))
                                 .font(DinoTheme.subheadlineFont())
                                 .foregroundColor(.white.opacity(0.8))
                                 .italic()
@@ -122,7 +122,7 @@ struct MeditationView: View {
                                     }
                                 }
                             }) {
-                                Text(viewModel.isRunning ? "end session" : "begin")
+                                Text(viewModel.isRunning ? String(localized: "end session") : String(localized: "begin"))
                                     .font(DinoTheme.headlineFont())
                                     .foregroundColor(.white)
                                     .frame(maxWidth: .infinity)
@@ -142,7 +142,7 @@ struct MeditationView: View {
                                         }
                                     }
                                 }) {
-                                    Text(viewModel.isPaused ? "resume" : "pause")
+                                    Text(viewModel.isPaused ? String(localized: "resume") : String(localized: "pause"))
                                         .font(DinoTheme.headlineFont())
                                         .foregroundColor(DinoTheme.lavender)
                                         .frame(maxWidth: .infinity)
@@ -223,8 +223,8 @@ struct MeditationDoneScreen: View {
             }
 
             HStack(spacing: 20) {
-                StatPill(label: "meditated", value: viewModel.formattedElapsed, color: DinoTheme.lavender)
-                StatPill(label: "xp earned", value: "+20", color: DinoTheme.peach)
+                StatPill(label: String(localized: "meditated"), value: viewModel.formattedElapsed, color: DinoTheme.lavender)
+                StatPill(label: String(localized: "xp earned"), value: "+20", color: DinoTheme.peach)
             }
 
             Spacer()
@@ -272,7 +272,7 @@ class MeditationViewModel: ObservableObject {
     @Published var isPaused: Bool = false
     @Published var isDone: Bool = false
     @Published var totalElapsed: Int = 0
-    @Published var currentMessage: String = "breathe and let go"
+    @Published var currentMessage: String = String(localized: "breathe and let go")
 
     private var mainTimer: Timer?
     private var messageTimer: Timer?
@@ -287,11 +287,11 @@ class MeditationViewModel: ObservableObject {
     private let meditationTracks = ["meditation_ambient", "meditation_ambient_2"]
 
     let durationOptions: [(label: String, seconds: Int)] = [
-        ("2 min", 120),
-        ("5 min", 300),
-        ("10 min", 600),
-        ("15 min", 900),
-        ("20 min", 1200)
+        (String(localized: "2 min"), 120),
+        (String(localized: "5 min"), 300),
+        (String(localized: "10 min"), 600),
+        (String(localized: "15 min"), 900),
+        (String(localized: "20 min"), 1200)
     ]
 
     private let messages = DinoLiveActivityManager.calmingMessages
@@ -316,14 +316,14 @@ class MeditationViewModel: ObservableObject {
     var formattedElapsed: String {
         let m = totalElapsed / 60
         let s = totalElapsed % 60
-        return String(format: "%d min %02d sec", m, s)
+        return String(format: String(localized: "%d min %02d sec"), m, s)
     }
 
     func start() {
         timeRemaining = selectedDuration
         totalElapsed = 0
         messageIndex = 0
-        currentMessage = messages.first ?? "breathe and let go"
+        currentMessage = messages.first ?? String(localized: "breathe and let go")
         isPaused = false
         isDone = false
         isRunning = true

@@ -25,11 +25,11 @@ enum BreathingPhase: String {
 
     var label: String {
         switch self {
-        case .idle: return "ready"
-        case .inhale: return "breathe in"
-        case .hold: return "hold"
-        case .exhale: return "breathe out"
-        case .done: return "done"
+        case .idle: return String(localized: "ready")
+        case .inhale: return String(localized: "breathe in")
+        case .hold: return String(localized: "hold")
+        case .exhale: return String(localized: "breathe out")
+        case .done: return String(localized: "done")
         }
     }
 
@@ -77,9 +77,9 @@ class BreathingViewModel: ObservableObject {
     private var lastPauseDate: Date?
 
     let durationOptions: [(label: String, seconds: Int)] = [
-        ("2 min", 120),
-        ("5 min", 300),
-        ("10 min", 600)
+        (String(localized: "2 min"), 120),
+        (String(localized: "5 min"), 300),
+        (String(localized: "10 min"), 600)
     ]
 
     var cycleLength: Int { selectedPattern.cycleLength }
@@ -380,6 +380,6 @@ class BreathingViewModel: ObservableObject {
     var formattedElapsed: String {
         let mins = totalElapsed / 60
         let secs = totalElapsed % 60
-        return String(format: "%d min %02d sec", mins, secs)
+        return String(format: String(localized: "%d min %02d sec"), mins, secs)
     }
 }

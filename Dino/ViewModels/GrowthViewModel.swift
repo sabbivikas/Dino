@@ -147,9 +147,9 @@ final class GrowthViewModel: ObservableObject {
 
     var xpProgress: Double { dataManager.growthStats.xpProgress }
 
-    var levelLabel: String { "level \(currentLevel)" }
+    var levelLabel: String { String(localized: "level \(currentLevel)") }
 
-    var xpLabel: String { "\(xpInCurrentLevel) / \(xpToNextLevel) xp" }
+    var xpLabel: String { String(localized: "\(xpInCurrentLevel) / \(xpToNextLevel) xp") }
 
     /// Award XP and handle level-up bookkeeping. Persistence is automatic via
     /// the `growthStats` didSet in SharedDataManager.
@@ -202,7 +202,8 @@ final class GrowthViewModel: ObservableObject {
         guard let monday = cal.date(byAdding: .day, value: -daysBackToMonday, to: today) else {
             return []
         }
-        let labels = ["m", "t", "w", "t", "f", "s", "s"]
+        let symbols = cal.veryShortStandaloneWeekdaySymbols   // Sun-first
+        let labels = (0..<7).map { symbols[($0 + 1) % 7].lowercased() }   // Mon-first
         return (0..<7).compactMap { offset in
             guard let d = cal.date(byAdding: .day, value: offset, to: monday) else { return nil }
             var done: Set<PracticeType> = []
@@ -372,22 +373,22 @@ final class GrowthViewModel: ObservableObject {
     /// priority when the plant has been neglected.
     var statusMessage: String {
         switch careState {
-        case .tired:      return "looking a little thirsty"
-        case .struggling: return "your sunflower needs attention"
-        case .wilting:    return "wilting — come back soon"
-        case .dying:      return "nearly gone — one practice saves it"
-        case .dead:       return "your sunflower has rested. a new seed waits"
+        case .tired:      return String(localized: "looking a little thirsty")
+        case .struggling: return String(localized: "your sunflower needs attention")
+        case .wilting:    return String(localized: "wilting — come back soon")
+        case .dying:      return String(localized: "nearly gone — one practice saves it")
+        case .dead:       return String(localized: "your sunflower has rested. a new seed waits")
         case .healthy:
             switch growthStage {
-            case .seed:     return "a seed full of potential"
-            case .cracking: return "something is stirring underground"
-            case .sprout:   return "your sunflower just broke through"
-            case .seedling: return "growing stronger every day"
-            case .growing:  return "reaching for the light"
-            case .budding:  return "a bud is forming — keep going"
-            case .opening:  return "almost there, keep showing up"
-            case .bloomed:  return "your sunflower is in full bloom"
-            case .thriving: return "thriving beyond measure"
+            case .seed:     return String(localized: "a seed full of potential")
+            case .cracking: return String(localized: "something is stirring underground")
+            case .sprout:   return String(localized: "your sunflower just broke through")
+            case .seedling: return String(localized: "growing stronger every day")
+            case .growing:  return String(localized: "reaching for the light")
+            case .budding:  return String(localized: "a bud is forming — keep going")
+            case .opening:  return String(localized: "almost there, keep showing up")
+            case .bloomed:  return String(localized: "your sunflower is in full bloom")
+            case .thriving: return String(localized: "thriving beyond measure")
             }
         }
     }

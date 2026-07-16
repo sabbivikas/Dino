@@ -291,7 +291,7 @@ final class HealthService: ObservableObject {
         var displayString: String {
             let hours = Int(durationHours)
             let mins = Int((durationHours - Double(hours)) * 60)
-            return mins > 0 ? "\(hours)h \(mins)min" : "\(hours)h"
+            return mins > 0 ? String(localized: "\(hours)h \(mins)min") : String(localized: "\(hours)h")
         }
 
         var dinoObservation: String {

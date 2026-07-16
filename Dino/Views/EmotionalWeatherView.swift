@@ -170,18 +170,18 @@ struct EmotionalWeatherView: View {
                     // intensity fills lavender dusk
                     VStack(spacing: 24) {
                         MoodSlider(
-                            title: "energy",
+                            title: String(localized: "energy"),
                             value: $viewModel.energyLevel,
-                            lowLabel: "drained",
-                            highLabel: "energized",
+                            lowLabel: String(localized: "drained"),
+                            highLabel: String(localized: "energized"),
                             color: Color(hex: "#E8B84A")
                         )
 
                         MoodSlider(
-                            title: "intensity",
+                            title: String(localized: "intensity"),
                             value: $viewModel.intensityLevel,
-                            lowLabel: "calm",
-                            highLabel: "intense",
+                            lowLabel: String(localized: "calm"),
+                            highLabel: String(localized: "intense"),
                             color: Color(hex: "#9C8FB8")
                         )
                     }
@@ -944,7 +944,7 @@ struct WeeklyMoodTrend: View {
                     }
                     .frame(maxWidth: .infinity)
                     .accessibilityElement(children: .ignore)
-                    .accessibilityLabel("\(fullDayLabel(date)), \(mood?.label ?? "no log")")
+                    .accessibilityLabel("\(fullDayLabel(date)), \(mood?.label ?? String(localized: "no log"))")
                 }
             }
             .padding(.vertical, 16)

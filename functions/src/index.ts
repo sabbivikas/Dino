@@ -1873,10 +1873,18 @@ type MissionOutcome = "gift" | "silence" | "retryable";
  *  hop in the chain (provider error, timeout, quota, empty or invalid
  *  output); "silence" is final (gentleness rejection — a bad gift does not
  *  get a second chance at being bad). */
+const FALLBACK_DINO_LINE: Record<string, string> = {
+  en: "dino went looking tonight and this glimmered",
+  es: "dino salió a buscar esta noche y esto brillaba",
+  ja: "dinoが今夜さがしにいって、これがきらっとひかっていたよ",
+  ko: "dino가 오늘 밤 찾으러 나갔다가 이게 반짝이고 있었어",
+  vi: "dino đi tìm tối nay và thấy điều này lấp lánh",
+};
+
 async function attemptMission(
   db: admin.firestore.Firestore, uid: string, needKind: string,
   r: AiRoute, keys: { openai?: string; metaKey?: string; metaBase?: string },
-  sources: string[], recentSources: string[]
+  sources: string[], recentSources: string[], userLocale = "en"
 ): Promise<MissionOutcome> {
   const deadline = Date.now() + MISSION_TIMEOUT_MS;
   let promptTokens = 0;
@@ -1947,7 +1955,7 @@ async function attemptMission(
       if (!check.gift) return check.reason === "gentle" ? "silence" : "retryable";
       const gift = check.gift;
       // delivered words — the one warm line the user reads (router: 4.1 mini)
-      let dinoLine = "dino went looking tonight and this glimmered";
+      let dinoLine = FALLBACK_DINO_LINE[userLocale] ?? FALLBACK_DINO_LINE.en;
       try {
         const dw = aiRoute("deliveredWords");
         const dwClient = aiClientFor(dw, { openai: OPENAI_API_KEY.value() });
@@ -1957,7 +1965,8 @@ async function attemptMission(
             { role: "system", content:
               "you are dino. write ONE warm lowercase line, no dashes, 14 words or fewer, " +
               "to hand someone a small gift you found for them. never clinical, never salesy. " +
-              "never address them by any name: a name in the gift's title is not their name." },
+              "never address them by any name: a name in the gift's title is not their name." +
+              getLanguageInstruction(userLocale) },
             { role: "user", content: `the gift is a ${needKind} kind of thing called "${gift.title}".` },
           ],
         });
@@ -1991,7 +2000,7 @@ async function attemptMission(
  *  the whole chain; the hard rules were asserted on every hop by the
  *  router. All hops fail = silence, never an error to the user. */
 async function runExpeditionMission(db: admin.firestore.Firestore, uid: string, needKind: string,
-                                    recentSources: string[] = []): Promise<boolean> {
+                                    recentSources: string[] = [], userLocale = "en"): Promise<boolean> {
   if (!(await grantMissionBudget(db, uid))) return false;
   const keys = {
     openai: OPENAI_API_KEY.value(),
@@ -2007,7 +2016,7 @@ async function runExpeditionMission(db: admin.firestore.Firestore, uid: string, 
       // meta unconfigured → this hop cannot run; fall through to the next
     } else {
       aiLogRoute("mission", r);
-      outcome = await attemptMission(db, uid, needKind, r, keys, sources, recentSources);
+      outcome = await attemptMission(db, uid, needKind, r, keys, sources, recentSources, userLocale);
       // outcome telemetry — model + result only, never user data
       functions.logger.info("mission_attempt", { model: r.model, outcome });
     }
@@ -2082,7 +2091,9 @@ export const nightlyExpeditionWatch = onSchedule(
           }, { merge: true });
           const recentSources = (Array.isArray(exp.recentSources) ? exp.recentSources : [])
             .map((s: unknown) => String(s)).slice(0, 6);
-          await runExpeditionMission(db, doc.id, needKind, recentSources);   // F2 — silence on any failure
+          const userLocale = ["en", "es", "ja", "ko", "vi"].includes(String(d.userLocale))
+            ? String(d.userLocale) : "en";
+          await runExpeditionMission(db, doc.id, needKind, recentSources, userLocale);   // F2 — silence on any failure
         }
       } catch {
         // luna failure = a quiet night; no attempt recorded → tomorrow may retry

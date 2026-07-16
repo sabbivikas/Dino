@@ -40,7 +40,7 @@ struct JournalEntry: Codable, Identifiable {
         date: Date = Date(),
         audioFileName: String,
         title: String,
-        summary: String = "voice note recorded",
+        summary: String = String(localized: "voice note recorded"),
         moodTag: String = "reflective",
         isFavorite: Bool = false,
         durationSeconds: Double = 0,
@@ -100,9 +100,9 @@ struct JournalEntry: Codable, Identifiable {
         let mins = Int(durationSeconds) / 60
         let secs = Int(durationSeconds) % 60
         if mins > 0 {
-            return "\(mins)m \(secs)s"
+            return String(localized: "\(mins)m \(secs)s")
         } else {
-            return "\(secs)s"
+            return String(localized: "\(secs)s")
         }
     }
 }

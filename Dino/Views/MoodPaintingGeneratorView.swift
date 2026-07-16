@@ -32,10 +32,10 @@ struct MoodPaintingGeneratorView: View {
     @State private var showShare = false
 
     private let stages = [
-        "reading your moods...",
-        "mixing the colors...",
-        "painting your story...",
-        "almost done..."
+        String(localized: "reading your moods..."),
+        String(localized: "mixing the colors..."),
+        String(localized: "painting your story..."),
+        String(localized: "almost done...")
     ]
 
     var body: some View {

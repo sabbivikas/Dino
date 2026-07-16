@@ -34,11 +34,11 @@ struct NotificationCenterView: View {
         var id: String { rawValue }
         var label: String {
             switch self {
-            case .all: return "all"
-            case .growth: return "growth"
-            case .world: return "world"
-            case .creative: return "creative"
-            case .dino: return "dino says"
+            case .all: return String(localized: "all")
+            case .growth: return String(localized: "growth")
+            case .world: return String(localized: "world")
+            case .creative: return String(localized: "creative")
+            case .dino: return String(localized: "dino says")
             }
         }
         var category: DinoNotificationCategory? {
@@ -415,7 +415,7 @@ private struct LetterCard: View {
     private func relativeTimeString(_ date: Date) -> String {
         let f = RelativeDateTimeFormatter()
         f.unitsStyle = .full
-        if abs(Date().timeIntervalSince(date)) < 60 { return "just now" }
+        if abs(Date().timeIntervalSince(date)) < 60 { return String(localized: "just now") }
         return f.localizedString(for: date, relativeTo: Date()).lowercased()
     }
 }

@@ -1,0 +1,404 @@
+{
+  "sourceLanguage": "en",
+  "strings": {
+    "CFBundleName": {
+      "comment": "Bundle name",
+      "extractionState": "extracted_with_value",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "Dino"
+          }
+        }
+      },
+      "shouldTranslate": false
+    },
+    "NSCalendarsFullAccessUsageDescription": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "dino uses your calendar to find free moments for you to breathe and recharge."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "dino usa tu calendario para encontrar momentos libres para respirar y recargar energía."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "dinoはカレンダーから空いた時間を見つけて、ひと息ついたり充電したりできるようにするよ。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "dino는 캘린더에서 여유로운 순간을 찾아 숨을 고르고 재충전할 수 있게 도와줘요."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "dino dùng lịch của bạn để tìm những khoảnh khắc rảnh giúp bạn hít thở và nạp lại năng lượng."
+          }
+        }
+      }
+    },
+    "NSCalendarsUsageDescription": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "dino uses your calendar to find free moments for you to breathe and recharge."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "dino usa tu calendario para encontrar momentos libres para respirar y recargar energía."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "dinoはカレンダーから空いた時間を見つけて、ひと息ついたり充電したりできるようにするよ。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "dino는 캘린더에서 여유로운 순간을 찾아 숨을 고르고 재충전할 수 있게 도와줘요."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "dino dùng lịch của bạn để tìm những khoảnh khắc rảnh giúp bạn hít thở và nạp lại năng lượng."
+          }
+        }
+      }
+    },
+    "NSCalendarsWriteOnlyAccessUsageDescription": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "dino adds a gentle break to your calendar when you want one."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "dino añade una pausa suave a tu calendario cuando tú quieras."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "dinoは、あなたが望むときにカレンダーへやさしい休憩を追加するよ。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "dino는 원할 때 캘린더에 부드러운 쉬는 시간을 추가해요."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "dino thêm một quãng nghỉ nhẹ nhàng vào lịch khi bạn muốn."
+          }
+        }
+      }
+    },
+    "NSCameraUsageDescription": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "dino uses the camera so you can capture your finished mirror of affirmations."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "dino usa la cámara para que captures tu espejo de afirmaciones terminado."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "dinoはカメラを使って、完成したアファメーションの鏡を写真に残せるようにするよ。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "dino는 카메라로 완성된 확언 거울을 찍어 간직할 수 있게 해줘요."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "dino dùng máy ảnh để bạn lưu lại tấm gương lời khẳng định đã hoàn thành."
+          }
+        }
+      }
+    },
+    "NSHealthShareUsageDescription": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "dino reads your sleep and steps to understand how rest and movement shape your emotional patterns, so it can help you prepare for harder days."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "dino lee tu sueño y tus pasos para entender cómo el descanso y el movimiento moldean tus patrones emocionales, y así ayudarte a prepararte para los días más difíciles."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "dinoは睡眠と歩数を読み取って、休息と運動が気持ちのパターンにどう影響するかを理解し、つらい日にそなえる手助けをするよ。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "dino는 수면과 걸음을 읽고 휴식과 움직임이 감정 패턴에 어떤 영향을 주는지 이해해서, 힘든 날을 준비하도록 도와줘요."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "dino đọc giấc ngủ và số bước chân để hiểu cách nghỉ ngơi và vận động ảnh hưởng đến cảm xúc của bạn, từ đó giúp bạn chuẩn bị cho những ngày khó khăn hơn."
+          }
+        }
+      }
+    },
+    "NSHealthUpdateUsageDescription": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "dino never writes health data. apple requires this description for any app with healthkit access."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "dino nunca escribe datos de salud. apple exige esta descripción para cualquier app con acceso a healthkit."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "dinoは健康データを書き込むことはないよ。healthkitを使うアプリには、appleがこの説明を必要としているんだ。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "dino는 건강 데이터를 절대 기록하지 않아요. healthkit을 사용하는 앱에는 apple이 이 설명을 요구해요."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "dino không bao giờ ghi dữ liệu sức khỏe. apple yêu cầu mô tả này cho mọi ứng dụng có quyền truy cập healthkit."
+          }
+        }
+      }
+    },
+    "NSLocationWhenInUseUsageDescription": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "dino uses your location to match the sky to the weather around you and show support resources nearby."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "dino usa tu ubicación para que el cielo refleje el clima a tu alrededor y mostrarte recursos de apoyo cercanos."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "dinoは位置情報を使って、まわりの天気に空を合わせたり、近くのサポート情報を表示したりするよ。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "dino는 위치를 사용해 주변 날씨에 하늘을 맞추고 가까운 지원 리소스를 보여줘요."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "dino dùng vị trí để bầu trời khớp với thời tiết quanh bạn và hiển thị các nguồn hỗ trợ gần đó."
+          }
+        }
+      }
+    },
+    "NSMicrophoneUsageDescription": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "dino uses the microphone to record your voice journal and turn it into words."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "dino usa el micrófono para grabar tu diario de voz y convertirlo en palabras."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "dinoはマイクを使って音声日記を録音し、ことばにするよ。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "dino는 마이크로 음성 일기를 녹음해서 글로 바꿔줘요."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "dino dùng micrô để ghi âm nhật ký bằng giọng nói và chuyển thành chữ."
+          }
+        }
+      }
+    },
+    "NSMotionUsageDescription": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "dino uses motion for a gentle parallax in the ambient background."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "dino usa el movimiento para un suave efecto de paralaje en el fondo ambiental."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "dinoはモーションを使って、背景にやさしい視差効果をつけるよ。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "dino는 모션을 사용해 배경에 은은한 시차 효과를 더해요."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "dino dùng chuyển động để tạo hiệu ứng thị sai nhẹ nhàng cho nền."
+          }
+        }
+      }
+    },
+    "NSPhotoLibraryAddUsageDescription": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "dino saves your mirror photo to your camera roll so you can keep the memory."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "dino guarda la foto de tu espejo en tu carrete para que conserves el recuerdo."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "dinoは鏡の写真をカメラロールに保存して、思い出をのこせるようにするよ。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "dino는 거울 사진을 카메라 롤에 저장해서 추억을 간직할 수 있게 해줘요."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "dino lưu ảnh chiếc gương vào thư viện ảnh để bạn giữ lại kỷ niệm."
+          }
+        }
+      }
+    },
+    "NSSpeechRecognitionUsageDescription": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "dino transcribes your spoken journal into text so you can keep it as a written reflection."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "dino transcribe tu diario hablado a texto para que lo guardes como una reflexión escrita."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "dinoは話した日記を文字にして、書かれたふり返りとして残せるようにするよ。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "dino는 말로 남긴 일기를 글로 옮겨서 기록으로 간직할 수 있게 해줘요."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "dino chuyển nhật ký bạn nói thành chữ để bạn giữ lại như một dòng suy ngẫm."
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
+}

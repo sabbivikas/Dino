@@ -22,9 +22,9 @@ struct FocusSession: Codable, Identifiable {
         let mins = durationSeconds / 60
         let secs = durationSeconds % 60
         if mins > 0 {
-            return "\(mins) min \(secs) sec"
+            return String(localized: "\(mins) min \(secs) sec")
         } else {
-            return "\(secs) sec"
+            return String(localized: "\(secs) sec")
         }
     }
 }

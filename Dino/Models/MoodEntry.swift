@@ -22,23 +22,23 @@ enum EmotionalWeather: String, Codable, CaseIterable {
 
     var label: String {
         switch self {
-        case .clear: return "clear"
-        case .partlyCloudy: return "partly cloudy"
-        case .overwhelmed: return "overwhelmed"
-        case .drained: return "drained"
+        case .clear: return String(localized: "clear")
+        case .partlyCloudy: return String(localized: "partly cloudy")
+        case .overwhelmed: return String(localized: "overwhelmed")
+        case .drained: return String(localized: "drained")
         }
     }
 
     var suggestion: String {
         switch self {
         case .clear:
-            return "you're shining today ✨ keep that energy going."
+            return String(localized: "you're shining today ✨ keep that energy going.")
         case .partlyCloudy:
-            return "a little mixed — that's okay. take it one step at a time."
+            return String(localized: "a little mixed — that's okay. take it one step at a time.")
         case .overwhelmed:
-            return "take a breath. you don't have to carry it all at once."
+            return String(localized: "take a breath. you don't have to carry it all at once.")
         case .drained:
-            return "rest is healing. be gentle with yourself today."
+            return String(localized: "rest is healing. be gentle with yourself today.")
         }
     }
 

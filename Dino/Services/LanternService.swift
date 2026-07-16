@@ -25,9 +25,9 @@ enum LanternService {
 
     /// The three tap-to-use suggestion phrases on the compose sheet.
     static let suggestions = [
-        "you're doing better than you think 🌱",
-        "this feeling will pass. you've made it through every hard day so far",
-        "someone across the world is rooting for you 🏮",
+        String(localized: "you're doing better than you think 🌱"),
+        String(localized: "this feeling will pass. you've made it through every hard day so far"),
+        String(localized: "someone across the world is rooting for you 🏮"),
     ]
 
     static func sendLantern(text: String) async -> SendResult {
@@ -104,7 +104,7 @@ enum LanternService {
     }
 
     static func countryName(_ code: String) -> String {
-        if code == "elsewhere" { return "somewhere in the world" }
+        if code == "elsewhere" { return String(localized: "somewhere in the world") }
         return (Locale.current.localizedString(forRegionCode: code) ?? code).lowercased()
     }
 }

@@ -113,13 +113,13 @@ class JournalViewModel: NSObject, ObservableObject {
         let dateFormatter = DateFormatter()
         dateFormatter.dateStyle = .medium
         let dateStr = dateFormatter.string(from: Date())
-        let title = "journal entry — \(dateStr)"
+        let title = String(localized: "journal entry — \(dateStr)")
 
         let entry = JournalEntry(
             date: entryDate,
             audioFileName: fileName,
             title: title,
-            summary: "voice note recorded",
+            summary: String(localized: "voice note recorded"),
             moodTag: "reflective",
             durationSeconds: recordingDuration
         )

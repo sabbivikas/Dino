@@ -279,13 +279,13 @@ enum WorldMoodService {
         guard pct > 0 else { return nil }
         switch mood {
         case .clear:
-            return "you and \(pct)% of dinos are clear today ✨"
+            return String(localized: "you and \(pct)% of dinos are clear today ✨")
         case .partlyCloudy:
-            return "you and \(pct)% of dinos are under soft clouds today"
+            return String(localized: "you and \(pct)% of dinos are under soft clouds today")
         case .overwhelmed:
-            return "you're not alone. \(pct)% of dinos are under clouds today"
+            return String(localized: "you're not alone. \(pct)% of dinos are under clouds today")
         case .drained:
-            return "you're not alone. \(pct)% of dinos are running low today"
+            return String(localized: "you're not alone. \(pct)% of dinos are running low today")
         }
     }
 }

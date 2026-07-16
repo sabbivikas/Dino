@@ -22,9 +22,7 @@ actor ForestLetterService {
 
     private let cacheKey = "dino.forestDailyLetter"
 
-    private static let fallbackLetter = """
-        the water has been here longer than your worries. it does not rush. it does not stop. it simply finds its way. so will you.
-        """
+    private static let fallbackLetter = String(localized: "the water has been here longer than your worries. it does not rush. it does not stop. it simply finds its way. so will you.")
 
     // MARK: - Public API
 
@@ -80,7 +78,7 @@ actor ForestLetterService {
     /// flips the cached letter's `savedToJar` flag so it persists across
     /// app launches.
     func saveToGratitudeJar(_ letter: ForestDailyLetter) async {
-        let payload = "from the forest: " + letter.content
+        let payload = String(localized: "from the forest: ") + letter.content
         await MainActor.run {
             let note = GratitudeNote(
                 id: UUID(),
