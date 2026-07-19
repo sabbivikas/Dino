@@ -36,10 +36,10 @@ struct FeedbackView: View {
         var id: String { rawValue }
         var label: String {
             switch self {
-            case .bug: return "🐛 bug"
-            case .suggestion: return "💡 suggestion"
-            case .love: return "❤️ love note"
-            case .help: return "🆘 help"
+            case .bug: return String(localized: "🐛 bug")
+            case .suggestion: return String(localized: "💡 suggestion")
+            case .love: return String(localized: "❤️ love note")
+            case .help: return String(localized: "🆘 help")
             }
         }
         var backendId: String {
@@ -86,7 +86,7 @@ struct FeedbackView: View {
                     messageEditor
 
                     HStack {
-                        Text("your message comes from \(authManager.currentUser?.email ?? "anonymous")")
+                        Text("your message comes from \(authManager.currentUser?.email ?? String(localized: "anonymous"))")
                             .font(DinoTheme.dinoFont(size: 11))
                             .foregroundColor(muted)
                         Spacer()

@@ -163,17 +163,17 @@ struct WeeklyDigest: Equatable {
 
     // MARK: - Local delta templates (the offline fix for the repetition bug)
 
-    static let moodUpClearlyLine = "this week rose. clearer skies than last week, and that came from you 🌱"
-    static let moodUpGentlyLine = "a gentle lift this week. a little lighter than the last one"
-    static let moodDownClearlyLine = "this week asked more of you than last week did. be soft with yourself 🌿"
-    static let moodDownGentlyLine = "a slightly heavier week than last. nothing to fix, just something i noticed"
-    static let moodSteadyLine = "a steady week, much like the last. steadiness counts 🌱"
-    static let movementMoreLine = "more movement in this week than last. your body carried you well 🌿"
-    static let movementLessLine = "a stiller week for your body than last. rest has its own rhythm too"
-    static let movementLiftLine = "your brighter days often had a little more movement in them"
-    static let sleepUpLine = "more rested nights than last week. it shows, gently"
-    static let sleepDownLine = "sleep ran shorter this week than last. today deserves some extra kindness 🌙"
-    static let practiceMoreLine = "you showed up for yourself more often this week than last 🌱"
+    static let moodUpClearlyLine = String(localized: "this week rose. clearer skies than last week, and that came from you 🌱")
+    static let moodUpGentlyLine = String(localized: "a gentle lift this week. a little lighter than the last one")
+    static let moodDownClearlyLine = String(localized: "this week asked more of you than last week did. be soft with yourself 🌿")
+    static let moodDownGentlyLine = String(localized: "a slightly heavier week than last. nothing to fix, just something i noticed")
+    static let moodSteadyLine = String(localized: "a steady week, much like the last. steadiness counts 🌱")
+    static let movementMoreLine = String(localized: "more movement in this week than last. your body carried you well 🌿")
+    static let movementLessLine = String(localized: "a stiller week for your body than last. rest has its own rhythm too")
+    static let movementLiftLine = String(localized: "your brighter days often had a little more movement in them")
+    static let sleepUpLine = String(localized: "more rested nights than last week. it shows, gently")
+    static let sleepDownLine = String(localized: "sleep ran shorter this week than last. today deserves some extra kindness 🌙")
+    static let practiceMoreLine = String(localized: "you showed up for yourself more often this week than last 🌱")
 
     /// 2–3 delta-grounded lines, priority ordered. Differing deltas cannot
     /// produce identical output because every line is keyed off a delta enum.
@@ -196,7 +196,7 @@ struct WeeklyDigest: Equatable {
         if digest.sleepDirection == .up { lines.append(sleepUpLine) }
         if digest.practicedDelta == .more { lines.append(practiceMoreLine) }
         if digest.themeIsNew, let theme = digest.topTheme {
-            lines.append("\(theme) has been on your mind more this week. i'm holding it with you")
+            lines.append(String(localized: "\(theme.localized) has been on your mind more this week. i'm holding it with you"))
         }
         if digest.movementLift, digest.moodDirection != .down, (digest.movementDaysThisWeek ?? 0) > 0 {
             lines.append(movementLiftLine)
@@ -207,10 +207,10 @@ struct WeeklyDigest: Equatable {
     // MARK: - Sparse weeks (honest, rotating — never the same nag twice)
 
     static let sparseLines = [
-        "a quiet week in the log. no pressure 🌿",
-        "we didn't cross paths much this week. the door is always open 🌱",
-        "a few quiet days. dino kept the garden warm for you 🍃",
-        "not much written down this week. weeks like that happen, and that's okay",
+        String(localized: "a quiet week in the log. no pressure 🌿"),
+        String(localized: "we didn't cross paths much this week. the door is always open 🌱"),
+        String(localized: "a few quiet days. dino kept the garden warm for you 🍃"),
+        String(localized: "not much written down this week. weeks like that happen, and that's okay"),
     ]
 
     static func sparseLine(weekIndex: Int) -> String {

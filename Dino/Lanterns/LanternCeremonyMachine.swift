@@ -179,38 +179,38 @@ enum CeremonyLayout {
 // MARK: - Ceremony copy (owner-approved verbatim; lowercase, zero dashes)
 
 enum CeremonyStrings {
-    static let loggedLine = "logged 🌱"
-    static let hoverTitle = "it drifted a long way"
-    static let hoverSub = "someone far away left it for you"
-    static let tapToOpen = "tap to open"
-    static let keepButton = "keep it close 🌱"
-    static let reportLink = "report this lantern"
-    static let keptCaption = "kept in your jar · warm things stay"
-    static let jarStackLine = "tonight's lantern is in your jar"
-    static let voHush = "the evening is arriving early"
-    static let voDrift = "something is drifting in"
+    static let loggedLine = String(localized: "logged 🌱")
+    static let hoverTitle = String(localized: "it drifted a long way")
+    static let hoverSub = String(localized: "someone far away left it for you")
+    static let tapToOpen = String(localized: "tap to open")
+    static let keepButton = String(localized: "keep it close 🌱")
+    static let reportLink = String(localized: "report this lantern")
+    static let keptCaption = String(localized: "kept in your jar · warm things stay")
+    static let jarStackLine = String(localized: "tonight's lantern is in your jar")
+    static let voHush = String(localized: "the evening is arriving early")
+    static let voDrift = String(localized: "something is drifting in")
 
     static func kicker(countryName: String?) -> String {
-        guard let countryName, !countryName.isEmpty else { return "from a dino far away" }
-        return "from a dino in \(countryName)"
+        guard let countryName, !countryName.isEmpty else { return String(localized: "from a dino far away") }
+        return String(localized: "from a dino in \(countryName)")
     }
 
     /// "4,000 miles · just for you" — km for metric locales, warm fallback
     /// when the distance is unknowable.
     static func distanceLine(kilometers: Double?, metric: Bool) -> String {
-        guard let km = kilometers, km > 0 else { return "a long way · just for you" }
+        guard let km = kilometers, km > 0 else { return String(localized: "a long way · just for you") }
         let formatter = NumberFormatter()
         formatter.numberStyle = .decimal
         formatter.maximumFractionDigits = 0
         if metric {
             let rounded = (km / 100).rounded() * 100
             let n = formatter.string(from: NSNumber(value: rounded)) ?? "\(Int(rounded))"
-            return "\(n) km · just for you"
+            return String(localized: "\(n) km · just for you")
         } else {
             let miles = km * 0.621371
             let rounded = (miles / 100).rounded() * 100
             let n = formatter.string(from: NSNumber(value: rounded)) ?? "\(Int(rounded))"
-            return "\(n) miles · just for you"
+            return String(localized: "\(n) miles · just for you")
         }
     }
 

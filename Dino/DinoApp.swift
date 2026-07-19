@@ -28,22 +28,22 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
     private func registerNotificationCategories() {
         let logMoodAction = UNNotificationAction(
             identifier: "LOG_MOOD",
-            title: "log mood 🌿",
+            title: String(localized: "log mood 🌿"),
             options: [.foreground]
         )
         let openJournalAction = UNNotificationAction(
             identifier: "OPEN_JOURNAL",
-            title: "open journal ✍️",
+            title: String(localized: "open journal ✍️"),
             options: [.foreground]
         )
         let logActivityAction = UNNotificationAction(
             identifier: "LOG_ACTIVITY",
-            title: "log something 🌱",
+            title: String(localized: "log something 🌱"),
             options: [.foreground]
         )
         let startBreathingAction = UNNotificationAction(
             identifier: "START_BREATHING",
-            title: "breathe with dino 🌬️",
+            title: String(localized: "breathe with dino 🌬️"),
             options: [.foreground]
         )
 

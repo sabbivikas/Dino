@@ -176,7 +176,7 @@ struct SignInView: View {
                                 .font(DinoTheme.dinoFont(size: 14))
                                 .foregroundColor(DinoTheme.textSecondary)
 
-                            Text(showEmailSignUp ? "hide email sign up" : "sign up with email")
+                            Text(showEmailSignUp ? String(localized: "hide email sign up") : String(localized: "sign up with email"))
                                 .font(DinoTheme.headlineFont())
                                 .foregroundColor(DinoTheme.textPrimary)
                         }
@@ -223,23 +223,23 @@ struct SignInView: View {
                             .background(DinoTheme.cardBackground)
                             .cornerRadius(8)
 
-                            DinoTextField(placeholder: "email", text: $emailText, icon: "envelope", isSecure: false)
+                            DinoTextField(placeholder: String(localized: "email"), text: $emailText, icon: "envelope", isSecure: false)
 
-                            DinoTextField(placeholder: "password", text: $passwordText, icon: "lock", isSecure: true)
+                            DinoTextField(placeholder: String(localized: "password"), text: $passwordText, icon: "lock", isSecure: true)
 
                             if isSignUp {
-                                DinoTextField(placeholder: "confirm password", text: $confirmPasswordText, icon: "lock.fill", isSecure: true)
+                                DinoTextField(placeholder: String(localized: "confirm password"), text: $confirmPasswordText, icon: "lock.fill", isSecure: true)
                             }
 
                             Button {
                                 Task {
                                     if isSignUp {
                                         guard passwordText == confirmPasswordText else {
-                                            authManager.errorMessage = "passwords don't match"
+                                            authManager.errorMessage = String(localized: "passwords don't match")
                                             return
                                         }
                                         guard passwordText.count >= 6 else {
-                                            authManager.errorMessage = "password must be at least 6 characters"
+                                            authManager.errorMessage = String(localized: "password must be at least 6 characters")
                                             return
                                         }
                                         await authManager.signUpWithEmail(email: emailText, password: passwordText)
@@ -251,7 +251,7 @@ struct SignInView: View {
                                     }
                                 }
                             } label: {
-                                Text(isSignUp ? "create account" : "sign in")
+                                Text(isSignUp ? String(localized: "create account") : String(localized: "sign in"))
                                     .font(DinoTheme.headlineFont())
                                     .foregroundColor(.white)
                                     .frame(maxWidth: .infinity)

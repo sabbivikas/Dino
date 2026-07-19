@@ -215,7 +215,7 @@ struct GratitudeJarView: View {
     }
 
     private var subNote: String {
-        "a little shelf for little joys."
+        String(localized: "a little shelf for little joys.")
     }
 }
 

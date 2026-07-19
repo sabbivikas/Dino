@@ -188,7 +188,7 @@ enum StepsSignal {
     static func compactSleep(hours: Double) -> String {
         let h = Int(hours)
         let m = Int((hours - Double(h)) * 60)
-        return m > 0 ? "\(h)h \(m)m" : "\(h)h"
+        return m > 0 ? String(localized: "\(h)h \(m)m") : String(localized: "\(h)h")
     }
 }
 

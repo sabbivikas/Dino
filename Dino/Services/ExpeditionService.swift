@@ -24,14 +24,14 @@ struct ExpeditionGift: Codable, Equatable {
 
 enum ExpeditionVoice {
     // fixed strings (lowercase, zero dashes — voice tested)
-    static let cardHeader = "dino went looking and found this for you \u{1F54A}"
-    static let fromPrefix = "from"
-    static let openLink = "see where it lives"
-    static let keepIt = "keep this"
-    static let driftedAway = "this one has drifted away"
-    static let settingsTitle = "little expeditions"
-    static let settingsBody = "dino sometimes goes looking for small things for you, using only your weather patterns, never your words."
-    static let fallbackLine = "dino went looking tonight and this glimmered"
+    static let cardHeader = String(localized: "dino went looking and found this for you \u{1F54A}")
+    static let fromPrefix = String(localized: "from")
+    static let openLink = String(localized: "see where it lives")
+    static let keepIt = String(localized: "keep this")
+    static let driftedAway = String(localized: "this one has drifted away")
+    static let settingsTitle = String(localized: "little expeditions")
+    static let settingsBody = String(localized: "dino sometimes goes looking for small things for you, using only your weather patterns, never your words.")
+    static let fallbackLine = String(localized: "dino went looking tonight and this glimmered")
     static let needKinds = ["rest", "beauty", "hope", "wonder", "connection"]
 
     static var allFixedStrings: [String] {
@@ -76,9 +76,13 @@ enum ExpeditionStore {
         defaults.set(gift.foundAt, forKey: ExpeditionSignals.lastDeliveredKey)
     }
 
-    /// "keep this" → the little shelf, riding the keepsake store as a gift.
+    /// "keep this" — the delivery already sits on the shelf (F4 archives at
+    /// display time); keeping marks that entry rather than inserting again.
+    /// Falls back to an insert if the entry is somehow missing.
     static func keep(_ gift: ExpeditionGift, now: Date = Date(), defaults: UserDefaults = .standard) {
-        RichRecStore.recordKeepsake(gift.asKeepsakeRec, now: now, defaults: defaults)
+        if RichRecStore.markKept(title: gift.title, now: now, defaults: defaults) == nil {
+            RichRecStore.recordKeepsake(gift.asKeepsakeRec, kept: true, now: now, defaults: defaults)
+        }
     }
 }
 

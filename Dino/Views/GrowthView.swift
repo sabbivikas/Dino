@@ -260,7 +260,7 @@ struct GrowthView: View {
 
     private static func stampDate() -> String {
         let f = DateFormatter()
-        f.locale = Locale(identifier: "en_US")
+        f.locale = Locale.current
         f.dateFormat = "MMM d"
         return f.string(from: Date()).lowercased()
     }
@@ -571,7 +571,7 @@ private struct ProgressCard: View {
     }
 
     private func phaseLabel(_ text: String) -> some View {
-        Text(text)
+        Text(text.localized)
             .font(DinoTheme.dinoFont(size: 10))
             .foregroundColor(Color(hex: "#6B7280"))
     }
@@ -579,11 +579,11 @@ private struct ProgressCard: View {
     @ViewBuilder
     private var nextStageLine: some View {
         HStack(spacing: 4) {
-            Text("your sunflower is \(vm.growthStage.displayName)")
+            Text("your sunflower is \(vm.growthStage.displayName.localized)")
                 .font(DinoTheme.dinoFont(size: 13))
                 .foregroundColor(Color(hex: "#2D3142"))
             if let remain = vm.sessionsToNextStage, let next = vm.nextStageName {
-                Text(" · \(remain) more \(remain == 1 ? "session" : "sessions") to \(next)")
+                Text(remain == 1 ? String(localized: " · \(remain) more session to \(next)") : String(localized: " · \(remain) more sessions to \(next)"))
                     .font(DinoTheme.dinoFont(size: 12))
                     .foregroundColor(Color(hex: "#6B7280"))
             }
@@ -1727,7 +1727,7 @@ private struct StatusLine: View {
                 .font(DinoTheme.dinoFont(size: 16))
                 .foregroundColor(messageColor)
                 .multilineTextAlignment(.center)
-            Text("\(vm.growthPercent)% GROWN")
+            Text(String(localized: "\(vm.growthPercent)% GROWN"))
                 .font(DinoTheme.dinoFont(size: 10))
                 .tracking(1)
                 .foregroundColor(Color(hex: "#6B7280"))
@@ -1756,25 +1756,25 @@ private struct PracticePillsRow: View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 10) {
                 PracticePill(
-                    label: "journal",
+                    label: String(localized: "journal"),
                     count: vm.journalSessionCount,
                     dotColor: Color(hex: "#F5C842"),
                     usedToday: vm.usedJournalToday
                 )
                 PracticePill(
-                    label: "mood",
+                    label: String(localized: "mood"),
                     count: vm.moodSessionCount,
                     dotColor: Color(hex: "#E8A0A8"),
                     usedToday: vm.usedMoodToday
                 )
                 PracticePill(
-                    label: "gratitude",
+                    label: String(localized: "gratitude"),
                     count: vm.gratitudeSessionCount,
                     dotColor: Color(hex: "#C4A35A"),
                     usedToday: vm.usedGratitudeToday
                 )
                 PracticePill(
-                    label: "breathing",
+                    label: String(localized: "breathing"),
                     count: vm.breathingSessionCount,
                     dotColor: Color(hex: "#A594C4"),
                     usedToday: vm.usedBreathingToday

@@ -21,23 +21,23 @@ struct WeeklyCheckInView: View {
     @State private var generatedResult: WeeklyCheckInResult? = nil
 
     private static let questions: [String] = [
-        "over the past week, how often have you felt little interest or pleasure in doing things?",
-        "over the past week, how often have you felt down, depressed, or hopeless?",
-        "over the past week, how often have you felt nervous, anxious, or on edge?",
-        "over the past week, how often have you not been able to stop or control worrying?",
-        "over the past week, how often have you had trouble falling or staying asleep?",
-        "over the past week, how often have you felt tired or had little energy?",
-        "over the past week, how often have you felt cheerful and in good spirits?",
-        "over the past week, how often have you felt calm and relaxed?",
-        "over the past week, how often have you woken up feeling fresh and rested?",
-        "over the past week, how often has your daily life been filled with things that interest you?"
+        String(localized: "over the past week, how often have you felt little interest or pleasure in doing things?"),
+        String(localized: "over the past week, how often have you felt down, depressed, or hopeless?"),
+        String(localized: "over the past week, how often have you felt nervous, anxious, or on edge?"),
+        String(localized: "over the past week, how often have you not been able to stop or control worrying?"),
+        String(localized: "over the past week, how often have you had trouble falling or staying asleep?"),
+        String(localized: "over the past week, how often have you felt tired or had little energy?"),
+        String(localized: "over the past week, how often have you felt cheerful and in good spirits?"),
+        String(localized: "over the past week, how often have you felt calm and relaxed?"),
+        String(localized: "over the past week, how often have you woken up feeling fresh and rested?"),
+        String(localized: "over the past week, how often has your daily life been filled with things that interest you?")
     ]
 
     private static let optionLabels = [
-        "not at all",
-        "several days",
-        "more than half the days",
-        "nearly every day"
+        String(localized: "not at all"),
+        String(localized: "several days"),
+        String(localized: "more than half the days"),
+        String(localized: "nearly every day")
     ]
 
     // Tokens
@@ -180,17 +180,17 @@ struct WeeklyCheckInView: View {
     private func fallbackReport() -> WeeklyReport {
         WeeklyReport(
             overallScore: 70,
-            overallLabel: "thanks for checking in",
+            overallLabel: String(localized: "thanks for checking in"),
             overallEmoji: "\u{1F33F}",
             moodEnergyScore: 70,
-            moodEnergyInsight: "keep noticing how your week feels.",
+            moodEnergyInsight: String(localized: "keep noticing how your week feels."),
             anxietyStressScore: 70,
-            anxietyStressInsight: "small steady steps add up.",
+            anxietyStressInsight: String(localized: "small steady steps add up."),
             wellbeingScore: 70,
-            wellbeingInsight: "you showed up. that matters.",
-            weeklyReflection: "thanks for taking a few minutes for yourself.",
+            wellbeingInsight: String(localized: "you showed up. that matters."),
+            weeklyReflection: String(localized: "thanks for taking a few minutes for yourself."),
             trend: "stable",
-            trendNote: "keep going"
+            trendNote: String(localized: "keep going")
         )
     }
 
@@ -371,7 +371,7 @@ private struct QuestionView: View {
                     guard currentAnswer >= 0 else { return }
                     onAdvance()
                 }) {
-                    Text(currentQuestion == questions.count - 1 ? "finish \u{2192}" : "next \u{2192}")
+                    Text(currentQuestion == questions.count - 1 ? String(localized: "finish \u{2192}") : String(localized: "next \u{2192}"))
                         .font(DinoTheme.dinoFont(size: 17))
                         .foregroundColor(.white)
                         .padding(.horizontal, 36)
@@ -444,10 +444,10 @@ private struct GeneratingView: View {
     @State private var dotPhase: Int = 0
 
     private let messages = [
-        "looking at your patterns...",
-        "understanding your week...",
-        "writing your report...",
-        "almost ready..."
+        String(localized: "looking at your patterns..."),
+        String(localized: "understanding your week..."),
+        String(localized: "writing your report..."),
+        String(localized: "almost ready...")
     ]
 
     var body: some View {
@@ -565,21 +565,21 @@ private struct ReportView: View {
                     // Sub-scores
                     VStack(spacing: 14) {
                         ScoreCard(
-                            title: "mood & energy",
+                            title: String(localized: "mood & energy"),
                             score: report.moodEnergyScore,
                             insight: report.moodEnergyInsight,
                             sage: sage, amber: amber, softRed: softRed,
                             darkInk: darkInk, mutedInk: mutedInk
                         )
                         ScoreCard(
-                            title: "anxiety & stress",
+                            title: String(localized: "anxiety & stress"),
                             score: report.anxietyStressScore,
                             insight: report.anxietyStressInsight,
                             sage: sage, amber: amber, softRed: softRed,
                             darkInk: darkInk, mutedInk: mutedInk
                         )
                         ScoreCard(
-                            title: "well-being",
+                            title: String(localized: "well-being"),
                             score: report.wellbeingScore,
                             insight: report.wellbeingInsight,
                             sage: sage, amber: amber, softRed: softRed,

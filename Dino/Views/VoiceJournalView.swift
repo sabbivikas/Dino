@@ -147,7 +147,7 @@ struct VoiceJournalView: View {
         let dateFormatter = DateFormatter()
         dateFormatter.dateStyle = .medium
         let dateStr = dateFormatter.string(from: Date())
-        let title = "journal entry \u{2014} \(dateStr)"
+        let title = String(localized: "journal entry \u{2014} \(dateStr)")
 
         let photoFileName = saveComposerPhoto(image)
 
@@ -433,15 +433,16 @@ private struct JournalComposerCard: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private let prompts = [
-        "what's been on your mind?",
-        "one small thing that went well today…",
-        "what does your body need right now?"
+        String(localized: "what's been on your mind?"),
+        String(localized: "one small thing that went well today…"),
+        String(localized: "what does your body need right now?")
     ]
 
     private var metaText: String {
         let formatter = DateFormatter()
         formatter.dateFormat = "EEEE, MMM d"
-        return formatter.string(from: entryDate).uppercased() + " · DEAR DIARY"
+        let dateStr = formatter.string(from: entryDate).uppercased()
+        return String(localized: "\(dateStr) · DEAR DIARY")
     }
 
     private var isBackdated: Bool {
@@ -687,6 +688,8 @@ private struct JournalComposerCard: View {
                         HStack(spacing: 6) {
                             Text("develop".localized)
                                 .font(.system(size: 14, weight: .semibold))
+                                .lineLimit(1)
+                                .fixedSize(horizontal: true, vertical: false)
                             Image(systemName: "arrow.down")
                                 .font(.system(size: 12, weight: .semibold))
                         }
@@ -953,7 +956,7 @@ struct JournalPolaroidCard: View {
         if !title.isEmpty {
             return title.count > 80 ? String(title.prefix(80)) + "\u{2026}" : title
         }
-        return "voice note recorded"
+        return String(localized: "voice note recorded")
     }
 
     /// Friendly lowercase caption with a decorative floral/seasonal suffix
@@ -1014,7 +1017,7 @@ struct JournalPolaroidCard: View {
             Button {
                 viewModel.toggleFavorite(entry)
             } label: {
-                Label(entry.isFavorite ? "unfavorite" : "favorite",
+                Label(entry.isFavorite ? String(localized: "unfavorite") : String(localized: "favorite"),
                       systemImage: entry.isFavorite ? "star.slash" : "star")
             }
             Button(role: .destructive) {
@@ -1274,7 +1277,7 @@ private struct JournalPolaroidBack: View {
                     .foregroundColor(Color(hex: "#3D3A35"))
 
                 HStack(spacing: 8) {
-                    Text("mood: \(entry.moodTag)")
+                    Text("mood: \(entry.moodTag.localized)")
                     if entry.durationSeconds > 0 {
                         Text("\u{00B7}")
                         Text(formatDuration(entry.durationSeconds))
@@ -1288,7 +1291,7 @@ private struct JournalPolaroidBack: View {
 
                 ScrollView {
                     Text(entry.summary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                         ? "voice note recorded"
+                         ? String(localized: "voice note recorded")
                          : entry.summary)
                         .font(.system(size: 12))
                         .foregroundColor(Color(hex: "#3D3A35"))
@@ -1713,10 +1716,10 @@ struct JournalCardPreviewOverlay: View {
         }
         .overlay(alignment: .bottom) {
             HStack(spacing: 12) {
-                actionPill(label: "save to photos 📸") {
+                actionPill(label: String(localized: "save to photos 📸")) {
                     saveToPhotos()
                 }
-                actionPill(label: "share 🔗") {
+                actionPill(label: String(localized: "share 🔗")) {
                     shareCard()
                 }
             }
@@ -1727,7 +1730,7 @@ struct JournalCardPreviewOverlay: View {
         }
         .sheet(isPresented: $showShareSheet) {
             if let image = renderedImage {
-                ShareSheet(items: [image, "my dino journal entry \u{1F995}\u{1F33F} #dino #mentalhealth #wellness"])
+                ShareSheet(items: [image, String(localized: "my dino journal entry \u{1F995}\u{1F33F} #dino #mentalhealth #wellness")])
             }
         }
     }
@@ -1776,7 +1779,7 @@ struct JournalCardPreviewOverlay: View {
         guard let image = render() else { return }
         renderedImage = image
         UIImageWriteToSavedPhotosAlbum(image, nil, nil, nil)
-        toast = "saved to photos"
+        toast = String(localized: "saved to photos")
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) { toast = nil }
     }
 

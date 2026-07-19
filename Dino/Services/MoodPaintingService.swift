@@ -17,10 +17,10 @@ enum MoodPaintingError: Error, LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .invalidResponse(let code): return "invalid response from painting service (\(code))"
-        case .modelNotReady:       return "painting model is still warming up"
-        case .decodeFailed:        return "couldn't decode painting image"
-        case .serviceUnavailable:  return "painting service is temporarily unavailable"
+        case .invalidResponse(let code): return String(localized: "invalid response from painting service (\(code))")
+        case .modelNotReady:       return String(localized: "painting model is still warming up")
+        case .decodeFailed:        return String(localized: "couldn't decode painting image")
+        case .serviceUnavailable:  return String(localized: "painting service is temporarily unavailable")
         case .network(let m):      return m
         }
     }

@@ -25,7 +25,7 @@ struct TodaysFocusProvider: TimelineProvider {
     func placeholder(in context: Context) -> TodaysFocusEntry {
         TodaysFocusEntry(
             date: Date(),
-            focusText: "25 min focused today",
+            focusText: String(localized: "25 min focused today"),
             weeklyDays: [true, true, false, true, false, false, false]
         )
     }
@@ -178,7 +178,7 @@ struct TodaysFocusSmallView: View {
         VStack(spacing: 6) {
             ClockFace(size: 64)
 
-            Text(hasFocused ? focusText : "start today's focus")
+            Text(hasFocused ? focusText : String(localized: "start today's focus"))
                 .font(.custom("DinoInitiativeFont-Regular", size: 12))
                 .foregroundColor(focusInk)
                 .multilineTextAlignment(.center)
@@ -198,14 +198,14 @@ struct TodaysFocusMediumView: View {
     private var hasFocused: Bool { !focusText.isEmpty }
 
     private var headline: String {
-        hasFocused ? "one session\ndown." : "ready when\nyou are."
+        hasFocused ? String(localized: "one session\ndown.") : String(localized: "ready when\nyou are.")
     }
 
     var body: some View {
         HStack(alignment: .center, spacing: 14) {
             VStack(spacing: 4) {
                 ClockFace(size: 70)
-                Text(hasFocused ? focusText : "25 min")
+                Text(hasFocused ? focusText : String(localized: "25 min"))
                     .font(.custom("DinoInitiativeFont-Regular", size: 10))
                     .foregroundColor(focusInkSoft)
             }

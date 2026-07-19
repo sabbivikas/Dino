@@ -233,7 +233,7 @@ struct ThemeSettingsView: View {
                     } else {
                         Image(systemName: "arrow.clockwise")
                     }
-                    Text(themeManager.isLoadingWeather ? "loading..." : "refresh")
+                    Text(themeManager.isLoadingWeather ? String(localized: "loading...") : String(localized: "refresh"))
                         .font(DinoTheme.bodyFont())
                 }
                 .foregroundColor(.white)

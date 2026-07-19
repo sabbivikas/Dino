@@ -99,7 +99,7 @@ struct LanternCard: View {
         }
         .buttonStyle(.plain)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("lantern from \(LanternService.countryName(lantern.countryCode)): \(lantern.text)")
+        .accessibilityLabel(String(localized: "lantern from \(LanternService.countryName(lantern.countryCode)): \(lantern.text)"))
     }
 }
 
@@ -130,7 +130,7 @@ struct WorldLanternGrid: View {
                             .foregroundColor(ink2)
                     }
                     .buttonStyle(.plain)
-                    .accessibilityHint("opens all your kept lanterns")
+                    .accessibilityHint(String(localized: "opens all your kept lanterns"))
                 }
             }
 

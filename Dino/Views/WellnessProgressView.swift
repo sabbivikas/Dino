@@ -177,7 +177,7 @@ struct WellnessProgressView: View {
             let value = components.isEmpty ? 0 : components.reduce(0, +) / Double(components.count)
             return WellnessWeekPoint(
                 weekIndex: offset,
-                label: "w\(offset + 1)",
+                label: String(localized: "w\(offset + 1)"),
                 value: max(0, min(1, value)),
                 hasData: !components.isEmpty
             )
@@ -230,7 +230,7 @@ struct WellnessProgressView: View {
 
         return ThisWeekSummary(
             weatherEmoji: weather?.emoji ?? "🌱",
-            moodLabel: weather?.label ?? "no mood logged yet",
+            moodLabel: weather?.label ?? String(localized: "no mood logged yet"),
             avgEnergy: avgEnergyVal,
             activeDays: activeDays
         )

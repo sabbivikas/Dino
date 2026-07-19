@@ -62,20 +62,20 @@ struct BreathingLiveActivity: Widget {
 
 private func phaseDisplayText(_ phase: String) -> String {
     switch phase {
-    case "Inhale": return "inhale"
-    case "Hold":   return "hold"
-    case "Exhale": return "exhale"
-    default:       return "breathe"
+    case "Inhale": return String(localized: "inhale")
+    case "Hold":   return String(localized: "hold")
+    case "Exhale": return String(localized: "exhale")
+    default:       return String(localized: "breathe")
     }
 }
 
 private func phaseCueText(_ phase: String, isPaused: Bool) -> String {
-    if isPaused { return "take your time" }
+    if isPaused { return String(localized: "take your time") }
     switch phase {
-    case "Inhale": return "smell the flowers"
-    case "Hold":   return "hold the calm"
-    case "Exhale": return "release and let go"
-    default:       return "breathe with dino"
+    case "Inhale": return String(localized: "smell the flowers")
+    case "Hold":   return String(localized: "hold the calm")
+    case "Exhale": return String(localized: "release and let go")
+    default:       return String(localized: "breathe with dino")
     }
 }
 
@@ -89,8 +89,8 @@ private func formatBreathingTime(_ seconds: Int) -> String {
 private func patternText(_ sessionType: String) -> String {
     // "4-7-8" -> "4 · 7 · 8 rhythm"
     let parts = sessionType.split(separator: "-")
-    guard !parts.isEmpty else { return "\(sessionType) rhythm" }
-    return parts.joined(separator: " · ") + " rhythm"
+    guard !parts.isEmpty else { return String(localized: "\(sessionType) rhythm") }
+    return String(localized: "\(parts.joined(separator: " · ")) rhythm")
 }
 
 // MARK: - Pattern Pill

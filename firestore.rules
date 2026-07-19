@@ -74,7 +74,7 @@ service cloud.firestore {
     // text, no numbers). The expedition result doc is server-written only.
     match /expeditionSignals/{uid} {
       allow write: if request.auth != null && request.auth.uid == uid
-        && request.resource.data.keys().hasOnly(['eligible','moodTrend','heavyDays7','themes','sleepBucket','stepsBucket','sinceLastRec','sinceLastExpedition','updatedAt'])
+        && request.resource.data.keys().hasOnly(['eligible','moodTrend','heavyDays7','themes','sleepBucket','stepsBucket','sinceLastRec','sinceLastExpedition','userLocale','updatedAt'])
         && request.resource.data.eligible is bool
         && request.resource.data.moodTrend in ['steady','wobbly','heavy']
         && request.resource.data.heavyDays7 in ['0','1','2to3','4plus']
@@ -84,10 +84,54 @@ service cloud.firestore {
         && request.resource.data.sinceLastExpedition in ['0to2','3to7','8to13','14plus']
         && request.resource.data.themes is list
         && request.resource.data.themes.size() <= 3
+        && (!request.resource.data.keys().hasAny(['userLocale'])
+            || request.resource.data.userLocale in ['en','es','ja','ko','vi'])
         && request.resource.data.updatedAt == request.time;
       allow read: if request.auth != null && request.auth.uid == uid;
     }
     match /expeditions/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow write: if false;
+    }
+
+    // Outcome ledger (memory + shelf arc F1) — the enum twin of the shelf.
+    // Enum-shaped ONLY; the single string field is a gift's publisher domain
+    // (server trusted-sources vocabulary), size-capped. Content never lands here.
+    match /outcomes/{uid}/entries/{entryId} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow create: if request.auth != null && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['kind','itemType','sourceDomain','moodContext','daypart','action','needsFollowup','shownAt','expiresAt'])
+        && request.resource.data.kind in ['rec','gift']
+        && ((request.resource.data.kind == 'rec'
+              && request.resource.data.itemType in ['music','book','film']
+              && !request.resource.data.keys().hasAny(['sourceDomain']))
+            || (request.resource.data.kind == 'gift'
+              && request.resource.data.itemType in ['rest','beauty','hope','wonder','connection']
+              && (!request.resource.data.keys().hasAny(['sourceDomain'])
+                  || (request.resource.data.sourceDomain is string
+                      && request.resource.data.sourceDomain.size() <= 40))))
+        && request.resource.data.moodContext in ['clear','partlyCloudy','overwhelmed','drained','none']
+        && request.resource.data.daypart in ['morning','afternoon','evening','night']
+        && request.resource.data.action == 'shown'
+        && request.resource.data.needsFollowup == true
+        && request.resource.data.shownAt == request.time
+        && request.resource.data.expiresAt is timestamp;
+      allow update: if request.auth != null && request.auth.uid == uid
+        && (
+          (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['action','actionAt'])
+            && request.resource.data.action in ['opened','kept','ignored','notTonight','lateKept']
+            && request.resource.data.actionAt == request.time)
+          ||
+          (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['followupTrend','followupAt','needsFollowup'])
+            && request.resource.data.followupTrend in ['improved','steady','heavier','unknown']
+            && request.resource.data.followupAt == request.time
+            && request.resource.data.needsFollowup == false)
+        );
+      allow delete: if false;
+    }
+
+    // Preference doc (F2) — derived, server-write-only, client reads own.
+    match /prefs/{uid} {
       allow read: if request.auth != null && request.auth.uid == uid;
       allow write: if false;
     }

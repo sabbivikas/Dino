@@ -16,7 +16,7 @@ struct StreakBadge: View {
                 .font(DinoTheme.dinoFont(size: 20))
 
             VStack(alignment: .leading, spacing: 2) {
-                Text("\(streak) day\(streak == 1 ? "" : "s")")
+                Text(streak == 1 ? String(localized: "\(streak) day") : String(localized: "\(streak) days"))
                     .font(DinoTheme.headlineFont())
                     .foregroundColor(DinoTheme.textPrimary)
 

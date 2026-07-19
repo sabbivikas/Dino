@@ -166,8 +166,8 @@ class NotificationManager: ObservableObject {
         scheduleBreathingReminder(hour: 8, minute: 0)
         scheduleJournalReminder(hour: 19, minute: 0)
         scheduleGratitudeReminder(hour: 20, minute: 0)
-        setSelfCareReminder(id: "selfcare-water", body: "hey, when did you last have water? 💧", hour: 10, minute: 0) { _ in }
-        setSelfCareReminder(id: "selfcare-eat",   body: "dino noticed it might be lunchtime 🍽", hour: 12, minute: 30) { _ in }
+        setSelfCareReminder(id: "selfcare-water", body: String(localized: "hey, when did you last have water? 💧"), hour: 10, minute: 0) { _ in }
+        setSelfCareReminder(id: "selfcare-eat",   body: String(localized: "dino noticed it might be lunchtime 🍽"), hour: 12, minute: 30) { _ in }
 
         ud.set(true, forKey: "selfcare-water.enabled")
         ud.set(10, forKey: "selfcare-water.hour"); ud.set(0, forKey: "selfcare-water.minute")
@@ -295,9 +295,9 @@ class NotificationManager: ObservableObject {
         let breathing = ud.object(forKey: "wind_down_breathing") as? Bool ?? true
         let journal   = ud.object(forKey: "wind_down_journal") as? Bool ?? true
         let gratitude = ud.object(forKey: "wind_down_gratitude") as? Bool ?? true
-        if breathing { routines.append("breathing") }
-        if journal { routines.append("journal") }
-        if gratitude { routines.append("gratitude") }
+        if breathing { routines.append(String(localized: "breathing")) }
+        if journal { routines.append(String(localized: "journal")) }
+        if gratitude { routines.append(String(localized: "gratitude")) }
 
         var dc = DateComponents()
         dc.hour = hour
@@ -308,7 +308,7 @@ class NotificationManager: ObservableObject {
         let content = UNMutableNotificationContent()
         content.title = title
         if !routines.isEmpty {
-            content.body = "tonight: " + routines.joined(separator: " · ")
+            content.body = String(localized: "tonight: \(routines.joined(separator: " · "))")
         }
         content.sound = .default
         content.categoryIdentifier = "WIND_DOWN"
@@ -535,8 +535,8 @@ class NotificationManager: ObservableObject {
             Task { @MainActor in
                 guard Self.isPermissionGranted(settings.authorizationStatus) else { return }
                 let content = UNMutableNotificationContent()
-                content.title = "your dino break 🌿"
-                content.body = "a quiet moment is coming up. tap to begin."
+                content.title = String(localized: "your dino break 🌿")
+                content.body = String(localized: "a quiet moment is coming up. tap to begin.")
                 content.sound = .default
                 content.userInfo = ["action": action]
                 let comps = Calendar.current.dateComponents(
@@ -559,8 +559,8 @@ class NotificationManager: ObservableObject {
         UNUserNotificationCenter.current().getNotificationSettings { settings in
             guard Self.isPermissionGranted(settings.authorizationStatus) else { return }
             let content = UNMutableNotificationContent()
-            content.title = "a letter from the forest 🌲"
-            content.body = "something arrived for tomorrow. tap to read it."
+            content.title = String(localized: "a letter from the forest 🌲")
+            content.body = String(localized: "something arrived for tomorrow. tap to read it.")
             content.sound = .default
             content.userInfo = ["action": "rhythmsletter"]
 
@@ -584,8 +584,8 @@ class NotificationManager: ObservableObject {
     /// Not #if DEBUG-gated so the in-app test button works on TestFlight.
     func scheduleRhythmsLetterTest() {
         let content = UNMutableNotificationContent()
-        content.title = "a letter from the forest 🌲"
-        content.body = "something arrived for tomorrow. tap to read it."
+        content.title = String(localized: "a letter from the forest 🌲")
+        content.body = String(localized: "something arrived for tomorrow. tap to read it.")
         content.sound = .default
         content.userInfo = ["action": "rhythmsletter"]
         let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 5, repeats: false)
@@ -596,8 +596,8 @@ class NotificationManager: ObservableObject {
 
     func sendTestNotification() {
         let content = UNMutableNotificationContent()
-        content.title = "dino is here"
-        content.body = "notifications are working perfectly"
+        content.title = String(localized: "dino is here")
+        content.body = String(localized: "notifications are working perfectly")
         content.sound = .default
 
         let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 5, repeats: false)
@@ -719,9 +719,9 @@ class NotificationManager: ObservableObject {
         guard notificationsEnabled && hasPermission else { return }
 
         let reEngagementMessages = [
-            ("we miss you", "even a small moment of reflection helps"),
-            ("hey, it's been a while", "your dino misses you. come say hi."),
-            ("no pressure", "whenever you're ready, we're here"),
+            (String(localized: "we miss you"), String(localized: "even a small moment of reflection helps")),
+            (String(localized: "hey, it's been a while"), String(localized: "your dino misses you. come say hi.")),
+            (String(localized: "no pressure"), String(localized: "whenever you're ready, we're here")),
         ]
 
         let message = reEngagementMessages.randomElement() ?? reEngagementMessages[0]

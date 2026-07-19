@@ -43,9 +43,9 @@ final class BreakSchedulerService {
     private static let slot: TimeInterval = 20 * 60     // each break is 20 min
     private static let maxCandidates = 12
 
-    private static let fbAck = "today sounds heavy"
+    private static let fbAck = String(localized: "today sounds heavy")
     private static let fbActivity = "breathing"
-    private static let fbReason = "a quiet moment to breathe 🌿"
+    private static let fbReason = String(localized: "a quiet moment to breathe 🌿")
 
     // MARK: - Once-per-day client gate (server keeps its 5/day backstop)
 
@@ -177,8 +177,9 @@ final class BreakSchedulerService {
     /// Creates the calendar event for the chosen slot and schedules a reminder
     /// 5 min before that deep-links to the suggested activity. True on success.
     func confirmBreak(slot: SlotOption, suggestion: BreakSuggestion) async -> Bool {
+        let activityDisplay = suggestion.suggestedActivity.localized
         let created = CalendarService.shared.createBreakEvent(
-            title: "\(suggestion.suggestedActivity) break with dino 🌿",
+            title: String(localized: "\(activityDisplay) break with dino 🌿"),
             start: slot.startDate,
             duration: TimeInterval(slot.duration * 60),
             notes: suggestion.reason

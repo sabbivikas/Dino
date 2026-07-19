@@ -62,7 +62,7 @@ struct FocusLockScreenView: View {
                     HStack(spacing: 8) {
                         Text("🎯")
                             .font(.system(size: 20))
-                        Text(context.state.isPaused ? "paused" : "deep focus")
+                        Text(context.state.isPaused ? String(localized: "paused") : String(localized: "deep focus"))
                             .font(.custom("DinoInitiativeFont-Regular", size: 16))
                             .foregroundColor(.white)
                     }
@@ -122,7 +122,7 @@ struct FocusExpandedLeading: View {
                 .font(.system(size: 18))
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(context.state.isPaused ? "paused" : "deep focus")
+                Text(context.state.isPaused ? String(localized: "paused") : String(localized: "deep focus"))
                     .font(.custom("DinoInitiativeFont-Regular", size: 13))
                     .foregroundColor(.white)
                 Text(context.state.motivationMessage)

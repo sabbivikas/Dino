@@ -40,32 +40,32 @@ struct WhatsNewSlide: Identifiable {
             id: "intelligence",
             tag: .new,
             accent: Color(hex: "#7BA872"),
-            title: "personal intelligence",
-            body: "dino now gently understands your sleep, your movement, and your moments. it learns your rhythms, only ever compares you to you, and knows when to speak and when to just be there",
+            title: String(localized: "personal intelligence"),
+            body: String(localized: "dino now gently understands your sleep, your movement, and your moments. it learns your rhythms, only ever compares you to you, and knows when to speak and when to just be there"),
             emoji: ["🌙", "🚶"]
         ),
         WhatsNewSlide(
             id: "recs",
             tag: .new,
             accent: Color(hex: "#F5C842"),
-            title: "gentle suggestions",
-            body: "on a heavy day, once in a while, dino offers one soft thing. a playlist, a comfort film, a cozy game. never a feed, always a friend",
+            title: String(localized: "gentle suggestions"),
+            body: String(localized: "on a heavy day, once in a while, dino offers one soft thing. a playlist, a comfort film, a cozy game. never a feed, always a friend"),
             emoji: ["🎧", "🍵"]
         ),
         WhatsNewSlide(
             id: "weather",
             tag: .new,
             accent: DinoTheme.skyBlue,
-            title: "real weather in dino's world",
-            body: "rain outside your window means rain in the garden now. dino's world breathes with yours",
+            title: String(localized: "real weather in dino's world"),
+            body: String(localized: "rain outside your window means rain in the garden now. dino's world breathes with yours"),
             emoji: ["🌦️", "🌻"]
         ),
         WhatsNewSlide(
             id: "care",
             tag: .better,
             accent: Color(hex: "#C4B8D4"),
-            title: "quieter care",
-            body: "smarter check ins that know when you slept short, and nudges that lean gentler on heavy days",
+            title: String(localized: "quieter care"),
+            body: String(localized: "smarter check ins that know when you slept short, and nudges that lean gentler on heavy days"),
             emoji: ["💬", "🌿"]
         ),
     ]
@@ -156,7 +156,7 @@ struct WhatsNewView: View {
                         withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) { index += 1 }
                     }
                 } label: {
-                    Text(isLast ? "start exploring 🦕" : "next")
+                    Text(isLast ? String(localized: "start exploring 🦕") : String(localized: "next"))
                         .font(DinoTheme.dinoFont(size: 17))
                         .foregroundColor(.white)
                         .frame(maxWidth: .infinity)

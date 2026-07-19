@@ -78,7 +78,7 @@ final class SpeechTranscriber: ObservableObject {
 
     private func beginSession() {
         guard let recognizer = recognizer, recognizer.isAvailable else {
-            self.lastError = "Speech recognizer unavailable"
+            self.lastError = String(localized: "Speech recognizer unavailable")
             return
         }
 

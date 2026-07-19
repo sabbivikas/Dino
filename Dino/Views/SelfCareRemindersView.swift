@@ -25,36 +25,36 @@ private let selfCareReminders: [SelfCareReminder] = [
     SelfCareReminder(
         id: "selfcare-water",
         icon: "💧",
-        name: "drink water",
-        body: "hey, when did you last have water? 💧 dino thinks you should drink some now",
+        name: String(localized: "drink water"),
+        body: String(localized: "hey, when did you last have water? 💧 dino thinks you should drink some now"),
         defaultHour: 9, defaultMinute: 0
     ),
     SelfCareReminder(
         id: "selfcare-eat",
         icon: "🍽",
-        name: "eat something",
-        body: "dino noticed it might be lunchtime 🍽 have you eaten something today?",
+        name: String(localized: "eat something"),
+        body: String(localized: "dino noticed it might be lunchtime 🍽 have you eaten something today?"),
         defaultHour: 12, defaultMinute: 30
     ),
     SelfCareReminder(
         id: "breathing_reminder",
         icon: "🌬️",
-        name: "breathing",
-        body: "hey take a breath with dino 🌬️",
+        name: String(localized: "breathing"),
+        body: String(localized: "hey take a breath with dino 🌬️"),
         defaultHour: 8, defaultMinute: 0
     ),
     SelfCareReminder(
         id: "journal_reminder",
         icon: "✍️",
-        name: "journal",
-        body: "your journal is waiting 📝",
+        name: String(localized: "journal"),
+        body: String(localized: "your journal is waiting 📝"),
         defaultHour: 19, defaultMinute: 0
     ),
     SelfCareReminder(
         id: "gratitude_reminder",
         icon: "🫙",
-        name: "gratitude",
-        body: "drop one small good thing in the jar today 🫙",
+        name: String(localized: "gratitude"),
+        body: String(localized: "drop one small good thing in the jar today 🫙"),
         defaultHour: 20, defaultMinute: 0
     )
 ]

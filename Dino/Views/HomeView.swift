@@ -463,22 +463,22 @@ struct HomeView: View {
     private var actionGrid: some View {
         let rows = [
             [
-                ActionItem(id: "journal", title: "Journal", icon: "mic.fill", color: DinoTheme.sageGreen, tab: 1),
-                ActionItem(id: "mood", title: "Mood", icon: "cloud.sun.fill", color: DinoTheme.skyBlue, tab: 2),
-                ActionItem(id: "gratitude", title: "Gratitude", icon: "archivebox.fill", color: DinoTheme.peach, tab: 3),
+                ActionItem(id: "journal", title: String(localized: "Journal"), icon: "mic.fill", color: DinoTheme.sageGreen, tab: 1),
+                ActionItem(id: "mood", title: String(localized: "Mood"), icon: "cloud.sun.fill", color: DinoTheme.skyBlue, tab: 2),
+                ActionItem(id: "gratitude", title: String(localized: "Gratitude"), icon: "archivebox.fill", color: DinoTheme.peach, tab: 3),
             ],
             [
-                ActionItem(id: "breathing", title: "Breathing", icon: "circle.circle", color: DinoTheme.lavender, tab: nil),
-                ActionItem(id: "meditation", title: "Meditation", icon: "leaf.fill", color: DinoTheme.sageGreen.opacity(0.8), tab: nil),
-                ActionItem(id: "affirmations", title: "Affirm", icon: "sparkles", color: DinoTheme.warmRose, tab: nil),
+                ActionItem(id: "breathing", title: String(localized: "Breathing"), icon: "circle.circle", color: DinoTheme.lavender, tab: nil),
+                ActionItem(id: "meditation", title: String(localized: "Meditation"), icon: "leaf.fill", color: DinoTheme.sageGreen.opacity(0.8), tab: nil),
+                ActionItem(id: "affirmations", title: String(localized: "Affirm"), icon: "sparkles", color: DinoTheme.warmRose, tab: nil),
             ],
             [
-                ActionItem(id: "rhythms", title: "rhythms", icon: "waveform.path", color: DinoTheme.lavender, tab: nil),
-                ActionItem(id: "growth", title: "Growth", icon: "tree.fill", color: DinoTheme.sageGreen, tab: nil),
+                ActionItem(id: "rhythms", title: String(localized: "rhythms"), icon: "waveform.path", color: DinoTheme.lavender, tab: nil),
+                ActionItem(id: "growth", title: String(localized: "Growth"), icon: "tree.fill", color: DinoTheme.sageGreen, tab: nil),
                 // world replaced the Help tile (slot 9); Help lives on in
                 // Profile → resources. Circle tints toward today's dominant
                 // world mood when the aggregate is cached.
-                ActionItem(id: "world", title: "world", icon: "globe.americas.fill", color: worldTileColor, tab: nil),
+                ActionItem(id: "world", title: String(localized: "world"), icon: "globe.americas.fill", color: worldTileColor, tab: nil),
             ]
         ]
 

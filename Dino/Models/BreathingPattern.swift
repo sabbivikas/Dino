@@ -77,15 +77,15 @@ extension BreathingPattern {
 
     static let bigSigh = BreathingPattern(
         id: "big-sigh",
-        name: "the big sigh",
-        tagline: "two sips of air, one long letting go",
+        name: String(localized: "the big sigh"),
+        tagline: String(localized: "two sips of air, one long letting go"),
         accentHex: "#E8889A",
         steps: [
-            BreathStep(kind: .inhale, label: "breathe in", shortLabel: "in", seconds: 4, targetScale: 0.9, targetOpacity: 0.95, curve: .gentle),
-            BreathStep(kind: .inhale, label: "a little more", shortLabel: "top up", seconds: 2, targetScale: 1.15, targetOpacity: 1.0, curve: .lift),
-            BreathStep(kind: .exhale, label: "let it all out", shortLabel: "out", seconds: 6, targetScale: 0.6, targetOpacity: 0.85, curve: .release)
+            BreathStep(kind: .inhale, label: String(localized: "breathe in"), shortLabel: String(localized: "in"), seconds: 4, targetScale: 0.9, targetOpacity: 0.95, curve: .gentle),
+            BreathStep(kind: .inhale, label: String(localized: "a little more"), shortLabel: String(localized: "top up"), seconds: 2, targetScale: 1.15, targetOpacity: 1.0, curve: .lift),
+            BreathStep(kind: .exhale, label: String(localized: "let it all out"), shortLabel: String(localized: "out"), seconds: 6, targetScale: 0.6, targetOpacity: 0.85, curve: .release)
         ],
-        closingLine: "you let it all out. lighter now 🌿",
+        closingLine: String(localized: "you let it all out. lighter now 🌿"),
         shimmersOnHold: false,
         quarterTickHolds: false,
         thinsOnExhale: true
@@ -93,15 +93,15 @@ extension BreathingPattern {
 
     static let sleepyCloud = BreathingPattern(
         id: "sleepy-cloud",
-        name: "the sleepy cloud",
-        tagline: "the 4 7 8, for drifting off",
+        name: String(localized: "the sleepy cloud"),
+        tagline: String(localized: "the 4 7 8, for drifting off"),
         accentHex: "#C4B8D4",
         steps: [
-            BreathStep(kind: .inhale, label: "breathe in", shortLabel: "in", seconds: 4, targetScale: 1.1, targetOpacity: 1.0, curve: .gentle),
-            BreathStep(kind: .hold, label: "hold, softly", shortLabel: "hold", seconds: 7, targetScale: 1.1, targetOpacity: 1.0, curve: .gentle),
-            BreathStep(kind: .exhale, label: "breathe out", shortLabel: "out", seconds: 8, targetScale: 0.6, targetOpacity: 0.85, curve: .gentle)
+            BreathStep(kind: .inhale, label: String(localized: "breathe in"), shortLabel: String(localized: "in"), seconds: 4, targetScale: 1.1, targetOpacity: 1.0, curve: .gentle),
+            BreathStep(kind: .hold, label: String(localized: "hold, softly"), shortLabel: String(localized: "hold"), seconds: 7, targetScale: 1.1, targetOpacity: 1.0, curve: .gentle),
+            BreathStep(kind: .exhale, label: String(localized: "breathe out"), shortLabel: String(localized: "out"), seconds: 8, targetScale: 0.6, targetOpacity: 0.85, curve: .gentle)
         ],
-        closingLine: "the night can hold you now 🌙",
+        closingLine: String(localized: "the night can hold you now 🌙"),
         shimmersOnHold: true,
         quarterTickHolds: false,
         thinsOnExhale: false
@@ -109,16 +109,16 @@ extension BreathingPattern {
 
     static let steadySquare = BreathingPattern(
         id: "steady-square",
-        name: "the steady square",
-        tagline: "four counts, four sides, steady",
+        name: String(localized: "the steady square"),
+        tagline: String(localized: "four counts, four sides, steady"),
         accentHex: "#7BA872",
         steps: [
-            BreathStep(kind: .inhale, label: "breathe in", shortLabel: "in", seconds: 4, targetScale: 1.1, targetOpacity: 1.0, curve: .gentle),
-            BreathStep(kind: .hold, label: "hold", shortLabel: "hold", seconds: 4, targetScale: 1.1, targetOpacity: 1.0, curve: .gentle),
-            BreathStep(kind: .exhale, label: "breathe out", shortLabel: "out", seconds: 4, targetScale: 0.6, targetOpacity: 0.85, curve: .gentle),
-            BreathStep(kind: .hold, label: "rest", shortLabel: "rest", seconds: 4, targetScale: 0.6, targetOpacity: 0.85, curve: .gentle)
+            BreathStep(kind: .inhale, label: String(localized: "breathe in"), shortLabel: String(localized: "in"), seconds: 4, targetScale: 1.1, targetOpacity: 1.0, curve: .gentle),
+            BreathStep(kind: .hold, label: String(localized: "hold"), shortLabel: String(localized: "hold"), seconds: 4, targetScale: 1.1, targetOpacity: 1.0, curve: .gentle),
+            BreathStep(kind: .exhale, label: String(localized: "breathe out"), shortLabel: String(localized: "out"), seconds: 4, targetScale: 0.6, targetOpacity: 0.85, curve: .gentle),
+            BreathStep(kind: .hold, label: String(localized: "rest"), shortLabel: String(localized: "rest"), seconds: 4, targetScale: 0.6, targetOpacity: 0.85, curve: .gentle)
         ],
-        closingLine: "your heart found its square 💚",
+        closingLine: String(localized: "your heart found its square 💚"),
         shimmersOnHold: false,
         quarterTickHolds: true,
         thinsOnExhale: false
@@ -126,14 +126,14 @@ extension BreathingPattern {
 
     static let calmCurrent = BreathingPattern(
         id: "calm-current",
-        name: "the calm current",
-        tagline: "no holds, just slow waves",
+        name: String(localized: "the calm current"),
+        tagline: String(localized: "no holds, just slow waves"),
         accentHex: "#FFE066",
         steps: [
-            BreathStep(kind: .inhale, label: "breathe in", shortLabel: "in", seconds: 5, targetScale: 1.1, targetOpacity: 1.0, curve: .wave),
-            BreathStep(kind: .exhale, label: "breathe out", shortLabel: "out", seconds: 5, targetScale: 0.6, targetOpacity: 0.85, curve: .wave)
+            BreathStep(kind: .inhale, label: String(localized: "breathe in"), shortLabel: String(localized: "in"), seconds: 5, targetScale: 1.1, targetOpacity: 1.0, curve: .wave),
+            BreathStep(kind: .exhale, label: String(localized: "breathe out"), shortLabel: String(localized: "out"), seconds: 5, targetScale: 0.6, targetOpacity: 0.85, curve: .wave)
         ],
-        closingLine: "steady as the tide 🌊",
+        closingLine: String(localized: "steady as the tide 🌊"),
         shimmersOnHold: false,
         quarterTickHolds: false,
         thinsOnExhale: false

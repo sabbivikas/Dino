@@ -12,10 +12,10 @@ import SwiftUI
 
 /// pure strings — lowercase, zero dashes, no emoji (voice-tested)
 enum MoodButtonVoice {
-    static let heavyLine = "however it is, it counts"
-    static let lightLine = "glad the sky is kind today"
-    static let logLabel = "log this feeling"
-    static let savedLabel = "saved"
+    static let heavyLine = String(localized: "however it is, it counts")
+    static let lightLine = String(localized: "glad the sky is kind today")
+    static let logLabel = String(localized: "log this feeling")
+    static let savedLabel = String(localized: "saved")
 
     static func line(for mood: EmotionalWeather) -> String {
         switch mood {

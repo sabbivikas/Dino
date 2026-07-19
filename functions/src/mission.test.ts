@@ -100,3 +100,18 @@ test("fabricated looking values are not in the allowlist", () => {
   assert.ok(!EXPEDITION_SIGNAL_ALLOW.sleepBucket.includes("zero"));
   assert.ok(!EXPEDITION_SIGNAL_ALLOW.stepsBucket.includes("0"));
 });
+
+
+test("avoid-domains rotate to the back of the source order (F3)", () => {
+  const sources = trustedSourcesFor("wonder", ["atlasobscura.com"]);
+  assert.ok(sources.length > 1);
+  assert.notEqual(sources[0], "atlasobscura.com");
+  assert.equal(sources[sources.length - 1], "atlasobscura.com");
+});
+
+test("gift fatigue reaches the watcher prompt (F3)", () => {
+  const buckets = { moodTrend: "heavy", heavyDays7: "4plus", sleepBucket: "short",
+                    stepsBucket: "low", sinceLastExpedition: "14plus", sinceLastRec: "14plus" };
+  assert.ok(buildLunaUserPrompt(buckets, [], "high").includes("gift fatigue high"));
+  assert.ok(buildLunaUserPrompt(buckets, []).includes("gift fatigue none"));
+});

@@ -13,19 +13,19 @@ import SwiftUI
 
 enum ComfortSlip {
     // strings (owner-approved verbatim; lowercase, zero dashes)
-    static let takeALook = "take a look"
-    static let notTonight = "not tonight"
+    static let takeALook = String(localized: "take a look")
+    static let notTonight = String(localized: "not tonight")
 
     /// "a small comfort · for tonight" — daypart by hour.
     static func kicker(hour: Int) -> String {
         let when: String
         switch hour {
-        case 21..., ..<5: when = "for tonight"
-        case 17..<21:     when = "for this evening"
-        case 5..<12:      when = "for this morning"
-        default:          when = "for today"
+        case 21..., ..<5: when = String(localized: "for tonight")
+        case 17..<21:     when = String(localized: "for this evening")
+        case 5..<12:      when = String(localized: "for this morning")
+        default:          when = String(localized: "for today")
         }
-        return "a small comfort · \(when)"
+        return String(localized: "a small comfort · \(when)")
     }
 
     static func tapeTint(type: String) -> Color {
@@ -53,8 +53,8 @@ enum ComfortSlip {
     }
 
     static func source(link: String) -> String {
-        guard let host = URL(string: link)?.host else { return "from somewhere gentle" }
-        return "from \(host.hasPrefix("www.") ? String(host.dropFirst(4)) : host)"
+        guard let host = URL(string: link)?.host else { return String(localized: "from somewhere gentle") }
+        return String(localized: "from \(host.hasPrefix("www.") ? String(host.dropFirst(4)) : host)")
     }
 
     static var allFixedStrings: [String] {

@@ -8,6 +8,9 @@
 //    source URL as a comment for future re-verification.
 //  • Region comes from Locale.current.region (device setting): no location
 //    permission, works offline.
+//  • KR danuri label + JP details localized; action verbs / fallback line /
+//    emergency footer / international details wrapped String(localized:)
+//    by owner gate 2026-07-16 (crisis localization arc). Numbers unchanged.
 //  • Hours rule (owner-approved): any entry whose 24/7 status is not
 //    verified ships WITHOUT the 24h badge and says "hours vary" —
 //    understate, never overstate availability.
@@ -38,7 +41,7 @@ struct RegionalResource {
     }
 
     var secondaryLabel: String? {
-        textNumber.map { "text \($0) instead" }
+        textNumber.map { String(localized: "text \($0) instead") }
     }
 
     var actionURL: URL? {
@@ -58,10 +61,11 @@ struct RegionalResource {
 
     var actionLabel: String {
         switch kind {
-        case .call:     return "call \(contact)"
-        case .text:     return smsBody.map { "text \($0) to \(contact)" } ?? "text \(contact)"
-        case .whatsapp: return "whatsapp \(contact)"
-        case .link:     return "open \(URL(string: contact)?.host ?? contact)"
+        case .call:     return String(localized: "call \(contact)")
+        case .text:     return smsBody.map { String(localized: "text \($0) to \(contact)") }
+                            ?? String(localized: "text \(contact)")
+        case .whatsapp: return String(localized: "whatsapp \(contact)")
+        case .link:     return String(localized: "open \(URL(string: contact)?.host ?? contact)")
         }
     }
 }
@@ -69,10 +73,10 @@ struct RegionalResource {
 enum CrisisResources {
 
     /// Warm line above the international fallback block.
-    static let fallbackLine = "wherever you are, help exists. these directories can find a line close to you 🌍"
+    static let fallbackLine = String(localized: "wherever you are, help exists. these directories can find a line close to you 🌍")
 
     /// Region-neutral emergency footer (replaces the old US-only 911 line).
-    static let emergencyFooter = "if you are in immediate danger, please call your local emergency number."
+    static let emergencyFooter = String(localized: "if you are in immediate danger, please call your local emergency number.")
 
     /// Resolves the device region to its resource set. Unknown/missing region
     /// falls back to the international block — never an empty screen.
@@ -89,13 +93,13 @@ enum CrisisResources {
     static let international: [RegionalResource] = [
         // source: https://findahelpline.com
         RegionalResource(name: "find a helpline", kind: .link, contact: "https://findahelpline.com",
-                         detail: "crisis lines for over 130 countries", is24h: true),
+                         detail: String(localized: "crisis lines for over 130 countries"), is24h: true),
         // source: https://befrienders.org
         RegionalResource(name: "befrienders worldwide", kind: .link, contact: "https://befrienders.org",
-                         detail: "emotional support centres around the world", is24h: true),
+                         detail: String(localized: "emotional support centres around the world"), is24h: true),
         // source: https://www.iasp.info/suicidalthoughts/
         RegionalResource(name: "iasp crisis centres", kind: .link, contact: "https://www.iasp.info/suicidalthoughts/",
-                         detail: "the international association for suicide prevention directory", is24h: true),
+                         detail: String(localized: "the international association for suicide prevention directory"), is24h: true),
     ]
 
     /// ISO 3166-1 alpha-2 → verified resources. Owner-reviewed 2026-07-09;
@@ -177,18 +181,18 @@ enum CrisisResources {
         "JP": [
             // source: https://www.since2011.net/yorisoi/
             RegionalResource(name: "よりそいホットライン", kind: .call, contact: "0120-279-338",
-                             detail: "無料・秘密厳守, hours vary", is24h: false),
+                             detail: "無料・秘密厳守、受付時間はさまざま", is24h: false),
             // source: https://www.inochinodenwa.org
             RegionalResource(name: "いのちの電話", kind: .call, contact: "0570-783-556",
-                             detail: "10am to 10pm", is24h: false),
+                             detail: "午前10時から午後10時まで", is24h: false),
         ],
         "KR": [
             // source: https://www.mohw.go.kr (109 unified line, launched 2024; verified 2026-07-09)
             RegionalResource(name: "자살예방상담전화", kind: .call, contact: "109",
                              detail: "언제든지, 무료", is24h: true),
             // source: https://www.liveinkorea.kr (danuri multilingual; verified 2026-07-09)
-            RegionalResource(name: "danuri helpline (multilingual)", kind: .call, contact: "1577-1366",
-                             detail: "support in many languages", is24h: true),
+            RegionalResource(name: "다누리콜센터 (danuri)", kind: .call, contact: "1577-1366",
+                             detail: "여러 언어로 도움을 받을 수 있어요", is24h: true),
         ],
         "SG": [
             // source: https://www.sos.org.sg (verified 2026-07-09)

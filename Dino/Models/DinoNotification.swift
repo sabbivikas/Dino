@@ -23,10 +23,10 @@ enum DinoNotificationCategory: String, Codable, CaseIterable, Identifiable {
 
     var displayName: String {
         switch self {
-        case .growth:   return "growth"
-        case .world:    return "world"
-        case .creative: return "creative"
-        case .dinoSays: return "dino says"
+        case .growth:   return String(localized: "growth")
+        case .world:    return String(localized: "world")
+        case .creative: return String(localized: "creative")
+        case .dinoSays: return String(localized: "dino says")
         }
     }
 
@@ -224,14 +224,14 @@ final class NotificationStore: ObservableObject {
         if !defaults.bool(forKey: seedAddedKey) {
             insertIfNew(
                 category: .dinoSays,
-                title: "welcome to dino",
-                subtitle: "a small, soft place to land. take your time.",
+                title: String(localized: "welcome to dino"),
+                subtitle: String(localized: "a small, soft place to land. take your time."),
                 dedupeKey: "welcome"
             )
             insertIfNew(
                 category: .world,
-                title: "the world is breathing with you",
-                subtitle: "thousands of dinos are checking in alongside you today.",
+                title: String(localized: "the world is breathing with you"),
+                subtitle: String(localized: "thousands of dinos are checking in alongside you today."),
                 dedupeKey: "world-welcome"
             )
             defaults.set(true, forKey: seedAddedKey)
@@ -242,7 +242,7 @@ final class NotificationStore: ObservableObject {
         for m in streakMilestones where streakDays >= m {
             insertIfNew(
                 category: .growth,
-                title: "\(m)-day streak!",
+                title: String(localized: "\(m)-day streak!"),
                 subtitle: streakSubtitle(for: m),
                 dedupeKey: "streak-\(m)"
             )
@@ -255,8 +255,8 @@ final class NotificationStore: ObservableObject {
             let key = "checkin-\(StreakData.dateKey(for: Date()))"
             insertIfNew(
                 category: .growth,
-                title: "a quiet check-in?",
-                subtitle: "haven't heard your voice in a day — even one breath counts.",
+                title: String(localized: "a quiet check-in?"),
+                subtitle: String(localized: "haven't heard your voice in a day — even one breath counts."),
                 dedupeKey: key
             )
         }
@@ -265,16 +265,16 @@ final class NotificationStore: ObservableObject {
         if journalCount >= 1 {
             insertIfNew(
                 category: .creative,
-                title: "first voice note saved",
-                subtitle: "your story has a place to live now. keep going.",
+                title: String(localized: "first voice note saved"),
+                subtitle: String(localized: "your story has a place to live now. keep going."),
                 dedupeKey: "journal-first"
             )
         }
         if journalCount >= 10 {
             insertIfNew(
                 category: .creative,
-                title: "10 voice notes recorded",
-                subtitle: "a small archive of your inner weather.",
+                title: String(localized: "10 voice notes recorded"),
+                subtitle: String(localized: "a small archive of your inner weather."),
                 dedupeKey: "journal-10"
             )
         }
@@ -283,8 +283,8 @@ final class NotificationStore: ObservableObject {
         for m in [3, 10, 25] where gratitudeCount >= m {
             insertIfNew(
                 category: .creative,
-                title: "\(m) tokens in the jar",
-                subtitle: "the jar is filling up with small good things.",
+                title: String(localized: "\(m) tokens in the jar"),
+                subtitle: String(localized: "the jar is filling up with small good things."),
                 dedupeKey: "gratitude-\(m)"
             )
         }
@@ -293,16 +293,16 @@ final class NotificationStore: ObservableObject {
         if breathingSessionCount >= 1 {
             insertIfNew(
                 category: .growth,
-                title: "you took your first breath with dino 🫁",
-                subtitle: "small breaths, big shifts.",
+                title: String(localized: "you took your first breath with dino 🫁"),
+                subtitle: String(localized: "small breaths, big shifts."),
                 dedupeKey: "breathing-first"
             )
         }
         if breathingSessionCount >= 10 {
             insertIfNew(
                 category: .growth,
-                title: "10 breathing sessions — your lungs thank you 🌿",
-                subtitle: "a steady rhythm is taking root.",
+                title: String(localized: "10 breathing sessions — your lungs thank you 🌿"),
+                subtitle: String(localized: "a steady rhythm is taking root."),
                 dedupeKey: "breathing-10"
             )
         }
@@ -311,16 +311,16 @@ final class NotificationStore: ObservableObject {
         if meditationSessionCount >= 1 {
             insertIfNew(
                 category: .growth,
-                title: "you meditated for the first time 🧘",
-                subtitle: "one quiet minute is its own kind of brave.",
+                title: String(localized: "you meditated for the first time 🧘"),
+                subtitle: String(localized: "one quiet minute is its own kind of brave."),
                 dedupeKey: "meditation-first"
             )
         }
         if meditationSessionCount >= 10 {
             insertIfNew(
                 category: .growth,
-                title: "stillness is a superpower — 10 sessions done ✨",
-                subtitle: "you keep coming back to the quiet.",
+                title: String(localized: "stillness is a superpower — 10 sessions done ✨"),
+                subtitle: String(localized: "you keep coming back to the quiet."),
                 dedupeKey: "meditation-10"
             )
         }
@@ -329,8 +329,8 @@ final class NotificationStore: ObservableObject {
         if hasMonthlyPainting {
             insertIfNew(
                 category: .creative,
-                title: "your monthly painting is ready",
-                subtitle: "a month of moods, painted softly. tap to see it.",
+                title: String(localized: "your monthly painting is ready"),
+                subtitle: String(localized: "a month of moods, painted softly. tap to see it."),
                 dedupeKey: "painting-\(paintingMonthKey)"
             )
         }
@@ -345,11 +345,11 @@ final class NotificationStore: ObservableObject {
 
     private func streakSubtitle(for days: Int) -> String {
         switch days {
-        case 3:  return "three days in a row — a tiny rhythm is forming."
-        case 7:  return "a full week. that's roots beginning to grow."
-        case 14: return "two weeks. you're building something real."
-        case 30: return "a whole month. take a breath — this is huge."
-        default: return "another day, another small showing-up."
+        case 3:  return String(localized: "three days in a row — a tiny rhythm is forming.")
+        case 7:  return String(localized: "a full week. that's roots beginning to grow.")
+        case 14: return String(localized: "two weeks. you're building something real.")
+        case 30: return String(localized: "a whole month. take a breath — this is huge.")
+        default: return String(localized: "another day, another small showing-up.")
         }
     }
 }

@@ -52,10 +52,10 @@ struct WorldMoodCard: View {
 
     private var headline: String {
         guard let b = bucket, b.global.total > 0, let mood = b.global.dominantMood else {
-            return "see everyone's inner weather 🌎"
+            return String(localized: "see everyone's inner weather 🌎")
         }
         let pct = Int((b.global.share(of: mood) * 100).rounded())
-        return "\(pct)% of dinos are \(mood.label) today"
+        return String(localized: "\(pct)% of dinos are \(mood.label) today")
     }
 
     /// Tiny glowing globe: peach halo, cream sphere, 3 pulsing mood dots.

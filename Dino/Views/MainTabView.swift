@@ -85,7 +85,9 @@ private struct DinoCustomTabBar: View {
     @State private var animatingTab: Int? = nil
 
     private let tabs: [(label: String, tag: Int)] = [
-        ("Home", 0), ("Journal", 1), ("Mood", 2), ("Jar", 3), ("Profile", 4)
+        (String(localized: "Home"), 0), (String(localized: "Journal"), 1),
+        (String(localized: "Mood"), 2), (String(localized: "Jar"), 3),
+        (String(localized: "Profile"), 4)
     ]
 
     var body: some View {

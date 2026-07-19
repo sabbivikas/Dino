@@ -22,31 +22,31 @@ enum GardenShare {
 
     // MARK: - Voice (lowercase, zero dashes — tested)
 
-    static func caption(day: Int) -> String { "my little garden \u{00B7} day \(day)" }
-    static let footer = "grown with dino \u{1F995}"
-    static let topLabel = "\u{00B7} the dino garden \u{00B7}"
-    static let daysLabel = "days"
-    static let stampFailToast = "couldn't make your postcard just now. try again \u{1F331}"
+    static func caption(day: Int) -> String { String(localized: "my little garden \u{00B7} day \(day)") }
+    static let footer = String(localized: "grown with dino \u{1F995}")
+    static let topLabel = String(localized: "\u{00B7} the dino garden \u{00B7}")
+    static let daysLabel = String(localized: "days")
+    static let stampFailToast = String(localized: "couldn't make your postcard just now. try again \u{1F331}")
 
     /// stage-only caption for the stamp — privacy safe (never mood or streak)
     static func stageCaption(_ stage: GrowthStage) -> String {
         switch stage {
-        case .seed:     return "just planted"
-        case .cracking: return "breaking ground"
-        case .sprout:   return "a new sprout"
-        case .seedling: return "a young seedling"
-        case .growing:  return "growing tall"
-        case .budding:  return "about to bloom"
-        case .opening:  return "opening up"
-        case .bloomed:  return "in full bloom"
-        case .thriving: return "thriving"
+        case .seed:     return String(localized: "just planted")
+        case .cracking: return String(localized: "breaking ground")
+        case .sprout:   return String(localized: "a new sprout")
+        case .seedling: return String(localized: "a young seedling")
+        case .growing:  return String(localized: "growing tall")
+        case .budding:  return String(localized: "about to bloom")
+        case .opening:  return String(localized: "opening up")
+        case .bloomed:  return String(localized: "in full bloom")
+        case .thriving: return String(localized: "thriving")
         }
     }
-    static let postmarkTop = "dino post"
-    static func postmarkDay(day: Int) -> String { "day \(day)" }
-    static let composingLine = "picking the best light..."
-    static let shareText = "my little garden is growing \u{1F331} i keep it in dino, a tiny gentle companion"
-    static let shareButtonLabel = "share my garden"
+    static let postmarkTop = String(localized: "dino post")
+    static func postmarkDay(day: Int) -> String { String(localized: "day \(day)") }
+    static let composingLine = String(localized: "picking the best light...")
+    static let shareText = String(localized: "my little garden is growing \u{1F331} i keep it in dino, a tiny gentle companion")
+    static let shareButtonLabel = String(localized: "share my garden")
 
     static var allFixedStrings: [String] {
         [caption(day: 3), footer, postmarkTop, postmarkDay(day: 3), composingLine, shareText, shareButtonLabel,

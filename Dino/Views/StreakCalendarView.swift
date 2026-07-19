@@ -245,21 +245,21 @@ private struct StatCardsRow: View {
                 iconName: "flame.fill",
                 iconColor: Color(hex: "#A8503A"),
                 value: currentStreak,
-                label: "days blooming"
+                label: String(localized: "days blooming")
             )
             StatCard(
                 background: Color(hex: "#A8C5A0"),
                 iconName: "trophy.fill",
                 iconColor: Color(hex: "#5A7A50"),
                 value: longestStreak,
-                label: "personal best"
+                label: String(localized: "personal best")
             )
             StatCard(
                 background: Color(hex: "#A8D4E6"),
                 iconName: "calendar",
                 iconColor: Color(hex: "#3F6F88"),
                 value: totalVisits,
-                label: "total visits"
+                label: String(localized: "total visits")
             )
         }
     }
@@ -303,7 +303,7 @@ private struct CalendarCard: View {
     @Binding var displayedMonth: Date
     let activeDates: Set<String>
 
-    private let dayLabels = ["s", "m", "t", "w", "t", "f", "s"]
+    private let dayLabels = Calendar.current.veryShortWeekdaySymbols.map { $0.lowercased() }
 
     var body: some View {
         ZStack(alignment: .topTrailing) {
@@ -592,7 +592,7 @@ private struct ClosingNote: View {
                 (
                     Text("you showed up ")
                         .foregroundColor(StreakCalendarView.INK)
-                    + Text("\(currentStreak) day\(currentStreak == 1 ? "" : "s") in a row")
+                    + Text(currentStreak == 1 ? String(localized: "\(currentStreak) day in a row") : String(localized: "\(currentStreak) days in a row"))
                         .foregroundColor(StreakCalendarView.PEACH_D)
                         .fontWeight(.semibold)
                     + Text(".")

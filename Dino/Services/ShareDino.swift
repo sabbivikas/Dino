@@ -14,9 +14,9 @@ enum ShareDino {
     // App Store id verified live via itunes lookup (bundleId com.vikassabbi.dino).
     static let appStoreURL = URL(string: "https://apps.apple.com/app/id6763940737")!
 
-    static let shareText = "i've been using dino, a tiny gentle companion for heavy days. thought of you 🦕"
-    static let profileRowTitle = "share dino with someone who needs it 🦕"
-    static let contextualLine = "know someone with heavy days too? dino fits in a pocket 🦕"
+    static let shareText = String(localized: "i've been using dino, a tiny gentle companion for heavy days. thought of you 🦕")
+    static let profileRowTitle = String(localized: "share dino with someone who needs it 🦕")
+    static let contextualLine = String(localized: "know someone with heavy days too? dino fits in a pocket 🦕")
 
     static let contextShownKey = "dino.share.contextShown"
 

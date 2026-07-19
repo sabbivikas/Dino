@@ -21,9 +21,9 @@ enum AccountDeletionError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .requiresReauthentication: return "please sign in again to confirm account deletion."
-        case .noProvider: return "couldn't determine your sign-in method."
-        case .reauthFailed: return "reauthentication failed. please try again."
+        case .requiresReauthentication: return String(localized: "please sign in again to confirm account deletion.")
+        case .noProvider: return String(localized: "couldn't determine your sign-in method.")
+        case .reauthFailed: return String(localized: "reauthentication failed. please try again.")
         }
     }
 }
@@ -115,7 +115,7 @@ class AuthManager: ObservableObject {
 
             guard let tokenData = credential.identityToken,
                   let tokenString = String(data: tokenData, encoding: .utf8) else {
-                errorMessage = "Failed to get Apple identity token"
+                errorMessage = String(localized: "Failed to get Apple identity token")
                 isLoading = false
                 return
             }
@@ -162,7 +162,7 @@ class AuthManager: ObservableObject {
         #endif
 
         guard let app = FirebaseApp.app() else {
-            errorMessage = "Firebase not configured"
+            errorMessage = String(localized: "Firebase not configured")
             isLoading = false
             #if DEBUG
             print("[Auth] ERROR: FirebaseApp not configured")
@@ -171,7 +171,7 @@ class AuthManager: ObservableObject {
         }
 
         guard let clientID = app.options.clientID else {
-            errorMessage = "Missing Google client ID — check GoogleService-Info.plist has CLIENT_ID"
+            errorMessage = String(localized: "Missing Google client ID — check GoogleService-Info.plist has CLIENT_ID")
             isLoading = false
             #if DEBUG
             print("[Auth] ERROR: Firebase clientID missing")
@@ -184,7 +184,7 @@ class AuthManager: ObservableObject {
 
         guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
               let rootViewController = windowScene.windows.first?.rootViewController else {
-            errorMessage = "Cannot find root view controller"
+            errorMessage = String(localized: "Cannot find root view controller")
             isLoading = false
             #if DEBUG
             print("[Auth] ERROR: no root view controller")
@@ -196,7 +196,7 @@ class AuthManager: ObservableObject {
             let result = try await GIDSignIn.sharedInstance.signIn(withPresenting: rootViewController)
 
             guard let idToken = result.user.idToken?.tokenString else {
-                errorMessage = "Failed to get ID token"
+                errorMessage = String(localized: "Failed to get ID token")
                 isLoading = false
                 #if DEBUG
                 print("[Auth] ERROR: no ID token from Google")
@@ -497,7 +497,7 @@ private class AppleSignInCoordinator: NSObject,
         } else {
             continuation.resume(throwing: NSError(
                 domain: "AppleSignIn", code: -1,
-                userInfo: [NSLocalizedDescriptionKey: "Invalid credential type"]
+                userInfo: [NSLocalizedDescriptionKey: String(localized: "Invalid credential type")]
             ))
         }
     }

@@ -47,9 +47,9 @@ private enum WeatherKind {
     }
     var label: String {
         switch self {
-        case .clear:     return "clear"
-        case .clearing:  return "clearing"
-        case .lightRain: return "light rain"
+        case .clear:     return String(localized: "clear")
+        case .clearing:  return String(localized: "clearing")
+        case .lightRain: return String(localized: "light rain")
         }
     }
     var tint: Color {
@@ -68,9 +68,18 @@ private enum WeatherKind {
 
 // MARK: - Weekday names (Calendar: 1 = Sunday … 7 = Saturday)
 
-private let weekdayNames = ["", "sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"]
+private let weekdayNames: [String] = {
+    let df = DateFormatter()
+    df.locale = Locale.current
+    return [""] + df.weekdaySymbols.map { $0.lowercased() }
+}()
+private let weekdayShortNames: [String] = {
+    let df = DateFormatter()
+    df.locale = Locale.current
+    return [""] + df.shortWeekdaySymbols.map { $0.lowercased() }
+}()
 private func weekdayName(_ wd: Int) -> String { weekdayNames.indices.contains(wd) ? weekdayNames[wd] : "" }
-private func weekdayShort(_ wd: Int) -> String { String(weekdayName(wd).prefix(3)) }
+private func weekdayShort(_ wd: Int) -> String { weekdayShortNames.indices.contains(wd) ? weekdayShortNames[wd] : "" }
 
 // MARK: - Root
 
@@ -134,7 +143,7 @@ private struct RhythmsLearningView: View {
             // Progress: N more days + count + bar.
             VStack(alignment: .leading, spacing: 10) {
                 HStack {
-                    Text(remaining == 1 ? "1 more day" : "\(remaining) more days")
+                    Text(remaining == 1 ? String(localized: "1 more day") : String(localized: "\(remaining) more days"))
                         .font(DinoTheme.dinoFont(size: 15)).foregroundColor(RH.ink)
                     Spacer()
                     Text("\(daysAvailable) of \(needed) days gathered")
@@ -259,8 +268,8 @@ private struct RhythmsForecastView: View {
 
                 // 3-day forecast.
                 HStack(spacing: 10) {
-                    ForecastTile(when: "today", weather: todayWeather, accent: nil)
-                    ForecastTile(when: "tomorrow", weather: tomorrowWeather,
+                    ForecastTile(when: String(localized: "today"), weather: todayWeather, accent: nil)
+                    ForecastTile(when: String(localized: "tomorrow"), weather: tomorrowWeather,
                                  accent: analysis.risk.likelyHard ? RH.rain : nil, emphasized: true)
                     ForecastTile(when: weekdayShort(dayAfterWeekday), weather: dayAfterWeather, accent: nil)
                 }
@@ -336,7 +345,7 @@ private struct RhythmsForecastView: View {
             if gap >= 0.3 {
                 let strength = gap >= 1.0 ? 3 : (gap >= 0.5 ? 2 : 1)
                 out.append(InsightVM(symbol: "cloud.rain.fill", color: RH.hard,
-                                     text: "\(weekdayName(hardest))s ask a lot of you", strength: strength,
+                                     text: String(localized: "\(weekdayName(hardest))s ask a lot of you"), strength: strength,
                                      type: "weekday"))
             }
         }
@@ -345,7 +354,7 @@ private struct RhythmsForecastView: View {
         if let pc = analysis.practiceCorrelation, pc.liftRatio >= 1.1 {
             let strength = pc.liftRatio >= 1.8 ? 3 : (pc.liftRatio >= 1.3 ? 2 : 1)
             out.append(InsightVM(symbol: "pencil.and.outline", color: RH.sage,
-                                 text: "journaling lifts you \(ratioText(pc.liftRatio))× the next day",
+                                 text: String(localized: "journaling lifts you \(ratioText(pc.liftRatio))× the next day"),
                                  strength: strength, type: "practice"))
         }
 
@@ -353,9 +362,11 @@ private struct RhythmsForecastView: View {
         if let r = analysis.recoveryTimeDays {
             let days = Int(r.rounded())
             let strength = r <= 2 ? 3 : (r <= 4 ? 2 : 1)
-            let dayWord = days == 1 ? "day" : "days"
+            let text = days == 1
+                ? String(localized: "you bounce back in about \(days) day")
+                : String(localized: "you bounce back in about \(days) days")
             out.append(InsightVM(symbol: "leaf.fill", color: RH.growing,
-                                 text: "you bounce back in about \(days) \(dayWord)", strength: strength,
+                                 text: text, strength: strength,
                                  type: "recovery"))
         }
         return out
@@ -477,7 +488,7 @@ private struct InsightVM {
 private struct InsightCardView: View {
     let vm: InsightVM
     private var strengthLabel: String {
-        vm.strength >= 3 ? "strong pattern" : (vm.strength == 2 ? "a clear lean" : "a gentle hint")
+        vm.strength >= 3 ? String(localized: "strong pattern") : (vm.strength == 2 ? String(localized: "a clear lean") : String(localized: "a gentle hint"))
     }
     var body: some View {
         HStack(spacing: 14) {

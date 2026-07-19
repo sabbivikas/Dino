@@ -20,7 +20,7 @@ struct SettingsView: View {
                 Section {
                     SettingsToggle(
                         icon: "bell.fill",
-                        label: "notifications",
+                        label: String(localized: "notifications"),
                         color: DinoTheme.sageGreen,
                         isOn: $notifManager.notificationsEnabled
                     )
@@ -28,7 +28,7 @@ struct SettingsView: View {
                     if notifManager.notificationsEnabled {
                         SettingsToggle(
                             icon: "sun.max.fill",
-                            label: "daily check-in",
+                            label: String(localized: "daily check-in"),
                             color: DinoTheme.peach,
                             isOn: $notifManager.dailyCheckInEnabled
                         )
@@ -68,7 +68,7 @@ struct SettingsView: View {
 
                         SettingsToggle(
                             icon: "flame.fill",
-                            label: "streak reminders",
+                            label: String(localized: "streak reminders"),
                             color: .orange,
                             isOn: $notifManager.streakReminderEnabled
                         )

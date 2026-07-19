@@ -22,11 +22,11 @@ class AssessmentViewModel: ObservableObject {
     @Published var savedResult: AssessmentResult? = nil
 
     let questions: [AssessmentQuestion] = [
-        AssessmentQuestion(topic: "sleep", question: "how well have you been sleeping?", lowLabel: "poorly", highLabel: "great"),
-        AssessmentQuestion(topic: "energy", question: "how's your energy been?", lowLabel: "very low", highLabel: "high"),
-        AssessmentQuestion(topic: "stress", question: "how stressed have you felt?", lowLabel: "very stressed", highLabel: "very calm"),
-        AssessmentQuestion(topic: "mood", question: "how would you rate your overall mood?", lowLabel: "low", highLabel: "great"),
-        AssessmentQuestion(topic: "connection", question: "how connected have you felt to others?", lowLabel: "isolated", highLabel: "very connected")
+        AssessmentQuestion(topic: "sleep", question: String(localized: "how well have you been sleeping?"), lowLabel: String(localized: "poorly"), highLabel: String(localized: "great")),
+        AssessmentQuestion(topic: "energy", question: String(localized: "how's your energy been?"), lowLabel: String(localized: "very low"), highLabel: String(localized: "high")),
+        AssessmentQuestion(topic: "stress", question: String(localized: "how stressed have you felt?"), lowLabel: String(localized: "very stressed"), highLabel: String(localized: "very calm")),
+        AssessmentQuestion(topic: "mood", question: String(localized: "how would you rate your overall mood?"), lowLabel: String(localized: "low"), highLabel: String(localized: "great")),
+        AssessmentQuestion(topic: "connection", question: String(localized: "how connected have you felt to others?"), lowLabel: String(localized: "isolated"), highLabel: String(localized: "very connected"))
     ]
 
     private let dataManager: SharedDataManager
