@@ -24653,6 +24653,42 @@
       },
       "shouldGenerateSymbol": false
     },
+    "open it": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "open it"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ábrelo"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "あけてみて"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "열어봐요"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "mở ra xem"
+          }
+        }
+      },
+      "shouldGenerateSymbol": false
+    },
     "open journal ✍️": {
       "localizations": {
         "en": {

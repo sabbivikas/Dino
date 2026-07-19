@@ -237,3 +237,14 @@ export function decideSweep(input: SweepInput, rand: () => number = Math.random)
   }
   return { action: "announce", dayKey: todayKey };
 }
+
+// ---------------------------------------------------------------------------
+// F4 — the reveal's poster path (film only). TMDB's search result carries a
+// poster_path like "/abc123.jpg"; anything not exactly that shape is dropped.
+// The payload then either carries a safe path or nothing — the client renders
+// its paper-only card on nothing, never a broken image.
+export function posterPathOrNull(p: unknown): string | null {
+  if (typeof p !== "string") return null;
+  if (!/^\/[A-Za-z0-9._-]{1,95}\.(jpg|png)$/.test(p)) return null;
+  return p;
+}

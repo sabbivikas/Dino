@@ -59,7 +59,11 @@ struct ContentView: View {
                 DinoLiveActivityManager.shared.startRecParcelActivity(
                     deliveryId: "qa-parcel", announcedAt: Date())
             }
-            if ProcessInfo.processInfo.arguments.contains("-recRevealQA") {
+            // F4 reveal QA hooks: -recRevealQA (film + poster),
+            // -recRevealQAPaper (paper-only), -recRevealQAReduceMotion
+            // (forces the fade path). qa- ids use fixtures, write nothing.
+            let revealQAArgs = ["-recRevealQA", "-recRevealQAPaper", "-recRevealQAReduceMotion"]
+            if revealQAArgs.contains(where: ProcessInfo.processInfo.arguments.contains) {
                 // delay past first render — presenting during mount is dropped
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
                     dataManager.recRevealDeepLink = RecRevealLink(deliveryId: "qa-parcel")
@@ -83,9 +87,9 @@ struct ContentView: View {
             get: { dataManager.recRevealDeepLink != nil },
             set: { if !$0 { dataManager.recRevealDeepLink = nil } }
         )) {
-            // F4 replaces this destination — see RecRevealPlaceholderView.
+            // F4 — the reveal: unwrap moment, image-led card, dino presenting.
             // (bool-binding cover — the same proven pattern as the covers above)
-            RecRevealPlaceholderView(
+            RecRevealView(
                 deliveryId: dataManager.recRevealDeepLink?.deliveryId ?? "",
                 onDismiss: { dataManager.recRevealDeepLink = nil })
         }
@@ -138,8 +142,8 @@ struct ContentView: View {
             // whatever tab is active.
             dataManager.showRhythmsLetterFromDeepLink = true
         case "rec-reveal":
-            // Rec delivery F3 — the parcel's door (push tap or live activity
-            // tap). Lands on a minimal placeholder; F4 replaces the view.
+            // Rec delivery F3/F4 — the parcel's door (push tap or live
+            // activity tap) → the full-screen reveal moment.
             if let link = RecRevealLink.from(url: url) {
                 print("[RecReveal] deep link → \(link.deliveryId)")
                 dataManager.recRevealDeepLink = link

@@ -12,7 +12,7 @@ import { route as aiRoute, routeChain as aiRouteChain, logRoute as aiLogRoute, c
 import { validateGiftWithReason, trustedSourcesFor, EXPEDITION_SIGNAL_ALLOW, buildLunaUserPrompt } from "./mission";
 import { capSources, shouldRun, monthKey, creditSummary, REC_MAX_SOURCES_PER_RUN, REC_MIN_RUN_INTERVAL_DAYS } from "./credits";
 import { WORLD_PRIVACY_FLOOR, normalizeCountry, foldPulseCountry } from "./world";
-import { computeDeliverAfter, decideSweep, daypartFor, isValidTz, SWEEP_BATCH_LIMIT } from "./recDelivery";
+import { computeDeliverAfter, decideSweep, daypartFor, isValidTz, SWEEP_BATCH_LIMIT, posterPathOrNull } from "./recDelivery";
 import { buildRecAnnouncementMessage, isPlausiblePushToken, REC_PUSH_TOKENS_COLLECTION } from "./recAnnounce";
 
 admin.initializeApp();
@@ -2119,7 +2119,7 @@ const COMFORT_REC_FEELS = ["cozy", "hopeful", "quiet"];
 // throws — any failure returns null and the rec ships exactly as before.
 async function tmdbWatchInfo(
   title: string, year: number, country: string, token: string
-): Promise<{ provider: string; link: string } | null> {
+): Promise<{ provider: string; link: string; posterPath: string } | null> {
   try {
     // v4 read access tokens are JWTs (bearer header); a 32 char hex value
     // is a v3 api key (query param). accept either shape.
@@ -2134,22 +2134,25 @@ async function tmdbWatchInfo(
     if (!search.ok) return null;
     const movie = ((await search.json() as any)?.results ?? [])[0];
     if (!movie?.id) return null;
+    // F4 — the reveal's image-led card: the same search result carries the
+    // poster path. Validated to exactly tmdb's shape or dropped.
+    const posterPath = posterPathOrNull(movie.poster_path) ?? "";
     const prov = await fetch(
       `https://api.themoviedb.org/3/movie/${movie.id}/watch/providers?a=1${keyParam}`,
       { headers, signal: AbortSignal.timeout(4000) }
     );
-    if (!prov.ok) return null;
+    if (!prov.ok) return posterPath ? { provider: "", link: "", posterPath } : null;
     const region = ((await prov.json() as any)?.results ?? {})[country];
-    if (!region) return null;
+    if (!region) return posterPath ? { provider: "", link: "", posterPath } : null;
     const link = typeof region.link === "string" && region.link.startsWith("https://www.themoviedb.org/")
       ? region.link : "";
     const freeToThem = [...(region.flatrate ?? []), ...(region.free ?? []), ...(region.ads ?? [])];
     const name = freeToThem[0]?.provider_name;
     if (name && link) {
-      return { provider: String(name).toLowerCase().replace(/[–—-]/g, " ").slice(0, 40).trim(), link };
+      return { provider: String(name).toLowerCase().replace(/[–—-]/g, " ").slice(0, 40).trim(), link, posterPath };
     }
-    if (link) return { provider: "", link };   // rent only / no free tier → neutral watch page
-    return null;
+    if (link) return { provider: "", link, posterPath };   // rent only / no free tier → neutral watch page
+    return posterPath ? { provider: "", link: "", posterPath } : null;
   } catch {
     return null;   // timeout, network, parse — never break the rec
   }
@@ -2323,8 +2326,12 @@ export const generateComfortRecs = onCall(
       if (film && userCountry) {
         const w = await tmdbWatchInfo(film.title, film.year, userCountry, TMDB_API_TOKEN.value());
         if (w) {
-          film.watchProvider = w.provider;
-          film.watchLink = w.link;
+          if (w.link) {
+            film.watchProvider = w.provider;
+            film.watchLink = w.link;
+          }
+          // F4: the reveal's poster (payload-only — never returned at hold time)
+          if (w.posterPath) film.posterPath = w.posterPath;
         }
       }
       // F2 — THE HOLD (rec delivery arc). The recs are stored, never

@@ -35,6 +35,10 @@ struct RichRec: Codable, Equatable {
     // tmdb watch page. both optional — old cached recs decode unchanged.
     var watchProvider: String? = nil
     var watchLink: String? = nil
+    // films only (rec delivery F4): tmdb poster path ("/abc.jpg") for the
+    // reveal's image-led card. optional — old cached recs decode unchanged;
+    // absent = the paper-only card, never a broken image.
+    var posterPath: String? = nil
 }
 
 /// A plain search link — no APIs, no tracking, just where to look.
@@ -59,6 +63,10 @@ enum ComfortRecVoice {
     // feature 2: the one time ask, then dino remembers their place
     static let askWhich = String(localized: "listen on apple music or spotify?")
     static let orPrefix = String(localized: "or")
+    // rec delivery F4: the reveal's open button — routes through the same
+    // open flow the shelf uses (reopenLink). the share label reuses the
+    // existing "share" catalog key; this is F4's only new string.
+    static let openIt = String(localized: "open it")
     // films: free to them, or the neutral every option page
     static let watchOnPrefix = String(localized: "watch on")
     static let whereToWatch = String(localized: "see where to watch")
@@ -118,7 +126,7 @@ enum ComfortRecVoice {
 
     static var allFixedStrings: [String] {
         [whyLabel, feelPrefix, lengthPrefix, openAppleMusic, openSpotify,
-         openBooks, openTV, fallbackWhy, fallbackLength, askWhich, orPrefix,
+         openBooks, openTV, fallbackWhy, fallbackLength, askWhich, orPrefix, openIt,
          shelfTitle, shelfEmpty, shelfEmptySub, shelfRowLine(3),
          shelfBroughtLine(1), shelfFilterEverything, shelfFilterKept,
          shelfKeepThis, shelfEmptyRest,
@@ -173,6 +181,11 @@ enum ComfortRecSanitizer {
         let provider = voiceLine((dict["watchProvider"] as? String) ?? "", cap: 40)
         let rawLink = (dict["watchLink"] as? String) ?? ""
         let watchLink = rawLink.hasPrefix("https://www.themoviedb.org/") ? rawLink : ""
+        // poster path (rec delivery F4, film only) — exactly tmdb's shape or
+        // dropped; a dropped poster is the paper-only card, never broken.
+        let rawPoster = (dict["posterPath"] as? String) ?? ""
+        let posterOK = rawPoster.range(of: "^/[A-Za-z0-9._-]{1,95}\\.(jpg|png)$",
+                                       options: .regularExpression) != nil
         return RichRec(
             type: type,
             title: String(rawTitle.lowercased().trimmingCharacters(in: .whitespacesAndNewlines).prefix(80)),
@@ -183,7 +196,8 @@ enum ComfortRecSanitizer {
             feel: ComfortRecVoice.allowedFeels.contains(feelRaw) ? feelRaw : "quiet",
             length: length.isEmpty ? ComfortRecVoice.fallbackLength : length,
             watchProvider: (type == "film" && !provider.isEmpty && !watchLink.isEmpty) ? provider : nil,
-            watchLink: (type == "film" && !watchLink.isEmpty) ? watchLink : nil)
+            watchLink: (type == "film" && !watchLink.isEmpty) ? watchLink : nil,
+            posterPath: (type == "film" && posterOK) ? rawPoster : nil)
     }
 }
 
@@ -533,6 +547,33 @@ extension RichRecStore {
 }
 
 extension RichRec {
+    /// -recRevealQA fixture — the film case (real totoro poster path so the
+    /// image-led card renders on sim; a network miss falls back to paper).
+    static let qaFilmSample = RichRec(
+        type: "film",
+        title: "my neighbor totoro",
+        creator: "hayao miyazaki",
+        year: 1988,
+        why: "a soft green world where nothing bad happens and the rain is a friend",
+        flags: ["not graphic", "a soft one"],
+        feel: "hopeful",
+        length: "about 86 minutes",
+        watchProvider: "max",
+        watchLink: "https://www.themoviedb.org/movie/8392/watch",
+        posterPath: "/rtGDOeG9LzoerkDGZF9dnVeLppL.jpg")
+
+    /// -recRevealQAPaper fixture — a film WITHOUT a poster path: the
+    /// deterministic paper-only card (zero network, the honest fallback).
+    static let qaPaperOnlySample = RichRec(
+        type: "film",
+        title: "the straight story",
+        creator: "david lynch",
+        year: 1999,
+        why: "slow roads and small kindnesses, the gentlest film he ever made",
+        flags: ["gentle pacing", "some bittersweet moments"],
+        feel: "quiet",
+        length: "about 2 hours")
+
     /// -richRecQA sample — screenshot verification only, never ships a path.
     static let qaSample = RichRec(
         type: "music",

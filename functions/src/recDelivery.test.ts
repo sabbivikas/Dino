@@ -6,8 +6,27 @@ import {
   isValidTz, localDayKey, isQuietHours, localTimeToUtcMs,
   pushOutOfQuietHours, nextDayFirstSlot, applyDailyCap,
   holdDelayMinutes, rescheduleDelayMinutes, computeDeliverAfter,
-  isSessionActive, daypartFor, decideSweep,
+  isSessionActive, daypartFor, decideSweep, posterPathOrNull,
 } from "./recDelivery";
+
+// --- F4: the reveal's poster path gate --------------------------------------
+
+test("posterPathOrNull accepts exactly tmdb's poster shape", () => {
+  assert.equal(posterPathOrNull("/rtGDOeG9LzoerkDGZF9dnVeLppL.jpg"), "/rtGDOeG9LzoerkDGZF9dnVeLppL.jpg");
+  assert.equal(posterPathOrNull("/a_b-c.9.png"), "/a_b-c.9.png");
+});
+
+test("posterPathOrNull drops anything else (never a broken image)", () => {
+  assert.equal(posterPathOrNull(undefined), null);
+  assert.equal(posterPathOrNull(42), null);
+  assert.equal(posterPathOrNull(""), null);
+  assert.equal(posterPathOrNull("no-leading-slash.jpg"), null);
+  assert.equal(posterPathOrNull("/nested/path.jpg"), null);
+  assert.equal(posterPathOrNull("https://evil.example/x.jpg"), null);
+  assert.equal(posterPathOrNull("/query.jpg?x=1"), null);
+  assert.equal(posterPathOrNull("/noextension"), null);
+  assert.equal(posterPathOrNull("/" + "a".repeat(120) + ".jpg"), null);
+});
 
 // QUIET HOURS ARE SACRED (owner rubric): every boundary below is asserted
 // to the minute, in the USER'S zone, across the overnight wrap and DST.

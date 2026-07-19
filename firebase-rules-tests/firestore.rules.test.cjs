@@ -121,6 +121,66 @@ describe("firestore.rules", () => {
     });
   });
 
+  // rec delivery arc F4 — the reveal's one client write: announced → opened
+  // (+ server-stamped openedAt), owner only, nothing else may move.
+  describe("recDeliveries opened flip (F4)", () => {
+    const { updateDoc } = require("firebase/firestore");
+    const meta = () => ({
+      deliverAfter: Timestamp.now(), createdAt: Timestamp.now(),
+      daypart: "afternoon", tz: "America/New_York", attempts: 0,
+    });
+
+    beforeEach(async () => {
+      await testEnv.withSecurityRulesDisabled(async (ctx) => {
+        const db = ctx.firestore();
+        await setDoc(doc(db, "recDeliveries", "userA", "deliveries", "flip1"),
+          { ...meta(), status: "announced" });
+        await setDoc(doc(db, "recDeliveries", "userA", "deliveries", "heldF"),
+          { ...meta(), status: "held" });
+      });
+    });
+
+    it("allows the owner's announced → opened flip with a server-stamped openedAt", async () => {
+      const alice = testEnv.authenticatedContext("userA").firestore();
+      await assertSucceeds(updateDoc(doc(alice, "recDeliveries", "userA", "deliveries", "flip1"),
+        { status: "opened", openedAt: serverTimestamp() }));
+    });
+
+    it("denies opening a held delivery (no peeking past the hold)", async () => {
+      const alice = testEnv.authenticatedContext("userA").firestore();
+      await assertFails(updateDoc(doc(alice, "recDeliveries", "userA", "deliveries", "heldF"),
+        { status: "opened", openedAt: serverTimestamp() }));
+    });
+
+    it("denies any status other than opened", async () => {
+      const alice = testEnv.authenticatedContext("userA").firestore();
+      await assertFails(updateDoc(doc(alice, "recDeliveries", "userA", "deliveries", "flip1"),
+        { status: "expired", openedAt: serverTimestamp() }));
+      await assertFails(updateDoc(doc(alice, "recDeliveries", "userA", "deliveries", "flip1"),
+        { status: "held", openedAt: serverTimestamp() }));
+    });
+
+    it("denies touching any other field alongside the flip", async () => {
+      const alice = testEnv.authenticatedContext("userA").firestore();
+      await assertFails(updateDoc(doc(alice, "recDeliveries", "userA", "deliveries", "flip1"),
+        { status: "opened", openedAt: serverTimestamp(), attempts: 99 }));
+      await assertFails(updateDoc(doc(alice, "recDeliveries", "userA", "deliveries", "flip1"),
+        { status: "opened", openedAt: serverTimestamp(), deliverAfter: Timestamp.now() }));
+    });
+
+    it("denies a client-chosen openedAt", async () => {
+      const alice = testEnv.authenticatedContext("userA").firestore();
+      await assertFails(updateDoc(doc(alice, "recDeliveries", "userA", "deliveries", "flip1"),
+        { status: "opened", openedAt: Timestamp.fromMillis(1000) }));
+    });
+
+    it("denies another user flipping someone else's delivery", async () => {
+      const bob = testEnv.authenticatedContext("userB").firestore();
+      await assertFails(updateDoc(doc(bob, "recDeliveries", "userA", "deliveries", "flip1"),
+        { status: "opened", openedAt: serverTimestamp() }));
+    });
+  });
+
   // rec delivery arc F2 — presence heartbeat: strict two-field shape,
   // server-stamped time, owner-write-only, nobody reads it back.
   describe("presence (F2)", () => {

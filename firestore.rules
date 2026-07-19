@@ -147,7 +147,16 @@ service cloud.firestore {
       match /deliveries/{deliveryId} {
         allow read: if request.auth != null && request.auth.uid == uid
           && resource.data.status != 'held';
-        allow write: if false;
+        // F4 — the reveal's single client write: exactly the announced →
+        // opened flip plus a server-stamped openedAt. Nothing else on the
+        // doc may move, no other transition exists for a client, and only
+        // the owner may make it. Everything else stays server-authored.
+        allow update: if request.auth != null && request.auth.uid == uid
+          && resource.data.status == 'announced'
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'openedAt'])
+          && request.resource.data.status == 'opened'
+          && request.resource.data.openedAt == request.time;
+        allow create, delete: if false;
       }
       match /payloads/{deliveryId} {
         allow read: if request.auth != null && request.auth.uid == uid
