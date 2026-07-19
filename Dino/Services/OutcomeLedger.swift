@@ -35,6 +35,25 @@ enum OutcomeLedger {
     static let moods = ["clear", "partlyCloudy", "overwhelmed", "drained", "none"]
     static let dayparts = ["morning", "afternoon", "evening", "night"]
 
+    // MARK: announcement (knock timing) — rec delivery arc F6
+    // The announcement lifecycle is a knock: shown → opened | ignored, each
+    // stamped with the daypart it landed in, so a future distiller can learn
+    // WHICH daypart earns opens vs ignores. SHOWN (at announce) and IGNORED
+    // (at 72h expiry) are written SERVER-side — the client can never create
+    // one, which is why 'announcement' is deliberately NOT in `kinds` (that
+    // list mirrors the rules' client-create allowlist, ['rec','gift']). The
+    // client's ONLY reach is flipping an existing knock to 'opened' at the
+    // reveal, keyed by a deterministic id so push-tap / live-activity /
+    // shelf-catch reveals of the same delivery collapse to one open.
+    static let announcementKind = "announcement"
+    static let announcementItemType = "parcel"          // the knock, not its contents
+    static let announcementActions = ["shown", "opened", "ignored"]
+    static let announcementIdPrefix = "ann_"
+
+    static func announcementOutcomeId(deliveryId: String) -> String {
+        announcementIdPrefix + deliveryId
+    }
+
     static let retentionDays = 365
     static let followupHours = 48
     static let followupBatchLimit = 20
@@ -134,6 +153,19 @@ enum OutcomeLedger {
             "action": action,
             "actionAt": FieldValue.serverTimestamp(),
         ]) { _ in }
+    }
+
+    /// The announcement was OPENED — the user revealed the parcel (rec
+    /// delivery arc F6). Flips the server-authored knock outcome in place,
+    /// keyed by a deterministic id so the open dedupes across every reveal
+    /// path and never double-counts against F4's SEPARATE rec-outcome (the
+    /// knock and the rec are two different events). Enum-only; fire-and-forget.
+    static func recordAnnouncementOpened(deliveryId: String) {
+        guard let uid = Auth.auth().currentUser?.uid else { return }
+        entriesRef(uid: uid).document(announcementOutcomeId(deliveryId: deliveryId)).updateData([
+            "action": "opened",
+            "actionAt": FieldValue.serverTimestamp(),
+        ]) { _ in }   // silent — never a user-visible error
     }
 
     /// Late keep from the shelf (F4) — the shelf entry carries its ledger id.

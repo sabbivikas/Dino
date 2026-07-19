@@ -9,6 +9,15 @@
 export const PREF_REC_TYPES = ["music", "book", "film"];
 export const PREF_GIFT_NEEDS = ["rest", "beauty", "hope", "wonder", "connection"];
 export const PREF_DAYPARTS = ["morning", "afternoon", "evening", "night", "unknown"];
+// F6 (rec delivery) distiller-facing note — NO behavior change here. The
+// ledger now also carries KNOCK-TIMING signals: kind:"announcement" entries
+// (itemType:"parcel", action ∈ shown|opened|ignored) each stamped with the
+// daypart the knock landed in. A future distiller can group those by daypart
+// to learn which knock time earns opens vs ignores — refining bestDaypart
+// from the announcement lifecycle specifically (today bestDaypart is derived
+// across ALL entries). buildDistillerInput already serializes them as ordinary
+// enum tuples (announcement|parcel|none|<daypart>|<action>|unknown); the
+// consumer that acts on them is a separate task.
 export const PREF_FATIGUE = ["none", "mild", "high"];
 export const PREF_MIN_OUTCOMES = 8;      // enough signal to say anything real
 export const PREF_MAX_ENTRIES = 200;     // ledger retention cap (prune target)

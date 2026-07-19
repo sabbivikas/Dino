@@ -31,6 +31,7 @@ export const SESSION_ACTIVE_WINDOW_MS = 3 * 60 * 1000;
 export const RESCHEDULE_MIN_MINUTES = 15;
 export const RESCHEDULE_MAX_MINUTES = 30;
 export const HELD_EXPIRY_MS = 72 * 3600 * 1000;    // a rec 3 days stale is a new day's problem
+export const ANNOUNCED_EXPIRY_MS = 72 * 3600 * 1000; // an announced knock unanswered 3 days retires
 export const SWEEP_BATCH_LIMIT = 200;
 
 export const DELIVERY_STATUSES = ["held", "announced", "opened", "expired"] as const;
@@ -166,6 +167,21 @@ export function computeDeliverAfter(
   const jitter = jitterMinutes(rand);
   const daylit = pushOutOfQuietHours(held, tz, jitter);
   return applyDailyCap(daylit, tz, blockedDayKeys, jitter);
+}
+
+/**
+ * F6 — the IGNORED knock-timing signal. An announcement the user never
+ * opened, stale past 72h (measured from announcedAt, the moment the knock
+ * landed), retires: the delivery flips announced → expired and its
+ * announcement outcome flips shown → ignored ("the knock went unanswered").
+ * Only announced docs qualify — a never-announced held expiry was never a
+ * knock, so it emits no ignored signal.
+ */
+export function shouldExpireAnnounced(
+  status: string, announcedAtMs: number | null, nowMs: number
+): boolean {
+  return status === "announced" && announcedAtMs !== null
+    && nowMs - announcedAtMs >= ANNOUNCED_EXPIRY_MS;
 }
 
 /** Active = a heartbeat within the last 3 min (a future stamp counts too). */

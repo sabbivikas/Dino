@@ -328,6 +328,13 @@ struct RecRevealView: View {
         // F5 — remember this delivery as opened on-device so the shelf catch
         // drops its wrapped parcel at once (the markOpened flip is async).
         RichRecStore.markDeliveryOpened(deliveryId)
+        // F6 — the knock's OPENED signal. Rides this same single-fire path
+        // (didRecord gate) so it records exactly once, and the deterministic
+        // id makes re-reveals idempotent. Distinct from the rec-outcome below:
+        // the knock (was it answered, in which daypart) is a different event
+        // from the rec (what was brought). Dedupes with the delivery status
+        // flip that markOpened just performed.
+        OutcomeLedger.recordAnnouncementOpened(deliveryId: deliveryId)
         // exactly the old presentRichRec flow: scarcity clock, ledger 'shown',
         // the shelf keepsake (one event, two faces), analytics
         GentleRecStore.recordShown()

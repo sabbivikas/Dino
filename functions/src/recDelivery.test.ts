@@ -7,7 +7,26 @@ import {
   pushOutOfQuietHours, nextDayFirstSlot, applyDailyCap,
   holdDelayMinutes, rescheduleDelayMinutes, computeDeliverAfter,
   isSessionActive, daypartFor, decideSweep, posterPathOrNull,
+  shouldExpireAnnounced, ANNOUNCED_EXPIRY_MS,
 } from "./recDelivery";
+
+// --- F6: the announced-expiry (IGNORED knock) gate --------------------------
+
+test("shouldExpireAnnounced fires only on announced docs stale past 72h", () => {
+  const now = 1_000_000_000_000;
+  const announced = now - ANNOUNCED_EXPIRY_MS;          // exactly 72h old
+  assert.equal(shouldExpireAnnounced("announced", announced, now), true);
+  assert.equal(shouldExpireAnnounced("announced", announced - 1, now), true);
+  // not yet stale
+  assert.equal(shouldExpireAnnounced("announced", now - 3600_000, now), false);
+  assert.equal(shouldExpireAnnounced("announced", now, now), false);
+  // a never-announced held expiry is NOT a knock — no ignored signal
+  assert.equal(shouldExpireAnnounced("held", announced, now), false);
+  assert.equal(shouldExpireAnnounced("opened", announced, now), false);
+  assert.equal(shouldExpireAnnounced("expired", announced, now), false);
+  // missing announcedAt (shouldn't happen, but never crash) → no expire
+  assert.equal(shouldExpireAnnounced("announced", null, now), false);
+});
 
 // --- F4: the reveal's poster path gate --------------------------------------
 

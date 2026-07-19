@@ -12,8 +12,9 @@ import { route as aiRoute, routeChain as aiRouteChain, logRoute as aiLogRoute, c
 import { validateGiftWithReason, trustedSourcesFor, EXPEDITION_SIGNAL_ALLOW, buildLunaUserPrompt } from "./mission";
 import { capSources, shouldRun, monthKey, creditSummary, REC_MAX_SOURCES_PER_RUN, REC_MIN_RUN_INTERVAL_DAYS } from "./credits";
 import { WORLD_PRIVACY_FLOOR, normalizeCountry, foldPulseCountry } from "./world";
-import { computeDeliverAfter, decideSweep, daypartFor, isValidTz, SWEEP_BATCH_LIMIT, posterPathOrNull } from "./recDelivery";
+import { computeDeliverAfter, decideSweep, daypartFor, isValidTz, SWEEP_BATCH_LIMIT, posterPathOrNull, shouldExpireAnnounced, ANNOUNCED_EXPIRY_MS } from "./recDelivery";
 import { buildRecAnnouncementMessage, isPlausiblePushToken, REC_PUSH_TOKENS_COLLECTION } from "./recAnnounce";
+import { buildAnnouncementOutcome, announcementOutcomeId, isOutcomeDaypart, OUTCOME_RETENTION_DAYS } from "./outcomes";
 
 admin.initializeApp();
 
@@ -2481,6 +2482,22 @@ export const recDeliverySweep = onSchedule(
               announcedAt: admin.firestore.FieldValue.serverTimestamp(),
             });
             tx.set(parentRef, { lastAnnouncedDayKey: decision.dayKey }, { merge: true });
+            // F6 — the knock's SHOWN signal: enum-only, server-authored (so
+            // 'shown' is un-forgeable — the client can never CREATE one), keyed
+            // by ann_<deliveryId> so the reveal's OPENED flip and the expiry's
+            // IGNORED flip both land on this one doc. daypart is the moment the
+            // knock actually lands. Atomic with the announce in this same tx.
+            const annBody = buildAnnouncementOutcome("shown", daypartFor(Date.now(), tz));
+            if (annBody) {
+              const annRef = db.collection("outcomes").doc(uid)
+                .collection("entries").doc(announcementOutcomeId(docSnap.id));
+              tx.set(annRef, {
+                ...annBody,
+                shownAt: admin.firestore.FieldValue.serverTimestamp(),
+                expiresAt: admin.firestore.Timestamp.fromMillis(
+                  Date.now() + OUTCOME_RETENTION_DAYS * 86400 * 1000),
+              });
+            }
           }
           return decision.action;
         });
@@ -2493,9 +2510,75 @@ export const recDeliverySweep = onSchedule(
         functions.logger.warn(`recDeliverySweep: uid=${uid} delivery=${docSnap.id} failed: ${err}`);
       }
     }
+
+    // F6 — second pass: the IGNORED knock-timing signal. Announced deliveries
+    // the user never opened, stale past 72h, retire to 'expired' and their
+    // announcement outcome flips shown → ignored ("the knock went unanswered").
+    // Server-authored + enum-only, same as SHOWN. The tx re-reads status, so a
+    // delivery opened in the meantime (status 'opened') is skipped — the state
+    // machine is shown → opened OR shown → ignored, never both.
+    const ignoredCutoff = admin.firestore.Timestamp.fromMillis(Date.now() - ANNOUNCED_EXPIRY_MS);
+    const staleAnnounced = await db.collectionGroup("deliveries")
+      .where("status", "==", "announced")
+      .where("announcedAt", "<=", ignoredCutoff)
+      .limit(SWEEP_BATCH_LIMIT)
+      .get();
+    let ignoredCount = 0;
+    for (const docSnap of staleAnnounced.docs) {
+      const uid = docSnap.ref.parent.parent?.id;
+      if (!uid) continue;
+      try {
+        await db.runTransaction(async (tx) => {
+          const fresh = await tx.get(docSnap.ref);
+          const d = fresh.data();
+          if (!d) return;
+          const announcedAtMs = d.announcedAt instanceof admin.firestore.Timestamp
+            ? d.announcedAt.toMillis() : null;
+          if (!shouldExpireAnnounced(String(d.status ?? ""), announcedAtMs, Date.now())) return;
+          const annRef = db.collection("outcomes").doc(uid)
+            .collection("entries").doc(announcementOutcomeId(docSnap.id));
+          const annSnap = await tx.get(annRef);   // all reads BEFORE any write
+          tx.update(docSnap.ref, { status: "expired" });
+          if (annSnap.exists) {
+            // If the knock was already OPENED (the client flips the outcome
+            // even when the delivery status flip lags before its rule deploys),
+            // it was answered — retire the doc but KEEP 'opened', never clobber
+            // it to ignored. Otherwise flip shown → ignored, preserving the
+            // SHOWN doc's daypart.
+            if (annSnap.data()?.action !== "opened") {
+              tx.update(annRef, {
+                action: "ignored",
+                actionAt: admin.firestore.FieldValue.serverTimestamp(),
+              });
+            }
+          } else {
+            // legacy: announced before F6 shipped the SHOWN write — reconstruct
+            // the enum-only doc from the delivery's stored daypart
+            const tz = isValidTz(d.tz) ? d.tz : "Etc/UTC";
+            const daypart = isOutcomeDaypart(d.daypart)
+              ? d.daypart : daypartFor(announcedAtMs ?? Date.now(), tz);
+            const body = buildAnnouncementOutcome("ignored", daypart);
+            if (body) {
+              tx.set(annRef, {
+                ...body,
+                shownAt: admin.firestore.FieldValue.serverTimestamp(),
+                actionAt: admin.firestore.FieldValue.serverTimestamp(),
+                expiresAt: admin.firestore.Timestamp.fromMillis(
+                  Date.now() + OUTCOME_RETENTION_DAYS * 86400 * 1000),
+              });
+            }
+          }
+        });
+        ignoredCount += 1;
+      } catch (err) {
+        functions.logger.warn(
+          `recDeliverySweep(ignored): uid=${uid} delivery=${docSnap.id} failed: ${err}`);
+      }
+    }
+
     functions.logger.info(
       `recDeliverySweep: due=${due.docs.length} announced=${announcedCount} ` +
-      `rescheduled=${rescheduledCount} expired=${expiredCount}`);
+      `rescheduled=${rescheduledCount} expired=${expiredCount} ignored=${ignoredCount}`);
   }
 );
 

@@ -258,4 +258,54 @@ describe("firestore.rules", () => {
       await assertSucceeds(deleteDoc(doc(alice, "pushTokens", "userA")));
     });
   });
+
+  // rec delivery arc F6 — announcement (knock-timing) outcomes. The three
+  // signals are ENUM-ONLY. SHOWN (announce) and IGNORED (72h expiry) are
+  // server-authored via the admin SDK (rules-exempt); the client's ONLY reach
+  // is flipping an EXISTING knock to 'opened' at the reveal. It can never
+  // CREATE an announcement outcome — the outcomes create allowlist is
+  // rec/gift — so 'shown' is un-forgeable. (These lock the existing rules;
+  // F6 changes no rule.)
+  describe("outcomes — announcement (F6)", () => {
+    const { updateDoc } = require("firebase/firestore");
+    beforeEach(async () => {
+      await testEnv.withSecurityRulesDisabled(async (ctx) => {
+        const db = ctx.firestore();
+        await setDoc(doc(db, "outcomes", "userA", "entries", "ann_d1"), {
+          kind: "announcement", itemType: "parcel", moodContext: "none",
+          daypart: "evening", action: "shown", needsFollowup: false,
+          shownAt: Timestamp.now(),
+          expiresAt: Timestamp.fromMillis(Date.now() + 365 * 86400000),
+        });
+      });
+    });
+
+    it("allows the owner flipping a knock to opened (the reveal)", async () => {
+      const alice = testEnv.authenticatedContext("userA").firestore();
+      await assertSucceeds(updateDoc(doc(alice, "outcomes", "userA", "entries", "ann_d1"),
+        { action: "opened", actionAt: serverTimestamp() }));
+    });
+
+    it("denies a client CREATING an announcement outcome (shown is server-only)", async () => {
+      const alice = testEnv.authenticatedContext("userA").firestore();
+      await assertFails(setDoc(doc(alice, "outcomes", "userA", "entries", "ann_forge"), {
+        kind: "announcement", itemType: "parcel", moodContext: "none",
+        daypart: "evening", action: "shown", needsFollowup: true,
+        shownAt: serverTimestamp(),
+        expiresAt: Timestamp.fromMillis(Date.now() + 365 * 86400000),
+      }));
+    });
+
+    it("denies touching extra fields alongside the opened flip", async () => {
+      const alice = testEnv.authenticatedContext("userA").firestore();
+      await assertFails(updateDoc(doc(alice, "outcomes", "userA", "entries", "ann_d1"),
+        { action: "opened", actionAt: serverTimestamp(), daypart: "morning" }));
+    });
+
+    it("denies another user flipping someone else's knock", async () => {
+      const bob = testEnv.authenticatedContext("userB").firestore();
+      await assertFails(updateDoc(doc(bob, "outcomes", "userA", "entries", "ann_d1"),
+        { action: "opened", actionAt: serverTimestamp() }));
+    });
+  });
 });
