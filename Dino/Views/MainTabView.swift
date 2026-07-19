@@ -10,11 +10,10 @@ struct MainTabView: View {
     @ObservedObject private var themeManager = ThemeManager.shared
     @StateObject private var updateService = AppUpdateService.shared
     #if DEBUG
-    // QA runs land on the mood tab directly (screenshot verification only)
+    // QA runs land on the tab hosting the state (screenshot verification
+    // only) — the shelf lives on the profile tab now (rec delivery F1).
     @State private var selectedTab: Int =
-        ProcessInfo.processInfo.arguments.contains(where: {
-            $0.hasPrefix("-richRecQA") || $0.hasPrefix("-expeditionQA") || $0.hasPrefix("-giftReaderQA")
-        }) ? 2 : 0
+        ProcessInfo.processInfo.arguments.contains("-richRecQA3") ? 4 : 0
     #else
     @State private var selectedTab: Int = 0
     #endif

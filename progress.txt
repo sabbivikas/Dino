@@ -80,7 +80,7 @@ HARD LIMITS: never touch main or push anywhere; no App Store/TestFlight/producti
 
 TASK LIST:
 [DONE] convergence — integration/convergence built: main + feature/localization (fast-forward, 0 conflicts) + feature/agent-memory (4 conflicts resolved per resolution law). build green, DinoTests 385/385, functions 51/51, crisis hash verified ba2ebd56…, catalogs 1324/128/12/9/1 keys 0 gaps. see CONVERGENCE-NOTES.md.
-[TODO] F1 shelf-under-profile
+[DONE] F1 shelf-under-profile — the little shelf moved to a profile row ("your journey", reuses shelfTitle/shelfEmptySub keys — zero new strings); mood screen is pure check-in (shelf chip + rich rec card + comfort slip + expedition card + fetch plumbing removed; generation + ExpeditionSignals sync untouched; support surfaces stay). -richRecQA3 → profile; dead mood QA hooks removed; KoreanWalk test05 updated; F1RecDeliveryUITests added. build green, DinoTests 385/385, 4 QA screenshots + f1-verdict.md in scratchpad rec-delivery-QA/. crisis hash ba2ebd56… intact.
 [TODO] F2 delayed delivery server
 [TODO] F3 announcement (push + live activity)
 [TODO] F4 reveal screen

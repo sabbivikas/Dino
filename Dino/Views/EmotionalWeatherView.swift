@@ -32,23 +32,11 @@ struct EmotionalWeatherView: View {
     @State private var showLanternCompose = false
     @State private var ceremonyLantern: ReceivedLantern?
     @State private var showJarLine = false
-    // Gentle recommendation: ONE real thing, one warm line, only when the
-    // moment engine says so (see GentleRecEngine — scarcity is the feature).
-    @State private var pendingRec: GentleRec?
-    @State private var shownRec: GentleRec?
-    @State private var recWasTapped = false
-    // Rich rec (2.1): the personalized pick; the classic pool above is the
-    // silent fallback. Only one of the two ever shows.
-    @State private var pendingRichRec: RichRec?
-    @State private var shownRichRec: RichRec?
-    // Rec keepsakes (2.1 feature 3): the little shelf, shown only when
-    // something rests on it.
-    @State private var showRecShelf = false
-    @State private var keepsakeCount = 0
-    // Expedition gift (agentic v1 F3): the dove waits here, never a push.
-    @State private var expeditionGift: ExpeditionGift?
-    // Read inside dino: the gift's source in an in app reader sheet.
-    @State private var expeditionReaderLink: ReaderLink?
+    // Rec delivery F1: the mood screen is pure check-in — mood, weather,
+    // dino's response. Every rec display surface (comfort slip, rich rec
+    // card, expedition card, the little shelf chip) moved off this screen;
+    // the shelf lives on profile now. Generation is untouched — delivery
+    // returns elsewhere in a later task.
     // Tiered support: quiet glyph always; the row only on a heavy stretch
     // (StretchSignal). Support beats the gentle rec when both are eligible.
     @State private var showResources = false
@@ -202,22 +190,10 @@ struct EmotionalWeatherView: View {
                             if let line = WorldMoodService.worldMomentLine(mood: w, bucket: worldBucket ?? WorldMoodService.cachedTodayBucket) {
                                 worldMomentPending = (line, w)
                             }
-                            // Support row on a heavy stretch — it takes the
-                            // slot; the gentle rec stays quiet that day.
+                            // Support row on a heavy stretch — never a
+                            // single tired tuesday (StretchSignal).
                             if stretchSignalFires() {
                                 pendingSupportRow = true
-                            } else {
-                                // And — rarely — a gentle recommendation for
-                                // after the break card. Gates run locally first.
-                                Task {
-                                    if let rich = await ComfortRecCoordinator.fetchIfMomentIsRight(
-                                        dataManager: dataManager, freshHeavyMood: w) {
-                                        pendingRichRec = rich
-                                    } else {
-                                        pendingRec = await GentleRecCoordinator.fetchIfMomentIsRight(
-                                            dataManager: dataManager, freshHeavyMood: w)
-                                    }
-                                }
                             }
                             // The ceremony is the headliner when a lantern is
                             // available: claim races a short window; nil or
@@ -392,71 +368,6 @@ struct EmotionalWeatherView: View {
                         .transition(.opacity)
                     }
 
-                    // The expedition gift (agentic v1 F3) — the dove's small
-                    // delivery. Opacity only transition: reduce motion safe.
-                    if let gift = expeditionGift {
-                        ExpeditionCard(gift: gift, onOpen: {
-                            // read inside dino — never bounced out to safari
-                            OutcomeLedger.recordAction(kind: "gift", action: "opened")
-                            if let url = URL(string: gift.url) { expeditionReaderLink = ReaderLink(url: url) }
-                        }, onKeep: {
-                            ExpeditionStore.keep(gift)
-                            OutcomeLedger.recordAction(kind: "gift", action: "kept")
-                            keepsakeCount = RichRecStore.keepsakes().count
-                            withAnimation(.easeInOut(duration: 0.35)) { expeditionGift = nil }
-                        }, onNotTonight: {
-                            ExpeditionSignals.recordIgnore()
-                            OutcomeLedger.recordAction(kind: "gift", action: "notTonight")
-                            withAnimation(.easeInOut(duration: 0.35)) { expeditionGift = nil }
-                        })
-                        .padding(.horizontal, DinoTheme.padding)
-                        .padding(.top, 12)
-                        .transition(.opacity)
-                    }
-
-                    // Rich comfort rec (2.1) — dino's personalized pick.
-                    // Same signals as the slip: tap teaches, ignore teaches.
-                    if let rich = shownRichRec {
-                        RichRecCard(rec: rich, onOpen: { url in
-                            recWasTapped = true
-                            GentleRecStore.recordTapped(type: rich.type)
-                            OutcomeLedger.recordAction(kind: "rec", action: "opened")
-                            AnalyticsManager.shared.trackRecTapped()
-                            UIApplication.shared.open(url)
-                        }, onNotTonight: {
-                            recWasTapped = true   // consumed — no double count on disappear
-                            GentleRecStore.recordIgnored(type: rich.type)
-                            OutcomeLedger.recordAction(kind: "rec", action: "notTonight")
-                            AnalyticsManager.shared.trackRecIgnored()
-                            withAnimation(.easeInOut(duration: 0.35)) { shownRichRec = nil }
-                        })
-                        .padding(.horizontal, DinoTheme.padding)
-                        .padding(.top, 12)
-                        .transition(.opacity.combined(with: .move(edge: .bottom)))
-                    }
-
-                    // Comfort slip (concept 3a) — the gentle rec's new body.
-                    // "not tonight" feeds the exact ignore signal leaving did;
-                    // every GentleRecEngine gate is unchanged.
-                    if let rec = shownRec {
-                        ComfortSlipView(rec: rec, onTake: {
-                            recWasTapped = true
-                            GentleRecStore.recordTapped(type: rec.type)
-                            AnalyticsManager.shared.trackRecTapped()
-                            if let url = URL(string: rec.link) {
-                                UIApplication.shared.open(url)
-                            }
-                        }, onNotTonight: {
-                            recWasTapped = true   // consumed — no double count on disappear
-                            GentleRecStore.recordIgnored(type: rec.type)
-                            AnalyticsManager.shared.trackRecIgnored()
-                            withAnimation(.easeInOut(duration: 0.35)) { shownRec = nil }
-                        })
-                        .padding(.horizontal, DinoTheme.padding)
-                        .padding(.top, 12)
-                        .transition(.opacity.combined(with: .move(edge: .bottom)))
-                    }
-
                     // Lantern invite — after a bright log, pass the light on.
                     if showLanternInvite {
                         Button {
@@ -488,33 +399,6 @@ struct EmotionalWeatherView: View {
                     WeeklyMoodTrend(viewModel: viewModel)
                         .padding(.horizontal, DinoTheme.padding)
 
-                    // The little shelf (2.1 feature 3) — past picks, kept.
-                    if keepsakeCount > 0 {
-                        Button {
-                            AnalyticsManager.shared.trackScreen("rec_shelf")
-                            showRecShelf = true
-                        } label: {
-                            HStack {
-                                Text(ComfortRecVoice.shelfRowLine(keepsakeCount))
-                                    .font(DinoTheme.dinoFont(size: 14))
-                                    .foregroundColor(Color(hex: "#7A7266"))
-                                Spacer()
-                                Image(systemName: "chevron.right")
-                                    .font(.system(size: 11, weight: .semibold))
-                                    .foregroundColor(Color(hex: "#A8A29A"))
-                            }
-                            .padding(14)
-                            .background(
-                                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                    .fill(Color(hex: "#FFFDF6"))
-                                    .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                        .stroke(Color(hex: "#EFE7D2"), lineWidth: 1))
-                            )
-                        }
-                        .buttonStyle(.plain)
-                        .padding(.horizontal, DinoTheme.padding)
-                    }
-
                     // Dino World card — a glowing glimpse of everyone's weather.
                     WorldMoodCard(bucket: worldBucket) {
                         AnalyticsManager.shared.trackWorldCardTapped()
@@ -542,48 +426,17 @@ struct EmotionalWeatherView: View {
                 if let agg = await WorldMoodService.fetchAggregate() {
                     worldBucket = agg.bucket(for: WorldMoodService.todayKey())
                 }
-                // Journal-signal path — support beats the gentle rec here too.
+                // Journal-signal path — the same stretch gate as post-log.
                 if stretchSignalFires() {
                     presentSupportRow()
-                } else if expeditionGift == nil,
-                          let gift = await ExpeditionCoordinator.fetchPending() {
-                    presentExpedition(gift)   // the gift outranks a rec; support outranks both
-                } else if shownRec == nil, pendingRec == nil,
-                          shownRichRec == nil, pendingRichRec == nil {
-                    if let rich = await ComfortRecCoordinator.fetchIfMomentIsRight(dataManager: dataManager) {
-                        presentRichRec(rich)
-                    } else if let rec = await GentleRecCoordinator.fetchIfMomentIsRight(dataManager: dataManager) {
-                        presentRec(rec)
-                    }
                 }
             }
             .onAppear {
                 AnalyticsManager.shared.trackMoodScreenOpened()
                 AnalyticsManager.shared.trackScreen("mood")
-                keepsakeCount = RichRecStore.keepsakes().count
                 #if DEBUG
                 if ProcessInfo.processInfo.arguments.contains("-resourcesQA") {
                     showResources = true   // screenshot hook, debug only
-                }
-                if ProcessInfo.processInfo.arguments.contains("-richRecQA") {
-                    RecOpenMemory.forget()   // deterministic first ask state
-                    presentRichRec(.qaSample)
-                }
-                if ProcessInfo.processInfo.arguments.contains("-richRecQA2") {
-                    RecOpenMemory.remember(RecOpenMemory.spotify)   // remembered state
-                    presentRichRec(.qaSample)
-                }
-                if ProcessInfo.processInfo.arguments.contains("-expeditionQA") {
-                    presentExpedition(.qaSample)
-                }
-                if ProcessInfo.processInfo.arguments.contains("-giftReaderQA"),
-                   let url = URL(string: ExpeditionGift.qaSample.url) {
-                    expeditionReaderLink = ReaderLink(url: url)
-                }
-                if ProcessInfo.processInfo.arguments.contains("-richRecQA3") {
-                    RichRecStore.seedQAKeepsakes()   // a full shelf
-                    keepsakeCount = RichRecStore.keepsakes().count
-                    showRecShelf = true
                 }
                 if ProcessInfo.processInfo.arguments.contains("-moodStepsQA") {
                     sleepData = HealthService.SleepData(durationHours: 7.2,
@@ -621,21 +474,6 @@ struct EmotionalWeatherView: View {
                 }
                 #endif
             }
-            .onDisappear {
-                // Shown but never tapped → an ignore for the learning loop
-                // (3 ignores of a type and that type goes quiet).
-                if let rec = shownRec, !recWasTapped {
-                    GentleRecStore.recordIgnored(type: rec.type)
-                    AnalyticsManager.shared.trackRecIgnored()
-                    shownRec = nil
-                }
-                if let rich = shownRichRec, !recWasTapped {
-                    GentleRecStore.recordIgnored(type: rich.type)
-                    OutcomeLedger.recordAction(kind: "rec", action: "ignored")
-                    AnalyticsManager.shared.trackRecIgnored()
-                    shownRichRec = nil
-                }
-            }
             .sheet(isPresented: $showBreakCard, onDismiss: {
                 // The break card finished (confirmed or dismissed) — the world
                 // moment line appears as the final beat below.
@@ -647,22 +485,9 @@ struct EmotionalWeatherView: View {
                 if pendingSupportRow {
                     pendingSupportRow = false
                     presentSupportRow()
-                } else if let rich = pendingRichRec {
-                    pendingRichRec = nil
-                    presentRichRec(rich)
-                } else if let rec = pendingRec {
-                    pendingRec = nil
-                    presentRec(rec)
                 }
             }) {
                 BreakSuggestionCard(mood: breakMood, onDismiss: { showBreakCard = false })
-            }
-            .sheet(isPresented: $showRecShelf) {
-                RecKeepsakesView()
-            }
-            .sheet(item: $expeditionReaderLink) { link in
-                GiftReaderView(url: link.url)
-                    .ignoresSafeArea()
             }
             .fullScreenCover(isPresented: $showWorld) {
                 WorldView()
@@ -777,33 +602,6 @@ struct EmotionalWeatherView: View {
         withAnimation(.easeInOut(duration: 0.35)) { showSupportRow = true }
     }
 
-    private func presentRec(_ rec: GentleRec) {
-        GentleRecStore.recordShown()   // the scarcity clock starts at display, not fetch
-        AnalyticsManager.shared.trackRecShown(type: rec.type)
-        recWasTapped = false
-        withAnimation(.easeInOut(duration: 0.35)) { shownRec = rec }
-    }
-
-    private func presentExpedition(_ gift: ExpeditionGift) {
-        ExpeditionStore.markPresented(gift)   // shown once — the dove never nags
-        let ledgerId = OutcomeLedger.recordShown(kind: "gift", itemType: gift.needKind,
-                                                 sourceDomain: OutcomeLedger.sourceDomain(from: gift.url),
-                                                 moodEntries: dataManager.moodEntries)
-        // the shelf archives every delivery now, kept or not (F4)
-        RichRecStore.recordKeepsake(gift.asKeepsakeRec, ledgerId: ledgerId)
-        keepsakeCount = RichRecStore.keepsakes().count
-        withAnimation(.easeInOut(duration: 0.35)) { expeditionGift = gift }
-    }
-
-    private func presentRichRec(_ rec: RichRec) {
-        GentleRecStore.recordShown()   // same scarcity clock as the classic path
-        let ledgerId = OutcomeLedger.recordShown(kind: "rec", itemType: rec.type,
-                                                 moodEntries: dataManager.moodEntries)
-        RichRecStore.recordKeepsake(rec, ledgerId: ledgerId)   // one event, two faces
-        AnalyticsManager.shared.trackRecShown(type: rec.type)
-        recWasTapped = false
-        withAnimation(.easeInOut(duration: 0.35)) { shownRichRec = rec }
-    }
 }
 
 // MARK: - Mood Slider — a measure of light
