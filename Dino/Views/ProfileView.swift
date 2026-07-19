@@ -288,6 +288,12 @@ struct ProfileView: View {
                 RichRecStore.seedQAKeepsakes()   // a full shelf
                 showRecShelf = true
             }
+            // -recShelfEmptyQA: open the shelf with nothing on it (F5 empty
+            // state). -recShelfWrappedQA is read by the service, not here.
+            if ProcessInfo.processInfo.arguments.contains("-recShelfEmptyQA") {
+                RichRecStore.clearForQA()
+                showRecShelf = true
+            }
             #endif
         }
         .onChange(of: scenePhase) { _, phase in
@@ -345,6 +351,7 @@ struct ProfileView: View {
         }
         .fullScreenCover(isPresented: $showRecShelf) {
             RecKeepsakesView()
+                .environmentObject(dataManager)
         }
         .alert("enjoying dino?", isPresented: $showRateAlert) {
             Button("rate now") { requestReview() }

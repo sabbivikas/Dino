@@ -325,6 +325,9 @@ struct RecRevealView: View {
                                                 deliveryStatus: delivery.status) else { return }
         RecRevealService.markOpened(deliveryId: deliveryId)
         guard !isQA else { return }   // fixtures never write the shelf/ledger
+        // F5 — remember this delivery as opened on-device so the shelf catch
+        // drops its wrapped parcel at once (the markOpened flip is async).
+        RichRecStore.markDeliveryOpened(deliveryId)
         // exactly the old presentRichRec flow: scarcity clock, ledger 'shown',
         // the shelf keepsake (one event, two faces), analytics
         GentleRecStore.recordShown()

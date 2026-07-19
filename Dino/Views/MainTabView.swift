@@ -12,8 +12,11 @@ struct MainTabView: View {
     #if DEBUG
     // QA runs land on the tab hosting the state (screenshot verification
     // only) — the shelf lives on the profile tab now (rec delivery F1).
-    @State private var selectedTab: Int =
-        ProcessInfo.processInfo.arguments.contains("-richRecQA3") ? 4 : 0
+    @State private var selectedTab: Int = {
+        // shelf QA hooks all live on the profile tab (rec delivery F1/F5).
+        let args = ProcessInfo.processInfo.arguments
+        return (args.contains("-richRecQA3") || args.contains("-recShelfEmptyQA")) ? 4 : 0
+    }()
     #else
     @State private var selectedTab: Int = 0
     #endif

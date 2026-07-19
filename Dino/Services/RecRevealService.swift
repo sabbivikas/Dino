@@ -103,6 +103,29 @@ enum RecRevealService {
         let recs: [RichRec]    // sanitized; first is the reveal, rest go to the cache
     }
 
+    /// Rec delivery F5 — the shelf catch's read: every delivery still
+    /// 'announced' (never opened) for this user, as wrapped parcels. The
+    /// no-leak rule permits this client read (status != 'held'); the payload
+    /// stays sealed until the reveal. Empty on any miss — the shelf simply
+    /// shows the opened keepsakes alone.
+    static func announcedDeliveries() async -> [WrappedDelivery] {
+        #if DEBUG
+        if let qa = qaWrappedDeliveries() { return qa }
+        #endif
+        guard let uid = Auth.auth().currentUser?.uid else { return [] }
+        let snap = try? await Firestore.firestore()
+            .collection("recDeliveries").document(uid)
+            .collection("deliveries")
+            .whereField("status", isEqualTo: "announced")
+            .limit(to: 20)
+            .getDocuments()
+        guard let docs = snap?.documents else { return [] }
+        return docs.compactMap { d -> WrappedDelivery? in
+            guard let ts = d.data()["announcedAt"] as? Timestamp else { return nil }
+            return WrappedDelivery(deliveryId: d.documentID, announcedAt: ts.dateValue())
+        }
+    }
+
     /// Reads the delivery status + the status-gated payload. nil on any miss
     /// (offline, still held, signed out) — the parcel simply stays wrapped.
     static func fetch(deliveryId: String) async -> Delivery? {
@@ -149,6 +172,20 @@ enum RecRevealService {
             return Delivery(status: "announced", recs: [.qaPaperOnlySample])
         }
         return Delivery(status: "announced", recs: [.qaFilmSample])
+    }
+
+    /// -recShelfWrappedQA fixtures — two wrapped parcels for the shelf-catch
+    /// screenshots. The qa- ids route through qaDelivery on tap (the film /
+    /// paper reveal fixtures), so a wrapped parcel opens the real F4 reveal
+    /// without touching Firestore, the ledger, or the shelf archive.
+    static func qaWrappedDeliveries(now: Date = Date(),
+                                    arguments: [String] = ProcessInfo.processInfo.arguments) -> [WrappedDelivery]? {
+        guard arguments.contains("-recShelfWrappedQA") else { return nil }
+        return [
+            WrappedDelivery(deliveryId: "qa-parcel", announcedAt: now),
+            WrappedDelivery(deliveryId: "qa-wrapped-2",
+                            announcedAt: now.addingTimeInterval(-3600)),
+        ]
     }
     #endif
 }

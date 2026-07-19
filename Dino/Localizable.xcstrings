@@ -5,6 +5,41 @@
       "shouldGenerateSymbol": false,
       "shouldTranslate": false
     },
+    "still wrapped · tap to open": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "still wrapped · tap to open"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "todavía sin abrir · toca para abrir"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "まだ包んだまま · タップして開けてね"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "아직 포장된 채예요 · 눌러서 열어봐요"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "vẫn còn gói kín · chạm để mở"
+          }
+        }
+      },
+      "shouldGenerateSymbol": false
+    },
     " ": {
       "shouldGenerateSymbol": false,
       "shouldTranslate": false

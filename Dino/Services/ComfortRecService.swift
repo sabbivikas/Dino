@@ -84,6 +84,9 @@ enum ComfortRecVoice {
     static let shelfFilterEverything = String(localized: "everything")
     static let shelfFilterKept = String(localized: "kept")
     static let shelfKeepThis = String(localized: "keep this")
+    // rec delivery F5: the shelf catch — a still-wrapped parcel's caption.
+    // lowercase, the middot is intentional (never a dash), gentle voice.
+    static let shelfStillWrapped = String(localized: "still wrapped \u{00B7} tap to open")
     static let shelfEmptyRest = String(localized: "when dino brings you something, it will rest here 🌿")
     static func shelfRowLine(_ n: Int) -> String { shelfBroughtLine(n) }
 
@@ -129,7 +132,7 @@ enum ComfortRecVoice {
          openBooks, openTV, fallbackWhy, fallbackLength, askWhich, orPrefix, openIt,
          shelfTitle, shelfEmpty, shelfEmptySub, shelfRowLine(3),
          shelfBroughtLine(1), shelfFilterEverything, shelfFilterKept,
-         shelfKeepThis, shelfEmptyRest,
+         shelfKeepThis, shelfEmptyRest, shelfStillWrapped,
          watchOnPrefix, whereToWatch,
          header(hour: 13), header(hour: 21)]
             + allowedFlags + allowedFeels
@@ -293,6 +296,11 @@ struct RichRecBatch: Codable, Equatable {
 enum RichRecStore {
     static let cacheKey = "dino.recs.richCache"
     static let keepsakesKey = "dino.recs.keepsakes"
+    // rec delivery F5: delivery ids opened on THIS device. The shelf's catch
+    // dedupes a just-opened parcel out of the wrapped list immediately —
+    // before the fire-and-forget markOpened write flips the doc out of the
+    // server-side 'announced' query — so it never double-shows.
+    static let openedDeliveryIdsKey = "dino.recs.openedDeliveryIds"
     static let staleDays = 45
     static let keepsakeCap = 200   // full archive — mirrors the ledger cap
 
@@ -380,6 +388,24 @@ enum RichRecStore {
         all[idx].keptAt = now
         if let data = try? JSONEncoder().encode(all) { defaults.set(data, forKey: keepsakesKey) }
         return all[idx].ledgerId
+    }
+
+    /// The delivery ids the reveal has opened on this device (F5 dedupe).
+    static func openedDeliveryIds(defaults: UserDefaults = .standard) -> Set<String> {
+        Set(defaults.stringArray(forKey: openedDeliveryIdsKey) ?? [])
+    }
+
+    /// Remember a delivery as opened locally so the shelf drops its wrapped
+    /// parcel at once (the server flip is fire-and-forget). Capped like the
+    /// keepsake archive so the set can never grow without bound.
+    static func markDeliveryOpened(_ deliveryId: String, defaults: UserDefaults = .standard) {
+        guard !deliveryId.isEmpty else { return }
+        var ids = openedDeliveryIds(defaults: defaults)
+        guard !ids.contains(deliveryId) else { return }
+        ids.insert(deliveryId)
+        var arr = Array(ids)
+        if arr.count > keepsakeCap { arr = Array(arr.suffix(keepsakeCap)) }
+        defaults.set(arr, forKey: openedDeliveryIdsKey)
     }
 
     /// Titles the model should not repeat (cache + shelf, capped at 10).
@@ -525,6 +551,13 @@ enum ComfortRecCoordinator {
 
 #if DEBUG
 extension RichRecStore {
+    /// -recShelfEmptyQA — wipe the archive so the shelf's empty state can be
+    /// captured (screenshot verification only).
+    static func clearForQA(defaults: UserDefaults = .standard) {
+        defaults.removeObject(forKey: keepsakesKey)
+        defaults.removeObject(forKey: openedDeliveryIdsKey)
+    }
+
     /// -richRecQA3 seed — a shelf worth of picks for screenshot verification.
     static func seedQAKeepsakes(defaults: UserDefaults = .standard) {
         defaults.removeObject(forKey: keepsakesKey)
