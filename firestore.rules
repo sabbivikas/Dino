@@ -172,6 +172,23 @@ service cloud.firestore {
         && request.resource.data.tz.size() <= 64;
     }
 
+    // Push token (rec delivery arc F3) — one FCM registration token per
+    // user. Owner-written, strict shape; only the announcement sender
+    // (admin SDK) reads it. The client stores it ONLY while notifications
+    // are permitted and wanted; toggling off deletes the doc, which is the
+    // user's server-side mute (no token → the sweep announces silently).
+    match /pushTokens/{uid} {
+      allow read: if false;
+      allow create, update: if request.auth != null && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['token', 'platform', 'updatedAt'])
+        && request.resource.data.token is string
+        && request.resource.data.token.size() >= 1
+        && request.resource.data.token.size() <= 512
+        && request.resource.data.platform == 'ios'
+        && request.resource.data.updatedAt == request.time;
+      allow delete: if request.auth != null && request.auth.uid == uid;
+    }
+
     // Received-lantern reports: create-only, strict shape, for manual review.
     match /lanternReports/{docId} {
       allow create: if request.auth != null

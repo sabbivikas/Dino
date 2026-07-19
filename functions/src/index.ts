@@ -13,6 +13,7 @@ import { validateGiftWithReason, trustedSourcesFor, EXPEDITION_SIGNAL_ALLOW, bui
 import { capSources, shouldRun, monthKey, creditSummary, REC_MAX_SOURCES_PER_RUN, REC_MIN_RUN_INTERVAL_DAYS } from "./credits";
 import { WORLD_PRIVACY_FLOOR, normalizeCountry, foldPulseCountry } from "./world";
 import { computeDeliverAfter, decideSweep, daypartFor, isValidTz, SWEEP_BATCH_LIMIT } from "./recDelivery";
+import { buildRecAnnouncementMessage, isPlausiblePushToken, REC_PUSH_TOKENS_COLLECTION } from "./recAnnounce";
 
 admin.initializeApp();
 
@@ -2383,15 +2384,41 @@ export const generateComfortRecs = onCall(
 // never announce twice, and a user never hears two in one local day.
 // ---------------------------------------------------------------------------
 
-// F3 BOUNDARY — sendRecAnnouncement(uid, deliveryId).
-// F2 ships this log-only stub; F3 replaces the BODY with the real
-// announcement (push + live activity) without touching the caller.
-// Contract: invoked at most once per delivery, strictly AFTER the doc is
-// transactionally 'announced' (the idempotency gate lives in the sweep
-// transaction, not here). It must never throw — a failed announcement is a
-// quiet miss (F3 owns retry design), never a crash loop.
+// F3 — sendRecAnnouncement(uid, deliveryId): the real announcement.
+// Contract (unchanged from the F2 boundary): invoked at most once per
+// delivery, strictly AFTER the doc is transactionally 'announced' (the
+// idempotency gate lives in the sweep transaction, not here). It must
+// never throw — a failed announcement is a quiet miss, never a crash loop;
+// the rec still surfaces in-app (client observer raises the parcel live
+// activity on next open; F4's reveal reads the payload).
+//
+// CONTENT-FREE: the push carries loc-keys + the deliveryId only (see
+// recAnnounce.ts). The recs stay behind the status-gated payload doc.
+// No token (user muted, or push infra not yet provisioned) is a silent,
+// logged skip — never spammy beats never missed.
 async function sendRecAnnouncement(uid: string, deliveryId: string): Promise<void> {
-  functions.logger.info(`sendRecAnnouncement (stub, F3): uid=${uid} delivery=${deliveryId}`);
+  try {
+    const tokenRef = admin.firestore().collection(REC_PUSH_TOKENS_COLLECTION).doc(uid);
+    const token = (await tokenRef.get()).data()?.token;
+    if (!isPlausiblePushToken(token)) {
+      functions.logger.info(
+        `sendRecAnnouncement: uid=${uid} delivery=${deliveryId} no push token — silent skip`);
+      return;
+    }
+    await admin.messaging().send(
+      buildRecAnnouncementMessage(token, deliveryId) as admin.messaging.TokenMessage);
+    functions.logger.info(`sendRecAnnouncement: uid=${uid} delivery=${deliveryId} push sent`);
+  } catch (err) {
+    // a dead token never gets a second try — remove it; the client re-registers
+    const code = (err as { code?: string })?.code ?? "";
+    if (code === "messaging/registration-token-not-registered"
+        || code === "messaging/invalid-registration-token") {
+      await admin.firestore().collection(REC_PUSH_TOKENS_COLLECTION).doc(uid)
+        .delete().catch(() => { /* best effort */ });
+    }
+    functions.logger.warn(
+      `sendRecAnnouncement: uid=${uid} delivery=${deliveryId} failed (quiet miss): ${err}`);
+  }
 }
 
 export const recDeliverySweep = onSchedule(

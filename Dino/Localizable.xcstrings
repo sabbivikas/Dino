@@ -30208,6 +30208,78 @@
       },
       "shouldGenerateSymbol": false
     },
+    "rec_announcement_body": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "what is it? 🎁"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "¿qué será? 🎁"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "なんだろう？🎁"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "뭘까요? 🎁"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "là gì nhỉ? 🎁"
+          }
+        }
+      },
+      "shouldGenerateSymbol": false
+    },
+    "rec_announcement_title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "dino found something for you"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "dino encontró algo para ti"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ディノがあなたになにかみつけたよ"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "디노가 당신을 위해 뭔가 찾았어요"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "dino đã tìm thấy điều gì đó cho bạn"
+          }
+        }
+      },
+      "shouldGenerateSymbol": false
+    },
     "something arrived for tomorrow. tap to read it.": {
       "localizations": {
         "en": {

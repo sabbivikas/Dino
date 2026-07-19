@@ -52,6 +52,20 @@ struct ContentView: View {
                 handleDeepLink(url)
                 DinoPendingDeepLink.url = nil
             }
+            #if DEBUG
+            // QA hook (rec delivery F3): -recParcelQA raises the parcel live
+            // activity immediately so lock screen / island shots are capturable.
+            if ProcessInfo.processInfo.arguments.contains("-recParcelQA") {
+                DinoLiveActivityManager.shared.startRecParcelActivity(
+                    deliveryId: "qa-parcel", announcedAt: Date())
+            }
+            if ProcessInfo.processInfo.arguments.contains("-recRevealQA") {
+                // delay past first render — presenting during mount is dropped
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                    dataManager.recRevealDeepLink = RecRevealLink(deliveryId: "qa-parcel")
+                }
+            }
+            #endif
         }
         .fullScreenCover(isPresented: Binding(
             get: { dataManager.showRhythmsLetterFromDeepLink },
@@ -64,6 +78,16 @@ struct ContentView: View {
             set: { dataManager.showAmbientFromDeepLink = $0 }
         )) {
             AmbientSoundsView()
+        }
+        .fullScreenCover(isPresented: Binding(
+            get: { dataManager.recRevealDeepLink != nil },
+            set: { if !$0 { dataManager.recRevealDeepLink = nil } }
+        )) {
+            // F4 replaces this destination — see RecRevealPlaceholderView.
+            // (bool-binding cover — the same proven pattern as the covers above)
+            RecRevealPlaceholderView(
+                deliveryId: dataManager.recRevealDeepLink?.deliveryId ?? "",
+                onDismiss: { dataManager.recRevealDeepLink = nil })
         }
     }
 
@@ -113,6 +137,13 @@ struct ContentView: View {
             // The night-before rhythms letter opens the envelope UI over
             // whatever tab is active.
             dataManager.showRhythmsLetterFromDeepLink = true
+        case "rec-reveal":
+            // Rec delivery F3 — the parcel's door (push tap or live activity
+            // tap). Lands on a minimal placeholder; F4 replaces the view.
+            if let link = RecRevealLink.from(url: url) {
+                print("[RecReveal] deep link → \(link.deliveryId)")
+                dataManager.recRevealDeepLink = link
+            }
         case "meditation":
             // Break-finder reminder opens meditation over the home tab.
             dataManager.deepLinkTab = 0

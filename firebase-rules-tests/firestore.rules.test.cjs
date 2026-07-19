@@ -153,4 +153,49 @@ describe("firestore.rules", () => {
       await assertFails(getDoc(doc(alice, "presence", "userA")));
     });
   });
+
+  // rec delivery arc F3 — push token: owner-written strict shape, never
+  // client-readable, deletable by the owner (the server-side mute).
+  describe("pushTokens (F3)", () => {
+    const good = () => ({ token: "fcm-token-abc123", platform: "ios", updatedAt: serverTimestamp() });
+
+    it("allows the owner's strict token write", async () => {
+      const alice = testEnv.authenticatedContext("userA").firestore();
+      await assertSucceeds(setDoc(doc(alice, "pushTokens", "userA"), good()));
+    });
+
+    it("denies extra fields", async () => {
+      const alice = testEnv.authenticatedContext("userA").firestore();
+      await assertFails(setDoc(doc(alice, "pushTokens", "userA"),
+        { ...good(), mood: "drained" }));
+    });
+
+    it("denies a non-ios platform and a client-chosen timestamp", async () => {
+      const alice = testEnv.authenticatedContext("userA").firestore();
+      await assertFails(setDoc(doc(alice, "pushTokens", "userA"),
+        { ...good(), platform: "android" }));
+      await assertFails(setDoc(doc(alice, "pushTokens", "userA"),
+        { token: "t", platform: "ios", updatedAt: Timestamp.fromMillis(1000) }));
+    });
+
+    it("denies an oversized or empty token", async () => {
+      const alice = testEnv.authenticatedContext("userA").firestore();
+      await assertFails(setDoc(doc(alice, "pushTokens", "userA"),
+        { ...good(), token: "x".repeat(513) }));
+      await assertFails(setDoc(doc(alice, "pushTokens", "userA"),
+        { ...good(), token: "" }));
+    });
+
+    it("denies writing another user's token", async () => {
+      const bob = testEnv.authenticatedContext("userB").firestore();
+      await assertFails(setDoc(doc(bob, "pushTokens", "userA"), good()));
+    });
+
+    it("denies reading, even one's own; allows the owner's delete (the mute)", async () => {
+      const alice = testEnv.authenticatedContext("userA").firestore();
+      await assertFails(getDoc(doc(alice, "pushTokens", "userA")));
+      const { deleteDoc } = require("firebase/firestore");
+      await assertSucceeds(deleteDoc(doc(alice, "pushTokens", "userA")));
+    });
+  });
 });

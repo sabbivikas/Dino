@@ -141,6 +141,8 @@ final class SharedDataManager: ObservableObject {
 
     // MARK: - Deep Link State
     @Published var deepLinkTab: Int?
+    /// Rec delivery F3 — the parcel's destination (F4 replaces the VIEW, not this route).
+    @Published var recRevealDeepLink: RecRevealLink?
     @Published var showBreathingFromDeepLink: Bool = false
     @Published var showFocusFromDeepLink: Bool = false
     @Published var showAmbientFromDeepLink: Bool = false

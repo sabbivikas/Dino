@@ -38,6 +38,23 @@ struct MeditationActivityAttributes: ActivityAttributes {
     var totalDurationSeconds: Int
 }
 
+// MARK: - Rec Parcel Activity (rec delivery F3)
+
+/// The paper parcel on the lock screen: "dino has something for you".
+/// Static by design — the parcel never updates, it only appears (announce)
+/// and disappears (opened, or the 6h staleDate sweep).
+struct RecParcelActivityAttributes: ActivityAttributes {
+    public struct ContentState: Codable, Hashable {
+        // no dynamic state — the parcel just glows until it is opened
+    }
+
+    var deliveryId: String      // the door: dino://rec-reveal/{deliveryId}
+    var announcedAt: Date       // announce instant; staleDate = +lifetime
+
+    /// A parcel lives at most 6h after the announcement (owner spec).
+    static let lifetime: TimeInterval = 6 * 3600
+}
+
 // MARK: - Focus Session Activity
 
 struct FocusActivityAttributes: ActivityAttributes {

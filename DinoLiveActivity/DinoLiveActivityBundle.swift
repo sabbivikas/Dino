@@ -15,6 +15,7 @@ struct DinoLiveActivityBundle: WidgetBundle {
         BreathingLiveActivity()
         MeditationLiveActivity()
         FocusLiveActivity()
+        RecParcelLiveActivity()   // rec delivery F3 — the paper parcel
 
         // Home Screen Widgets — mood/streak/breathing redesigned
         MoodWidget()

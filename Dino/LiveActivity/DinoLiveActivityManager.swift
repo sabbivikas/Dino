@@ -20,6 +20,7 @@ class DinoLiveActivityManager: ObservableObject {
     @Published var breathingActivity: Activity<BreathingActivityAttributes>?
     @Published var meditationActivity: Activity<MeditationActivityAttributes>?
     @Published var focusActivity: Activity<FocusActivityAttributes>?
+    @Published var recParcelActivity: Activity<RecParcelActivityAttributes>?
 
     // MARK: - Message Banks
 
@@ -259,6 +260,61 @@ class DinoLiveActivityManager: ObservableObject {
         Task {
             await activity.end(dismissalPolicy: .immediate)
             focusActivity = nil
+        }
+    }
+
+    // MARK: - Rec Parcel (rec delivery F3)
+
+    /// Raise the paper parcel for an announced delivery. Idempotent — one
+    /// delivery gets at most one parcel — and never raised past the 6h life.
+    /// staleDate marks the system's "this is old" point; the true end is the
+    /// foreground sweep below or the reveal opening (client-side start is
+    /// the honest limit without provisioned push-to-start — see F3 verdict).
+    @available(iOS 16.2, *)
+    func startRecParcelActivity(deliveryId: String, announcedAt: Date, now: Date = Date()) {
+        guard activitiesEnabled else { return }
+        guard !Activity<RecParcelActivityAttributes>.activities
+            .contains(where: { $0.attributes.deliveryId == deliveryId }) else { return }
+        let staleDate = announcedAt.addingTimeInterval(RecParcelActivityAttributes.lifetime)
+        guard staleDate > now else { return }   // announced too long ago — stay quiet
+
+        let attributes = RecParcelActivityAttributes(deliveryId: deliveryId, announcedAt: announcedAt)
+        do {
+            let content = ActivityContent(
+                state: RecParcelActivityAttributes.ContentState(),
+                staleDate: staleDate
+            )
+            let activity = try Activity.request(attributes: attributes, content: content)
+            recParcelActivity = activity
+            print("[Dino] Rec parcel Live Activity started: \(activity.id)")
+        } catch {
+            #if DEBUG
+            print("[Dino] Failed to start rec parcel Live Activity: \(error)")
+            #endif
+        }
+    }
+
+    /// The parcel was opened (deep link landed) — every parcel ends now.
+    @available(iOS 16.2, *)
+    func endRecParcelActivities() {
+        recParcelActivity = nil
+        Task {
+            for activity in Activity<RecParcelActivityAttributes>.activities {
+                await activity.end(dismissalPolicy: .immediate)
+            }
+        }
+    }
+
+    /// 6h expiry — ActivityKit cannot end an activity while the app is
+    /// closed, so each foreground pass ends any parcel past its life
+    /// (between hour 6 and the next open, the system's staleDate dims it).
+    @available(iOS 16.2, *)
+    func sweepStaleRecParcels(now: Date = Date()) {
+        Task {
+            for activity in Activity<RecParcelActivityAttributes>.activities
+            where activity.attributes.announcedAt.addingTimeInterval(RecParcelActivityAttributes.lifetime) <= now {
+                await activity.end(dismissalPolicy: .immediate)
+            }
         }
     }
 }
