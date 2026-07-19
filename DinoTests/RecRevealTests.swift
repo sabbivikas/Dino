@@ -60,6 +60,16 @@ final class RecRevealTests: XCTestCase {
         XCTAssertFalse(RecRevealMachine.parcelStaysForLater(phase: .revealed))
     }
 
+    func testStalePurgedRevealDismissesToTheShelfNeverAnUnopenableParcel() {
+        // an already-opened delivery whose server payload was purged: readable
+        // status, but no recs → dismiss to the shelf (keepsake already there)
+        XCTAssertTrue(RecRevealMachine.shouldDismissToShelf(deliveryReadable: true, hasRecs: false))
+        // a real reveal with content never dismisses
+        XCTAssertFalse(RecRevealMachine.shouldDismissToShelf(deliveryReadable: true, hasRecs: true))
+        // a full miss (offline / still held — unreadable) stays a wrapped parcel
+        XCTAssertFalse(RecRevealMachine.shouldDismissToShelf(deliveryReadable: false, hasRecs: false))
+    }
+
     // MARK: - image pipeline: fallback selection (never a broken image)
 
     private func rec(type: String, posterPath: String? = nil) -> RichRec {

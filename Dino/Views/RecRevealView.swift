@@ -283,6 +283,18 @@ struct RecRevealView: View {
     private func load() {
         Task {
             let fetched = await RecRevealService.fetch(deliveryId: deliveryId)
+            // Stale re-tap of an already-opened delivery whose server payload was
+            // purged (F4 read the content into memory before the open flip; the
+            // server deletes the payload on that flip). Nothing to unwrap — return
+            // to the shelf, where the opened keepsake already lives, rather than
+            // leave an un-openable parcel on screen. A full miss (offline / still
+            // held) keeps the parcel wrapped, exactly as before.
+            if RecRevealMachine.shouldDismissToShelf(
+                deliveryReadable: fetched != nil,
+                hasRecs: !(fetched?.recs.isEmpty ?? true)) {
+                onDismiss()
+                return
+            }
             delivery = fetched
             guard let first = fetched?.recs.first else { return }
             // pre-warm during the wrapped beat; a late arrival fades in

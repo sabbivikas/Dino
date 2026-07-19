@@ -2,7 +2,7 @@ import * as admin from "firebase-admin";
 import * as functions from "firebase-functions/v1";
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { onSchedule } from "firebase-functions/v2/scheduler";
-import { onDocumentCreated } from "firebase-functions/v2/firestore";
+import { onDocumentCreated, onDocumentUpdated } from "firebase-functions/v2/firestore";
 import { defineSecret, defineString } from "firebase-functions/params";
 import { setGlobalOptions } from "firebase-functions/v2";
 import OpenAI from "openai";
@@ -12,7 +12,7 @@ import { route as aiRoute, routeChain as aiRouteChain, logRoute as aiLogRoute, c
 import { validateGiftWithReason, trustedSourcesFor, EXPEDITION_SIGNAL_ALLOW, buildLunaUserPrompt } from "./mission";
 import { capSources, shouldRun, monthKey, creditSummary, REC_MAX_SOURCES_PER_RUN, REC_MIN_RUN_INTERVAL_DAYS } from "./credits";
 import { WORLD_PRIVACY_FLOOR, normalizeCountry, foldPulseCountry } from "./world";
-import { computeDeliverAfter, decideSweep, daypartFor, isValidTz, SWEEP_BATCH_LIMIT, posterPathOrNull, shouldExpireAnnounced, ANNOUNCED_EXPIRY_MS } from "./recDelivery";
+import { computeDeliverAfter, decideSweep, daypartFor, isValidTz, SWEEP_BATCH_LIMIT, posterPathOrNull, shouldExpireAnnounced, ANNOUNCED_EXPIRY_MS, shouldDeletePayloadOnTransition, payloadExpiresAtMs } from "./recDelivery";
 import { buildRecAnnouncementMessage, isPlausiblePushToken, REC_PUSH_TOKENS_COLLECTION } from "./recAnnounce";
 import { buildAnnouncementOutcome, announcementOutcomeId, isOutcomeDaypart, OUTCOME_RETENTION_DAYS } from "./outcomes";
 
@@ -2363,6 +2363,11 @@ export const generateComfortRecs = onCall(
       holdBatch.set(deliveryParentRef.collection("payloads").doc(deliveryRef.id), {
         recs,
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        // Backstop TTL (~2x the worst-case lifecycle). The open trigger and the
+        // expiry sweep delete this doc first; this only reaps a payload those
+        // paths missed. Requires the owner to enable the Firestore TTL policy
+        // on the payloads collection group (field expiresAt) in the console.
+        expiresAt: admin.firestore.Timestamp.fromMillis(payloadExpiresAtMs(nowMs)),
       });
       await holdBatch.commit();
       functions.logger.info(
@@ -2379,6 +2384,40 @@ export const generateComfortRecs = onCall(
       const message = err instanceof Error ? err.message : "OpenAI request failed";
       throw new HttpsError("internal", message);
     }
+  }
+);
+
+// ---------------------------------------------------------------------------
+// Rec delivery — purge the content payload the instant a delivery is opened.
+// Rec content must not persist. The client flips announced -> opened (the one
+// write the rules allow) but can NEVER delete a payload (payloads write:false),
+// so the server watches the status flip and deletes the sibling content doc.
+// F4's reveal reads the payload INTO MEMORY before the flip fires, so the
+// content is already on the client when this runs — deleting the server copy
+// after the open is safe. Idempotent (a missing payload is a no-op) and cheap:
+// shouldDeletePayloadOnTransition no-ops on every non-open update (announce,
+// reschedule, openedAt-only touch, expiry).
+// ---------------------------------------------------------------------------
+export const onRecDeliveryOpened = onDocumentUpdated(
+  "recDeliveries/{uid}/deliveries/{deliveryId}",
+  async (event) => {
+    const before = event.data?.before.data();
+    const after = event.data?.after.data();
+    if (!before || !after) return;
+    if (!shouldDeletePayloadOnTransition(
+      String(before.status ?? ""), String(after.status ?? ""))) return;
+    const { uid, deliveryId } = event.params;
+    await admin.firestore()
+      .collection("recDeliveries").doc(uid)
+      .collection("payloads").doc(deliveryId)
+      .delete()
+      .catch((err) => {
+        // never a crash loop — a missing payload is the success case
+        functions.logger.warn(
+          `onRecDeliveryOpened: uid=${uid} delivery=${deliveryId} payload delete: ${err}`);
+      });
+    functions.logger.info(
+      `onRecDeliveryOpened: uid=${uid} delivery=${deliveryId} payload purged on open`);
   }
 );
 
@@ -2448,6 +2487,7 @@ export const recDeliverySweep = onSchedule(
         const hb = presence.data()?.lastActiveAt;
         const lastActiveAtMs = hb instanceof admin.firestore.Timestamp ? hb.toMillis() : null;
         const parentRef = db.collection("recDeliveries").doc(uid);
+        const payloadRef = parentRef.collection("payloads").doc(docSnap.id);
         const outcome = await db.runTransaction(async (tx) => {
           const fresh = await tx.get(docSnap.ref);
           const parent = await tx.get(parentRef);
@@ -2470,6 +2510,9 @@ export const recDeliverySweep = onSchedule(
           });
           if (decision.action === "expire") {
             tx.update(docSnap.ref, { status: "expired" });
+            // rec content must not persist — an expired hold's payload is
+            // orphaned; purge it in the same tx (idempotent if already gone).
+            tx.delete(payloadRef);
           } else if (decision.action === "reschedule") {
             tx.update(docSnap.ref, {
               deliverAfter: admin.firestore.Timestamp.fromMillis(decision.deliverAfterMs),
@@ -2539,6 +2582,10 @@ export const recDeliverySweep = onSchedule(
             .collection("entries").doc(announcementOutcomeId(docSnap.id));
           const annSnap = await tx.get(annRef);   // all reads BEFORE any write
           tx.update(docSnap.ref, { status: "expired" });
+          // rec content must not persist — the ignored knock retires; purge
+          // its payload in the same tx (idempotent if already gone).
+          tx.delete(db.collection("recDeliveries").doc(uid)
+            .collection("payloads").doc(docSnap.id));
           if (annSnap.exists) {
             // If the knock was already OPENED (the client flips the outcome
             // even when the delivery status flip lags before its rule deploys),

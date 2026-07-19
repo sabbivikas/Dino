@@ -8,7 +8,30 @@ import {
   holdDelayMinutes, rescheduleDelayMinutes, computeDeliverAfter,
   isSessionActive, daypartFor, decideSweep, posterPathOrNull,
   shouldExpireAnnounced, ANNOUNCED_EXPIRY_MS,
+  shouldDeletePayloadOnTransition, payloadExpiresAtMs, PAYLOAD_RETENTION_DAYS,
 } from "./recDelivery";
+
+// --- payload retention: purge content on open, backstop TTL on create -------
+
+test("shouldDeletePayloadOnTransition fires only on a real transition into opened", () => {
+  // the one case that purges: anything not-opened -> opened
+  assert.equal(shouldDeletePayloadOnTransition("announced", "opened"), true);
+  assert.equal(shouldDeletePayloadOnTransition("held", "opened"), true);
+  assert.equal(shouldDeletePayloadOnTransition("expired", "opened"), true);
+  // no-ops: every other update the trigger might see
+  assert.equal(shouldDeletePayloadOnTransition("opened", "opened"), false);   // openedAt-only touch / re-write
+  assert.equal(shouldDeletePayloadOnTransition("held", "announced"), false);  // announce
+  assert.equal(shouldDeletePayloadOnTransition("held", "held"), false);       // reschedule
+  assert.equal(shouldDeletePayloadOnTransition("announced", "expired"), false); // ignored knock
+  assert.equal(shouldDeletePayloadOnTransition("announced", "announced"), false);
+});
+
+test("payloadExpiresAtMs is exactly 14 days out", () => {
+  assert.equal(PAYLOAD_RETENTION_DAYS, 14);
+  const now = 1_700_000_000_000;
+  assert.equal(payloadExpiresAtMs(now), now + 14 * 24 * 3600 * 1000);
+  assert.equal(payloadExpiresAtMs(0), 14 * 86_400_000);
+});
 
 // --- F6: the announced-expiry (IGNORED knock) gate --------------------------
 

@@ -32,6 +32,14 @@ export const RESCHEDULE_MIN_MINUTES = 15;
 export const RESCHEDULE_MAX_MINUTES = 30;
 export const HELD_EXPIRY_MS = 72 * 3600 * 1000;    // a rec 3 days stale is a new day's problem
 export const ANNOUNCED_EXPIRY_MS = 72 * 3600 * 1000; // an announced knock unanswered 3 days retires
+// The content payload's server-side backstop TTL. The delete paths (open
+// trigger + expiry sweep) reap it first; this only ever catches a payload
+// those paths missed. Sized as ~2x the worst-case lifecycle: a payload can
+// legitimately live HELD_EXPIRY_MS (up to 72h held) + ANNOUNCED_EXPIRY_MS
+// (up to 72h announced-before-ignored) ~= 6 days, so 7 leaves almost no
+// margin and could race a slow-to-open gift near the boundary; 14 never
+// cuts off a claimable gift and only reaps genuinely-orphaned payloads.
+export const PAYLOAD_RETENTION_DAYS = 14;           // client sees nothing; server-only backstop
 export const SWEEP_BATCH_LIMIT = 200;
 
 export const DELIVERY_STATUSES = ["held", "announced", "opened", "expired"] as const;
@@ -182,6 +190,31 @@ export function shouldExpireAnnounced(
 ): boolean {
   return status === "announced" && announcedAtMs !== null
     && nowMs - announcedAtMs >= ANNOUNCED_EXPIRY_MS;
+}
+
+/**
+ * The content payload must not persist. It is deleted on open (the server
+ * trigger below) and on expiry (the sweep), but the delete that matters is
+ * the transition INTO 'opened': the client can never delete a payload under
+ * the rules, so the server watches the status flip and purges the sibling
+ * content doc. True only on a genuine transition into 'opened' — announce,
+ * reschedule, an openedAt-only touch, or a re-write of an already-'opened'
+ * doc all no-op, so the trigger stays cheap.
+ */
+export function shouldDeletePayloadOnTransition(
+  beforeStatus: string, afterStatus: string
+): boolean {
+  return beforeStatus !== "opened" && afterStatus === "opened";
+}
+
+/**
+ * The payload's backstop-TTL instant: nowMs + PAYLOAD_RETENTION_DAYS. Wired
+ * into the create-time write (expiresAt) so an orphaned payload the delete
+ * paths missed still self-reaps once the owner enables the Firestore TTL
+ * policy on the payloads collection group (field expiresAt) in the console.
+ */
+export function payloadExpiresAtMs(nowMs: number): number {
+  return nowMs + PAYLOAD_RETENTION_DAYS * DAY_MS;
 }
 
 /** Active = a heartbeat within the last 3 min (a future stamp counts too). */

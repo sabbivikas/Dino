@@ -58,6 +58,17 @@ enum RecRevealMachine {
     static func parcelStaysForLater(phase: RecRevealPhase) -> Bool {
         phase != .revealed
     }
+
+    /// A reveal opened for a delivery whose server payload is gone (purged on
+    /// open/expiry) has nothing to unwrap. When the delivery is readable but
+    /// carries no recs — a stale re-tap of an already-opened delivery (deep
+    /// link / live activity tap after open) — the reveal must not sit on a
+    /// parcel that can never open: it dismisses to the shelf, where the opened
+    /// keepsake already lives. A full miss (delivery unreadable — offline / still
+    /// held) is NOT this case; that parcel stays wrapped, catchable later.
+    static func shouldDismissToShelf(deliveryReadable: Bool, hasRecs: Bool) -> Bool {
+        deliveryReadable && !hasRecs
+    }
 }
 
 // MARK: - Share payload (title + link — locked spec; pure, tested)
@@ -137,9 +148,18 @@ enum RecRevealService {
         guard let deliverySnap = try? await parent.collection("deliveries")
             .document(deliveryId).getDocument(),
               let status = deliverySnap.data()?["status"] as? String else { return nil }
+        // A network/permission miss on the payload read (getDocument throws) is
+        // a transient nil — the parcel stays wrapped, catchable later. But a
+        // read that SUCCEEDS with no payload doc means the content was purged on
+        // open/expiry: the payload is created atomically with the delivery, so a
+        // readable non-held delivery always had one. That is a stale re-tap of
+        // an already-opened delivery — surface the status with no recs so the
+        // reveal dismisses cleanly to the shelf instead of sitting on a parcel
+        // that can never unwrap.
         guard let payloadSnap = try? await parent.collection("payloads")
-            .document(deliveryId).getDocument(),
-              let raw = payloadSnap.data()?["recs"] as? [[String: Any]] else { return nil }
+            .document(deliveryId).getDocument() else { return nil }
+        guard payloadSnap.exists else { return Delivery(status: status, recs: []) }
+        guard let raw = payloadSnap.data()?["recs"] as? [[String: Any]] else { return nil }
         let recs = raw.compactMap { ComfortRecSanitizer.rec(from: $0) }
         guard !recs.isEmpty else { return nil }
         return Delivery(status: status, recs: recs)
