@@ -379,13 +379,14 @@ enum RichRecStore {
 @MainActor
 enum ComfortRecCoordinator {
 
-    /// Same gates as the classic path (one source of truth: GentleRecEngine),
-    /// cache first, one network call fetches three. Returns nil on any miss —
-    /// the caller falls back to the classic pool, then to silence.
-    static func fetchIfMomentIsRight(dataManager: SharedDataManager,
-                                     freshHeavyMood: EmotionalWeather? = nil,
-                                     now: Date = Date(),
-                                     calendar: Calendar = .current) async -> RichRec? {
+    /// The moment gates + the enum payload — one source of truth shared by
+    /// the legacy fetch below and the F2 generate-and-hold trigger.
+    /// Returns nil when the moment is wrong (GentleRecEngine decides —
+    /// crisis window first and absolute, scarcity, ignore cooloffs).
+    static func momentPayload(dataManager: SharedDataManager,
+                              freshHeavyMood: EmotionalWeather? = nil,
+                              now: Date = Date(),
+                              calendar: Calendar = .current) -> [String: Any]? {
         // gate inputs — identical math to GentleRecCoordinator
         let heavyToday: Bool = {
             if let m = freshHeavyMood { return m == .drained || m == .overwhelmed }
@@ -406,9 +407,6 @@ enum ComfortRecCoordinator {
             journalToggleOn: dataManager.journalThemeLearningEnabled,
             journalThemesToday: journalThemesToday,
             ignoreCounts: GentleRecStore.ignoreCounts) else { return nil }
-
-        // cache first — one call covers many cleared moments
-        if let cached = RichRecStore.consumeOne(now: now) { return cached }
 
         let heavyMoodValue = freshHeavyMood.flatMap { m in
             (m == .drained || m == .overwhelmed) ? m.rawValue : nil
@@ -432,6 +430,44 @@ enum ComfortRecCoordinator {
             "excludeTitles": RichRecStore.excludeTitles(),
         ]
         if !heavyMoodValue.isEmpty { payload["mood"] = heavyMoodValue }
+        return payload
+    }
+
+    /// Rec delivery F2 — the mood-log trigger. Same gates as ever, same
+    /// enum payload, but the server HOLDS the recs for a later announcement:
+    /// nothing returns, nothing is cached locally, nothing shows until the
+    /// announcement lands (the no-leak rule). Fire and forget.
+    static func generateAndHoldIfMomentIsRight(dataManager: SharedDataManager,
+                                               freshHeavyMood: EmotionalWeather? = nil,
+                                               now: Date = Date(),
+                                               calendar: Calendar = .current) async {
+        guard let payload = momentPayload(dataManager: dataManager,
+                                          freshHeavyMood: freshHeavyMood,
+                                          now: now, calendar: calendar) else { return }
+        do {
+            let functions = Functions.functions(region: "us-central1")
+            _ = try await functions.httpsCallable("generateComfortRecs").call(payload)
+        } catch {
+            #if DEBUG
+            print("\u{1F319} comfort rec hold error: \(error)")
+            #endif
+        }
+    }
+
+    /// Same gates as the classic path (one source of truth: GentleRecEngine),
+    /// cache first, one network call fetches three. Returns nil on any miss —
+    /// the caller falls back to the classic pool, then to silence.
+    /// (Legacy display path: the server now HOLDS fresh recs, so the network
+    /// branch yields nil in practice; F4's reveal replaces this read.)
+    static func fetchIfMomentIsRight(dataManager: SharedDataManager,
+                                     freshHeavyMood: EmotionalWeather? = nil,
+                                     now: Date = Date(),
+                                     calendar: Calendar = .current) async -> RichRec? {
+        guard let payload = momentPayload(dataManager: dataManager,
+                                          freshHeavyMood: freshHeavyMood,
+                                          now: now, calendar: calendar) else { return nil }
+        // cache first — one call covers many cleared moments
+        if let cached = RichRecStore.consumeOne(now: now) { return cached }
 
         do {
             let functions = Functions.functions(region: "us-central1")

@@ -12,6 +12,7 @@ import { route as aiRoute, routeChain as aiRouteChain, logRoute as aiLogRoute, c
 import { validateGiftWithReason, trustedSourcesFor, EXPEDITION_SIGNAL_ALLOW, buildLunaUserPrompt } from "./mission";
 import { capSources, shouldRun, monthKey, creditSummary, REC_MAX_SOURCES_PER_RUN, REC_MIN_RUN_INTERVAL_DAYS } from "./credits";
 import { WORLD_PRIVACY_FLOOR, normalizeCountry, foldPulseCountry } from "./world";
+import { computeDeliverAfter, decideSweep, daypartFor, isValidTz, SWEEP_BATCH_LIMIT } from "./recDelivery";
 
 admin.initializeApp();
 
@@ -2202,8 +2203,18 @@ export const generateComfortRecs = onCall(
       } catch { countryName = ""; }
     }
 
-    // Rate limit — house pattern: per-UID daily counter, refund on failure.
+    // Rec delivery F2 — one held delivery at a time: a second heavy log
+    // while one waits must not queue an assembly line or burn a model call
+    // (never spammy). Returning the existing id keeps the retry cheap.
     const db = admin.firestore();
+    const deliveryParentRef = db.collection("recDeliveries").doc(uid);
+    const deliveriesRef = deliveryParentRef.collection("deliveries");
+    const alreadyHeld = await deliveriesRef.where("status", "==", "held").limit(1).get();
+    if (!alreadyHeld.empty) {
+      return { held: true, deliveryId: alreadyHeld.docs[0].id };
+    }
+
+    // Rate limit — house pattern: per-UID daily counter, refund on failure.
     const dayKey = new Date().toISOString().slice(0, 10);
     const counterRef = db.collection("comfortRecLimits").doc(uid);
     await db.runTransaction(async (tx) => {
@@ -2315,7 +2326,40 @@ export const generateComfortRecs = onCall(
           film.watchLink = w.link;
         }
       }
-      return { recs };
+      // F2 — THE HOLD (rec delivery arc). The recs are stored, never
+      // returned: the delivery doc carries timing metadata only (enums +
+      // timestamps), the payload doc carries the recs for F4's status-gated
+      // reveal. deliverAfter = now + 45..90 random minutes, pushed out of
+      // quiet hours (21:30-08:30 user-local) and past the 1/day cap.
+      const presenceSnap = await db.collection("presence").doc(uid).get();
+      const tzRaw = presenceSnap.data()?.tz;
+      // no heartbeat yet (or an invalid zone) → utc, the conservative floor
+      const tz = isValidTz(tzRaw) ? tzRaw : "Etc/UTC";
+      const parentSnap = await deliveryParentRef.get();
+      const blockedDays = new Set<string>();
+      const lastAnnouncedDayKey = parentSnap.data()?.lastAnnouncedDayKey;
+      if (typeof lastAnnouncedDayKey === "string") blockedDays.add(lastAnnouncedDayKey);
+      const nowMs = Date.now();
+      const deliverAfterMs = computeDeliverAfter(nowMs, tz, blockedDays);
+      const deliveryRef = deliveriesRef.doc();
+      const holdBatch = db.batch();
+      holdBatch.set(deliveryRef, {
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        deliverAfter: admin.firestore.Timestamp.fromMillis(deliverAfterMs),
+        status: "held",
+        daypart: daypartFor(deliverAfterMs, tz),
+        tz,
+        attempts: 0,
+      });
+      holdBatch.set(deliveryParentRef.collection("payloads").doc(deliveryRef.id), {
+        recs,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      await holdBatch.commit();
+      functions.logger.info(
+        `comfortRecs held: uid=${uid} delivery=${deliveryRef.id} ` +
+        `deliverAfter=${new Date(deliverAfterMs).toISOString()} tz=${tz}`);
+      return { held: true, deliveryId: deliveryRef.id };
     } catch (err) {
       // Refund — a failure never burns the user's daily cap.
       await counterRef.set(
@@ -2326,6 +2370,98 @@ export const generateComfortRecs = onCall(
       const message = err instanceof Error ? err.message : "OpenAI request failed";
       throw new HttpsError("internal", message);
     }
+  }
+);
+
+// ---------------------------------------------------------------------------
+// Rec delivery sweep (rec delivery arc F2)
+// Every ~10 minutes (off-minute cron), sweep due HELD deliveries and decide:
+// announce, back off (active session / 1-a-day cap / quiet hours), or expire.
+// All policy math lives in recDelivery.ts (pure, node-tested); this function
+// only wires firestore. Announcing is transactional and idempotent: the
+// status flip and the per-day marker commit together, so a delivery can
+// never announce twice, and a user never hears two in one local day.
+// ---------------------------------------------------------------------------
+
+// F3 BOUNDARY — sendRecAnnouncement(uid, deliveryId).
+// F2 ships this log-only stub; F3 replaces the BODY with the real
+// announcement (push + live activity) without touching the caller.
+// Contract: invoked at most once per delivery, strictly AFTER the doc is
+// transactionally 'announced' (the idempotency gate lives in the sweep
+// transaction, not here). It must never throw — a failed announcement is a
+// quiet miss (F3 owns retry design), never a crash loop.
+async function sendRecAnnouncement(uid: string, deliveryId: string): Promise<void> {
+  functions.logger.info(`sendRecAnnouncement (stub, F3): uid=${uid} delivery=${deliveryId}`);
+}
+
+export const recDeliverySweep = onSchedule(
+  { schedule: "7-59/10 * * * *", timeoutSeconds: 300, memory: "256MiB" },
+  async () => {
+    const db = admin.firestore();
+    const due = await db.collectionGroup("deliveries")
+      .where("status", "==", "held")
+      .where("deliverAfter", "<=", admin.firestore.Timestamp.now())
+      .limit(SWEEP_BATCH_LIMIT)
+      .get();
+    let announcedCount = 0; let rescheduledCount = 0; let expiredCount = 0;
+    for (const docSnap of due.docs) {
+      const uid = docSnap.ref.parent.parent?.id;
+      if (!uid) continue;
+      try {
+        // presence read outside the tx — a heartbeat is advisory, not contended
+        const presence = await db.collection("presence").doc(uid).get();
+        const hb = presence.data()?.lastActiveAt;
+        const lastActiveAtMs = hb instanceof admin.firestore.Timestamp ? hb.toMillis() : null;
+        const parentRef = db.collection("recDeliveries").doc(uid);
+        const outcome = await db.runTransaction(async (tx) => {
+          const fresh = await tx.get(docSnap.ref);
+          const parent = await tx.get(parentRef);
+          const d = fresh.data();
+          if (!d) return "skip";
+          const tz = isValidTz(d.tz) ? d.tz : "Etc/UTC";
+          const deliverAfterMs = d.deliverAfter instanceof admin.firestore.Timestamp
+            ? d.deliverAfter.toMillis() : 0;
+          const createdAtMs = d.createdAt instanceof admin.firestore.Timestamp
+            ? d.createdAt.toMillis() : deliverAfterMs;
+          const marker = parent.data()?.lastAnnouncedDayKey;
+          const decision = decideSweep({
+            status: String(d.status ?? ""),
+            createdAtMs,
+            deliverAfterMs,
+            tz,
+            nowMs: Date.now(),
+            lastActiveAtMs,
+            lastAnnouncedDayKey: typeof marker === "string" ? marker : null,
+          });
+          if (decision.action === "expire") {
+            tx.update(docSnap.ref, { status: "expired" });
+          } else if (decision.action === "reschedule") {
+            tx.update(docSnap.ref, {
+              deliverAfter: admin.firestore.Timestamp.fromMillis(decision.deliverAfterMs),
+              daypart: daypartFor(decision.deliverAfterMs, tz),
+              attempts: admin.firestore.FieldValue.increment(1),
+            });
+          } else if (decision.action === "announce") {
+            tx.update(docSnap.ref, {
+              status: "announced",
+              announcedAt: admin.firestore.FieldValue.serverTimestamp(),
+            });
+            tx.set(parentRef, { lastAnnouncedDayKey: decision.dayKey }, { merge: true });
+          }
+          return decision.action;
+        });
+        if (outcome === "announce") {
+          announcedCount += 1;
+          await sendRecAnnouncement(uid, docSnap.id);
+        } else if (outcome === "reschedule") { rescheduledCount += 1; }
+        else if (outcome === "expire") { expiredCount += 1; }
+      } catch (err) {
+        functions.logger.warn(`recDeliverySweep: uid=${uid} delivery=${docSnap.id} failed: ${err}`);
+      }
+    }
+    functions.logger.info(
+      `recDeliverySweep: due=${due.docs.length} announced=${announcedCount} ` +
+      `rescheduled=${rescheduledCount} expired=${expiredCount}`);
   }
 );
 

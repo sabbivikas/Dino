@@ -207,6 +207,9 @@ struct DinoApp: App {
                     case .active:
                         sessionStartTime = Date()
                         AnalyticsManager.shared.trackSessionStarted()
+                        // Rec delivery F2: the presence heartbeat — the
+                        // delivery sweep never announces into an open app.
+                        PresenceHeartbeat.appBecameActive()
                         // Foreground return → app_opened(open_type: foreground).
                         // (onChange does not fire for the initial active at mount,
                         // so the cold-launch active is never misclassified here.)
@@ -222,6 +225,7 @@ struct DinoApp: App {
                             AnalyticsManager.shared.trackAppBackgrounded(sessionDuration: duration)
                             AnalyticsManager.shared.trackSessionEnded(durationSeconds: Int(duration))
                         }
+                        PresenceHeartbeat.appResignedActive()
                     @unknown default:
                         break
                     }
