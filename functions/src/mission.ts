@@ -48,10 +48,12 @@ export const EXPEDITION_SIGNAL_ALLOW: Record<string, string[]> = {
 
 /** The exact user payload luna sees — pure so tests can pin that unknown
  *  buckets pass through verbatim and nothing fabricates a value. */
-export function buildLunaUserPrompt(buckets: Record<string, string>, themes: string[]): string {
+export function buildLunaUserPrompt(buckets: Record<string, string>, themes: string[],
+                                    giftFatigue = "none"): string {
   return `buckets: mood trend ${buckets.moodTrend}, heavy days this week ${buckets.heavyDays7}, ` +
     `themes ${themes.join(", ") || "none"}, sleep ${buckets.sleepBucket}, movement ${buckets.stepsBucket}, ` +
-    `since last gift ${buckets.sinceLastExpedition}, since last rec ${buckets.sinceLastRec}.`;
+    `since last gift ${buckets.sinceLastExpedition}, since last rec ${buckets.sinceLastRec}, ` +
+    `gift fatigue ${giftFatigue}.`;
 }
 
 // ── Trusted sources per needKind — the expedition looks HERE FIRST —─────

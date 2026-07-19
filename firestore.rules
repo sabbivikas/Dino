@@ -94,6 +94,48 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Outcome ledger (memory + shelf arc F1) — the enum twin of the shelf.
+    // Enum-shaped ONLY; the single string field is a gift's publisher domain
+    // (server trusted-sources vocabulary), size-capped. Content never lands here.
+    match /outcomes/{uid}/entries/{entryId} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow create: if request.auth != null && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['kind','itemType','sourceDomain','moodContext','daypart','action','needsFollowup','shownAt','expiresAt'])
+        && request.resource.data.kind in ['rec','gift']
+        && ((request.resource.data.kind == 'rec'
+              && request.resource.data.itemType in ['music','book','film']
+              && !request.resource.data.keys().hasAny(['sourceDomain']))
+            || (request.resource.data.kind == 'gift'
+              && request.resource.data.itemType in ['rest','beauty','hope','wonder','connection']
+              && (!request.resource.data.keys().hasAny(['sourceDomain'])
+                  || (request.resource.data.sourceDomain is string
+                      && request.resource.data.sourceDomain.size() <= 40))))
+        && request.resource.data.moodContext in ['clear','partlyCloudy','overwhelmed','drained','none']
+        && request.resource.data.daypart in ['morning','afternoon','evening','night']
+        && request.resource.data.action == 'shown'
+        && request.resource.data.needsFollowup == true
+        && request.resource.data.shownAt == request.time
+        && request.resource.data.expiresAt is timestamp;
+      allow update: if request.auth != null && request.auth.uid == uid
+        && (
+          (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['action','actionAt'])
+            && request.resource.data.action in ['opened','kept','ignored','notTonight','lateKept']
+            && request.resource.data.actionAt == request.time)
+          ||
+          (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['followupTrend','followupAt','needsFollowup'])
+            && request.resource.data.followupTrend in ['improved','steady','heavier','unknown']
+            && request.resource.data.followupAt == request.time
+            && request.resource.data.needsFollowup == false)
+        );
+      allow delete: if false;
+    }
+
+    // Preference doc (F2) — derived, server-write-only, client reads own.
+    match /prefs/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow write: if false;
+    }
+
     // Received-lantern reports: create-only, strict shape, for manual review.
     match /lanternReports/{docId} {
       allow create: if request.auth != null

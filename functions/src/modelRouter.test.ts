@@ -45,3 +45,13 @@ test("hard rule: comfort recs off 4.1 mini throws", () => {
   assert.throws(() => assertRoute("comfortRecs",
     { provider: "openai", model: "gpt-5.6-luna", maxTokens: 1, temperature: 0 }));
 });
+
+
+test("preferences route to luna, never meta or spark (hard rule)", () => {
+  const chain = routeChain("preferences");
+  assert.equal(chain.length, 1);
+  assert.equal(chain[0].model, "gpt-5.6-luna");
+  assert.equal(chain[0].provider, "openai");
+  assert.throws(() => assertRoute("preferences", { provider: "meta", model: "muse-spark-1.1", maxTokens: 300, temperature: 0 }));
+  assert.throws(() => assertRoute("preferences", { provider: "openai", model: "muse-spark-1.1", maxTokens: 300, temperature: 0 }));
+});

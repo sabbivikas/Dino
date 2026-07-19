@@ -68,7 +68,16 @@ enum ComfortRecVoice {
     static let shelfEmptySub = String(localized: "when dino picks something for you, it rests here")
 
     static func shelfKept(_ n: Int) -> String { String(localized: "\(n) kept") }
-    static func shelfRowLine(_ n: Int) -> String { "\(shelfTitle) \u{00B7} \(shelfKept(n))" }
+    /// The mood-screen chip — the full archive count (memory + shelf F4).
+    static func shelfBroughtLine(_ n: Int) -> String {
+        n == 1 ? String(localized: "your little shelf \u{00B7} 1 thing dino has brought you")
+               : String(localized: "your little shelf \u{00B7} \(n) things dino has brought you")
+    }
+    static let shelfFilterEverything = String(localized: "everything")
+    static let shelfFilterKept = String(localized: "kept")
+    static let shelfKeepThis = String(localized: "keep this")
+    static let shelfEmptyRest = String(localized: "when dino brings you something, it will rest here 🌿")
+    static func shelfRowLine(_ n: Int) -> String { shelfBroughtLine(n) }
 
     static let allowedTypes = ["music", "book", "film"]
     static let allowedFeels = ["cozy", "hopeful", "quiet"]
@@ -111,6 +120,8 @@ enum ComfortRecVoice {
         [whyLabel, feelPrefix, lengthPrefix, openAppleMusic, openSpotify,
          openBooks, openTV, fallbackWhy, fallbackLength, askWhich, orPrefix,
          shelfTitle, shelfEmpty, shelfEmptySub, shelfRowLine(3),
+         shelfBroughtLine(1), shelfFilterEverything, shelfFilterKept,
+         shelfKeepThis, shelfEmptyRest,
          watchOnPrefix, whereToWatch,
          header(hour: 13), header(hour: 21)]
             + allowedFlags + allowedFeels
@@ -269,7 +280,7 @@ enum RichRecStore {
     static let cacheKey = "dino.recs.richCache"
     static let keepsakesKey = "dino.recs.keepsakes"
     static let staleDays = 45
-    static let keepsakeCap = 24
+    static let keepsakeCap = 200   // full archive — mirrors the ledger cap
 
     static func loadCache(defaults: UserDefaults = .standard, now: Date = Date()) -> RichRecBatch? {
         guard let data = defaults.data(forKey: cacheKey),
@@ -296,10 +307,33 @@ enum RichRecStore {
         if let data = try? JSONEncoder().encode(batch) { defaults.set(data, forKey: cacheKey) }
     }
 
-    /// Every rec dino actually showed — the keepsakes shelf (feature 3).
+    /// Everything dino ever brought — the full-archive shelf (memory + shelf
+    /// arc F4). One event feeds two faces: this local entry (the visible one,
+    /// with titles) and the enum twin in the outcome ledger (ledgerId).
     struct Keepsake: Codable, Equatable {
         let rec: RichRec
         let shownAt: Date
+        var kept: Bool
+        var keptAt: Date?
+        var ledgerId: String?
+
+        init(rec: RichRec, shownAt: Date, kept: Bool = false,
+             keptAt: Date? = nil, ledgerId: String? = nil) {
+            self.rec = rec; self.shownAt = shownAt
+            self.kept = kept; self.keptAt = keptAt; self.ledgerId = ledgerId
+        }
+
+        // migration: entries saved before the full archive lack `kept` —
+        // they were the old keepsakes shelf, which reads as kept (owner
+        // decision: continuity over strictness; history starts fresh here).
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            rec = try c.decode(RichRec.self, forKey: .rec)
+            shownAt = try c.decode(Date.self, forKey: .shownAt)
+            kept = try c.decodeIfPresent(Bool.self, forKey: .kept) ?? true
+            keptAt = try c.decodeIfPresent(Date.self, forKey: .keptAt)
+            ledgerId = try c.decodeIfPresent(String.self, forKey: .ledgerId)
+        }
     }
 
     static func keepsakes(defaults: UserDefaults = .standard) -> [Keepsake] {
@@ -308,11 +342,30 @@ enum RichRecStore {
         return kept
     }
 
-    static func recordKeepsake(_ rec: RichRec, now: Date = Date(), defaults: UserDefaults = .standard) {
-        var kept = keepsakes(defaults: defaults)
-        kept.insert(Keepsake(rec: rec, shownAt: now), at: 0)
-        if kept.count > keepsakeCap { kept = Array(kept.prefix(keepsakeCap)) }
-        if let data = try? JSONEncoder().encode(kept) { defaults.set(data, forKey: keepsakesKey) }
+    static func recordKeepsake(_ rec: RichRec, kept isKept: Bool = false,
+                               ledgerId: String? = nil,
+                               now: Date = Date(), defaults: UserDefaults = .standard) {
+        var all = keepsakes(defaults: defaults)
+        all.insert(Keepsake(rec: rec, shownAt: now, kept: isKept,
+                            keptAt: isKept ? now : nil, ledgerId: ledgerId), at: 0)
+        if all.count > keepsakeCap { all = Array(all.prefix(keepsakeCap)) }
+        if let data = try? JSONEncoder().encode(all) { defaults.set(data, forKey: keepsakesKey) }
+    }
+
+    /// Mark the newest matching entry kept (the gift keep button, or the
+    /// shelf's late "keep this"). Returns the entry's ledger id if it has one
+    /// so the caller can write the enum twin.
+    @discardableResult
+    static func markKept(title: String, shownAt: Date? = nil,
+                         now: Date = Date(), defaults: UserDefaults = .standard) -> String? {
+        var all = keepsakes(defaults: defaults)
+        guard let idx = all.firstIndex(where: { k in
+            k.rec.title == title && (shownAt == nil || k.shownAt == shownAt)
+        }) else { return nil }
+        all[idx].kept = true
+        all[idx].keptAt = now
+        if let data = try? JSONEncoder().encode(all) { defaults.set(data, forKey: keepsakesKey) }
+        return all[idx].ledgerId
     }
 
     /// Titles the model should not repeat (cache + shelf, capped at 10).
@@ -435,7 +488,11 @@ extension RichRecStore {
             RichRec(type: "music", title: "music for airports", creator: "brian eno", year: 1978,
                     why: "w", flags: ["a soft one"], feel: "quiet", length: "about 48 minutes"),
         ]
-        for r in samples { recordKeepsake(r, defaults: defaults) }
+        // mixed kept/unkept so the F4 states (washi mark, plainer slips,
+        // keep this, filter) all show in one screenshot pass
+        for (i, r) in samples.enumerated() {
+            recordKeepsake(r, kept: i % 2 == 0, defaults: defaults)
+        }
     }
 }
 

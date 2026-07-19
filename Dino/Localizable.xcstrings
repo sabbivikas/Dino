@@ -14379,6 +14379,42 @@
       },
       "shouldGenerateSymbol": false
     },
+    "everything": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "everything"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "todo"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ぜんぶ"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "전부"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "tất cả"
+          }
+        }
+      },
+      "shouldGenerateSymbol": false
+    },
     "exhale": {
       "extractionState": "manual",
       "localizations": {
@@ -19717,6 +19753,42 @@
           "stringUnit": {
             "state": "translated",
             "value": "lưu một dòng suy nghĩ bạn nói vào nhật ký dino."
+          }
+        }
+      },
+      "shouldGenerateSymbol": false
+    },
+    "kept": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "kept"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "guardados"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "とっておいたもの"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "간직한 것"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "đã giữ"
           }
         }
       },
@@ -37438,6 +37510,42 @@
       },
       "shouldGenerateSymbol": false
     },
+    "when dino brings you something, it will rest here 🌿": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "when dino brings you something, it will rest here 🌿"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "cuando dino te traiga algo, descansará aquí 🌿"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "dinoがなにかを持ってきたら、ここでやすむよ 🌿"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "dino가 무언가를 가져오면, 여기서 쉬어갈 거예요 🌿"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "khi dino mang đến cho bạn điều gì đó, nó sẽ nằm nghỉ ở đây 🌿"
+          }
+        }
+      },
+      "shouldGenerateSymbol": false
+    },
     "when dino picks something for you, it rests here": {
       "extractionState": "manual",
       "localizations": {
@@ -41105,6 +41213,78 @@
           "stringUnit": {
             "state": "translated",
             "value": "chiếc kệ nhỏ của bạn"
+          }
+        }
+      },
+      "shouldGenerateSymbol": false
+    },
+    "your little shelf · %lld things dino has brought you": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "your little shelf · %lld things dino has brought you"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "tu pequeña repisa · %lld cosas que dino te ha traído"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "あなたのちいさな棚 · dinoが持ってきたもの%lld個"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "당신의 작은 선반 · dino가 가져온 것 %lld개"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "chiếc kệ nhỏ của bạn · %lld món dino đã mang đến"
+          }
+        }
+      },
+      "shouldGenerateSymbol": false
+    },
+    "your little shelf · 1 thing dino has brought you": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "your little shelf · 1 thing dino has brought you"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "tu pequeña repisa · 1 cosa que dino te ha traído"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "あなたのちいさな棚 · dinoが持ってきたもの1個"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "당신의 작은 선반 · dino가 가져온 것 1개"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "chiếc kệ nhỏ của bạn · 1 món dino đã mang đến"
           }
         }
       },

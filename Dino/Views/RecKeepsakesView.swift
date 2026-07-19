@@ -30,13 +30,20 @@ struct RecKeepsakesView: View {
         GridItem(.flexible(), spacing: 18)
     ]
 
-    private let kept: [RichRecStore.Keepsake] = RichRecStore.keepsakes()
+    // the full archive — everything dino ever brought (F4). mutable so the
+    // late "keep this" refreshes in place.
+    @State private var items: [RichRecStore.Keepsake] = RichRecStore.keepsakes()
+    @State private var showKeptOnly = false
+
+    private var visibleItems: [RichRecStore.Keepsake] {
+        showKeptOnly ? items.filter(\.kept) : items
+    }
 
     var body: some View {
         ZStack(alignment: .topTrailing) {
             Color(hex: "#FAF6EC").ignoresSafeArea()
 
-            if kept.isEmpty {
+            if items.isEmpty {
                 emptyState
             } else {
                 ScrollView {
@@ -45,8 +52,11 @@ struct RecKeepsakesView: View {
                             .padding(.horizontal, 20)
                             .padding(.top, 8)
 
+                        filterPills
+                            .padding(.horizontal, 20)
+
                         LazyVGrid(columns: columns, spacing: 18) {
-                            ForEach(Array(kept.enumerated()), id: \.offset) { idx, keepsake in
+                            ForEach(Array(visibleItems.enumerated()), id: \.offset) { idx, keepsake in
                                 slipCard(keepsake: keepsake, index: idx)
                             }
                         }
@@ -107,13 +117,51 @@ struct RecKeepsakesView: View {
         let appearDelay = min(Double(index) * 0.04, 0.6)
         return RecSlipView(
             keepsake: keepsake,
-            color: palette[index % palette.count],
+            // color rides the title, not the grid slot — stable across filters
+            color: palette[abs(keepsake.rec.title.hashValue) % palette.count],
             offsetX: dx,
             offsetY: dy,
             rotation: rot,
             appearDelay: appearDelay,
-            onTap: { open(keepsake) }
+            onTap: { open(keepsake) },
+            onKeep: { keepLate(keepsake) }
         )
+    }
+
+    /// Retroactive keeping from the shelf — marks the local entry and writes
+    /// the enum twin (lateKept) when the entry carries its ledger id.
+    private func keepLate(_ keepsake: RichRecStore.Keepsake) {
+        HapticManager.shared.light()
+        if let ledgerId = RichRecStore.markKept(title: keepsake.rec.title,
+                                                shownAt: keepsake.shownAt) {
+            OutcomeLedger.recordLateKeep(entryId: ledgerId)
+        }
+        items = RichRecStore.keepsakes()
+    }
+
+    /// everything · kept — a quiet two-pill filter, default everything.
+    private var filterPills: some View {
+        HStack(spacing: 8) {
+            filterPill(ComfortRecVoice.shelfFilterEverything, active: !showKeptOnly) {
+                showKeptOnly = false
+            }
+            filterPill(ComfortRecVoice.shelfFilterKept, active: showKeptOnly) {
+                showKeptOnly = true
+            }
+            Spacer()
+        }
+    }
+
+    private func filterPill(_ label: String, active: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(label)
+                .font(DinoTheme.dinoFont(size: 12))
+                .foregroundColor(active ? Color(hex: "#4A3520") : Color(hex: "#A89F90"))
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(Capsule().fill(active ? Color(hex: "#F0E7D3") : Color(hex: "#F7F3E9")))
+        }
+        .buttonStyle(.plain)
     }
 
     private var titleBlock: some View {
@@ -121,7 +169,7 @@ struct RecKeepsakesView: View {
             Text(ComfortRecVoice.shelfTitle)
                 .font(DinoTheme.dinoFont(size: 22))
                 .foregroundColor(Color(hex: "#4A3520"))
-            Text(ComfortRecVoice.shelfKept(kept.count))
+            Text(ComfortRecVoice.shelfKept(items.filter(\.kept).count))
                 .font(DinoTheme.dinoFont(size: 12))
                 .italic()
                 .foregroundColor(Color(hex: "#7A6F5F"))
@@ -147,7 +195,7 @@ struct RecKeepsakesView: View {
             Text(ComfortRecVoice.shelfEmpty)
                 .font(DinoTheme.dinoFont(size: 24))
                 .foregroundColor(Color(hex: "#7A6F5F"))
-            Text(ComfortRecVoice.shelfEmptySub)
+            Text(ComfortRecVoice.shelfEmptyRest)
                 .font(DinoTheme.dinoFont(size: 14))
                 .italic()
                 .foregroundColor(Color(hex: "#A89F90"))
@@ -180,6 +228,7 @@ private struct RecSlipView: View {
     let rotation: Double
     let appearDelay: Double
     let onTap: () -> Void
+    var onKeep: (() -> Void)? = nil
 
     @State private var visible: Bool = false
 
@@ -217,14 +266,37 @@ private struct RecSlipView: View {
                     .italic()
                     .foregroundColor(Color(hex: "#2E2A24").opacity(0.55))
             }
+            if !keepsake.kept, let onKeep {
+                Button(action: onKeep) {
+                    Text(ComfortRecVoice.shelfKeepThis)
+                        .font(DinoTheme.dinoFont(size: 11))
+                        .foregroundColor(Color(hex: "#4A3520"))
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4)
+                        .background(Capsule().fill(Color.white.opacity(0.55)))
+                }
+                .buttonStyle(.plain)
+            }
         }
         .padding(14)
         .frame(maxWidth: .infinity)
-        .frame(height: 170)
+        .frame(height: 190)
         .background(
             RoundedRectangle(cornerRadius: 8)
                 .fill(color)
+                .opacity(keepsake.kept ? 1.0 : 0.82)   // unkept sit plainer
         )
+        .overlay(alignment: .top) {
+            // the washi-tape mark — kept slips only. static, reduce motion safe.
+            if keepsake.kept {
+                RoundedRectangle(cornerRadius: 2)
+                    .fill(Color(hex: "#EAD9A8").opacity(0.85))
+                    .frame(width: 44, height: 14)
+                    .rotationEffect(.degrees(-4))
+                    .offset(y: -6)
+                    .shadow(color: .black.opacity(0.06), radius: 1, y: 1)
+            }
+        }
         .shadow(color: .black.opacity(0.10), radius: 6, x: 0, y: 3)
         .rotationEffect(.degrees(rotation))
         .offset(x: offsetX, y: offsetY)
