@@ -56,6 +56,28 @@ final class OutcomeLedgerTests: XCTestCase {
         XCTAssertLessThanOrEqual(OutcomeLedger.sourceDomain(from: long)?.count ?? 0, 40)
     }
 
+    func testAnnouncementVocabularyIsClosed() {
+        XCTAssertEqual(OutcomeLedger.announcementKind, "announcement")
+        XCTAssertEqual(OutcomeLedger.announcementItemType, "parcel")
+        XCTAssertEqual(OutcomeLedger.announcementActions, ["shown", "opened", "ignored"])
+        XCTAssertEqual(OutcomeLedger.announcementIdPrefix, "ann_")
+        // the announcement kind is NOT client-creatable — `kinds` mirrors the
+        // rules' client-create allowlist (['rec','gift']); SHOWN/IGNORED are
+        // server-authored, the client only flips an existing knock to opened
+        XCTAssertFalse(OutcomeLedger.kinds.contains("announcement"))
+        XCTAssertNil(OutcomeLedger.recordShown(kind: "announcement", itemType: "parcel", moodEntries: []))
+    }
+
+    func testAnnouncementOutcomeIdIsDeterministic() {
+        XCTAssertEqual(OutcomeLedger.announcementOutcomeId(deliveryId: "abc123"), "ann_abc123")
+        // stable → a push-tap and a shelf-catch reveal of the SAME delivery
+        // land on the SAME doc, so the open can never be double-recorded
+        XCTAssertEqual(OutcomeLedger.announcementOutcomeId(deliveryId: "abc123"),
+                       OutcomeLedger.announcementOutcomeId(deliveryId: "abc123"))
+        XCTAssertNotEqual(OutcomeLedger.announcementOutcomeId(deliveryId: "a"),
+                          OutcomeLedger.announcementOutcomeId(deliveryId: "b"))
+    }
+
     func testRecordShownRejectsOffShapeInput() {
         // no auth in unit tests — but shape rejection happens before auth is
         // consulted for invalid enums? recordShown guards auth first; these

@@ -203,32 +203,31 @@ final class KoreanWalkUITests: XCTestCase {
         }
     }
 
-    // MARK: - 05 mood-tab QA states
+    // MARK: - 05 QA states — rec delivery F1: the mood screen is pure
+    // check-in, so the rec-card / expedition / gift-reader mood hooks are
+    // gone; the shelf state walks through the profile tab instead.
     func test05MoodStates() throws {
-        let states: [(String, String)] = [
-            ("-richRecQA", "reccard"),
-            ("-richRecQA3", "keepsakes-shelf"),
-            ("-expeditionQA", "expedition-card"),
-            ("-giftReaderQA", "gift-reader"),
-            ("-ceremonyQA", "ceremony"),
-            ("-resourcesQA", "resources"),
-            ("-moodStepsQA", "mood-steps"),
+        let states: [(String, String, String)] = [
+            ("-richRecQA3", "profile-keepsakes-shelf", "프로필"),
+            ("-ceremonyQA", "mood-ceremony", "기분"),
+            ("-resourcesQA", "mood-resources", "기분"),
+            ("-moodStepsQA", "mood-mood-steps", "기분"),
         ]
-        for (flag, name) in states {
+        for (flag, name, tabLabel) in states {
             let app = makeApp([flag])
             app.launch()
             settle(5)
-            // some hooks do not preselect the mood tab — tap it explicitly
-            let pred = NSPredicate(format: "label CONTAINS %@", "기분")
+            // some hooks do not preselect the tab — tap it explicitly
+            let pred = NSPredicate(format: "label CONTAINS %@", tabLabel)
             let matches = (app.buttons.matching(pred).allElementsBoundByIndex
                          + app.staticTexts.matching(pred).allElementsBoundByIndex)
                 .filter { $0.isHittable }
             matches.max(by: { $0.frame.midY < $1.frame.midY })?.tap()
             settle(3)
-            snap(app, "mood-\(name)")
+            snap(app, name)
             app.swipeUp()
             settle(1)
-            snap(app, "mood-\(name)-scrolled")
+            snap(app, "\(name)-scrolled")
             app.terminate()
         }
     }

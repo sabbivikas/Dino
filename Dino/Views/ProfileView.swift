@@ -145,6 +145,9 @@ struct ProfileView: View {
     @State private var healthRowState: HealthRowState = .notConnected
     @State private var showAmbientSounds: Bool = false
     @State private var showForestLetter: Bool = false
+    // Rec delivery F1: the little shelf lives here now — the full archive of
+    // everything dino ever brought, off the mood screen for good.
+    @State private var showRecShelf: Bool = false
     @State private var showRateAlert: Bool = false
     @AppStorage("dino.showStreak") private var showStreak: Bool = true
     @AppStorage("dino.journalThemeLearningEnabled") private var journalThemeLearning: Bool = false
@@ -278,6 +281,20 @@ struct ProfileView: View {
             AnalyticsManager.shared.trackScreen("profile")
             refreshCalendarAccess()
             refreshHealthAccess()
+            #if DEBUG
+            // -richRecQA3: seed and open the full shelf (moved with the shelf
+            // from the mood screen — rec delivery F1). Screenshot hook only.
+            if ProcessInfo.processInfo.arguments.contains("-richRecQA3") {
+                RichRecStore.seedQAKeepsakes()   // a full shelf
+                showRecShelf = true
+            }
+            // -recShelfEmptyQA: open the shelf with nothing on it (F5 empty
+            // state). -recShelfWrappedQA is read by the service, not here.
+            if ProcessInfo.processInfo.arguments.contains("-recShelfEmptyQA") {
+                RichRecStore.clearForQA()
+                showRecShelf = true
+            }
+            #endif
         }
         .onChange(of: scenePhase) { _, phase in
             // Refresh when returning from iPhone Settings (e.g. after granting).
@@ -331,6 +348,10 @@ struct ProfileView: View {
         }
         .fullScreenCover(isPresented: $showAmbientSounds) {
             AmbientSoundsView()
+        }
+        .fullScreenCover(isPresented: $showRecShelf) {
+            RecKeepsakesView()
+                .environmentObject(dataManager)
         }
         .alert("enjoying dino?", isPresented: $showRateAlert) {
             Button("rate now") { requestReview() }
@@ -835,6 +856,16 @@ struct ProfileView: View {
                 .padding(.vertical, 2)
             }
             .buttonStyle(.plain)
+            // the little shelf — reuses the shelf's own gentle voice
+            SBRow(
+                icon: "books.vertical.fill",
+                iconColor: SB.rust,
+                title: ComfortRecVoice.shelfTitle,
+                subtitle: ComfortRecVoice.shelfEmptySub
+            ) {
+                AnalyticsManager.shared.trackScreen("rec_shelf")
+                showRecShelf = true
+            }
         }
     }
 

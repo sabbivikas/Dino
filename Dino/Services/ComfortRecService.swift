@@ -35,6 +35,10 @@ struct RichRec: Codable, Equatable {
     // tmdb watch page. both optional — old cached recs decode unchanged.
     var watchProvider: String? = nil
     var watchLink: String? = nil
+    // films only (rec delivery F4): tmdb poster path ("/abc.jpg") for the
+    // reveal's image-led card. optional — old cached recs decode unchanged;
+    // absent = the paper-only card, never a broken image.
+    var posterPath: String? = nil
 }
 
 /// A plain search link — no APIs, no tracking, just where to look.
@@ -59,6 +63,10 @@ enum ComfortRecVoice {
     // feature 2: the one time ask, then dino remembers their place
     static let askWhich = String(localized: "listen on apple music or spotify?")
     static let orPrefix = String(localized: "or")
+    // rec delivery F4: the reveal's open button — routes through the same
+    // open flow the shelf uses (reopenLink). the share label reuses the
+    // existing "share" catalog key; this is F4's only new string.
+    static let openIt = String(localized: "open it")
     // films: free to them, or the neutral every option page
     static let watchOnPrefix = String(localized: "watch on")
     static let whereToWatch = String(localized: "see where to watch")
@@ -76,6 +84,9 @@ enum ComfortRecVoice {
     static let shelfFilterEverything = String(localized: "everything")
     static let shelfFilterKept = String(localized: "kept")
     static let shelfKeepThis = String(localized: "keep this")
+    // rec delivery F5: the shelf catch — a still-wrapped parcel's caption.
+    // lowercase, the middot is intentional (never a dash), gentle voice.
+    static let shelfStillWrapped = String(localized: "still wrapped \u{00B7} tap to open")
     static let shelfEmptyRest = String(localized: "when dino brings you something, it will rest here 🌿")
     static func shelfRowLine(_ n: Int) -> String { shelfBroughtLine(n) }
 
@@ -118,10 +129,10 @@ enum ComfortRecVoice {
 
     static var allFixedStrings: [String] {
         [whyLabel, feelPrefix, lengthPrefix, openAppleMusic, openSpotify,
-         openBooks, openTV, fallbackWhy, fallbackLength, askWhich, orPrefix,
+         openBooks, openTV, fallbackWhy, fallbackLength, askWhich, orPrefix, openIt,
          shelfTitle, shelfEmpty, shelfEmptySub, shelfRowLine(3),
          shelfBroughtLine(1), shelfFilterEverything, shelfFilterKept,
-         shelfKeepThis, shelfEmptyRest,
+         shelfKeepThis, shelfEmptyRest, shelfStillWrapped,
          watchOnPrefix, whereToWatch,
          header(hour: 13), header(hour: 21)]
             + allowedFlags + allowedFeels
@@ -173,6 +184,11 @@ enum ComfortRecSanitizer {
         let provider = voiceLine((dict["watchProvider"] as? String) ?? "", cap: 40)
         let rawLink = (dict["watchLink"] as? String) ?? ""
         let watchLink = rawLink.hasPrefix("https://www.themoviedb.org/") ? rawLink : ""
+        // poster path (rec delivery F4, film only) — exactly tmdb's shape or
+        // dropped; a dropped poster is the paper-only card, never broken.
+        let rawPoster = (dict["posterPath"] as? String) ?? ""
+        let posterOK = rawPoster.range(of: "^/[A-Za-z0-9._-]{1,95}\\.(jpg|png)$",
+                                       options: .regularExpression) != nil
         return RichRec(
             type: type,
             title: String(rawTitle.lowercased().trimmingCharacters(in: .whitespacesAndNewlines).prefix(80)),
@@ -183,7 +199,8 @@ enum ComfortRecSanitizer {
             feel: ComfortRecVoice.allowedFeels.contains(feelRaw) ? feelRaw : "quiet",
             length: length.isEmpty ? ComfortRecVoice.fallbackLength : length,
             watchProvider: (type == "film" && !provider.isEmpty && !watchLink.isEmpty) ? provider : nil,
-            watchLink: (type == "film" && !watchLink.isEmpty) ? watchLink : nil)
+            watchLink: (type == "film" && !watchLink.isEmpty) ? watchLink : nil,
+            posterPath: (type == "film" && posterOK) ? rawPoster : nil)
     }
 }
 
@@ -279,6 +296,11 @@ struct RichRecBatch: Codable, Equatable {
 enum RichRecStore {
     static let cacheKey = "dino.recs.richCache"
     static let keepsakesKey = "dino.recs.keepsakes"
+    // rec delivery F5: delivery ids opened on THIS device. The shelf's catch
+    // dedupes a just-opened parcel out of the wrapped list immediately —
+    // before the fire-and-forget markOpened write flips the doc out of the
+    // server-side 'announced' query — so it never double-shows.
+    static let openedDeliveryIdsKey = "dino.recs.openedDeliveryIds"
     static let staleDays = 45
     static let keepsakeCap = 200   // full archive — mirrors the ledger cap
 
@@ -368,6 +390,24 @@ enum RichRecStore {
         return all[idx].ledgerId
     }
 
+    /// The delivery ids the reveal has opened on this device (F5 dedupe).
+    static func openedDeliveryIds(defaults: UserDefaults = .standard) -> Set<String> {
+        Set(defaults.stringArray(forKey: openedDeliveryIdsKey) ?? [])
+    }
+
+    /// Remember a delivery as opened locally so the shelf drops its wrapped
+    /// parcel at once (the server flip is fire-and-forget). Capped like the
+    /// keepsake archive so the set can never grow without bound.
+    static func markDeliveryOpened(_ deliveryId: String, defaults: UserDefaults = .standard) {
+        guard !deliveryId.isEmpty else { return }
+        var ids = openedDeliveryIds(defaults: defaults)
+        guard !ids.contains(deliveryId) else { return }
+        ids.insert(deliveryId)
+        var arr = Array(ids)
+        if arr.count > keepsakeCap { arr = Array(arr.suffix(keepsakeCap)) }
+        defaults.set(arr, forKey: openedDeliveryIdsKey)
+    }
+
     /// Titles the model should not repeat (cache + shelf, capped at 10).
     static func excludeTitles(defaults: UserDefaults = .standard) -> [String] {
         let cached = loadCache(defaults: defaults)?.recs.map(\.title) ?? []
@@ -379,13 +419,14 @@ enum RichRecStore {
 @MainActor
 enum ComfortRecCoordinator {
 
-    /// Same gates as the classic path (one source of truth: GentleRecEngine),
-    /// cache first, one network call fetches three. Returns nil on any miss —
-    /// the caller falls back to the classic pool, then to silence.
-    static func fetchIfMomentIsRight(dataManager: SharedDataManager,
-                                     freshHeavyMood: EmotionalWeather? = nil,
-                                     now: Date = Date(),
-                                     calendar: Calendar = .current) async -> RichRec? {
+    /// The moment gates + the enum payload — one source of truth shared by
+    /// the legacy fetch below and the F2 generate-and-hold trigger.
+    /// Returns nil when the moment is wrong (GentleRecEngine decides —
+    /// crisis window first and absolute, scarcity, ignore cooloffs).
+    static func momentPayload(dataManager: SharedDataManager,
+                              freshHeavyMood: EmotionalWeather? = nil,
+                              now: Date = Date(),
+                              calendar: Calendar = .current) -> [String: Any]? {
         // gate inputs — identical math to GentleRecCoordinator
         let heavyToday: Bool = {
             if let m = freshHeavyMood { return m == .drained || m == .overwhelmed }
@@ -406,9 +447,6 @@ enum ComfortRecCoordinator {
             journalToggleOn: dataManager.journalThemeLearningEnabled,
             journalThemesToday: journalThemesToday,
             ignoreCounts: GentleRecStore.ignoreCounts) else { return nil }
-
-        // cache first — one call covers many cleared moments
-        if let cached = RichRecStore.consumeOne(now: now) { return cached }
 
         let heavyMoodValue = freshHeavyMood.flatMap { m in
             (m == .drained || m == .overwhelmed) ? m.rawValue : nil
@@ -432,6 +470,44 @@ enum ComfortRecCoordinator {
             "excludeTitles": RichRecStore.excludeTitles(),
         ]
         if !heavyMoodValue.isEmpty { payload["mood"] = heavyMoodValue }
+        return payload
+    }
+
+    /// Rec delivery F2 — the mood-log trigger. Same gates as ever, same
+    /// enum payload, but the server HOLDS the recs for a later announcement:
+    /// nothing returns, nothing is cached locally, nothing shows until the
+    /// announcement lands (the no-leak rule). Fire and forget.
+    static func generateAndHoldIfMomentIsRight(dataManager: SharedDataManager,
+                                               freshHeavyMood: EmotionalWeather? = nil,
+                                               now: Date = Date(),
+                                               calendar: Calendar = .current) async {
+        guard let payload = momentPayload(dataManager: dataManager,
+                                          freshHeavyMood: freshHeavyMood,
+                                          now: now, calendar: calendar) else { return }
+        do {
+            let functions = Functions.functions(region: "us-central1")
+            _ = try await functions.httpsCallable("generateComfortRecs").call(payload)
+        } catch {
+            #if DEBUG
+            print("\u{1F319} comfort rec hold error: \(error)")
+            #endif
+        }
+    }
+
+    /// Same gates as the classic path (one source of truth: GentleRecEngine),
+    /// cache first, one network call fetches three. Returns nil on any miss —
+    /// the caller falls back to the classic pool, then to silence.
+    /// (Legacy display path: the server now HOLDS fresh recs, so the network
+    /// branch yields nil in practice; F4's reveal replaces this read.)
+    static func fetchIfMomentIsRight(dataManager: SharedDataManager,
+                                     freshHeavyMood: EmotionalWeather? = nil,
+                                     now: Date = Date(),
+                                     calendar: Calendar = .current) async -> RichRec? {
+        guard let payload = momentPayload(dataManager: dataManager,
+                                          freshHeavyMood: freshHeavyMood,
+                                          now: now, calendar: calendar) else { return nil }
+        // cache first — one call covers many cleared moments
+        if let cached = RichRecStore.consumeOne(now: now) { return cached }
 
         do {
             let functions = Functions.functions(region: "us-central1")
@@ -475,6 +551,13 @@ enum ComfortRecCoordinator {
 
 #if DEBUG
 extension RichRecStore {
+    /// -recShelfEmptyQA — wipe the archive so the shelf's empty state can be
+    /// captured (screenshot verification only).
+    static func clearForQA(defaults: UserDefaults = .standard) {
+        defaults.removeObject(forKey: keepsakesKey)
+        defaults.removeObject(forKey: openedDeliveryIdsKey)
+    }
+
     /// -richRecQA3 seed — a shelf worth of picks for screenshot verification.
     static func seedQAKeepsakes(defaults: UserDefaults = .standard) {
         defaults.removeObject(forKey: keepsakesKey)
@@ -497,6 +580,33 @@ extension RichRecStore {
 }
 
 extension RichRec {
+    /// -recRevealQA fixture — the film case (real totoro poster path so the
+    /// image-led card renders on sim; a network miss falls back to paper).
+    static let qaFilmSample = RichRec(
+        type: "film",
+        title: "my neighbor totoro",
+        creator: "hayao miyazaki",
+        year: 1988,
+        why: "a soft green world where nothing bad happens and the rain is a friend",
+        flags: ["not graphic", "a soft one"],
+        feel: "hopeful",
+        length: "about 86 minutes",
+        watchProvider: "max",
+        watchLink: "https://www.themoviedb.org/movie/8392/watch",
+        posterPath: "/rtGDOeG9LzoerkDGZF9dnVeLppL.jpg")
+
+    /// -recRevealQAPaper fixture — a film WITHOUT a poster path: the
+    /// deterministic paper-only card (zero network, the honest fallback).
+    static let qaPaperOnlySample = RichRec(
+        type: "film",
+        title: "the straight story",
+        creator: "david lynch",
+        year: 1999,
+        why: "slow roads and small kindnesses, the gentlest film he ever made",
+        flags: ["gentle pacing", "some bittersweet moments"],
+        feel: "quiet",
+        length: "about 2 hours")
+
     /// -richRecQA sample — screenshot verification only, never ships a path.
     static let qaSample = RichRec(
         type: "music",

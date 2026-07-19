@@ -24,7 +24,13 @@ class NotificationManager: ObservableObject {
 
     // User preferences — persisted via UserDefaults
     @Published var notificationsEnabled: Bool {
-        didSet { UserDefaults.standard.set(notificationsEnabled, forKey: "notif_enabled"); rescheduleAll() }
+        didSet {
+            UserDefaults.standard.set(notificationsEnabled, forKey: "notif_enabled")
+            rescheduleAll()
+            // Rec delivery F3: the master toggle also governs the server-held
+            // push token — off deletes it (the server-side mute), on restores it.
+            RecPushTokenStore.sync()
+        }
     }
     @Published var dailyCheckInEnabled: Bool {
         didSet { UserDefaults.standard.set(dailyCheckInEnabled, forKey: "notif_dailyCheckIn"); rescheduleAll() }

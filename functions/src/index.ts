@@ -2,7 +2,7 @@ import * as admin from "firebase-admin";
 import * as functions from "firebase-functions/v1";
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { onSchedule } from "firebase-functions/v2/scheduler";
-import { onDocumentCreated } from "firebase-functions/v2/firestore";
+import { onDocumentCreated, onDocumentUpdated } from "firebase-functions/v2/firestore";
 import { defineSecret, defineString } from "firebase-functions/params";
 import { setGlobalOptions } from "firebase-functions/v2";
 import OpenAI from "openai";
@@ -12,6 +12,9 @@ import { route as aiRoute, routeChain as aiRouteChain, logRoute as aiLogRoute, c
 import { validateGiftWithReason, trustedSourcesFor, EXPEDITION_SIGNAL_ALLOW, buildLunaUserPrompt } from "./mission";
 import { capSources, shouldRun, monthKey, creditSummary, REC_MAX_SOURCES_PER_RUN, REC_MIN_RUN_INTERVAL_DAYS } from "./credits";
 import { WORLD_PRIVACY_FLOOR, normalizeCountry, foldPulseCountry } from "./world";
+import { computeDeliverAfter, decideSweep, daypartFor, isValidTz, SWEEP_BATCH_LIMIT, posterPathOrNull, shouldExpireAnnounced, ANNOUNCED_EXPIRY_MS, shouldDeletePayloadOnTransition, payloadExpiresAtMs } from "./recDelivery";
+import { buildRecAnnouncementMessage, isPlausiblePushToken, REC_PUSH_TOKENS_COLLECTION } from "./recAnnounce";
+import { buildAnnouncementOutcome, announcementOutcomeId, isOutcomeDaypart, OUTCOME_RETENTION_DAYS } from "./outcomes";
 
 admin.initializeApp();
 
@@ -2117,7 +2120,7 @@ const COMFORT_REC_FEELS = ["cozy", "hopeful", "quiet"];
 // throws — any failure returns null and the rec ships exactly as before.
 async function tmdbWatchInfo(
   title: string, year: number, country: string, token: string
-): Promise<{ provider: string; link: string } | null> {
+): Promise<{ provider: string; link: string; posterPath: string } | null> {
   try {
     // v4 read access tokens are JWTs (bearer header); a 32 char hex value
     // is a v3 api key (query param). accept either shape.
@@ -2132,22 +2135,25 @@ async function tmdbWatchInfo(
     if (!search.ok) return null;
     const movie = ((await search.json() as any)?.results ?? [])[0];
     if (!movie?.id) return null;
+    // F4 — the reveal's image-led card: the same search result carries the
+    // poster path. Validated to exactly tmdb's shape or dropped.
+    const posterPath = posterPathOrNull(movie.poster_path) ?? "";
     const prov = await fetch(
       `https://api.themoviedb.org/3/movie/${movie.id}/watch/providers?a=1${keyParam}`,
       { headers, signal: AbortSignal.timeout(4000) }
     );
-    if (!prov.ok) return null;
+    if (!prov.ok) return posterPath ? { provider: "", link: "", posterPath } : null;
     const region = ((await prov.json() as any)?.results ?? {})[country];
-    if (!region) return null;
+    if (!region) return posterPath ? { provider: "", link: "", posterPath } : null;
     const link = typeof region.link === "string" && region.link.startsWith("https://www.themoviedb.org/")
       ? region.link : "";
     const freeToThem = [...(region.flatrate ?? []), ...(region.free ?? []), ...(region.ads ?? [])];
     const name = freeToThem[0]?.provider_name;
     if (name && link) {
-      return { provider: String(name).toLowerCase().replace(/[–—-]/g, " ").slice(0, 40).trim(), link };
+      return { provider: String(name).toLowerCase().replace(/[–—-]/g, " ").slice(0, 40).trim(), link, posterPath };
     }
-    if (link) return { provider: "", link };   // rent only / no free tier → neutral watch page
-    return null;
+    if (link) return { provider: "", link, posterPath };   // rent only / no free tier → neutral watch page
+    return posterPath ? { provider: "", link: "", posterPath } : null;
   } catch {
     return null;   // timeout, network, parse — never break the rec
   }
@@ -2202,8 +2208,18 @@ export const generateComfortRecs = onCall(
       } catch { countryName = ""; }
     }
 
-    // Rate limit — house pattern: per-UID daily counter, refund on failure.
+    // Rec delivery F2 — one held delivery at a time: a second heavy log
+    // while one waits must not queue an assembly line or burn a model call
+    // (never spammy). Returning the existing id keeps the retry cheap.
     const db = admin.firestore();
+    const deliveryParentRef = db.collection("recDeliveries").doc(uid);
+    const deliveriesRef = deliveryParentRef.collection("deliveries");
+    const alreadyHeld = await deliveriesRef.where("status", "==", "held").limit(1).get();
+    if (!alreadyHeld.empty) {
+      return { held: true, deliveryId: alreadyHeld.docs[0].id };
+    }
+
+    // Rate limit — house pattern: per-UID daily counter, refund on failure.
     const dayKey = new Date().toISOString().slice(0, 10);
     const counterRef = db.collection("comfortRecLimits").doc(uid);
     await db.runTransaction(async (tx) => {
@@ -2311,11 +2327,53 @@ export const generateComfortRecs = onCall(
       if (film && userCountry) {
         const w = await tmdbWatchInfo(film.title, film.year, userCountry, TMDB_API_TOKEN.value());
         if (w) {
-          film.watchProvider = w.provider;
-          film.watchLink = w.link;
+          if (w.link) {
+            film.watchProvider = w.provider;
+            film.watchLink = w.link;
+          }
+          // F4: the reveal's poster (payload-only — never returned at hold time)
+          if (w.posterPath) film.posterPath = w.posterPath;
         }
       }
-      return { recs };
+      // F2 — THE HOLD (rec delivery arc). The recs are stored, never
+      // returned: the delivery doc carries timing metadata only (enums +
+      // timestamps), the payload doc carries the recs for F4's status-gated
+      // reveal. deliverAfter = now + 45..90 random minutes, pushed out of
+      // quiet hours (21:30-08:30 user-local) and past the 1/day cap.
+      const presenceSnap = await db.collection("presence").doc(uid).get();
+      const tzRaw = presenceSnap.data()?.tz;
+      // no heartbeat yet (or an invalid zone) → utc, the conservative floor
+      const tz = isValidTz(tzRaw) ? tzRaw : "Etc/UTC";
+      const parentSnap = await deliveryParentRef.get();
+      const blockedDays = new Set<string>();
+      const lastAnnouncedDayKey = parentSnap.data()?.lastAnnouncedDayKey;
+      if (typeof lastAnnouncedDayKey === "string") blockedDays.add(lastAnnouncedDayKey);
+      const nowMs = Date.now();
+      const deliverAfterMs = computeDeliverAfter(nowMs, tz, blockedDays);
+      const deliveryRef = deliveriesRef.doc();
+      const holdBatch = db.batch();
+      holdBatch.set(deliveryRef, {
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        deliverAfter: admin.firestore.Timestamp.fromMillis(deliverAfterMs),
+        status: "held",
+        daypart: daypartFor(deliverAfterMs, tz),
+        tz,
+        attempts: 0,
+      });
+      holdBatch.set(deliveryParentRef.collection("payloads").doc(deliveryRef.id), {
+        recs,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        // Backstop TTL (~2x the worst-case lifecycle). The open trigger and the
+        // expiry sweep delete this doc first; this only reaps a payload those
+        // paths missed. Requires the owner to enable the Firestore TTL policy
+        // on the payloads collection group (field expiresAt) in the console.
+        expiresAt: admin.firestore.Timestamp.fromMillis(payloadExpiresAtMs(nowMs)),
+      });
+      await holdBatch.commit();
+      functions.logger.info(
+        `comfortRecs held: uid=${uid} delivery=${deliveryRef.id} ` +
+        `deliverAfter=${new Date(deliverAfterMs).toISOString()} tz=${tz}`);
+      return { held: true, deliveryId: deliveryRef.id };
     } catch (err) {
       // Refund — a failure never burns the user's daily cap.
       await counterRef.set(
@@ -2326,6 +2384,248 @@ export const generateComfortRecs = onCall(
       const message = err instanceof Error ? err.message : "OpenAI request failed";
       throw new HttpsError("internal", message);
     }
+  }
+);
+
+// ---------------------------------------------------------------------------
+// Rec delivery — purge the content payload the instant a delivery is opened.
+// Rec content must not persist. The client flips announced -> opened (the one
+// write the rules allow) but can NEVER delete a payload (payloads write:false),
+// so the server watches the status flip and deletes the sibling content doc.
+// F4's reveal reads the payload INTO MEMORY before the flip fires, so the
+// content is already on the client when this runs — deleting the server copy
+// after the open is safe. Idempotent (a missing payload is a no-op) and cheap:
+// shouldDeletePayloadOnTransition no-ops on every non-open update (announce,
+// reschedule, openedAt-only touch, expiry).
+// ---------------------------------------------------------------------------
+export const onRecDeliveryOpened = onDocumentUpdated(
+  "recDeliveries/{uid}/deliveries/{deliveryId}",
+  async (event) => {
+    const before = event.data?.before.data();
+    const after = event.data?.after.data();
+    if (!before || !after) return;
+    if (!shouldDeletePayloadOnTransition(
+      String(before.status ?? ""), String(after.status ?? ""))) return;
+    const { uid, deliveryId } = event.params;
+    await admin.firestore()
+      .collection("recDeliveries").doc(uid)
+      .collection("payloads").doc(deliveryId)
+      .delete()
+      .catch((err) => {
+        // never a crash loop — a missing payload is the success case
+        functions.logger.warn(
+          `onRecDeliveryOpened: uid=${uid} delivery=${deliveryId} payload delete: ${err}`);
+      });
+    functions.logger.info(
+      `onRecDeliveryOpened: uid=${uid} delivery=${deliveryId} payload purged on open`);
+  }
+);
+
+// ---------------------------------------------------------------------------
+// Rec delivery sweep (rec delivery arc F2)
+// Every ~10 minutes (off-minute cron), sweep due HELD deliveries and decide:
+// announce, back off (active session / 1-a-day cap / quiet hours), or expire.
+// All policy math lives in recDelivery.ts (pure, node-tested); this function
+// only wires firestore. Announcing is transactional and idempotent: the
+// status flip and the per-day marker commit together, so a delivery can
+// never announce twice, and a user never hears two in one local day.
+// ---------------------------------------------------------------------------
+
+// F3 — sendRecAnnouncement(uid, deliveryId): the real announcement.
+// Contract (unchanged from the F2 boundary): invoked at most once per
+// delivery, strictly AFTER the doc is transactionally 'announced' (the
+// idempotency gate lives in the sweep transaction, not here). It must
+// never throw — a failed announcement is a quiet miss, never a crash loop;
+// the rec still surfaces in-app (client observer raises the parcel live
+// activity on next open; F4's reveal reads the payload).
+//
+// CONTENT-FREE: the push carries loc-keys + the deliveryId only (see
+// recAnnounce.ts). The recs stay behind the status-gated payload doc.
+// No token (user muted, or push infra not yet provisioned) is a silent,
+// logged skip — never spammy beats never missed.
+async function sendRecAnnouncement(uid: string, deliveryId: string): Promise<void> {
+  try {
+    const tokenRef = admin.firestore().collection(REC_PUSH_TOKENS_COLLECTION).doc(uid);
+    const token = (await tokenRef.get()).data()?.token;
+    if (!isPlausiblePushToken(token)) {
+      functions.logger.info(
+        `sendRecAnnouncement: uid=${uid} delivery=${deliveryId} no push token — silent skip`);
+      return;
+    }
+    await admin.messaging().send(
+      buildRecAnnouncementMessage(token, deliveryId) as admin.messaging.TokenMessage);
+    functions.logger.info(`sendRecAnnouncement: uid=${uid} delivery=${deliveryId} push sent`);
+  } catch (err) {
+    // a dead token never gets a second try — remove it; the client re-registers
+    const code = (err as { code?: string })?.code ?? "";
+    if (code === "messaging/registration-token-not-registered"
+        || code === "messaging/invalid-registration-token") {
+      await admin.firestore().collection(REC_PUSH_TOKENS_COLLECTION).doc(uid)
+        .delete().catch(() => { /* best effort */ });
+    }
+    functions.logger.warn(
+      `sendRecAnnouncement: uid=${uid} delivery=${deliveryId} failed (quiet miss): ${err}`);
+  }
+}
+
+export const recDeliverySweep = onSchedule(
+  { schedule: "7-59/10 * * * *", timeoutSeconds: 300, memory: "256MiB" },
+  async () => {
+    const db = admin.firestore();
+    const due = await db.collectionGroup("deliveries")
+      .where("status", "==", "held")
+      .where("deliverAfter", "<=", admin.firestore.Timestamp.now())
+      .limit(SWEEP_BATCH_LIMIT)
+      .get();
+    let announcedCount = 0; let rescheduledCount = 0; let expiredCount = 0;
+    for (const docSnap of due.docs) {
+      const uid = docSnap.ref.parent.parent?.id;
+      if (!uid) continue;
+      try {
+        // presence read outside the tx — a heartbeat is advisory, not contended
+        const presence = await db.collection("presence").doc(uid).get();
+        const hb = presence.data()?.lastActiveAt;
+        const lastActiveAtMs = hb instanceof admin.firestore.Timestamp ? hb.toMillis() : null;
+        const parentRef = db.collection("recDeliveries").doc(uid);
+        const payloadRef = parentRef.collection("payloads").doc(docSnap.id);
+        const outcome = await db.runTransaction(async (tx) => {
+          const fresh = await tx.get(docSnap.ref);
+          const parent = await tx.get(parentRef);
+          const d = fresh.data();
+          if (!d) return "skip";
+          const tz = isValidTz(d.tz) ? d.tz : "Etc/UTC";
+          const deliverAfterMs = d.deliverAfter instanceof admin.firestore.Timestamp
+            ? d.deliverAfter.toMillis() : 0;
+          const createdAtMs = d.createdAt instanceof admin.firestore.Timestamp
+            ? d.createdAt.toMillis() : deliverAfterMs;
+          const marker = parent.data()?.lastAnnouncedDayKey;
+          const decision = decideSweep({
+            status: String(d.status ?? ""),
+            createdAtMs,
+            deliverAfterMs,
+            tz,
+            nowMs: Date.now(),
+            lastActiveAtMs,
+            lastAnnouncedDayKey: typeof marker === "string" ? marker : null,
+          });
+          if (decision.action === "expire") {
+            tx.update(docSnap.ref, { status: "expired" });
+            // rec content must not persist — an expired hold's payload is
+            // orphaned; purge it in the same tx (idempotent if already gone).
+            tx.delete(payloadRef);
+          } else if (decision.action === "reschedule") {
+            tx.update(docSnap.ref, {
+              deliverAfter: admin.firestore.Timestamp.fromMillis(decision.deliverAfterMs),
+              daypart: daypartFor(decision.deliverAfterMs, tz),
+              attempts: admin.firestore.FieldValue.increment(1),
+            });
+          } else if (decision.action === "announce") {
+            tx.update(docSnap.ref, {
+              status: "announced",
+              announcedAt: admin.firestore.FieldValue.serverTimestamp(),
+            });
+            tx.set(parentRef, { lastAnnouncedDayKey: decision.dayKey }, { merge: true });
+            // F6 — the knock's SHOWN signal: enum-only, server-authored (so
+            // 'shown' is un-forgeable — the client can never CREATE one), keyed
+            // by ann_<deliveryId> so the reveal's OPENED flip and the expiry's
+            // IGNORED flip both land on this one doc. daypart is the moment the
+            // knock actually lands. Atomic with the announce in this same tx.
+            const annBody = buildAnnouncementOutcome("shown", daypartFor(Date.now(), tz));
+            if (annBody) {
+              const annRef = db.collection("outcomes").doc(uid)
+                .collection("entries").doc(announcementOutcomeId(docSnap.id));
+              tx.set(annRef, {
+                ...annBody,
+                shownAt: admin.firestore.FieldValue.serverTimestamp(),
+                expiresAt: admin.firestore.Timestamp.fromMillis(
+                  Date.now() + OUTCOME_RETENTION_DAYS * 86400 * 1000),
+              });
+            }
+          }
+          return decision.action;
+        });
+        if (outcome === "announce") {
+          announcedCount += 1;
+          await sendRecAnnouncement(uid, docSnap.id);
+        } else if (outcome === "reschedule") { rescheduledCount += 1; }
+        else if (outcome === "expire") { expiredCount += 1; }
+      } catch (err) {
+        functions.logger.warn(`recDeliverySweep: uid=${uid} delivery=${docSnap.id} failed: ${err}`);
+      }
+    }
+
+    // F6 — second pass: the IGNORED knock-timing signal. Announced deliveries
+    // the user never opened, stale past 72h, retire to 'expired' and their
+    // announcement outcome flips shown → ignored ("the knock went unanswered").
+    // Server-authored + enum-only, same as SHOWN. The tx re-reads status, so a
+    // delivery opened in the meantime (status 'opened') is skipped — the state
+    // machine is shown → opened OR shown → ignored, never both.
+    const ignoredCutoff = admin.firestore.Timestamp.fromMillis(Date.now() - ANNOUNCED_EXPIRY_MS);
+    const staleAnnounced = await db.collectionGroup("deliveries")
+      .where("status", "==", "announced")
+      .where("announcedAt", "<=", ignoredCutoff)
+      .limit(SWEEP_BATCH_LIMIT)
+      .get();
+    let ignoredCount = 0;
+    for (const docSnap of staleAnnounced.docs) {
+      const uid = docSnap.ref.parent.parent?.id;
+      if (!uid) continue;
+      try {
+        await db.runTransaction(async (tx) => {
+          const fresh = await tx.get(docSnap.ref);
+          const d = fresh.data();
+          if (!d) return;
+          const announcedAtMs = d.announcedAt instanceof admin.firestore.Timestamp
+            ? d.announcedAt.toMillis() : null;
+          if (!shouldExpireAnnounced(String(d.status ?? ""), announcedAtMs, Date.now())) return;
+          const annRef = db.collection("outcomes").doc(uid)
+            .collection("entries").doc(announcementOutcomeId(docSnap.id));
+          const annSnap = await tx.get(annRef);   // all reads BEFORE any write
+          tx.update(docSnap.ref, { status: "expired" });
+          // rec content must not persist — the ignored knock retires; purge
+          // its payload in the same tx (idempotent if already gone).
+          tx.delete(db.collection("recDeliveries").doc(uid)
+            .collection("payloads").doc(docSnap.id));
+          if (annSnap.exists) {
+            // If the knock was already OPENED (the client flips the outcome
+            // even when the delivery status flip lags before its rule deploys),
+            // it was answered — retire the doc but KEEP 'opened', never clobber
+            // it to ignored. Otherwise flip shown → ignored, preserving the
+            // SHOWN doc's daypart.
+            if (annSnap.data()?.action !== "opened") {
+              tx.update(annRef, {
+                action: "ignored",
+                actionAt: admin.firestore.FieldValue.serverTimestamp(),
+              });
+            }
+          } else {
+            // legacy: announced before F6 shipped the SHOWN write — reconstruct
+            // the enum-only doc from the delivery's stored daypart
+            const tz = isValidTz(d.tz) ? d.tz : "Etc/UTC";
+            const daypart = isOutcomeDaypart(d.daypart)
+              ? d.daypart : daypartFor(announcedAtMs ?? Date.now(), tz);
+            const body = buildAnnouncementOutcome("ignored", daypart);
+            if (body) {
+              tx.set(annRef, {
+                ...body,
+                shownAt: admin.firestore.FieldValue.serverTimestamp(),
+                actionAt: admin.firestore.FieldValue.serverTimestamp(),
+                expiresAt: admin.firestore.Timestamp.fromMillis(
+                  Date.now() + OUTCOME_RETENTION_DAYS * 86400 * 1000),
+              });
+            }
+          }
+        });
+        ignoredCount += 1;
+      } catch (err) {
+        functions.logger.warn(
+          `recDeliverySweep(ignored): uid=${uid} delivery=${docSnap.id} failed: ${err}`);
+      }
+    }
+
+    functions.logger.info(
+      `recDeliverySweep: due=${due.docs.length} announced=${announcedCount} ` +
+      `rescheduled=${rescheduledCount} expired=${expiredCount} ignored=${ignoredCount}`);
   }
 );
 

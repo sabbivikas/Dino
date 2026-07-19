@@ -5,6 +5,41 @@
       "shouldGenerateSymbol": false,
       "shouldTranslate": false
     },
+    "still wrapped · tap to open": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "still wrapped · tap to open"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "todavía sin abrir · toca para abrir"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "まだ包んだまま · タップして開けてね"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "아직 포장된 채예요 · 눌러서 열어봐요"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "vẫn còn gói kín · chạm để mở"
+          }
+        }
+      },
+      "shouldGenerateSymbol": false
+    },
     " ": {
       "shouldGenerateSymbol": false,
       "shouldTranslate": false
@@ -24653,6 +24688,42 @@
       },
       "shouldGenerateSymbol": false
     },
+    "open it": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "open it"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ábrelo"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "あけてみて"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "열어봐요"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "mở ra xem"
+          }
+        }
+      },
+      "shouldGenerateSymbol": false
+    },
     "open journal ✍️": {
       "localizations": {
         "en": {
@@ -30203,6 +30274,78 @@
           "stringUnit": {
             "state": "translated",
             "value": "luôn có người trả lời bạn"
+          }
+        }
+      },
+      "shouldGenerateSymbol": false
+    },
+    "rec_announcement_body": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "what is it? 🎁"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "¿qué será? 🎁"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "なんだろう？🎁"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "뭘까요? 🎁"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "là gì nhỉ? 🎁"
+          }
+        }
+      },
+      "shouldGenerateSymbol": false
+    },
+    "rec_announcement_title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "dino found something for you"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "dino encontró algo para ti"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ディノがあなたになにかみつけたよ"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "디노가 당신을 위해 뭔가 찾았어요"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "dino đã tìm thấy điều gì đó cho bạn"
           }
         }
       },

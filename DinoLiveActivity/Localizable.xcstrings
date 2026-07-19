@@ -1971,6 +1971,78 @@
       },
       "shouldGenerateSymbol": false
     },
+    "dino has something for you": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "dino has something for you"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "dino tiene algo para ti"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ディノからあなたになにかあるよ"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "디노가 당신에게 줄 게 있어요"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "dino có điều gì đó cho bạn"
+          }
+        }
+      },
+      "shouldGenerateSymbol": false
+    },
+    "what is it? 🎁": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "what is it? 🎁"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "¿qué será? 🎁"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "なんだろう？🎁"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "뭘까요? 🎁"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "là gì nhỉ? 🎁"
+          }
+        }
+      },
+      "shouldGenerateSymbol": false
+    },
     "calm": {
       "extractionState": "manual",
       "localizations": {

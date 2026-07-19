@@ -52,6 +52,24 @@ struct ContentView: View {
                 handleDeepLink(url)
                 DinoPendingDeepLink.url = nil
             }
+            #if DEBUG
+            // QA hook (rec delivery F3): -recParcelQA raises the parcel live
+            // activity immediately so lock screen / island shots are capturable.
+            if ProcessInfo.processInfo.arguments.contains("-recParcelQA") {
+                DinoLiveActivityManager.shared.startRecParcelActivity(
+                    deliveryId: "qa-parcel", announcedAt: Date())
+            }
+            // F4 reveal QA hooks: -recRevealQA (film + poster),
+            // -recRevealQAPaper (paper-only), -recRevealQAReduceMotion
+            // (forces the fade path). qa- ids use fixtures, write nothing.
+            let revealQAArgs = ["-recRevealQA", "-recRevealQAPaper", "-recRevealQAReduceMotion"]
+            if revealQAArgs.contains(where: ProcessInfo.processInfo.arguments.contains) {
+                // delay past first render — presenting during mount is dropped
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                    dataManager.recRevealDeepLink = RecRevealLink(deliveryId: "qa-parcel")
+                }
+            }
+            #endif
         }
         .fullScreenCover(isPresented: Binding(
             get: { dataManager.showRhythmsLetterFromDeepLink },
@@ -64,6 +82,16 @@ struct ContentView: View {
             set: { dataManager.showAmbientFromDeepLink = $0 }
         )) {
             AmbientSoundsView()
+        }
+        .fullScreenCover(isPresented: Binding(
+            get: { dataManager.recRevealDeepLink != nil },
+            set: { if !$0 { dataManager.recRevealDeepLink = nil } }
+        )) {
+            // F4 — the reveal: unwrap moment, image-led card, dino presenting.
+            // (bool-binding cover — the same proven pattern as the covers above)
+            RecRevealView(
+                deliveryId: dataManager.recRevealDeepLink?.deliveryId ?? "",
+                onDismiss: { dataManager.recRevealDeepLink = nil })
         }
     }
 
@@ -113,6 +141,13 @@ struct ContentView: View {
             // The night-before rhythms letter opens the envelope UI over
             // whatever tab is active.
             dataManager.showRhythmsLetterFromDeepLink = true
+        case "rec-reveal":
+            // Rec delivery F3/F4 — the parcel's door (push tap or live
+            // activity tap) → the full-screen reveal moment.
+            if let link = RecRevealLink.from(url: url) {
+                print("[RecReveal] deep link → \(link.deliveryId)")
+                dataManager.recRevealDeepLink = link
+            }
         case "meditation":
             // Break-finder reminder opens meditation over the home tab.
             dataManager.deepLinkTab = 0

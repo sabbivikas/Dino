@@ -7,6 +7,7 @@ import SwiftUI
 import AppIntents
 import FirebaseCore
 import FirebaseFirestore
+import FirebaseMessaging
 import GoogleSignIn
 import UserNotifications
 import PostHog
@@ -17,6 +18,11 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
         FirebaseApp.configure()
         print("[App] Firebase configured")
         UNUserNotificationCenter.current().delegate = self
+        // Rec delivery F3: remote push (FCM). Registration is permissionless
+        // (the APNs token is not an alert grant); whether a token is ever
+        // STORED server-side is gated by RecPushTokenStore's prefs contract.
+        Messaging.messaging().delegate = self
+        application.registerForRemoteNotifications()
         registerNotificationCategories()
         // Donate the mood entity values (+ their synonyms) so the
         // parameterized siri phrase can match — without this call the phrase
@@ -74,6 +80,19 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
         return GIDSignIn.sharedInstance.handle(url)
     }
 
+    // MARK: - Remote push plumbing (rec delivery F3)
+
+    func application(_ application: UIApplication,
+                     didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
+        Messaging.messaging().apnsToken = deviceToken
+    }
+
+    func application(_ application: UIApplication,
+                     didFailToRegisterForRemoteNotificationsWithError error: Error) {
+        // expected on the simulator / before APNs provisioning — never fatal
+        print("[Push] APNs registration failed: \(error.localizedDescription)")
+    }
+
     // Handle notification taps and action buttons
     func userNotificationCenter(_ center: UNUserNotificationCenter,
                                  didReceive response: UNNotificationResponse,
@@ -97,6 +116,13 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
             case "STREAK_REMINDER": path = "dino://mood"
             case "WIND_DOWN":       path = "dino://breathe"
             default:
+                // Rec delivery F3: a remote announcement carries its own door
+                // (dino://rec-reveal/{deliveryId}) — content-free otherwise.
+                if let deepLink = response.notification.request.content.userInfo["deepLink"] as? String,
+                   deepLink.hasPrefix("dino://") {
+                    path = deepLink
+                    break
+                }
                 let action = response.notification.request.content.userInfo["action"] as? String ?? "home"
                 switch action {
                 case "mood":          path = "dino://mood"
@@ -126,6 +152,16 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
                                  willPresent notification: UNNotification,
                                  withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
         completionHandler([.banner, .sound])
+    }
+}
+
+extension AppDelegate: MessagingDelegate {
+    // Rec delivery F3: fresh FCM token → reconcile pushTokens/{uid} with the
+    // prefs contract (stored only while permitted + wanted; deleted otherwise).
+    func messaging(_ messaging: Messaging, didReceiveRegistrationToken fcmToken: String?) {
+        Task { @MainActor in
+            RecPushTokenStore.tokenDidRefresh(fcmToken)
+        }
     }
 }
 
@@ -201,12 +237,21 @@ struct DinoApp: App {
 
                     await IdentityLifecycleManager.shared.handleColdStart()
                     ImageCache.shared.preload(["DinoMascot", "dino-meditation", "DinoFlower-cut", "cut-DinoChecklist", "dino-only"])
+
+                    // Rec delivery F3: cold-start pass — reconcile the push
+                    // token with prefs, then raise/expire the parcel activity
+                    // for any announced delivery (onChange skips the mount).
+                    RecPushTokenStore.sync()
+                    await RecAnnouncementObserver.checkOnForeground()
                 }
                 .onChange(of: scenePhase) { _, newPhase in
                     switch newPhase {
                     case .active:
                         sessionStartTime = Date()
                         AnalyticsManager.shared.trackSessionStarted()
+                        // Rec delivery F2: the presence heartbeat — the
+                        // delivery sweep never announces into an open app.
+                        PresenceHeartbeat.appBecameActive()
                         // Foreground return → app_opened(open_type: foreground).
                         // (onChange does not fire for the initial active at mount,
                         // so the cold-launch active is never misclassified here.)
@@ -216,12 +261,19 @@ struct DinoApp: App {
                         Task { await RhythmsLetterScheduler.shared.evaluateAndScheduleIfNeeded() }
                         // DinoMind: generate today's smart check-in nudge (once/day).
                         Task { await DailyNudgeScheduler.generateIfNeeded() }
+                        // Rec delivery F3: foreground pass — the parcel live
+                        // activity raises here for announcements that landed
+                        // while the app was away (client-side start; the
+                        // closed-app gap is the push banner's job).
+                        RecPushTokenStore.sync()
+                        Task { await RecAnnouncementObserver.checkOnForeground() }
                     case .inactive, .background:
                         let duration = Date().timeIntervalSince(sessionStartTime)
                         if duration > 0 {
                             AnalyticsManager.shared.trackAppBackgrounded(sessionDuration: duration)
                             AnalyticsManager.shared.trackSessionEnded(durationSeconds: Int(duration))
                         }
+                        PresenceHeartbeat.appResignedActive()
                     @unknown default:
                         break
                     }
