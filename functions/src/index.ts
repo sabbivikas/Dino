@@ -10,6 +10,7 @@ import { createHash } from "node:crypto";
 import { seasonForMonth, isSeasonEligible, isSlotActive, REC_SEASON_VALUES } from "./season";
 import { route as aiRoute, routeChain as aiRouteChain, logRoute as aiLogRoute, clientFor as aiClientFor, type AiRoute } from "./modelRouter";
 import { validateGiftWithReason, trustedSourcesFor, EXPEDITION_SIGNAL_ALLOW, buildLunaUserPrompt } from "./mission";
+import { signalAvailability, computeConfidence, sanitizeConcernScore, decideRecGeneration } from "./concernScore";
 import { capSources, shouldRun, monthKey, creditSummary, REC_MAX_SOURCES_PER_RUN, REC_MIN_RUN_INTERVAL_DAYS } from "./credits";
 import { WORLD_PRIVACY_FLOOR, normalizeCountry, foldPulseCountry } from "./world";
 import { computeDeliverAfter, decideSweep, daypartFor, isValidTz, SWEEP_BATCH_LIMIT, posterPathOrNull, shouldExpireAnnounced, ANNOUNCED_EXPIRY_MS, shouldDeletePayloadOnTransition, payloadExpiresAtMs } from "./recDelivery";
@@ -1740,8 +1741,15 @@ const LUNA_WATCHER_PROMPT =
   "known, and be MORE conservative about acting when you know less. " +
   "gift fatigue is how often recent gifts went unopened: when it is high, dino has been bringing " +
   "more than this person wants right now — be far more reluctant to act. " +
-  'respond only with json {"act":false,"needKind":"none","confidence":0.0}. ' +
-  "needKind is exactly one of rest, beauty, hope, wonder, connection, none. when in doubt, stay quiet.";
+  'respond only with json {"act":false,"needKind":"none","confidence":0.0,"concern_score":0}. ' +
+  "needKind is exactly one of rest, beauty, hope, wonder, connection, none. when in doubt, stay quiet. " +
+  "concern_score is a separate integer 0-100: how heavy this person's last 7 days look versus their " +
+  "OWN recent baseline (the buckets already encode their personal trend — never compare them to other " +
+  "people). weigh the mood trend and heavy days most (heavy/wobbly and more heavy days push it up); " +
+  "short sleep and low movement add to it; themes add context. judge ONLY from signals that are " +
+  "present — unknown buckets and 'none' themes are absent and must neither raise nor lower it, only " +
+  "make you less certain. concern_score is INDEPENDENT of act: report an honest concern_score even when " +
+  "you decide not to send a gift, and a low one even when you do.";
 
 // F2 THE MISSION: when luna acts, muse spark (via the router — hard rule:
 // never luna) hunts the real web for ONE small genuine thing. Budget is
@@ -2017,6 +2025,8 @@ export const nightlyExpeditionWatch = onSchedule(
       .get();
     let watched = 0;
     let acted = 0;
+    let scored = 0;         // luna returned a usable concern_score
+    let wouldGenerate = 0;  // T1+T2 DRY-RUN: the trigger says a rec is due (not yet acted on — Task 3 wires it)
     for (const doc of snap.docs) {
       const d = doc.data() ?? {};
       // strict bucket validation — anything off shape is skipped silently
@@ -2089,11 +2099,58 @@ export const nightlyExpeditionWatch = onSchedule(
             .map((x: unknown) => String(x)).slice(0, 3);
           await runExpeditionMission(db, doc.id, needKind, recentSources, userLocale, keptKinds);   // F2 — silence on any failure
         }
+
+        // ── LUNA RECS T1+T2 — nightly concern score + trigger math (DRY-RUN) ──
+        // Rides THIS SAME gpt-5.6-luna call (zero added model calls, cost rule
+        // 2): the concern_score is one more field on the JSON we already
+        // parsed. Everything below is deterministic CODE, independent of the
+        // model (cost rule 4). This block only COMPUTES + LOGS the decision;
+        // it deliberately does NOT call generateComfortRecs — Task 3 wires that.
+        // Crisis is untouched: it is on-device + absolute and never reaches
+        // here, and this block gates nothing but comfort recs.
+        const concernScore = sanitizeConcernScore(parsed.concern_score);
+        // confidence is code-computed from which signals are actually present
+        // (never the model's self-report), so a model can't inflate its own bar
+        const recConfidence = computeConfidence(signalAvailability(buckets, themes));
+        // The 7-day cooldown and 4/30-day cap read the SERVER-OWNED delivery
+        // ledger (announcedAt = the moment a rec was actually delivered/knocked;
+        // it persists through opened/expired). One 30-day window covers both
+        // gates. This is the unfakeable source — not the client sinceLastRec
+        // bucket, whose 3to7 boundary is too coarse for a hard 7-day line.
+        const since30 = admin.firestore.Timestamp.fromMillis(Date.now() - 30 * 86400 * 1000);
+        const delivered = await db.collection("recDeliveries").doc(doc.id)
+          .collection("deliveries")
+          .where("announcedAt", ">=", since30)
+          .orderBy("announcedAt", "desc")
+          .get();
+        const deliveriesLast30d = delivered.size;
+        let daysSinceLastRec = Number.POSITIVE_INFINITY;
+        if (!delivered.empty) {
+          const lastAnnouncedAt = delivered.docs[0].data().announcedAt;
+          if (lastAnnouncedAt instanceof admin.firestore.Timestamp) {
+            daysSinceLastRec = (Date.now() - lastAnnouncedAt.toMillis()) / 86400000;
+          }
+        }
+        if (concernScore !== null) scored++;
+        const recDecision = decideRecGeneration({
+          score: concernScore, confidence: recConfidence, daysSinceLastRec, deliveriesLast30d,
+        });
+        if (recDecision.shouldGenerate) wouldGenerate++;
+        // enum/number facet ONLY — no uid, no themes, no raw content (privacy)
+        functions.logger.info("luna_rec_decision", {
+          concernScore, recConfidence,
+          daysSinceLastRec: Number.isFinite(daysSinceLastRec) ? Math.round(daysSinceLastRec) : -1,
+          deliveriesLast30d,
+          effectiveThreshold: Math.round(recDecision.effectiveThreshold),
+          reason: recDecision.reason,
+          shouldGenerate: recDecision.shouldGenerate,
+          dryRun: true,
+        });
       } catch {
         // luna failure = a quiet night; no attempt recorded → tomorrow may retry
       }
     }
-    functions.logger.info(`nightlyExpeditionWatch: cohort=${snap.docs.length} watched=${watched} acted=${acted}`);
+    functions.logger.info(`nightlyExpeditionWatch: cohort=${snap.docs.length} watched=${watched} acted=${acted} scored=${scored} wouldGenerate=${wouldGenerate} (recs dry-run)`);
   }
 );
 
