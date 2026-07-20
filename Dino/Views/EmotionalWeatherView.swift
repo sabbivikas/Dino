@@ -194,16 +194,14 @@ struct EmotionalWeatherView: View {
                             // single tired tuesday (StretchSignal).
                             if stretchSignalFires() {
                                 pendingSupportRow = true
-                            } else {
-                                // Rec delivery F2: generation still happens at
-                                // mood-log time, but the server HOLDS the recs —
-                                // the announcement comes 45-90 min later, never
-                                // here. Support beats recs; nothing shows now.
-                                Task {
-                                    await ComfortRecCoordinator.generateAndHoldIfMomentIsRight(
-                                        dataManager: dataManager, freshHeavyMood: w)
-                                }
                             }
+                            // T3 (luna-recs): comfort-rec generation no longer
+                            // fires at mood-log time. The nightly watcher's
+                            // concern score is the sole trigger now. Mood-logging
+                            // still writes the mood entry (viewModel.saveMood
+                            // above) and still updates the expeditionSignals doc
+                            // (the .task on this view) that the concern score
+                            // reads — only the generateComfortRecs trigger is gone.
                             // The ceremony is the headliner when a lantern is
                             // available: claim races a short window; nil or
                             // slow → today's exact flow (break card first).
