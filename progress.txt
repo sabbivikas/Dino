@@ -91,3 +91,34 @@ TASK LIST:
 [DONE] F4 reveal polish (feature/rec-delivery, RecRevealView.swift only) — (1) DINO REMOVED from the reveal: deleted the cut-DinoMascot block, the `breathing` @State + its .onAppear breathe animation from private struct RecDuskBackdrop; dropped the now-unused reduceMotion param (call site RecDuskBackdrop()); kept gradient + horizon-glow ellipse + two hills; updated file/struct comments (no strings). Card's Image("jar-dino") untouched. No unused symbols left (w/h + view.reduceMotion still used). (2) BLOOM HAPTIC: HapticManager.success()/import UIKit already present; parcelTapped() now fires HapticManager.shared.success() the instant phase becomes .revealed in BOTH paths (reduce-motion easeInOut path + the unwrap asyncAfter spring path). Once per reveal (existing guard next!=phase + inner guard phase==.unwrapping). Existing light() tap kept. (3) DISCOVERABLE DISMISS: new quiet closeButton (SF Symbol xmark in low-opacity cream circle, top-trailing) added as last ZStack child above the card, action onDismiss; AX label reuses EXISTING "close" catalog key via String(localized:) — no new string. Swipe hardened: .gesture(dismissDrag) -> .simultaneousGesture(dismissDrag) so the revealed card's allowsHitTesting no longer swallows the drag; dismiss works in every phase. VERIFIED: Debug build green; DinoTests 429/429 green (baseline held, no test touched the removed param). Screenshots: f4polish-no-dino.png LIVE (parcel over dusk world, NO dino on hills, close X visible), f4polish-dismissed.png LIVE (home = onDismiss target); f4polish-card.png NOT live (Simulator tap access denied by user, simctl has no tap; card unchanged by this task, verified by build/logic). Verdict: scratchpad/rec-delivery-QA/f4polish-verdict.md. CrisisResources hash ba2ebd56... intact; main untouched; nothing pushed.
 
 [TODO] final: morning report + REC_DELIVERY_DONE
+
+# ── overnight autonomous arc — luna-driven comfort recs (feature/luna-recs, off main @ 36b442a) ──
+GOAL: replace the mood-log-time comfort-rec trigger with a nightly LUNA CONCERN-SCORE that
+decides when dino should generate + hold comfort recs, and learn delivery cadence from the
+announcement outcome ledger.
+
+HARD LIMITS: work ONLY in /Users/vikas/Dino-luna, absolute paths every edit. NEVER touch
+/Users/vikas/Dino (main @ 36b442a, owner's checkout) or /Users/vikas/Dino-star (parked).
+NEVER modify main directly; NEVER push. CrisisResources.swift + crisis keyword nets UNTOUCHED
+(protected sha256 ba2ebd5645e249d0f5148235e6c83de25ebd39b4b653654e60b1a048a763e090).
+generateComfortRecs model stays gpt-4.1-mini (owner hard rule; assertRoute enforces).
+Secrets.xcconfig + functions/.env copied for build only — gitignored, NEVER commit.
+
+COST RULES:
+1. Prefer folding the concern-score into an EXISTING nightly job over a new cron. RECOMMENDED
+   HOST: nightlyExpeditionWatch (already reads expeditionSignals + already makes the per-user
+   gpt-5.6-luna call). Concern score should be a PURE function of already-bucketed signals →
+   ZERO new per-user model call. NOT the distiller (reads outcomes ledger, capped 50/night,
+   never sees current mood/sleep/steps signals).
+2. Luna nightly model = gpt-5.6-luna (cheap classification tier). Do not widen.
+3. Respect existing caps: EXPEDITION_LUNA_NIGHTLY_CAP=2000, COMFORT_REC_DAILY_LIMIT=2.
+
+TASK LIST:
+[DONE] 0. archaeology — full inventory in scratchpad/luna-recs-QA/task0-archaeology.md
+       (host recommendation, luna model id, reusable-vs-build, cost baseline, schemas,
+       F2 trigger at EmotionalWeatherView.swift:203 → generateAndHoldIfMomentIsRight → generateComfortRecs).
+[TODO] 1. concern score — deterministic from expeditionSignals buckets, hosted in the watcher (no new model call)
+[TODO] 2. trigger math — when concern score → call generateComfortRecs (gates/thresholds)
+[TODO] 3. rewire trigger — replace EmotionalWeatherView:203 mood-log trigger with the nightly path
+[TODO] 4. cadence learning — learn best daypart from announcement outcomes (shown/opened/ignored)
+[TODO] final: morning report + LUNA_RECS_DONE
