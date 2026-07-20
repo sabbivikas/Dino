@@ -65,7 +65,7 @@ export type PreferenceDoc = {
 //         r < 0.20   → +6   (very ignoring)    ceiling
 // Bounds [-6, +6] are REC_ADJ_MIN/MAX, imported from concernScore so this
 // producer and the threshold consumer share ONE source of truth. Lowering the
-// bar only eases eligibility WITHIN the hard 7-day cooldown + 4/30-day cap — it
+// bar only eases eligibility WITHIN the hard 7-day cooldown + 3/30-day cap — it
 // can NEVER breach them (those are independent checks in decideRecGeneration).
 export const REC_ADJ_WINDOW = 30;        // most-recent announcement knocks weighed
 export const REC_ADJ_MIN_RESOLVED = 4;   // min opened+ignored before any nudge

@@ -55,7 +55,7 @@ rec). This cannot be measured live (no deploy), so it is bounded:
   ~$100/month global**, exactly as before T3 — Part A only uses more of that
   pre-existing ceiling, it does not raise it. No new cap needed.
 - Realistic per-user add: expeditions are rare (≤2/user/mo, 14d cooldown) and
-  recs rare (≤4/mo), so gift-cooldown nights are a modest slice. Worst-case
+  recs rare (≤3/mo), so gift-cooldown nights are a modest slice. Worst-case
   heavy user (eligible most nights, freshly gifted): ~14 extra calls/mo ≈
   **$0.02–0.03/user/mo**; typical user ≈ near zero. Well under budget.
 

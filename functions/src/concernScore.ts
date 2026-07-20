@@ -9,7 +9,7 @@
 //     never asks a model for anything. `sanitizeConcernScore` only VALIDATES
 //     the number the model returned.
 //   • Everything else here — confidence, the effective threshold, the 7-day
-//     cooldown, the 4/30-day cap, the final shouldGenerate — is CODE, computed
+//     cooldown, the 3/30-day cap, the final shouldGenerate — is CODE, computed
 //     INDEPENDENT of the model output. A scoring bug or model drift can move
 //     the score but can NEVER move the caps: `decideRecGeneration` gates on
 //     cooldown/cap regardless of score (see the pathological-cap test).
@@ -78,12 +78,12 @@ export function sanitizeConcernScore(raw: unknown): number | null {
 // Tuned (Task 2.4) against a simulated population so:
 //   stable / low-signal  ≈ 0-1 rec / month
 //   typical variance      ≈ 2-3 / month
-//   sustained decline     → up to the 4/month ceiling
+//   sustained decline     → up to the 3/month ceiling
 // See concernScore.test.ts (frequency-shape sim) and scratchpad frequency-sim.md.
 export const BASE_THRESHOLD = 58;   // score a full-confidence user must clear
 export const CONFIDENCE_K = 20;     // how much a total lack of confidence raises the bar
 export const COOLDOWN_DAYS = 7;     // hard: ≥7 days since the last DELIVERED rec
-export const MONTHLY_CAP = 4;       // hard: ≤4 delivered recs per rolling 30 days
+export const MONTHLY_CAP = 3;       // hard: ≤3 delivered recs per rolling 30 days
 
 // ── T4: personalized cadence — the ledger-learned threshold adjustment ──
 // A user's own announcement (knock) engagement nudges their effective rec
@@ -136,7 +136,7 @@ export interface RecDecisionInput {
 export type RecDecisionReason =
   | "no-score"       // model gave no usable score → quiet
   | "cooldown"       // <7 days since last delivered rec → quiet (independent of score)
-  | "monthly-cap"    // already 4 delivered in 30 days → quiet (independent of score)
+  | "monthly-cap"    // already 3 delivered in 30 days → quiet (independent of score)
   | "below-threshold"// score under the confidence-adjusted bar → quiet
   | "generate";      // all gates pass → eligible to generate this night
 
@@ -150,7 +150,7 @@ export interface RecDecision {
  * The pure, unit-testable trigger. (score, confidence, daysSinceLastRec,
  * deliveriesLast30d) → shouldGenerate. The two caps are checked FIRST and are
  * fully independent of the score: no score, however high, can bypass the 7-day
- * cooldown or the 4/30-day cap. This is the runaway-generation firewall.
+ * cooldown or the 3/30-day cap. This is the runaway-generation firewall.
  */
 export function decideRecGeneration(input: RecDecisionInput): RecDecision {
   const eff = effectiveThreshold(input.confidence, input.recThresholdAdjustment ?? 0);
@@ -226,7 +226,7 @@ export interface ComfortRecInput {
  *  - excludeTitles = [] — no server-side history of prior rec titles (payloads
  *                  are deleted on open/expiry; the outcome ledger is enum-only,
  *                  no titles). Effect: a title could repeat. Mitigated by the
- *                  7-day cooldown + 4/month cap (recs are rare) and the prompt's
+ *                  7-day cooldown + 3/month cap (recs are rare) and the prompt's
  *                  "reach widely across artists, eras, countries" variety rule.
  *                  FLAGGED as a possible-repeat, low-frequency.
  */

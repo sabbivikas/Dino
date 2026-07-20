@@ -100,10 +100,10 @@ test("cooldown and cap gate BEFORE score, independent of it", () => {
   const hot = { score: 100, confidence: 1.0 };
   // cooldown: 6 days < 7 → quiet even at score 100
   assert.equal(decideRecGeneration({ ...hot, daysSinceLastRec: 6, deliveriesLast30d: 0 }).reason, "cooldown");
-  // cap: 4 already delivered → quiet even at score 100
-  assert.equal(decideRecGeneration({ ...hot, daysSinceLastRec: 999, deliveriesLast30d: 4 }).reason, "monthly-cap");
+  // cap: 3 already delivered → quiet even at score 100
+  assert.equal(decideRecGeneration({ ...hot, daysSinceLastRec: 999, deliveriesLast30d: 3 }).reason, "monthly-cap");
   // both clear → generate
-  assert.equal(decideRecGeneration({ ...hot, daysSinceLastRec: 7, deliveriesLast30d: 3 }).shouldGenerate, true);
+  assert.equal(decideRecGeneration({ ...hot, daysSinceLastRec: 7, deliveriesLast30d: 2 }).shouldGenerate, true);
 });
 
 test("null score never generates, but still respects nothing above caps", () => {
@@ -265,15 +265,15 @@ test("FREQUENCY SHAPE: monthly deliveries land in the target bands", () => {
   assert.ok(stable.avg <= 1.0, `stable avg ${stable.avg} should be ≤ 1`);
   // typical ≈ 2-3/month
   assert.ok(typical.avg >= 2.0 && typical.avg <= 3.0, `typical avg ${typical.avg} should be 2-3`);
-  // sustained decline → up to the 4/month ceiling (and NEVER over it)
-  assert.ok(declining.avg >= 3.0 && declining.avg <= 4.0, `declining avg ${declining.avg} should be 3-4`);
+  // sustained decline → AT OR NEAR the new 3/month ceiling (and NEVER over it)
+  assert.ok(declining.avg >= 2.9 && declining.avg <= 3.0, `declining avg ${declining.avg} should sit at ~3 (the new ceiling)`);
   assert.ok(declining.max <= MONTHLY_CAP, `declining max ${declining.max} must never exceed the ${MONTHLY_CAP} cap`);
   assert.ok(stable.avg < typical.avg && typical.avg < declining.avg, "bands must be ordered");
 });
 
 // ── REQUIRED TEST 1 — pathological score cap ─────────────────────────────
 
-test("PATHOLOGICAL CAP: concern_score=100 every night for 60 days stays ≤1/7d and ≤4/30d", () => {
+test("PATHOLOGICAL CAP: concern_score=100 every night for 60 days stays ≤1/7d and ≤3/30d", () => {
   // Force the worst case: eligible every night, top score, full confidence.
   const deliveryDays: number[] = [];
   for (let day = 0; day < 60; day++) {
@@ -289,18 +289,18 @@ test("PATHOLOGICAL CAP: concern_score=100 every night for 60 days stays ≤1/7d 
     assert.ok(deliveryDays[i] - deliveryDays[i - 1] >= COOLDOWN_DAYS,
       `deliveries ${deliveryDays[i - 1]} and ${deliveryDays[i]} are <7 days apart`);
   }
-  // ≤4 per any rolling 30-day window
+  // ≤3 per any rolling 30-day window
   for (let day = 0; day < 60; day++) {
     const inWindow = deliveryDays.filter((d) => d <= day && day - d < 30).length;
     assert.ok(inWindow <= MONTHLY_CAP, `${inWindow} deliveries in the 30d window ending day ${day} exceeds ${MONTHLY_CAP}`);
   }
-  // over 60 days at ~4/30d the ceiling yields at most 9 (two rolling months + boundary)
-  assert.ok(deliveryDays.length <= 9, `runaway: ${deliveryDays.length} deliveries in 60 days`);
+  // over 60 days at ~3/30d the ceiling yields at most 7 (two rolling months + boundary)
+  assert.ok(deliveryDays.length <= 7, `runaway: ${deliveryDays.length} deliveries in 60 days`);
 });
 
 // ── REQUIRED TEST 2 (T4) — pathological cap UNDER max downward adjustment ──
 
-test("PATHOLOGICAL CAP + MAX DOWNWARD ADJUSTMENT: most-engaged user, score=100 every night for 60 days STILL ≤1/7d and ≤4/30d", () => {
+test("PATHOLOGICAL CAP + MAX DOWNWARD ADJUSTMENT: most-engaged user, score=100 every night for 60 days STILL ≤1/7d and ≤3/30d", () => {
   // The cadence learner's strongest possible nudge (REC_ADJ_MIN = the most-
   // engaged user) stacked on the pathological score. The caps are hard and
   // independent of BOTH score and adjustment — lowering the bar can never
@@ -324,6 +324,6 @@ test("PATHOLOGICAL CAP + MAX DOWNWARD ADJUSTMENT: most-engaged user, score=100 e
     assert.ok(inWindow <= MONTHLY_CAP,
       `${inWindow} deliveries in the 30d window ending day ${day} exceeds ${MONTHLY_CAP} under max downward adjustment`);
   }
-  assert.ok(deliveryDays.length <= 9,
+  assert.ok(deliveryDays.length <= 7,
     `runaway under max downward adjustment: ${deliveryDays.length} deliveries in 60 days`);
 });

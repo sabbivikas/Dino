@@ -2134,7 +2134,7 @@ export const nightlyExpeditionWatch = onSchedule(
         // confidence is code-computed from which signals are actually present
         // (never the model's self-report), so a model can't inflate its own bar
         const recConfidence = computeConfidence(signalAvailability(buckets, themes));
-        // The 7-day cooldown and 4/30-day cap read the SERVER-OWNED delivery
+        // The 7-day cooldown and 3/30-day cap read the SERVER-OWNED delivery
         // ledger (announcedAt = the moment a rec was actually delivered/knocked;
         // it persists through opened/expired). One 30-day window covers both
         // gates. This is the unfakeable source — not the client sinceLastRec

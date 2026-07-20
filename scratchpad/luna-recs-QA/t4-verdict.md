@@ -25,7 +25,7 @@ OPEN-RATE: `opened / (opened + ignored)`.
 
 MIN-DATA FLOOR: `REC_ADJ_MIN_RESOLVED = 4` resolved (opened+ignored) knocks. Below
 that → **exactly 0** (no nudge until there is real signal). Rationale: recs are
-capped 4/month, so 4 resolved knocks ≈ a month+ of delivered signal.
+capped 3/month, so 4 resolved knocks ≈ a month+ of delivered signal.
 
 MAPPING (symmetric around a neutral 0.40–0.60 band; negative = lower bar / more
 recs, positive = raise bar / fewer):
@@ -77,8 +77,8 @@ needKindsLanding) — ONE existing Firestore read, no new read added. It now als
 New test `PATHOLOGICAL CAP + MAX DOWNWARD ADJUSTMENT`: the most-engaged user
 (`recThresholdAdjustment = REC_ADJ_MIN = -6`, easiest possible eligibility) with
 `score=100, confidence=1.0` every night for 60 days → **≤1 rec per rolling 7 days
-AND ≤4 per rolling 30 days**, ≤9 total over 60 days. **PASS.** The 7-day cooldown
-and 4/30-day cap are checked in `decideRecGeneration` BEFORE the score and are
+AND ≤3 per rolling 30 days**, ≤7 total over 60 days. **PASS.** The 7-day cooldown
+and 3/30-day cap are checked in `decideRecGeneration` BEFORE the score and are
 independent of BOTH score and adjustment — lowering the threshold only eases
 eligibility WITHIN the caps and can never breach them.
 
@@ -94,8 +94,8 @@ eligibility WITHIN the caps and can never breach them.
 - **caps-still-hard-under-max-adjustment**: PASS — extended pathological test
   (above) with `REC_ADJ_MIN` applied.
 - **opens-fewer-never-breach-ceiling**: PASS — opens LOWER the bar (more
-  eligible nights) but the 4/month cap is a hard independent gate; the pathological
-  test proves ≤4/30d even at max downward nudge + score 100 every night.
+  eligible nights) but the 3/month cap is a hard independent gate; the pathological
+  test proves ≤3/30d even at max downward nudge + score 100 every night.
 
 ## Suite counts
 
