@@ -136,3 +136,101 @@ export function decideRecGeneration(input: RecDecisionInput): RecDecision {
   }
   return { shouldGenerate: true, reason: "generate", effectiveThreshold: eff };
 }
+
+// ── T3 Part B — the SERVER-side generateComfortRecs input ────────────
+// When the watcher decides a rec is due it must build the SAME input shape
+// the onCall builds client-side (ComfortRecService.momentPayload), from the
+// data the watcher actually holds server-side. This is the pure, testable
+// half; runComfortRecGeneration (index.ts) consumes it. Every field's source
+// or default is documented here and in scratchpad/luna-recs-QA/t3-verdict.md.
+export const REC_THEMES = ["work", "sleep", "relationships", "health", "money", "self"];
+
+/** The validated input generateComfortRecs generation runs on. Both callers
+ *  (the onCall wrapper and the nightly watcher) produce this shape and hand it
+ *  to the SAME runComfortRecGeneration — the generation/hold logic is never
+ *  forked. `timeOfDay` is a free string here (not re-clamped) so the nightly
+ *  path can pass "night"; the onCall clamps client input to midday/evening. */
+export interface ComfortRecInput {
+  mood: string;          // "" | "drained" | "overwhelmed"
+  timeOfDay: string;     // onCall: midday|evening; watcher: night
+  moodTrend: string;     // steady | wobbly | heavy
+  recentThemes: string[];
+  quietTypes: string[];
+  userLocale: string;
+  userCountry: string;   // ISO-2 region, or "" when unknown
+  excludeTitles: string[];
+}
+
+/**
+ * Build the generateComfortRecs input from the server-side nightly signals the
+ * watcher already validated (buckets + themes + the signals doc's userLocale).
+ *
+ * FIELD SOURCES / DEFAULTS (rec-quality effect documented):
+ *  - moodTrend   ← buckets.moodTrend (identical enum to the client path).
+ *  - recentThemes← themes (EXPEDITION_THEME_ALLOW == REC_THEMES; identical).
+ *  - userLocale  ← signals doc userLocale (AppLanguage.current); validated to
+ *                  the 5 shipped languages, else "en". Drives the language of
+ *                  the "why"/"length" text — full quality.
+ *  - timeOfDay   = "night" (the watcher runs nightly). Honest context; recs are
+ *                  still delivered out of quiet hours (21:30-08:30) next daypart.
+ *  - mood        = "" — there is NO per-day logged mood server-side (signals
+ *                  carry only the moodTrend/heavyDays buckets). The prompt's
+ *                  "a quiet heaviness" fallback stands; moodTrend already
+ *                  encodes the heaviness. Minor effect.
+ *  - quietTypes  = [] — no server source for per-user disliked types. Effect:
+ *                  no type is hard-excluded; the prefs-based typesLanding/
+ *                  typesIgnored bias inside runComfortRecGeneration still
+ *                  personalizes, and the 3-different-types rule still holds.
+ *  - userCountry = "" — NO per-user country exists server-side (expeditionSignals
+ *                  carries userLocale/language, not region; world docs are
+ *                  privacy-folded aggregates, not per-uid profiles). Effect:
+ *                  the model falls back to "globally beloved works" and the
+ *                  TMDB watch-provider + poster lookup is skipped (film card is
+ *                  paper-only in the reveal). FLAGGED: this is the one real
+ *                  rec-quality degradation vs the client path (loses regional
+ *                  resonance); the "why" still lands in the user's language.
+ *  - excludeTitles = [] — no server-side history of prior rec titles (payloads
+ *                  are deleted on open/expiry; the outcome ledger is enum-only,
+ *                  no titles). Effect: a title could repeat. Mitigated by the
+ *                  7-day cooldown + 4/month cap (recs are rare) and the prompt's
+ *                  "reach widely across artists, eras, countries" variety rule.
+ *                  FLAGGED as a possible-repeat, low-frequency.
+ */
+export function buildWatcherComfortRecInput(
+  buckets: Record<string, string>, themes: string[], userLocale: string
+): ComfortRecInput {
+  const moodTrend = ["steady", "wobbly", "heavy"].includes(buckets.moodTrend)
+    ? buckets.moodTrend : "steady";
+  const recentThemes = (Array.isArray(themes) ? themes : [])
+    .map((t) => String(t)).filter((t) => REC_THEMES.includes(t)).slice(0, 3);
+  const locale = ["en", "es", "ja", "ko", "vi"].includes(userLocale) ? userLocale : "en";
+  return {
+    mood: "",
+    timeOfDay: "night",
+    moodTrend,
+    recentThemes,
+    quietTypes: [],
+    userLocale: locale,
+    userCountry: "",
+    excludeTitles: [],
+  };
+}
+
+// ── T3 Part A — the expedition-gift gates, as a pure predicate ─────────
+// Decoupling the concern score from these gates (moving the shared luna call
+// AHEAD of them) must NOT change which users get an expedition. This predicate
+// is the exact, testable statement of the two gift-specific gates the watcher
+// still applies AFTER the call: an expedition requires ≥14 days since the last
+// gift AND not within ~3 days of a rec. `expeditionGiftGatesPass` is the exact
+// complement of the old inline skip (`<14d` / `sinceLastRec==="0to2"` →
+// continue), so relocating it leaves expedition delivery frequency unchanged.
+export const EXPEDITION_MIN_DAYS = 14;
+
+export interface ExpeditionGiftGateInput {
+  daysSinceLastGift: number;  // (now - lastAt)/day; Infinity if no prior gift
+  sinceLastRec: string;       // client-bucketed spacing since the last rec
+}
+
+export function expeditionGiftGatesPass(input: ExpeditionGiftGateInput): boolean {
+  return input.daysSinceLastGift >= EXPEDITION_MIN_DAYS && input.sinceLastRec !== "0to2";
+}

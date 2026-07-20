@@ -10,7 +10,9 @@ import { createHash } from "node:crypto";
 import { seasonForMonth, isSeasonEligible, isSlotActive, REC_SEASON_VALUES } from "./season";
 import { route as aiRoute, routeChain as aiRouteChain, logRoute as aiLogRoute, clientFor as aiClientFor, type AiRoute } from "./modelRouter";
 import { validateGiftWithReason, trustedSourcesFor, EXPEDITION_SIGNAL_ALLOW, buildLunaUserPrompt } from "./mission";
-import { signalAvailability, computeConfidence, sanitizeConcernScore, decideRecGeneration } from "./concernScore";
+import { signalAvailability, computeConfidence, sanitizeConcernScore, decideRecGeneration,
+  buildWatcherComfortRecInput, expeditionGiftGatesPass,
+  type ComfortRecInput } from "./concernScore";
 import { capSources, shouldRun, monthKey, creditSummary, REC_MAX_SOURCES_PER_RUN, REC_MIN_RUN_INTERVAL_DAYS } from "./credits";
 import { WORLD_PRIVACY_FLOOR, normalizeCountry, foldPulseCountry } from "./world";
 import { computeDeliverAfter, decideSweep, daypartFor, isValidTz, SWEEP_BATCH_LIMIT, posterPathOrNull, shouldExpireAnnounced, ANNOUNCED_EXPIRY_MS, shouldDeletePayloadOnTransition, payloadExpiresAtMs } from "./recDelivery";
@@ -1725,7 +1727,8 @@ export const processEmailQueue = onSchedule(
 // looks identical to a calm week) → cohort eligibility (heavy signal in
 // last 7 days, on device) → 14 day server gate (server owned timestamp) →
 // rec spacing bucket → luna act + confidence ≥ 0.7.
-const EXPEDITION_MIN_DAYS = 14;
+// EXPEDITION_MIN_DAYS now lives in concernScore.ts (shared with the pure
+// expeditionGiftGatesPass predicate; see T3 Part A).
 const EXPEDITION_LUNA_NIGHTLY_CAP = 2000;   // global watcher cost bound
 const EXPEDITION_NEEDS = ["rest", "beauty", "hope", "wonder", "connection", "none"];
 const EXPEDITION_THEME_ALLOW = ["work", "sleep", "relationships", "health", "money", "self"];
@@ -2026,7 +2029,7 @@ export const nightlyExpeditionWatch = onSchedule(
     let watched = 0;
     let acted = 0;
     let scored = 0;         // luna returned a usable concern_score
-    let wouldGenerate = 0;  // T1+T2 DRY-RUN: the trigger says a rec is due (not yet acted on — Task 3 wires it)
+    let generated = 0;      // T3: the trigger fired and a rec was generated + held
     for (const doc of snap.docs) {
       const d = doc.data() ?? {};
       // strict bucket validation — anything off shape is skipped silently
@@ -2042,15 +2045,21 @@ export const nightlyExpeditionWatch = onSchedule(
         .map((t: unknown) => String(t))
         .filter((t: string) => EXPEDITION_THEME_ALLOW.includes(t))
         .slice(0, 3);
-      // server gates (the unfakeable ones — server owned timestamps)
+      // server gates (the unfakeable ones — server owned timestamps).
+      // T3 Part A — DECOUPLE: the shared gpt-5.6-luna call (and the concern
+      // score that rides it) now runs for EVERY eligible user, AHEAD of the
+      // expedition-gift-specific gates, so it serves the rec trigger too.
+      // Only the call-frequency guard (one luna attempt per ~night) still
+      // gates the CALL here; the 14-day-since-gift and 3-days-since-rec gates
+      // move BELOW the call (expeditionGiftGatesPass) and gate the expedition
+      // MISSION only — the set of users who get an expedition is unchanged.
       const expRef = db.collection("expeditions").doc(doc.id);
       const exp = (await expRef.get()).data() ?? {};
-      const lastAt = exp.lastAt instanceof admin.firestore.Timestamp ? exp.lastAt.toMillis() : 0;
-      if (Date.now() - lastAt < EXPEDITION_MIN_DAYS * 86400 * 1000) continue;
       const attemptedAt = exp.attemptedAt instanceof admin.firestore.Timestamp ? exp.attemptedAt.toMillis() : 0;
-      if (Date.now() - attemptedAt < 20 * 3600 * 1000) continue;   // one attempt per night
-      if (buckets.sinceLastRec === "0to2") continue;               // never within 3 days of a rec
-      watched++;
+      if (Date.now() - attemptedAt < 20 * 3600 * 1000) continue;   // one luna attempt per night
+      const lastAt = exp.lastAt instanceof admin.firestore.Timestamp ? exp.lastAt.toMillis() : 0;
+      const daysSinceLastGift = lastAt > 0 ? (Date.now() - lastAt) / 86400000 : Number.POSITIVE_INFINITY;
+      watched++;   // = luna calls this night (T3 Part A raises this: gift-gated eligible users are now scored too)
       // preference doc (memory + shelf F3) — derived, may not exist; null-safe
       const prefsSnap = await db.collection("prefs").doc(doc.id).get();
       const prefs = prefsSnap.data() ?? {};
@@ -2077,7 +2086,16 @@ export const nightlyExpeditionWatch = onSchedule(
         // gift fatigue generalizes the 2-ignore cooloff: high fatigue raises
         // the bar in code, not just in the prompt (deterministic quietness).
         const actThreshold = giftFatigue === "high" ? 0.85 : 0.7;
-        if (act && needKind !== "none" && Number.isFinite(confidence) && confidence >= actThreshold) {
+        // app-resolved language for both the expedition delivered-line and the
+        // rec's why/length text; hoisted so both paths below share it.
+        const userLocale = ["en", "es", "ja", "ko", "vi"].includes(String(d.userLocale))
+          ? String(d.userLocale) : "en";
+        // EXPEDITION delivery — still gated EXACTLY by the two gift-specific
+        // gates (≥14d since last gift AND not within 3 days of a rec), now
+        // applied AFTER the shared call via the pure predicate. Same full
+        // condition set as before the T3 move → expedition frequency unchanged.
+        if (expeditionGiftGatesPass({ daysSinceLastGift, sinceLastRec: buckets.sinceLastRec })
+            && act && needKind !== "none" && Number.isFinite(confidence) && confidence >= actThreshold) {
           acted++;
           await expRef.set({
             pendingNeed: needKind,
@@ -2093,19 +2111,18 @@ export const nightlyExpeditionWatch = onSchedule(
             ...(Array.isArray(exp.recentSources) ? exp.recentSources : [])
               .map((s: unknown) => String(s)),
           ])].slice(0, 10);
-          const userLocale = ["en", "es", "ja", "ko", "vi"].includes(String(d.userLocale))
-            ? String(d.userLocale) : "en";
           const keptKinds = (Array.isArray(prefs.needKindsLanding) ? prefs.needKindsLanding : [])
             .map((x: unknown) => String(x)).slice(0, 3);
           await runExpeditionMission(db, doc.id, needKind, recentSources, userLocale, keptKinds);   // F2 — silence on any failure
         }
 
-        // ── LUNA RECS T1+T2 — nightly concern score + trigger math (DRY-RUN) ──
+        // ── LUNA RECS T3 — nightly concern score TRIGGERS a held rec ──
         // Rides THIS SAME gpt-5.6-luna call (zero added model calls, cost rule
         // 2): the concern_score is one more field on the JSON we already
         // parsed. Everything below is deterministic CODE, independent of the
-        // model (cost rule 4). This block only COMPUTES + LOGS the decision;
-        // it deliberately does NOT call generateComfortRecs — Task 3 wires that.
+        // model (cost rule 4). When the decision fires, the watcher GENERATES
+        // via the exact same runComfortRecGeneration the onCall uses (cost rule
+        // 3: gpt-4.1-mini, one prompt, one held delivery — no new pathway).
         // Crisis is untouched: it is on-device + absolute and never reaches
         // here, and this block gates nothing but comfort recs.
         const concernScore = sanitizeConcernScore(parsed.concern_score);
@@ -2135,7 +2152,6 @@ export const nightlyExpeditionWatch = onSchedule(
         const recDecision = decideRecGeneration({
           score: concernScore, confidence: recConfidence, daysSinceLastRec, deliveriesLast30d,
         });
-        if (recDecision.shouldGenerate) wouldGenerate++;
         // enum/number facet ONLY — no uid, no themes, no raw content (privacy)
         functions.logger.info("luna_rec_decision", {
           concernScore, recConfidence,
@@ -2144,13 +2160,27 @@ export const nightlyExpeditionWatch = onSchedule(
           effectiveThreshold: Math.round(recDecision.effectiveThreshold),
           reason: recDecision.reason,
           shouldGenerate: recDecision.shouldGenerate,
-          dryRun: true,
         });
+        if (recDecision.shouldGenerate) {
+          // THE TRIGGER (T3): build the server-side input and run the SAME
+          // generation + hold the onCall runs. A rec failure is a quiet night
+          // for recs — isolated so it never disturbs the expedition path
+          // (already ran above) or the rest of the cohort loop.
+          try {
+            const genInput = buildWatcherComfortRecInput(buckets, themes, userLocale);
+            const res = await runComfortRecGeneration(doc.id, genInput);
+            if (res.held) generated++;
+          } catch {
+            // silence — the held-delivery machine and daily/scarcity gates
+            // inside runComfortRecGeneration already bound this; any throw
+            // (rate cap, openai miss) simply means no rec tonight.
+          }
+        }
       } catch {
         // luna failure = a quiet night; no attempt recorded → tomorrow may retry
       }
     }
-    functions.logger.info(`nightlyExpeditionWatch: cohort=${snap.docs.length} watched=${watched} acted=${acted} scored=${scored} wouldGenerate=${wouldGenerate} (recs dry-run)`);
+    functions.logger.info(`nightlyExpeditionWatch: cohort=${snap.docs.length} watched=${watched} acted=${acted} scored=${scored} generated=${generated}`);
   }
 );
 
@@ -2216,34 +2246,18 @@ async function tmdbWatchInfo(
   }
 }
 
-export const generateComfortRecs = onCall(
-  { secrets: [OPENAI_API_KEY, TMDB_API_TOKEN], timeoutSeconds: 30, memory: "256MiB" },
-  async (request) => {
-    if (!request.auth) {
-      throw new HttpsError("unauthenticated", "sign in required");
-    }
-    const uid = request.auth.uid;
-
-    const d = (request.data ?? {}) as Record<string, unknown>;
-    const ALLOWED_KEYS = [
-      "mood", "timeOfDay", "moodTrend", "recentThemes", "quietTypes", "userLocale", "userCountry", "excludeTitles",
-    ];
-    for (const k of Object.keys(d)) {
-      if (!ALLOWED_KEYS.includes(k)) {
-        throw new HttpsError("invalid-argument", `unexpected field: ${k}`);
-      }
-    }
-    const mood = ["drained", "overwhelmed"].includes(String(d.mood)) ? String(d.mood) : "";
-    const timeOfDay = ["midday", "evening"].includes(String(d.timeOfDay)) ? String(d.timeOfDay) : "evening";
-    const moodTrend = ["steady", "wobbly", "heavy"].includes(String(d.moodTrend)) ? String(d.moodTrend) : "steady";
-    const REC_THEMES = ["work", "sleep", "relationships", "health", "money", "self"];
-    const recentThemes = (Array.isArray(d.recentThemes) ? d.recentThemes : [])
-      .map((t) => String(t)).filter((t) => REC_THEMES.includes(t)).slice(0, 3);
-    const quietTypes = (Array.isArray(d.quietTypes) ? d.quietTypes : [])
-      .map((t) => String(t)).filter((t) => COMFORT_REC_TYPES.includes(t));
-    const userLocale = typeof d.userLocale === "string" ? d.userLocale : "en";
-    const excludeTitles = (Array.isArray(d.excludeTitles) ? d.excludeTitles : [])
-      .map((t) => String(t).slice(0, 80)).slice(0, 10);
+// T3 Part B — the CORE generation logic, extracted VERBATIM so BOTH the onCall
+// wrapper (below) and the nightly watcher call the identical generate + hold
+// path. Nothing here was rewritten: the same gpt-4.1-mini prompt, the same
+// per-uid daily cap + refund, the same held delivery/payload docs (deliverAfter
+// 45-90min out of quiet hours, tz, daypart, expiresAt TTL). The onCall's
+// externally-visible behavior is unchanged — it still validates/coerces the
+// client payload into a ComfortRecInput exactly as before, then calls this.
+async function runComfortRecGeneration(
+  uid: string, input: ComfortRecInput
+): Promise<{ held: boolean; deliveryId?: string }> {
+    const { mood, timeOfDay, moodTrend, recentThemes, quietTypes,
+      userLocale, userCountry, excludeTitles } = input;
     // Preference doc (memory + shelf F3) — derived, may not exist; null-safe.
     // Bias only: the fleet-variety rule below still guarantees mixed types.
     const prefsSnap = await admin.firestore().collection("prefs").doc(uid).get();
@@ -2255,9 +2269,9 @@ export const generateComfortRecs = onCall(
       .filter((t) => !typesLanding.includes(t));
 
     // Country awareness: an ISO region code only (device locale bucket — the
-    // same privacy class as userLocale, never a location reading).
-    const userCountry = typeof d.userCountry === "string" && /^[A-Za-z]{2}$/.test(d.userCountry)
-      ? d.userCountry.toUpperCase() : "";
+    // same privacy class as userLocale, never a location reading). userCountry
+    // arrives already validated on the input (onCall coerces the client value;
+    // the watcher supplies "" — see buildWatcherComfortRecInput).
     let countryName = "";
     if (userCountry) {
       try {
@@ -2441,6 +2455,43 @@ export const generateComfortRecs = onCall(
       const message = err instanceof Error ? err.message : "OpenAI request failed";
       throw new HttpsError("internal", message);
     }
+  }
+
+// T3 Part B — the onCall wrapper is now a thin adapter over the shared
+// runComfortRecGeneration: same auth guard, same allow-list rejection, same
+// coercion the client relied on, then hand-off. Byte-identical behavior.
+export const generateComfortRecs = onCall(
+  { secrets: [OPENAI_API_KEY, TMDB_API_TOKEN], timeoutSeconds: 30, memory: "256MiB" },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "sign in required");
+    }
+    const uid = request.auth.uid;
+    const d = (request.data ?? {}) as Record<string, unknown>;
+    const ALLOWED_KEYS = [
+      "mood", "timeOfDay", "moodTrend", "recentThemes", "quietTypes", "userLocale", "userCountry", "excludeTitles",
+    ];
+    for (const k of Object.keys(d)) {
+      if (!ALLOWED_KEYS.includes(k)) {
+        throw new HttpsError("invalid-argument", `unexpected field: ${k}`);
+      }
+    }
+    const REC_THEMES = ["work", "sleep", "relationships", "health", "money", "self"];
+    const input: ComfortRecInput = {
+      mood: ["drained", "overwhelmed"].includes(String(d.mood)) ? String(d.mood) : "",
+      timeOfDay: ["midday", "evening"].includes(String(d.timeOfDay)) ? String(d.timeOfDay) : "evening",
+      moodTrend: ["steady", "wobbly", "heavy"].includes(String(d.moodTrend)) ? String(d.moodTrend) : "steady",
+      recentThemes: (Array.isArray(d.recentThemes) ? d.recentThemes : [])
+        .map((t) => String(t)).filter((t) => REC_THEMES.includes(t)).slice(0, 3),
+      quietTypes: (Array.isArray(d.quietTypes) ? d.quietTypes : [])
+        .map((t) => String(t)).filter((t) => COMFORT_REC_TYPES.includes(t)),
+      userLocale: typeof d.userLocale === "string" ? d.userLocale : "en",
+      userCountry: typeof d.userCountry === "string" && /^[A-Za-z]{2}$/.test(d.userCountry)
+        ? d.userCountry.toUpperCase() : "",
+      excludeTitles: (Array.isArray(d.excludeTitles) ? d.excludeTitles : [])
+        .map((t) => String(t).slice(0, 80)).slice(0, 10),
+    };
+    return runComfortRecGeneration(uid, input);
   }
 );
 

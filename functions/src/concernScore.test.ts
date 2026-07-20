@@ -3,6 +3,7 @@ import assert from "node:assert";
 import {
   signalAvailability, computeConfidence, sanitizeConcernScore,
   effectiveThreshold, decideRecGeneration,
+  buildWatcherComfortRecInput, expeditionGiftGatesPass, EXPEDITION_MIN_DAYS,
   CONFIDENCE_FLOOR, CONFIDENCE_STEP,
   BASE_THRESHOLD, CONFIDENCE_K, COOLDOWN_DAYS, MONTHLY_CAP,
 } from "./concernScore";
@@ -73,6 +74,74 @@ test("cooldown and cap gate BEFORE score, independent of it", () => {
 
 test("null score never generates, but still respects nothing above caps", () => {
   assert.equal(decideRecGeneration({ score: null, confidence: 1.0, daysSinceLastRec: 999, deliveriesLast30d: 0 }).reason, "no-score");
+});
+
+// ── T3 Part B — the server-side input builder ────────────────────────────
+
+test("buildWatcherComfortRecInput: maps signals + applies documented defaults", () => {
+  const input = buildWatcherComfortRecInput(
+    { moodTrend: "heavy", heavyDays7: "4plus", sleepBucket: "short", stepsBucket: "low", sinceLastRec: "14plus" },
+    ["work", "sleep"], "ja");
+  // clean server mappings
+  assert.equal(input.moodTrend, "heavy");
+  assert.deepEqual(input.recentThemes, ["work", "sleep"]);
+  assert.equal(input.userLocale, "ja");
+  // nightly context
+  assert.equal(input.timeOfDay, "night");
+  // documented defaults for fields with no clean server source
+  assert.equal(input.mood, "");
+  assert.deepEqual(input.quietTypes, []);
+  assert.equal(input.userCountry, "");
+  assert.deepEqual(input.excludeTitles, []);
+});
+
+test("buildWatcherComfortRecInput: sanitizes off-shape trend/themes/locale", () => {
+  const input = buildWatcherComfortRecInput(
+    { moodTrend: "garbage" }, ["work", "notATheme", "health", "money", "self"], "xx");
+  assert.equal(input.moodTrend, "steady");                 // bad trend → safe default
+  assert.deepEqual(input.recentThemes, ["work", "health", "money"]); // filtered to allow-list, capped 3
+  assert.equal(input.userLocale, "en");                    // unknown locale → en
+});
+
+test("WIRING: a shouldGenerate=true decision yields a valid generation input", () => {
+  // The watcher's live path: decide → (if generate) build input → runComfortRecGeneration.
+  // runComfortRecGeneration is impure (firestore/openai) so it is not node-tested;
+  // this asserts the pure boundary the watcher crosses before invoking it.
+  const decision = decideRecGeneration({
+    score: 90, confidence: 1.0, daysSinceLastRec: 999, deliveriesLast30d: 0,
+  });
+  assert.equal(decision.shouldGenerate, true);
+  const input = buildWatcherComfortRecInput({ moodTrend: "heavy" }, ["work"], "en");
+  // the input the onCall's validators would accept unchanged
+  assert.ok(["", "drained", "overwhelmed"].includes(input.mood));
+  assert.ok(["steady", "wobbly", "heavy"].includes(input.moodTrend));
+  assert.equal(typeof input.userLocale, "string");
+});
+
+// ── T3 Part A — expedition-gift gates unchanged by the decouple ──────────
+
+test("expeditionGiftGatesPass: 14d-since-gift + 3d-since-rec gates preserved", () => {
+  // gift-gated: within 14 days of the last gift → NO expedition, whatever else
+  assert.equal(expeditionGiftGatesPass({ daysSinceLastGift: 5, sinceLastRec: "14plus" }), false);
+  assert.equal(expeditionGiftGatesPass({ daysSinceLastGift: EXPEDITION_MIN_DAYS - 0.001, sinceLastRec: "8to13" }), false);
+  // rec-gated: within ~3 days of a rec (0to2 bucket) → NO expedition
+  assert.equal(expeditionGiftGatesPass({ daysSinceLastGift: 999, sinceLastRec: "0to2" }), false);
+  // non-gated: ≥14d since gift AND not within 3d of a rec → expedition allowed
+  assert.equal(expeditionGiftGatesPass({ daysSinceLastGift: 14, sinceLastRec: "3to7" }), true);
+  assert.equal(expeditionGiftGatesPass({ daysSinceLastGift: Infinity, sinceLastRec: "14plus" }), true);
+});
+
+test("expeditionGiftGatesPass: is the exact complement of the old inline skip", () => {
+  // The pre-T3 watcher did: skip if (now-lastAt < 14d) OR (sinceLastRec==="0to2").
+  // The predicate must return the negation of that skip for every case, so the
+  // SET of users who get an expedition is identical after moving the call earlier.
+  for (const days of [0, 6.9, 13.999, 14, 14.001, 30, Infinity]) {
+    for (const rec of ["0to2", "3to7", "8to13", "14plus"]) {
+      const oldSkip = days < EXPEDITION_MIN_DAYS || rec === "0to2";
+      assert.equal(expeditionGiftGatesPass({ daysSinceLastGift: days, sinceLastRec: rec }), !oldSkip,
+        `mismatch at days=${days} rec=${rec}`);
+    }
+  }
 });
 
 // ── simulation harness (deterministic) ───────────────────────────────────

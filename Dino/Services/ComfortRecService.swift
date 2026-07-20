@@ -473,10 +473,12 @@ enum ComfortRecCoordinator {
         return payload
     }
 
-    /// Rec delivery F2 — the mood-log trigger. Same gates as ever, same
-    /// enum payload, but the server HOLDS the recs for a later announcement:
-    /// nothing returns, nothing is cached locally, nothing shows until the
-    /// announcement lands (the no-leak rule). Fire and forget.
+    /// Rec delivery F2 — the (former) mood-log trigger. Same gates, same enum
+    /// payload, server-held delivery. NO LONGER WIRED as of T3 (luna-recs): the
+    /// nightly watcher's concern score is the sole generation trigger now, so
+    /// this is intentionally unreferenced. Kept (not deleted) as the documented
+    /// client-side equivalent of the server path and for manual/QA use; safe to
+    /// remove once the nightly trigger has soaked. Fire and forget.
     static func generateAndHoldIfMomentIsRight(dataManager: SharedDataManager,
                                                freshHeavyMood: EmotionalWeather? = nil,
                                                now: Date = Date(),
