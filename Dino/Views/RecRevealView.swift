@@ -3,8 +3,8 @@
 //  Dino
 //
 //  Rec delivery F4 — the reveal: a full-screen gift moment. Dusk world
-//  backdrop (the app's own evening sky + hill palette), dino at the bottom
-//  presenting, the paper parcel center-screen. A tap unwraps (~1s of paper
+//  backdrop (the app's own evening sky + hill palette), the paper parcel
+//  center-screen. A tap unwraps (~1s of paper
 //  folding away), then the rec card blooms in — image-led when artwork
 //  arrives (tmdb poster / open library cover / itunes art via RecArtwork),
 //  paper-only otherwise, never a broken frame.
@@ -58,7 +58,7 @@ struct RecRevealView: View {
 
     var body: some View {
         ZStack {
-            RecDuskBackdrop(reduceMotion: reduceMotion)
+            RecDuskBackdrop()
 
             // the parcel beat — wrapped + unwrapping
             if phase != .revealed {
@@ -78,11 +78,19 @@ struct RecRevealView: View {
                     .opacity(phase == .revealed ? 1.0 : 0.0)
                     .allowsHitTesting(phase == .revealed)
             }
+
+            // always-visible, always-tappable dismiss — sits above the card
+            // so the reveal is never a trap (the card's hit-testing used to
+            // swallow the swipe once revealed). Quiet, minimal paper language.
+            closeButton
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
         }
         .offset(y: max(0, dragOffset))
         .contentShape(Rectangle())
         .onTapGesture { parcelTapped() }
-        .gesture(dismissDrag)
+        // simultaneous so the swipe still lands even when the revealed card
+        // is hit-testable above the backdrop — dismiss works in every phase
+        .simultaneousGesture(dismissDrag)
         .onAppear { load() }
     }
 
@@ -260,6 +268,26 @@ struct RecRevealView: View {
         }
     }
 
+    // MARK: - dismiss affordance
+
+    /// A quiet close control — a subtle glyph in a low-opacity cream circle,
+    /// dino's minimal paper language. Always present, always tappable, above
+    /// everything so it works in every phase (including the revealed card).
+    private var closeButton: some View {
+        Button(action: onDismiss) {
+            Image(systemName: "xmark")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundColor(cream.opacity(0.92))
+                .frame(width: 34, height: 34)
+                .background(Circle().fill(cream.opacity(0.14)))
+                .overlay(Circle().stroke(cream.opacity(0.18), lineWidth: 1))
+        }
+        .buttonStyle(.plain)
+        .padding(.top, 6)
+        .padding(.trailing, 18)
+        .accessibilityLabel(Text(String(localized: "close")))
+    }
+
     // MARK: - gestures + flow
 
     private var dismissDrag: some Gesture {
@@ -311,6 +339,7 @@ struct RecRevealView: View {
         if next == .revealed {
             // reduce motion — the card fades in, nothing folds
             withAnimation(.easeInOut(duration: 0.3)) { phase = .revealed }
+            HapticManager.shared.success()   // the card has bloomed
             recordRevealIfNeeded()
         } else {
             phase = .unwrapping
@@ -320,6 +349,7 @@ struct RecRevealView: View {
                 withAnimation(.spring(response: 0.45, dampingFraction: 0.75)) {
                     phase = RecRevealMachine.afterUnwrapAnimation(phase: phase)
                 }
+                HapticManager.shared.success()   // timed to the bloom finishing
                 recordRevealIfNeeded()
             }
         }
@@ -371,13 +401,10 @@ struct RecRevealView: View {
 
 // MARK: - the dusk world backdrop
 
-/// Dusk gradient + two soft hills + dino presenting — every color from the
-/// app's own evening sky palette (DinoSkyBackground), the dino from the
-/// existing mascot art. Fixed palette = identical (and safe) in dark mode.
+/// Dusk gradient + two soft hills — every color from the app's own evening
+/// sky palette (DinoSkyBackground). Fixed palette = identical (and safe) in
+/// dark mode.
 private struct RecDuskBackdrop: View {
-    let reduceMotion: Bool
-    @State private var breathing = false
-
     var body: some View {
         GeometryReader { geo in
             let w = geo.size.width
@@ -405,24 +432,9 @@ private struct RecDuskBackdrop: View {
                     .fill(Color(hex: "#364F31"))
                     .frame(width: w * 1.7, height: h * 0.26)
                     .position(x: w * 0.86, y: h * 1.04)
-
-                // dino, presenting — the existing mascot art, gently breathing
-                Image("cut-DinoMascot")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(height: 128)
-                    .scaleEffect(reduceMotion ? 1.0 : (breathing ? 1.025 : 0.985))
-                    .position(x: w * 0.26, y: h * 0.885)
-                    .shadow(color: .black.opacity(0.25), radius: 10, y: 6)
             }
         }
         .ignoresSafeArea()
-        .onAppear {
-            guard !reduceMotion else { return }
-            withAnimation(.easeInOut(duration: 3.6).repeatForever(autoreverses: true)) {
-                breathing = true
-            }
-        }
         .accessibilityHidden(true)
     }
 }
