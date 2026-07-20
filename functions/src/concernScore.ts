@@ -85,11 +85,44 @@ export const CONFIDENCE_K = 20;     // how much a total lack of confidence raise
 export const COOLDOWN_DAYS = 7;     // hard: ≥7 days since the last DELIVERED rec
 export const MONTHLY_CAP = 4;       // hard: ≤4 delivered recs per rolling 30 days
 
-/** Lower confidence demands a HIGHER score to fire. With BASE=58, K=20:
- *    confidence 1.0 → 58,  0.8 → 62,  0.6 → 66,  0.4 → 70 */
-export function effectiveThreshold(confidence: number): number {
+// ── T4: personalized cadence — the ledger-learned threshold adjustment ──
+// A user's own announcement (knock) engagement nudges their effective rec
+// threshold: consistent opens LOWER it (slightly more recs), consistent
+// ignoring RAISES it (fewer). The nudge is a BOUNDED integer computed purely
+// from stored enum outcomes (see preferences.ts computeRecThresholdAdjustment)
+// — no model call. These bounds are the single source of truth for both the
+// producer (the distiller) and the consumer (this module); preferences.ts
+// imports them from here so producer and consumer can never drift.
+export const REC_ADJ_MIN = -6;      // most-engaged floor (lowers the bar most)
+export const REC_ADJ_MAX = 6;       // most-ignoring ceiling (raises the bar most)
+// Final effective-threshold clamp — a sanity envelope so no combination of
+// confidence penalty + adjustment can push the bar out of a reasonable band.
+// Normal operation stays well inside it (min 58-6=52, max 70+6=76); the clamp
+// only ever catches a future retuning that overshoots.
+export const THRESHOLD_MIN = 50;
+export const THRESHOLD_MAX = 80;
+
+/** Coerce a stored recThresholdAdjustment to a clamped int; non-finite → 0. A
+ *  missing/garbage adjustment must read as "no nudge", never as a random shift. */
+export function sanitizeRecThresholdAdjustment(raw: unknown): number {
+  const n = Number(raw);
+  if (!Number.isFinite(n)) return 0;
+  return Math.max(REC_ADJ_MIN, Math.min(REC_ADJ_MAX, Math.round(n)));
+}
+
+/** Lower confidence demands a HIGHER score to fire; a per-user ledger
+ *  adjustment then shifts the bar (opens lower it, ignores raise it). With
+ *  BASE=58, K=20, adjustment 0:
+ *    confidence 1.0 → 58,  0.8 → 62,  0.6 → 66,  0.4 → 70
+ *  The adjustment is clamped to [REC_ADJ_MIN, REC_ADJ_MAX] and the final bar to
+ *  [THRESHOLD_MIN, THRESHOLD_MAX]. It only eases/tightens eligibility WITHIN the
+ *  hard cooldown/cap (checked separately in decideRecGeneration) — it can never
+ *  breach them. */
+export function effectiveThreshold(confidence: number, adjustment = 0): number {
   const c = Math.max(0, Math.min(1, confidence));
-  return BASE_THRESHOLD + (1 - c) * CONFIDENCE_K;
+  const adj = sanitizeRecThresholdAdjustment(adjustment);
+  const raw = BASE_THRESHOLD + (1 - c) * CONFIDENCE_K + adj;
+  return Math.max(THRESHOLD_MIN, Math.min(THRESHOLD_MAX, raw));
 }
 
 export interface RecDecisionInput {
@@ -97,6 +130,7 @@ export interface RecDecisionInput {
   confidence: number;        // computeConfidence output (0.4..1.0)
   daysSinceLastRec: number;  // from the last DELIVERED (announced) rec; Infinity if none
   deliveriesLast30d: number; // count of delivered recs in the rolling 30 days
+  recThresholdAdjustment?: number; // T4: per-user ledger nudge (clamped); default 0
 }
 
 export type RecDecisionReason =
@@ -119,7 +153,7 @@ export interface RecDecision {
  * cooldown or the 4/30-day cap. This is the runaway-generation firewall.
  */
 export function decideRecGeneration(input: RecDecisionInput): RecDecision {
-  const eff = effectiveThreshold(input.confidence);
+  const eff = effectiveThreshold(input.confidence, input.recThresholdAdjustment ?? 0);
   // Caps are independent of the model and are evaluated before the score, so a
   // pathological score can never slip past them.
   if (input.daysSinceLastRec < COOLDOWN_DAYS) {

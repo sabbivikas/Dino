@@ -6,6 +6,8 @@ import {
   buildWatcherComfortRecInput, expeditionGiftGatesPass, EXPEDITION_MIN_DAYS,
   CONFIDENCE_FLOOR, CONFIDENCE_STEP,
   BASE_THRESHOLD, CONFIDENCE_K, COOLDOWN_DAYS, MONTHLY_CAP,
+  REC_ADJ_MIN, REC_ADJ_MAX, THRESHOLD_MIN, THRESHOLD_MAX,
+  sanitizeRecThresholdAdjustment,
 } from "./concernScore";
 
 // ── confidence: from signal availability, deterministic ──────────────────
@@ -48,6 +50,38 @@ test("effectiveThreshold rises as confidence falls", () => {
   assert.ok(effectiveThreshold(0.6) > effectiveThreshold(1.0));
   assert.ok(effectiveThreshold(0.4) > effectiveThreshold(0.6));
   assert.equal(effectiveThreshold(0.8), BASE_THRESHOLD + 0.2 * CONFIDENCE_K);
+});
+
+// ── T4: the ledger-learned threshold adjustment ─────────────────────────
+
+test("T4: effectiveThreshold shifts by the clamped adjustment (default none)", () => {
+  assert.equal(effectiveThreshold(1.0), BASE_THRESHOLD);            // default 0 → unchanged
+  assert.equal(effectiveThreshold(1.0, -6), BASE_THRESHOLD - 6);    // engaged → lower bar
+  assert.equal(effectiveThreshold(1.0, 6), BASE_THRESHOLD + 6);     // ignoring → higher bar
+  // out-of-range adjustments clamp to [REC_ADJ_MIN, REC_ADJ_MAX]
+  assert.equal(effectiveThreshold(1.0, -100), BASE_THRESHOLD + REC_ADJ_MIN);
+  assert.equal(effectiveThreshold(1.0, 100), BASE_THRESHOLD + REC_ADJ_MAX);
+  // final bar stays inside the sane envelope
+  assert.ok(effectiveThreshold(0.4, REC_ADJ_MAX) <= THRESHOLD_MAX);
+  assert.ok(effectiveThreshold(1.0, REC_ADJ_MIN) >= THRESHOLD_MIN);
+});
+
+test("T4: sanitizeRecThresholdAdjustment clamps + rejects garbage as 0", () => {
+  assert.equal(sanitizeRecThresholdAdjustment(-3), -3);
+  assert.equal(sanitizeRecThresholdAdjustment(3.4), 3);
+  assert.equal(sanitizeRecThresholdAdjustment(-99), REC_ADJ_MIN);
+  assert.equal(sanitizeRecThresholdAdjustment(99), REC_ADJ_MAX);
+  assert.equal(sanitizeRecThresholdAdjustment("nonsense"), 0);
+  assert.equal(sanitizeRecThresholdAdjustment(undefined), 0);
+  assert.equal(sanitizeRecThresholdAdjustment(null), 0);
+});
+
+test("T4: a downward adjustment makes a borderline score eligible (within caps)", () => {
+  const score = BASE_THRESHOLD - 3;   // 55: below the full-confidence bar (58)
+  const base = { score, confidence: 1.0, daysSinceLastRec: 999, deliveriesLast30d: 0 };
+  assert.equal(decideRecGeneration(base).shouldGenerate, false);                        // no nudge → quiet
+  assert.equal(decideRecGeneration({ ...base, recThresholdAdjustment: -6 }).shouldGenerate, true);  // engaged → bar 52 → eligible
+  assert.equal(decideRecGeneration({ ...base, recThresholdAdjustment: 6 }).shouldGenerate, false);  // ignoring → bar 64 → quiet
 });
 
 test("CONFIDENCE GATING: one raw score crosses at full confidence, not at low", () => {
@@ -262,4 +296,34 @@ test("PATHOLOGICAL CAP: concern_score=100 every night for 60 days stays ≤1/7d 
   }
   // over 60 days at ~4/30d the ceiling yields at most 9 (two rolling months + boundary)
   assert.ok(deliveryDays.length <= 9, `runaway: ${deliveryDays.length} deliveries in 60 days`);
+});
+
+// ── REQUIRED TEST 2 (T4) — pathological cap UNDER max downward adjustment ──
+
+test("PATHOLOGICAL CAP + MAX DOWNWARD ADJUSTMENT: most-engaged user, score=100 every night for 60 days STILL ≤1/7d and ≤4/30d", () => {
+  // The cadence learner's strongest possible nudge (REC_ADJ_MIN = the most-
+  // engaged user) stacked on the pathological score. The caps are hard and
+  // independent of BOTH score and adjustment — lowering the bar can never
+  // breach them. This is the cost-rule-4 firewall proof for T4.
+  const deliveryDays: number[] = [];
+  for (let day = 0; day < 60; day++) {
+    const daysSinceLastRec = deliveryDays.length ? day - deliveryDays[deliveryDays.length - 1] : Infinity;
+    const deliveriesLast30d = deliveryDays.filter((d) => day - d < 30).length;
+    const decision = decideRecGeneration({
+      score: 100, confidence: 1.0, daysSinceLastRec, deliveriesLast30d,
+      recThresholdAdjustment: REC_ADJ_MIN,   // max downward — easiest possible eligibility
+    });
+    if (decision.shouldGenerate) deliveryDays.push(day);
+  }
+  for (let i = 1; i < deliveryDays.length; i++) {
+    assert.ok(deliveryDays[i] - deliveryDays[i - 1] >= COOLDOWN_DAYS,
+      `deliveries ${deliveryDays[i - 1]} and ${deliveryDays[i]} <7d apart under max downward adjustment`);
+  }
+  for (let day = 0; day < 60; day++) {
+    const inWindow = deliveryDays.filter((d) => d <= day && day - d < 30).length;
+    assert.ok(inWindow <= MONTHLY_CAP,
+      `${inWindow} deliveries in the 30d window ending day ${day} exceeds ${MONTHLY_CAP} under max downward adjustment`);
+  }
+  assert.ok(deliveryDays.length <= 9,
+    `runaway under max downward adjustment: ${deliveryDays.length} deliveries in 60 days`);
 });

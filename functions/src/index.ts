@@ -11,7 +11,7 @@ import { seasonForMonth, isSeasonEligible, isSlotActive, REC_SEASON_VALUES } fro
 import { route as aiRoute, routeChain as aiRouteChain, logRoute as aiLogRoute, clientFor as aiClientFor, type AiRoute } from "./modelRouter";
 import { validateGiftWithReason, trustedSourcesFor, EXPEDITION_SIGNAL_ALLOW, buildLunaUserPrompt } from "./mission";
 import { signalAvailability, computeConfidence, sanitizeConcernScore, decideRecGeneration,
-  buildWatcherComfortRecInput, expeditionGiftGatesPass,
+  sanitizeRecThresholdAdjustment, buildWatcherComfortRecInput, expeditionGiftGatesPass,
   type ComfortRecInput } from "./concernScore";
 import { capSources, shouldRun, monthKey, creditSummary, REC_MAX_SOURCES_PER_RUN, REC_MIN_RUN_INTERVAL_DAYS } from "./credits";
 import { WORLD_PRIVACY_FLOOR, normalizeCountry, foldPulseCountry } from "./world";
@@ -2065,6 +2065,11 @@ export const nightlyExpeditionWatch = onSchedule(
       const prefs = prefsSnap.data() ?? {};
       const giftFatigue = ["none", "mild", "high"].includes(String(prefs.giftFatigue))
         ? String(prefs.giftFatigue) : "none";
+      // T4: the ledger-learned cadence nudge (opens lower the bar, ignores
+      // raise it). Read once here from the SAME prefs doc; sanitized to a
+      // clamped int (missing/garbage → 0 → no nudge). Applied to the rec
+      // threshold below — the hard cooldown/cap are unaffected.
+      const recThresholdAdjustment = sanitizeRecThresholdAdjustment(prefs.recThresholdAdjustment);
       try {
         const r = aiRoute("watching");
         const client = aiClientFor(r, { openai: OPENAI_API_KEY.value() });
@@ -2151,10 +2156,11 @@ export const nightlyExpeditionWatch = onSchedule(
         if (concernScore !== null) scored++;
         const recDecision = decideRecGeneration({
           score: concernScore, confidence: recConfidence, daysSinceLastRec, deliveriesLast30d,
+          recThresholdAdjustment,
         });
         // enum/number facet ONLY — no uid, no themes, no raw content (privacy)
         functions.logger.info("luna_rec_decision", {
-          concernScore, recConfidence,
+          concernScore, recConfidence, recThresholdAdjustment,
           daysSinceLastRec: Number.isFinite(daysSinceLastRec) ? Math.round(daysSinceLastRec) : -1,
           deliveriesLast30d,
           effectiveThreshold: Math.round(recDecision.effectiveThreshold),
