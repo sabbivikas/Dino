@@ -14,7 +14,7 @@ import { signalAvailability, computeConfidence, sanitizeConcernScore, decideRecG
   sanitizeRecThresholdAdjustment, buildWatcherComfortRecInput, expeditionGiftGatesPass,
   type ComfortRecInput } from "./concernScore";
 import { capSources, shouldRun, monthKey, creditSummary, REC_MAX_SOURCES_PER_RUN, REC_MIN_RUN_INTERVAL_DAYS } from "./credits";
-import { WORLD_PRIVACY_FLOOR, normalizeCountry, foldPulseCountry } from "./world";
+import { WORLD_PRIVACY_FLOOR, normalizeCountry, foldPulseCountry, groupWorldMoodDocs, sanitizeAggregateDayKeys, retainNewestDays } from "./world";
 import { computeDeliverAfter, decideSweep, daypartFor, isValidTz, SWEEP_BATCH_LIMIT, posterPathOrNull, shouldExpireAnnounced, ANNOUNCED_EXPIRY_MS, shouldDeletePayloadOnTransition, payloadExpiresAtMs } from "./recDelivery";
 import { buildRecAnnouncementMessage, isPlausiblePushToken, REC_PUSH_TOKENS_COLLECTION } from "./recAnnounce";
 import { buildAnnouncementOutcome, announcementOutcomeId, isOutcomeDaypart, OUTCOME_RETENTION_DAYS } from "./outcomes";
@@ -1423,20 +1423,12 @@ export const aggregateWorldMoods = onSchedule("every 60 minutes", async () => {
   const cutoff = admin.firestore.Timestamp.fromMillis(Date.now() - 48 * 3600 * 1000);
   const snap = await db.collection("worldMoods").where("createdAt", ">", cutoff).get();
 
-  // dayKey -> countryCode -> mood -> count
-  const grouped: Record<string, Record<string, Record<string, number>>> = {};
-  snap.forEach((doc) => {
-    const d = doc.data();
-    const mood = String(d.mood ?? "");
-    if (!(WORLD_MOODS as readonly string[]).includes(mood)) return;
-    const dayKey = String(d.dayKey ?? "");
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(dayKey)) return;
-    const rawCountry = String(d.countryCode ?? "").toUpperCase();
-    const country = /^[A-Z]{2}$/.test(rawCountry) ? rawCountry : "elsewhere";
-    grouped[dayKey] ??= {};
-    grouped[dayKey][country] ??= {};
-    grouped[dayKey][country][mood] = (grouped[dayKey][country][mood] ?? 0) + 1;
-  });
+  // UTC-Gregorian day (from SERVER createdAt) -> countryCode -> mood -> count.
+  // The doc's client-written dayKey is never trusted — device calendars wrote
+  // corrupted keys (Buddhist "2569-…"). Pure logic + tests live in world.ts.
+  const docs: Record<string, unknown>[] = [];
+  snap.forEach((doc) => docs.push(doc.data()));
+  const grouped = groupWorldMoodDocs(docs);
 
   const aggRef = db.collection("worldAggregate").doc("current");
   const existing = (await aggRef.get()).data() ?? {};
@@ -1467,10 +1459,10 @@ export const aggregateWorldMoods = onSchedule("every 60 minutes", async () => {
     outDays[dayKey] = { global, countries: outCountries };
   }
 
-  // Retain only the newest 7 dayKeys (lexicographic == chronological for yyyy-MM-dd).
-  const keep = Object.keys(outDays).sort().slice(-7);
-  const trimmed: Record<string, unknown> = {};
-  for (const k of keep) trimmed[k] = outDays[k];
+  // Year-sanity auto-purge on the MERGED map (new + previously-stored days) —
+  // corrupted keys can never survive a run — then keep the newest 7 valid
+  // dayKeys (lexicographic == chronological for yyyy-MM-dd).
+  const trimmed = retainNewestDays(sanitizeAggregateDayKeys(outDays, Date.now()), 7);
 
   await aggRef.set({
     updatedAt: admin.firestore.FieldValue.serverTimestamp(),
