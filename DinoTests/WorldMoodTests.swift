@@ -90,11 +90,38 @@ final class WorldMoodTests: XCTestCase {
         XCTAssertNil(WorldMoodService.worldMomentLine(mood: .drained, bucket: none))
     }
 
-    // 6) Local-day key formatting.
-    @MainActor func testTodayKey() {
-        var cal = Calendar(identifier: .gregorian)
-        cal.timeZone = TimeZone(identifier: "America/Chicago")!
-        let d = cal.date(from: DateComponents(timeZone: cal.timeZone, year: 2026, month: 7, day: 3, hour: 23, minute: 50))!
-        XCTAssertEqual(WorldMoodService.todayKey(now: d, calendar: cal), "2026-07-03")
+    // 6) Day key is UTC-Gregorian regardless of device calendar or timezone
+    //    (the world-globe calendar fix: write, lookup, and server buckets all
+    //    share one UTC clock; device calendars like Buddhist year 2569 must
+    //    never leak into keys).
+    @MainActor func testTodayKeyIsUTCGregorian() {
+        var chicago = Calendar(identifier: .gregorian)
+        chicago.timeZone = TimeZone(identifier: "America/Chicago")!
+        // 23:50 in Chicago is already the NEXT day in UTC (04:50Z)
+        let lateNight = chicago.date(from: DateComponents(timeZone: chicago.timeZone, year: 2026, month: 7, day: 3, hour: 23, minute: 50))!
+        XCTAssertEqual(WorldMoodService.todayKey(now: lateNight, calendar: chicago), "2026-07-04")
+
+        // A Buddhist-calendar device (year 2569) still produces Gregorian keys.
+        var buddhist = Calendar(identifier: .buddhist)
+        buddhist.timeZone = TimeZone(identifier: "Asia/Bangkok")!
+        XCTAssertEqual(WorldMoodService.todayKey(now: lateNight, calendar: buddhist), "2026-07-04")
+
+        // Mid-day UTC stays the same UTC day.
+        var utc = Calendar(identifier: .gregorian)
+        utc.timeZone = TimeZone(identifier: "UTC")!
+        let noon = utc.date(from: DateComponents(timeZone: utc.timeZone, year: 2026, month: 7, day: 3, hour: 12))!
+        XCTAssertEqual(WorldMoodService.todayKey(now: noon), "2026-07-03")
+    }
+
+    // 7) dayKey → Date parser is the exact inverse of todayKey (Gregorian+UTC).
+    @MainActor func testDayKeyParserRoundTrip() {
+        let date = WorldMoodService.date(fromDayKey: "2026-07-04")
+        XCTAssertNotNil(date)
+        XCTAssertEqual(WorldMoodService.todayKey(now: date!), "2026-07-04")
+        // UTC midnight exactly
+        var utc = Calendar(identifier: .gregorian)
+        utc.timeZone = TimeZone(identifier: "UTC")!
+        XCTAssertEqual(date, utc.date(from: DateComponents(timeZone: utc.timeZone, year: 2026, month: 7, day: 4)))
+        XCTAssertNil(WorldMoodService.date(fromDayKey: "junk"))
     }
 }

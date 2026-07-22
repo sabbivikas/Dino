@@ -100,14 +100,35 @@ enum WorldMoodService {
     private static var cacheFetchedAt: Date?
     private static let cacheMaxAge: TimeInterval = 15 * 60   // aggregate rebuilds hourly
 
-    /// Local-day key, matching the app's other yyyy-MM-dd keys.
+    /// UTC-Gregorian day key ("yyyy-MM-dd") — the world's shared "today".
+    /// The calendar parameter is intentionally ignored: device calendars
+    /// corrupted dayKeys (a Thai device's .current calendar wrote Buddhist
+    /// year "2569-…"), and this one helper drives BOTH the written dayKey
+    /// field and the globe's aggregate lookup, so it must match the server's
+    /// UTC-Gregorian buckets exactly.
     static func todayKey(now: Date = Date(), calendar: Calendar = .current) -> String {
         let df = DateFormatter()
         df.locale = Locale(identifier: "en_US_POSIX")
-        df.calendar = calendar
-        df.timeZone = calendar.timeZone
+        var utcGregorian = Calendar(identifier: .gregorian)
+        utcGregorian.timeZone = TimeZone(identifier: "UTC")!
+        df.calendar = utcGregorian
+        df.timeZone = utcGregorian.timeZone
         df.dateFormat = "yyyy-MM-dd"
         return df.string(from: now)
+    }
+
+    /// Parses a "yyyy-MM-dd" dayKey back to its UTC-midnight Date — the exact
+    /// inverse of `todayKey`, pinned to Gregorian+UTC for the same reason
+    /// (an unpinned parser on a Buddhist-calendar device shifts the day).
+    static func date(fromDayKey dayKey: String) -> Date? {
+        let df = DateFormatter()
+        df.locale = Locale(identifier: "en_US_POSIX")
+        var utcGregorian = Calendar(identifier: .gregorian)
+        utcGregorian.timeZone = TimeZone(identifier: "UTC")!
+        df.calendar = utcGregorian
+        df.timeZone = utcGregorian.timeZone
+        df.dateFormat = "yyyy-MM-dd"
+        return df.date(from: dayKey)
     }
 
     /// Device-region country code (never GPS). Pure validation → testable.

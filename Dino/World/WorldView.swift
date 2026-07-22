@@ -217,14 +217,22 @@ struct WorldView: View {
     }
 
     private func chipLabel(_ dayKey: String) -> String {
+        // today keeps its plain label — the date would crowd the chip row and
+        // "today" already carries the meaning (existing catalog string).
         if dayKey == todayKey { return String(localized: "today") }
-        let df = DateFormatter()
-        df.locale = Locale(identifier: "en_US_POSIX")
-        df.dateFormat = "yyyy-MM-dd"
-        guard let date = df.date(from: dayKey) else { return dayKey }
+        // the Date comes from the pinned Gregorian+UTC parser — an unpinned
+        // parse on a non-Gregorian device calendar shifts the day
+        guard let date = WorldMoodService.date(fromDayKey: dayKey) else { return dayKey }
         let out = DateFormatter()
         out.locale = Locale.current
-        out.setLocalizedDateFormatFromTemplate("EEE")
+        // display in UTC too — the key names a UTC day; formatting its
+        // midnight in a western timezone would label the previous day
+        var utcGregorian = Calendar(identifier: .gregorian)
+        utcGregorian.timeZone = TimeZone(identifier: "UTC")!
+        out.calendar = utcGregorian
+        out.timeZone = utcGregorian.timeZone
+        // weekday + day-of-month, localized per-language (es/ja/ko/vi safe)
+        out.setLocalizedDateFormatFromTemplate("EEEd")
         return out.string(from: date).lowercased()
     }
 

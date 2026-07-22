@@ -42,6 +42,22 @@ final class WorldGlobeScene {
     private static let maxWeatherSystems = 10
     private static let localEchoName = "firefly-local-echo"
 
+    // ELSEWHERE — the folded below-floor + unknown-region logs, rendered as
+    // dim desaturated fireflies over open ocean (presence without a place).
+    private static let elsewhereFireflyCap = 6
+    private static let elsewhereFireflyOpacity: CGFloat = 0.34
+    private static let elsewhereFireflySize: CGFloat = 0.055
+    /// Open-ocean anchors — mid-Pacific, mid-Atlantic, Indian ocean; all well
+    /// clear of any landmass. Same (lat, lon) convention as countryAnchors.json.
+    private static let elsewhereOceanAnchors: [(lat: Double, lon: Double)] = [
+        (8.0, -140.0),    // mid-Pacific, north of the equator
+        (-18.0, -120.0),  // south Pacific
+        (25.0, -45.0),    // north Atlantic
+        (-22.0, -15.0),   // south Atlantic
+        (-25.0, 80.0),    // central Indian ocean
+        (12.0, 165.0),    // west-central Pacific
+    ]
+
     // MARK: - Build
 
     func build() {
@@ -197,6 +213,41 @@ final class WorldGlobeScene {
                 addTapTarget(to: node, size: size, name: "tap-firefly-\(code)")
                 fireflyContainer.addChildNode(node)
                 fireflies.append((node, size))
+                placed += 1
+            }
+        }
+
+        // ELSEWHERE — the server already folded below-floor countries into
+        // this bucket; render it as DIM, DESATURATED fireflies scattered over
+        // open ocean so the folded logs still glow while no country is ever
+        // revealed. Named countries keep firefly priority — elsewhere fills
+        // whatever budget remains, capped. Placement is deterministic (seeded
+        // from the bucket's total — no per-frame or Date-based randomness);
+        // the sprites share the scene's standard firefly motion, which is the
+        // scene's existing (un-gated) breathing — no new motion classes.
+        if let elsewhere = bucket.countries["elsewhere"], elsewhere.total > 0,
+           let mood = elsewhere.dominantMood, placed < Self.maxFireflies {
+            fireflyMoods["elsewhere"] = mood
+            let want = min(Self.elsewhereFireflyCap,
+                           max(1, elsewhere.total / 3),
+                           Self.maxFireflies - placed)
+            var rng = SplitMix64(seed: UInt64(max(elsewhere.total, 1)))
+            // desaturated: mood color pulled 55% toward a neutral gray
+            let dim = UIColor.blendWorld(DinoWorldPalette.moodColor(mood),
+                                         UIColor(white: 0.62, alpha: 1), t: 0.55)
+            for i in 0..<want {
+                let anchor = Self.elsewhereOceanAnchors[i % Self.elsewhereOceanAnchors.count]
+                let lat = anchor.lat + Double.random(in: -3...3, using: &rng)
+                let lon = anchor.lon + Double.random(in: -3...3, using: &rng)
+                let node = makeFirefly(color: dim, size: Self.elsewhereFireflySize)
+                node.opacity = Self.elsewhereFireflyOpacity
+                position(node, lat: lat, lon: lon,
+                         altitude: 1.03 + Float(Self.elsewhereFireflySize) * 0.4)
+                node.name = "firefly-elsewhere"
+                addTapTarget(to: node, size: Self.elsewhereFireflySize, name: "tap-firefly-elsewhere")
+                fireflyContainer.addChildNode(node)
+                // NOT appended to `fireflies` — the night-boost opacity pass
+                // would overwrite the deliberately-dim opacity.
                 placed += 1
             }
         }
@@ -437,5 +488,19 @@ final class WorldGlobeScene {
     func stop() {
         brightnessTimer?.invalidate()
         brightnessTimer = nil
+    }
+}
+
+/// Deterministic seeded RNG (SplitMix64) — the elsewhere scatter must not
+/// jump to a new layout on every rebuild of the same bucket.
+private struct SplitMix64: RandomNumberGenerator {
+    private var state: UInt64
+    init(seed: UInt64) { state = seed }
+    mutating func next() -> UInt64 {
+        state = state &+ 0x9E37_79B9_7F4A_7C15
+        var z = state
+        z = (z ^ (z >> 30)) &* 0xBF58_476D_1CE4_E5B9
+        z = (z ^ (z >> 27)) &* 0x94D0_49BB_1331_11EB
+        return z ^ (z >> 31)
     }
 }
