@@ -18,6 +18,7 @@ import { WORLD_PRIVACY_FLOOR, normalizeCountry, foldPulseCountry, groupWorldMood
 import { computeDeliverAfter, decideSweep, daypartFor, isValidTz, SWEEP_BATCH_LIMIT, posterPathOrNull, shouldExpireAnnounced, ANNOUNCED_EXPIRY_MS, shouldDeletePayloadOnTransition, payloadExpiresAtMs } from "./recDelivery";
 import { buildRecAnnouncementMessage, isPlausiblePushToken, REC_PUSH_TOKENS_COLLECTION } from "./recAnnounce";
 import { buildAnnouncementOutcome, announcementOutcomeId, isOutcomeDaypart, OUTCOME_RETENTION_DAYS } from "./outcomes";
+import { buildWeeklyPrompt } from "./weeklyReport";
 
 admin.initializeApp();
 
@@ -856,14 +857,14 @@ export const generateWeeklyReport = onCall(
     const systemPrompt =
       "You are Dino, a warm and empathetic mental wellness companion. You analyze weekly mental health check-in responses and generate caring, insightful wellness reports. Your tone is warm, personal, and encouraging — never clinical or alarming. Always remind users this is a reflection tool not a diagnosis.";
 
-    const userPrompt = buildWeeklyPrompt(
-      weekNumber,
-      dateRange,
-      questionsAndAnswers,
-      previousScores
-    );
-
     try {
+      // Inside the try so any throw from prompt-building also refunds the quota.
+      const userPrompt = buildWeeklyPrompt(
+        weekNumber,
+        dateRange,
+        questionsAndAnswers,
+        previousScores
+      );
       const openai = new OpenAI({ apiKey: OPENAI_API_KEY.value() });
       const resp = await openai.chat.completions.create({
         model: "gpt-4o",
@@ -893,60 +894,6 @@ export const generateWeeklyReport = onCall(
     }
   }
 );
-
-function buildWeeklyPrompt(
-  weekNumber: number,
-  dateRange: string,
-  questionsAndAnswers: Array<{ question: string; score: number }>,
-  previousScores: Array<{ key: string; score: number }>
-): string {
-  const labels = [
-    "not at all",
-    "several days",
-    "more than half the days",
-    "nearly every day",
-  ];
-  const lines: string[] = [];
-  lines.push(
-    `A user completed their weekly mental health check-in (Week ${weekNumber}, ${dateRange}). Here are their responses:`
-  );
-  lines.push("");
-  questionsAndAnswers.forEach((qa, i) => {
-    const score = Math.max(0, Math.min(3, Number(qa.score) || 0));
-    lines.push(`Q${i + 1}: ${qa.question}`);
-    lines.push(`A: ${labels[score]} (${score}/3)`);
-  });
-  lines.push("");
-  if (previousScores && previousScores.length > 0) {
-    const prevStr = previousScores
-      .map((p) => `${p.key}=${p.score}`)
-      .join(", ");
-    lines.push(`Previous week scores: ${prevStr}`);
-  } else {
-    lines.push("Previous week scores: none (first check-in)");
-  }
-  lines.push("");
-  lines.push(
-    [
-      "Return JSON with this exact shape:",
-      "{",
-      '  "overallScore": number 0-100,',
-      '  "overallLabel": string,',
-      '  "overallEmoji": string,',
-      '  "moodEnergyScore": number 0-100,',
-      '  "moodEnergyInsight": string (2-3 warm sentences),',
-      '  "anxietyStressScore": number 0-100,',
-      '  "anxietyStressInsight": string (2-3 warm sentences),',
-      '  "wellbeingScore": number 0-100,',
-      '  "wellbeingInsight": string (2-3 warm sentences),',
-      '  "weeklyReflection": string (3-4 sentences),',
-      '  "trend": "improved" | "stable" | "needs attention",',
-      '  "trendNote": string (one short line)',
-      "}",
-    ].join("\n")
-  );
-  return lines.join("\n");
-}
 
 // ---------------------------------------------------------------------------
 // DINO WORLD — hourly aggregation of anonymous worldMoods into ONE summary doc.

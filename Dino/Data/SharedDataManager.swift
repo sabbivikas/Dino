@@ -216,6 +216,7 @@ final class SharedDataManager: ObservableObject {
         self.growthStats = Self.load(GrowthStats.self, from: ud, key: Self.staticUserKey(uid, "growthStats")) ?? GrowthStats()
 
         resetSelfCareIfNewDay()
+        migrateStreakBuddhistKeysIfNeeded()
         persistCurrentUserId()
         applyFileProtectionToExistingAudio()
         applyFileProtectionToExistingPaintings()
@@ -343,6 +344,7 @@ final class SharedDataManager: ObservableObject {
         growthStats = Self.load(GrowthStats.self, from: ud, key: userKey("growthStats")) ?? GrowthStats()
 
         resetSelfCareIfNewDay()
+        migrateStreakBuddhistKeysIfNeeded()
         #if DEBUG
         print("[DataManager] data loaded — entries: \(moodEntries.count) moods")
         #endif
@@ -409,6 +411,27 @@ final class SharedDataManager: ObservableObject {
     func recordActivity() {
         updateStreak()
         FirestoreSyncService.shared.scheduleSyncToCloud()
+    }
+
+    // MARK: - One-time Buddhist-key write-back migration
+
+    /// Once per user, replace the stored activeDates with its normalized
+    /// (Buddhist-recovered / garbage-dropped) equivalent and re-derive the
+    /// counters, so the cleaned set persists and syncs via the normal path.
+    /// Naturally idempotent (normalizing a clean set is a no-op); the flag just
+    /// skips the redundant work on subsequent launches.
+    private func migrateStreakBuddhistKeysIfNeeded() {
+        let flagKey = userKey("dino.streak.buddhistMigrationV1")
+        guard !defaults.bool(forKey: flagKey) else { return }
+        let normalized = StreakData.normalizedActiveDates(streakData.activeDates)
+        if normalized != streakData.activeDates {
+            var sd = streakData
+            sd.activeDates = normalized
+            sd.currentStreak = sd.computedCurrentStreak()
+            sd.longestStreak = max(sd.computedLongestStreak(), sd.currentStreak)
+            streakData = sd   // didSet persists locally; existing sync propagates it
+        }
+        defaults.set(true, forKey: flagKey)
     }
 
     private func updateStreak() {
