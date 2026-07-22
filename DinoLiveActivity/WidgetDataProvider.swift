@@ -16,8 +16,12 @@ private struct StreakDataW: Codable {
     var lastActiveDate: Date
     var activeDates: Set<String>
 
+    // Pinned IDENTICALLY to StreakData.dateFormatter (Gregorian + en_US_POSIX,
+    // device-local timeZone). It decodes the same synced keys, so both must agree.
     private static let dateFormatter: DateFormatter = {
         let f = DateFormatter()
+        f.calendar = Calendar(identifier: .gregorian)
+        f.locale = Locale(identifier: "en_US_POSIX")
         f.dateFormat = "yyyy-MM-dd"
         return f
     }()

@@ -288,7 +288,10 @@ class FirestoreSyncService: ObservableObject {
                 // both counters from the merged set. (The old max-merge left stale
                 // low streak values after reinstall / device switch.)
                 var merged = dm.streakData
-                merged.activeDates = merged.activeDates.union(streak.activeDates)
+                // Normalize the union so Buddhist-corrupted keys arriving from an
+                // old device are recovered/dropped before they re-enter storage.
+                merged.activeDates = StreakData.normalizedActiveDates(
+                    merged.activeDates.union(streak.activeDates))
                 merged.currentStreak = merged.computedCurrentStreak()
                 merged.longestStreak = merged.computedLongestStreak()
                 dm.streakData = merged

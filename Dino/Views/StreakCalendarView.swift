@@ -45,14 +45,14 @@ struct StreakCalendarView: View {
                     StatCardsRow(
                         currentStreak: dataManager.streakData.currentStreak,
                         longestStreak: dataManager.streakData.longestStreak,
-                        totalVisits: dataManager.streakData.activeDates.count
+                        totalVisits: dataManager.streakData.normalizedActiveDates().count
                     )
                     .padding(.horizontal, 16)
                     .padding(.top, 12)
 
                     CalendarCard(
                         displayedMonth: $displayedMonth,
-                        activeDates: dataManager.streakData.activeDates
+                        activeDates: dataManager.streakData.normalizedActiveDates()
                     )
                     .padding(.horizontal, 16)
                     .padding(.top, 18)
