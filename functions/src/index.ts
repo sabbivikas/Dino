@@ -1,6 +1,6 @@
 import * as admin from "firebase-admin";
 import * as functions from "firebase-functions/v1";
-import { onCall, HttpsError } from "firebase-functions/v2/https";
+import { onCall, onRequest, HttpsError } from "firebase-functions/v2/https";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { onDocumentCreated, onDocumentUpdated } from "firebase-functions/v2/firestore";
 import { defineSecret, defineString } from "firebase-functions/params";
@@ -19,6 +19,7 @@ import { computeDeliverAfter, decideSweep, daypartFor, isValidTz, SWEEP_BATCH_LI
 import { buildRecAnnouncementMessage, isPlausiblePushToken, REC_PUSH_TOKENS_COLLECTION } from "./recAnnounce";
 import { buildAnnouncementOutcome, announcementOutcomeId, isOutcomeDaypart, OUTCOME_RETENTION_DAYS } from "./outcomes";
 import { buildWeeklyPrompt } from "./weeklyReport";
+import { debugRecForceGate, clampDelayMinutes, DEBUG_REC_FIXTURE_RECS } from "./debugRecForce";
 
 admin.initializeApp();
 
@@ -2520,6 +2521,86 @@ async function sendRecAnnouncement(uid: string, deliveryId: string): Promise<voi
       `sendRecAnnouncement: uid=${uid} delivery=${deliveryId} failed (quiet miss): ${err}`);
   }
 }
+
+// ── DEBUG (owner-only): force a rec delivery to test the TestFlight path ──
+// onRequest so the owner can curl it (no client hook exists for this).
+// Double-gated in debugRecForce.ts: env uid-allowlist (the endpoint acts
+// ONLY on the allowlisted uid — no uid param exists) + shared key; missing
+// env fails closed. Writes the SAME delivery/payload docs the hold block
+// writes (fixture recs — zero model calls) so announce → push → live
+// activity → reveal → shelf all run identically. CADENCE SAFETY: skips the
+// comfortRecLimits counter, never sets lastAnnouncedDayKey, writes no SHOWN
+// outcome, marks docs debug:true; ?cleanup=1 deletes them so the 30-day
+// cooldown/cap window is left exactly as before testing.
+export const forceRecDeliveryDebug = onRequest(
+  { timeoutSeconds: 30, memory: "256MiB" },
+  async (req, res) => {
+    const gate = debugRecForceGate(
+      process.env.DEBUG_REC_FORCE_UIDS, process.env.DEBUG_REC_FORCE_KEY,
+      String(req.query.key ?? ""));
+    if (!gate.allowed) {
+      res.status(403).send("forbidden");
+      return;
+    }
+    const uid = gate.uid;
+    const db = admin.firestore();
+    const parentRef = db.collection("recDeliveries").doc(uid);
+
+    // ?cleanup=1 — erase every debug delivery + payload for the uid so the
+    // real cadence window (30-day announcedAt query) is left untouched.
+    if (String(req.query.cleanup ?? "") === "1") {
+      const dbg = await parentRef.collection("deliveries").where("debug", "==", true).get();
+      const batch = db.batch();
+      dbg.docs.forEach((d) => {
+        batch.delete(d.ref);
+        batch.delete(parentRef.collection("payloads").doc(d.id));
+      });
+      await batch.commit();
+      functions.logger.info(`forceRecDeliveryDebug: uid=${uid} cleaned=${dbg.size}`);
+      res.json({ cleaned: dbg.size });
+      return;
+    }
+
+    const presenceSnap = await db.collection("presence").doc(uid).get();
+    const tzRaw = presenceSnap.data()?.tz;
+    const tz = isValidTz(tzRaw) ? tzRaw : "Etc/UTC";
+    const nowMs = Date.now();
+    const announceNow = String(req.query.announceNow ?? "") === "1";
+    const delayMin = clampDelayMinutes(req.query.delayMinutes);
+    const deliverAfterMs = announceNow ? nowMs : nowMs + delayMin * 60_000;
+
+    const deliveryRef = parentRef.collection("deliveries").doc();
+    const batch = db.batch();
+    batch.set(deliveryRef, {
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      deliverAfter: admin.firestore.Timestamp.fromMillis(deliverAfterMs),
+      status: announceNow ? "announced" : "held",
+      ...(announceNow ? { announcedAt: admin.firestore.FieldValue.serverTimestamp() } : {}),
+      daypart: daypartFor(deliverAfterMs, tz),
+      tz,
+      attempts: 0,
+      debug: true,
+    });
+    batch.set(parentRef.collection("payloads").doc(deliveryRef.id), {
+      recs: DEBUG_REC_FIXTURE_RECS,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      expiresAt: admin.firestore.Timestamp.fromMillis(payloadExpiresAtMs(nowMs)),
+      debug: true,
+    });
+    await batch.commit();
+    if (announceNow) {
+      await sendRecAnnouncement(uid, deliveryRef.id);
+    }
+    functions.logger.info(
+      `forceRecDeliveryDebug: uid=${uid} delivery=${deliveryRef.id} ` +
+      `mode=${announceNow ? "announceNow" : `held+${delayMin}m`} tz=${tz}`);
+    res.json({
+      deliveryId: deliveryRef.id,
+      mode: announceNow ? "announced" : "held",
+      deliverAfter: new Date(deliverAfterMs).toISOString(),
+      tz,
+    });
+  });
 
 export const recDeliverySweep = onSchedule(
   { schedule: "7-59/10 * * * *", timeoutSeconds: 300, memory: "256MiB" },
