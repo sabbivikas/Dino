@@ -30,6 +30,13 @@ export const FINDINGS_CITY = "Saint Paul, Minnesota";
  * from "the agent replied with prose that parsed to zero candidates".
  */
 export const AGENT_REPLY_LOG_CAP = 1200;
+/**
+ * Step margin the ONE-SHOT json retry needs before it is allowed to run. The
+ * retry's thinking steps land on the SAME 30-step tally, so it may only start
+ * while at least this many steps remain — the existing kill must never be
+ * pushed past by the retry itself.
+ */
+export const JSON_RETRY_STEP_MARGIN = 5;
 
 // ── the gate (fail closed) ───────────────────────────────────────────────────
 
@@ -338,6 +345,62 @@ export function summarizeAgentReply(
   return { truncated: flat.slice(0, limit), looksJson, length: raw.length };
 }
 
+// ── the ONE-SHOT json retry (the "agent narrated instead of emitting" fix) ───
+//
+// THE BUG (task opPrIgf6Akl3TpIrXdjD): the agent SUCCEEDED — 4 steps of 30, six
+// real gentle free Saint Paul events with dates, times and venues — then wrote
+// them out in PROSE, said it would "compile the results now", and the session
+// ended before the JSON array ever appeared. parseCandidates saw no array, the
+// run reported `empty`, and 26 steps of budget went unused. Pure output-format
+// failure, not a search failure. So: ask ONCE more, in the SAME session, for
+// just the JSON — the events are already in the agent's context, so this is a
+// formatting turn, not a second search.
+
+/**
+ * The follow-up message sent to the SAME session when the agent narrated
+ * instead of emitting. The candidate schema is restated so the agent does not
+ * have to reach back to the original prompt to re-format what it already found.
+ */
+export const JSON_RETRY_MESSAGE = [
+  "STOP. Do not browse any further and do not describe anything in words.",
+  "Reply with ONLY the JSON array of the candidates you just listed: no prose,",
+  "no markdown fence, no explanation, no commentary before or after it.",
+  "Your entire message must start with [ and end with ].",
+  "Each object exactly:",
+  '{ "title": string, "date": string, "venue": string, "url": string,',
+  '  "registrationNeeded": boolean, "startISO": string|null, "endISO": string|null,',
+  '  "dateConfidence": "exact"|"approximate"|"unknown" }',
+  "If you truly have none, reply with [].",
+].join("\n");
+
+/**
+ * The retry decision. PURE, never throws.
+ *
+ * Retry ONLY when all of these hold:
+ *   • nothing parsed (candidates === 0) — a good reply is never re-asked;
+ *   • the reply did NOT look like JSON — a genuine "[]" is an honest empty and
+ *     asking again would just burn steps on the same answer;
+ *   • we have not already retried — this is one-shot by contract;
+ *   • at least JSON_RETRY_STEP_MARGIN steps of the cap remain, so the retry
+ *     cannot be what pushes the run into the kill.
+ */
+export function shouldRetryForJson(params: {
+  candidates: number;
+  looksJson: boolean;
+  stepsUsed: number;
+  maxSteps?: number;
+  alreadyRetried: boolean;
+}): boolean {
+  if (params.alreadyRetried) return false;
+  if (!Number.isFinite(params.candidates) || params.candidates > 0) return false;
+  if (params.looksJson) return false;
+  const maxSteps = Number.isFinite(params.maxSteps as number)
+    ? (params.maxSteps as number) : MAX_AGENT_STEPS;
+  // an unreadable step tally is treated as "no budget left" (fail closed).
+  if (!Number.isFinite(params.stepsUsed) || params.stepsUsed < 0) return false;
+  return params.stepsUsed <= maxSteps - JSON_RETRY_STEP_MARGIN;
+}
+
 // ── prompt builders ──────────────────────────────────────────────────────────
 
 /**
@@ -374,6 +437,29 @@ export function buildSearchPrompt(
     "Prefer OFFICIAL sources: the city or county site, the public library calendar,",
     "the parks & recreation site, eventbrite, and venue/organizer pages. Only include",
     "an item you can point at a real, currently-live page for.",
+    "",
+    // CLINICAL EXCLUSION — mirrors the comfort-recs system prompt's rule ("only
+    // inherently gentle content … never clinical or academic works, and never
+    // books or films about mental illness, therapy, self help … comfort means
+    // escape and warmth, not a mirror of what they are feeling"), adapted from
+    // media to events so the two systems say the same thing. Owner-reported:
+    // "Talk with a Mental Health Professional" surfaced twice as a finding.
+    "NOT CARE SERVICES — dino brings small gentle outings, never care delivery.",
+    "Only inherently gentle outings: nothing graphic, violent, frightening, grief",
+    "centered, or otherwise distressing. EXCLUDE every clinical, therapeutic, or",
+    "medical-service event, even a free and kind-sounding one:",
+    "- therapy or counseling sessions, and \"talk with a mental health professional\"",
+    "  style services, psychiatric or psychological consultations,",
+    "- support groups, recovery or twelve step meetings, grief or bereavement",
+    "  circles, caregiver support sessions,",
+    "- health screenings, vaccination or flu shot clinics, blood drives, medical or",
+    "  dental clinics, health fairs, and any medical advice or diagnosis session,",
+    "- talks and workshops centered on mental illness, addiction, or illness.",
+    "KEEP the genuinely gentle non-clinical things: storytime, gardens and nature",
+    "walks, crafts and open studios, music, writing and other creative classes,",
+    "library programs, museum hours, quiet community gatherings.",
+    "A gentle outing is an escape and a little warmth, not a mirror of what someone",
+    "is going through.",
   ];
 
   if (preferBookable) {
@@ -430,6 +516,21 @@ export function buildSearchPrompt(
     "- NEVER invent a time. If the listing only says something like \"see listing\"",
     "  or gives no clear date and time, set startISO to null and dateConfidence to",
     "  \"unknown\". An honest \"unknown\" is always better than a guessed time.",
+    "",
+    // THE OUTPUT CONTRACT LIVES LAST ON PURPOSE — recency. A run that had found
+    // six good events narrated them in prose ("let me compile the results now")
+    // and never emitted the array; the whole search was thrown away by a
+    // formatting slip. Restating the contract as the final thing the agent reads
+    // is the cheapest place to prevent that.
+    "OUTPUT CONTRACT — a machine reads your answer, not a person:",
+    "- Your FINAL message must be ONLY the JSON array. Nothing else.",
+    "- Do not describe what you found in words. Your entire final message must",
+    "  start with [ and end with ].",
+    "- No prose before it, no summary after it, no markdown fence, no commentary,",
+    "  and never a \"let me compile the results now\" style narration. Listing the",
+    "  events in words instead of emitting the JSON is a FAILED run, even when you",
+    "  found perfect events.",
+    "- If you truly found nothing, your entire final message is exactly: []",
   );
   return lines.join("\n");
 }
@@ -437,6 +538,13 @@ export function buildSearchPrompt(
 /**
  * The pick prompt (gpt-4.1-mini): choose ONE gentle fit from the candidates and
  * write dino's "why" in a lowercase, warm, no-dashes voice. JSON out.
+ *
+ * The clinical exclusion is repeated here as a SAFETY NET: the search prompt
+ * already forbids care-delivery events, but the pick step is the last gate
+ * before a finding reaches someone's phone, and a clinical listing that slipped
+ * through the search must not be the thing dino hands them. Same intent as the
+ * comfort-recs system prompt's "never clinical … not a mirror of what they are
+ * feeling" rule, adapted to events.
  */
 export function buildPickPrompt(candidates: readonly FindingCandidateCore[]): {
   system: string;
@@ -445,6 +553,13 @@ export function buildPickPrompt(candidates: readonly FindingCandidateCore[]): {
   const system = [
     "you are dino, a gentle companion. you speak in lowercase, warm and plain,",
     "never using dashes. you are picking ONE thing for a tired person's week.",
+    "never pick a clinical, therapeutic, or medical event, even a free and kind",
+    "sounding one: no therapy or counseling session, no \"talk with a mental health",
+    "professional\" style service, no support group or recovery meeting, no grief",
+    "circle, no health screening, clinic, or medical advice session. dino brings",
+    "small gentle outings, not care services, so reach for the storytime, the",
+    "garden, the walk, the craft table, the library or museum hour instead. if",
+    "every option looks clinical, pick the least clinical one.",
     'reply with ONLY json: { "index": number, "why": string }.',
     "index is the 0-based position of your pick in the list. why is one soft",
     "sentence (<= 140 chars, lowercase, no dashes) about why it fits a quiet day.",

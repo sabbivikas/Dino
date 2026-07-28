@@ -179,3 +179,110 @@ VERIFY (this pass, all local)
 - iOS: not built and not touched — nothing to build.
 
 REDEPLOY REQUIRED (owner runs it): startFindingTask only. No client work.
+
+
+PASS: ONE-SHOT JSON RETRY + HARD OUTPUT CONTRACT + CLINICAL EXCLUSION
+=====================================================================
+(server-only, no rebuild)
+
+WHY: the raw-reply log from the pass above did its job on the very next empty
+run. Task opPrIgf6Akl3TpIrXdjD: steps=4 of 30, preferBookable=TRUE,
+candidates=0, looksJson=FALSE, replyLength=2820, no error, no cap-kill. The
+logged reply proves the agent SUCCEEDED at searching — it had six gentle free
+Saint Paul events with dates, times and venues (Garden Storytime, Community
+Health Services, Memoir Writing, Talk with a Mental Health Professional, Open
+Lab, Playdate) — then NARRATED them in prose, said "Let me compile the results
+now", and the session ended before the JSON array was ever emitted. Our loop
+took that narration as the final reply, parsed 0, and reported empty. A pure
+OUTPUT-FORMAT failure with 26 steps of budget unused. (The same log also shows
+the second problem: two of the six were clinical care services.)
+
+1. ONE-SHOT JSON RETRY (the core fix). New pure decision in starFindings.ts:
+   shouldRetryForJson({ candidates, looksJson, stepsUsed, maxSteps,
+   alreadyRetried }) -> boolean. Retries ONLY when nothing parsed AND the reply
+   did NOT look like JSON (a genuine "[]" is an honest empty and is left alone)
+   AND we have not already retried AND stepsUsed <= maxSteps -
+   JSON_RETRY_STEP_MARGIN (5), i.e. 25 of 30 — so the retry can never be what
+   pushes a run into the kill. Fails closed on NaN/negative step tallies.
+   The follow-up itself (JSON_RETRY_MESSAGE) is sent to the SAME session: "STOP
+   ... reply with ONLY the JSON array of the candidates you just listed", with
+   the candidate schema restated and "If you truly have none, reply with []".
+   Same session matters — the events are still in the agent's context, so this
+   is a FORMATTING turn, not a second search.
+   agiClient.ts gained the mechanism, because the session is terminated +
+   DELETEd in the finally block and a fresh session would have no memory of the
+   search: RunParams.followUp?(ctx) is called AT MOST ONCE, only after a reply
+   settles, and NEVER after a kill or an error. Its THOUGHTs land on the SAME
+   cumulative tally, so the 30-step kill still fires exactly where it did; the
+   vendor is handed only the REMAINING steps as its own max_steps, and no
+   start_url (it continues, it does not re-navigate). Deliberately NO event
+   de-duplication: if the vendor ever replayed events we would over-count, which
+   errs toward killing sooner — the safe direction for a per-step bill. A
+   follow-up POST that fails degrades to the first attempt's result (RunResult
+   .retryError) instead of turning a finished run into a failed one. The task
+   doc still stores the TOTAL steps (initial + retry), so cost telemetry is
+   accurate.
+   LOGGING: "findings_agent_reply" keeps every existing field and gains
+   retried:true|false; it now always describes the FIRST reply, so the prose
+   that triggered a retry is never overwritten. When retried, a second entry
+   "findings_agent_reply_retry" carries retryCandidates, retryLooksJson,
+   retryReplyLength, retryTruncated, stepsBeforeRetry, stepsTotal, killReason,
+   retryError and retryReply. An empty run stays diagnosable in one look.
+
+2. HARD JSON-ONLY OUTPUT CONTRACT. buildSearchPrompt now ends (recency: it is
+   the LAST thing the agent reads, in BOTH bias branches) with an OUTPUT
+   CONTRACT block: the FINAL message must be ONLY the JSON array; "Do not
+   describe what you found in words. Your entire final message must start with
+   [ and end with ]"; no prose, summary, fence or commentary, and never a "let
+   me compile the results now" style narration — listing the events in words
+   instead of emitting the JSON is a FAILED run even when the events are
+   perfect; a true empty is exactly "[]". The existing performance rules (do NOT
+   open each event's detail page, emit the JSON as soon as you have a few
+   candidates) and the softened bookable-bias semantics are untouched.
+
+3. CLINICAL / THERAPEUTIC / MEDICAL EXCLUSION (owner: "Talk with a Mental
+   Health Professional" surfaced twice). Findings now exclude care delivery the
+   same way the comfort recs do. MIRRORED from the recs system prompt in
+   runComfortRecGeneration ("only inherently gentle content: nothing graphic,
+   violent, frightening, grief centered, or otherwise distressing. never
+   clinical or academic works, and never books or films about mental illness,
+   therapy, self help, sleep science, or psychological distress; comfort means
+   escape and warmth, not a mirror of what they are feeling"), adapted from
+   media to events, and noted as such in a code comment. The search prompt gains
+   a "NOT CARE SERVICES — dino brings small gentle outings, never care delivery"
+   block (both branches) excluding therapy/counseling sessions, "talk with a
+   mental health professional" style services, psychiatric/psychological
+   consultations, support groups, recovery or twelve step meetings, grief and
+   caregiver circles, health screenings, vaccination/flu-shot clinics, blood
+   drives, medical and dental clinics, health fairs, medical advice or diagnosis
+   sessions, and illness/addiction/mental-illness centered talks — while
+   explicitly KEEPING storytime, gardens and nature walks, crafts and open
+   studios, music, writing and creative classes, library programs, museum hours
+   and quiet community gatherings. buildPickPrompt repeats it as a SAFETY NET in
+   dino's lowercase voice, because the pick is the last gate before a finding
+   reaches someone's phone.
+
+SERVER-ONLY / NO REBUILD: ZERO .swift files in this commit — only
+functions/src/{starFindings.ts,index.ts,agiClient.ts}, the NEW test file
+functions/src/findingsJsonRetry.test.ts, and this file. The client contract is
+untouched: request stays ["preferBookable": Bool], the callable response stays
+{ taskId, status, steps, outcome, finding } and the finding keeps
+title/when/venue/why/url/registrationNeeded/outcome/startISO/endISO/
+dateConfidence. The already-shipped b103 client picks this up as-is.
+
+VERIFY (this pass, all local)
+-----------------------------
+- functions: npm test -> 201 green (182 baseline, ALL unmodified, + 19 new
+  tests in the NEW file src/findingsJsonRetry.test.ts); tsc --noEmit clean.
+  The new tests cover the shouldRetryForJson matrix (retries the incident;
+  never twice; never on parsed candidates; never on a genuine []; the 25-of-30
+  margin boundary; fail-closed on junk), the retry message, the output contract
+  in both branches AND its position at the end, the clinical exclusion in both
+  branches AND in the pick prompt, and the runAgentTask follow-up: same session
+  reused (one create/terminate/delete), no start_url, remaining-budget
+  max_steps, cumulative steps, the kill still firing at exactly 30 across both
+  turns, no follow-up after a kill or an ERROR, and a failed follow-up POST
+  degrading to the first result.
+- iOS: not built and not touched — nothing to build.
+
+REDEPLOY REQUIRED (owner runs it): startFindingTask only. No client work.

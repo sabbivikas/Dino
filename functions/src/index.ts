@@ -24,8 +24,9 @@ import { debugRecForceGate, clampDelayMinutes, DEBUG_REC_FIXTURE_RECS } from "./
 import { starFindingsGate, buildSearchPrompt, buildPickPrompt, buildBookingPrompt,
   parseCandidates, outcomeForFinding, outcomeForBooking, parsePreferBookable,
   findingDeepLink, findingTaskPayload, noFindingTask, summarizeAgentReply,
+  shouldRetryForJson, JSON_RETRY_MESSAGE,
   MAX_TASKS_PER_DAY, MAX_AGENT_STEPS, WALL_CLOCK_MS, FINDINGS_CITY,
-  AGENT_REPLY_LOG_CAP } from "./starFindings";
+  AGENT_REPLY_LOG_CAP, type AgentReplySummary } from "./starFindings";
 import { runAgentTask, type RunResult } from "./agiClient";
 
 admin.initializeApp();
@@ -2981,6 +2982,12 @@ export const startFindingTask = onCall(
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
     });
 
+    // What the FIRST reply looked like, captured inside the retry decision so
+    // the log can still show it after a follow-up replaced lastContent.
+    let firstCandidateCount: number | null = null;
+    let firstReplyLog: AgentReplySummary | null = null;
+    let stepsBeforeRetry = 0;
+
     // SEARCH phase (real AGI browser agent). No PII in this phase.
     const searchRes = await runAgentTask({
       prompt: buildSearchPrompt(FINDINGS_CITY, preferBookable),
@@ -2988,6 +2995,26 @@ export const startFindingTask = onCall(
       maxSteps: MAX_AGENT_STEPS,
       wallClockMs: WALL_CLOCK_MS,
       stepDelaySeconds: 1,
+      // ONE-SHOT JSON RETRY. A run that found six real events, narrated them,
+      // and never emitted the array is a formatting failure, not a search
+      // failure — so ask once more, in the SAME session (the events are still
+      // in its context), for just the JSON. agiClient never calls this after a
+      // kill or an error, and the follow-up's steps land on the same 30-step
+      // tally, so the existing kill still fires exactly where it did.
+      followUp: (first) => {
+        const firstCandidates = parseCandidates(first.lastContent);
+        firstCandidateCount = firstCandidates.length;
+        firstReplyLog = summarizeAgentReply(first.lastContent, AGENT_REPLY_LOG_CAP);
+        stepsBeforeRetry = first.thoughts;
+        const retry = shouldRetryForJson({
+          candidates: firstCandidates.length,
+          looksJson: firstReplyLog.looksJson,
+          stepsUsed: first.thoughts,
+          maxSteps: MAX_AGENT_STEPS,
+          alreadyRetried: false,   // agiClient calls this at most once
+        });
+        return retry ? JSON_RETRY_MESSAGE : null;
+      },
     });
     const durationMs = Date.now() - startedAt;
     // the agent may end with a DONE or a trailing QUESTION that still carries
@@ -3000,11 +3027,16 @@ export const startFindingTask = onCall(
     // PII, single-lined so it stays one entry, and truncated at the cap. The API
     // key and auth headers live in agiClient's request options and never appear
     // in a message body, so nothing secret can ride along here.
-    const replyLog = summarizeAgentReply(searchRes.lastContent, AGENT_REPLY_LOG_CAP);
+    //
+    // This entry always describes the FIRST reply (identical to the final one
+    // when nothing was retried), so the prose that caused a retry is never lost;
+    // `steps` stays the TOTAL, and the retry's own reply gets the entry below.
+    const finalReplyLog = summarizeAgentReply(searchRes.lastContent, AGENT_REPLY_LOG_CAP);
+    const replyLog: AgentReplySummary = firstReplyLog ?? finalReplyLog;
     functions.logger.info("findings_agent_reply", {
       uid,
       task: taskRef.id,
-      candidates: candidates.length,
+      candidates: firstCandidateCount ?? candidates.length,
       steps: searchRes.thoughts,
       preferBookable,
       looksJson: replyLog.looksJson,
@@ -3013,8 +3045,24 @@ export const startFindingTask = onCall(
       killReason: searchRes.killReason ?? "",
       errored: searchRes.errored,
       durationMs,
+      retried: searchRes.retried,
       reply: replyLog.truncated,
     });
+    if (searchRes.retried) {
+      functions.logger.info("findings_agent_reply_retry", {
+        uid,
+        task: taskRef.id,
+        retryCandidates: candidates.length,
+        retryLooksJson: finalReplyLog.looksJson,
+        retryReplyLength: finalReplyLog.length,
+        retryTruncated: finalReplyLog.length > AGENT_REPLY_LOG_CAP,
+        stepsBeforeRetry,
+        stepsTotal: searchRes.thoughts,
+        killReason: searchRes.killReason ?? "",
+        retryError: searchRes.retryError ?? "",
+        retryReply: finalReplyLog.truncated,
+      });
+    }
 
     if (candidates.length === 0) {
       const outcome = searchRes.killReason === "step_cap" ? "failed:step_cap"
