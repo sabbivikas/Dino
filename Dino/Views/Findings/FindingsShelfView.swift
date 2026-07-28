@@ -17,6 +17,10 @@ struct FindingsShelfView: View {
     let findings: [FindingItem]
     var onOpenFinding: (FindingItem) -> Void = { _ in }
 
+    /// The paper-family cream (mirrors RecRevealView's cream) for headers on
+    /// the dark space backdrop — readable, still soft (owner fix #4).
+    static let creamHeader = Color(red: 0.984, green: 0.965, blue: 0.922)
+
     // the real comfort recs, read-only (display only — no keeping here).
     private let keepsakes: [RichRecStore.Keepsake] = RichRecStore.keepsakes()
 
@@ -33,14 +37,14 @@ struct FindingsShelfView: View {
         VStack(alignment: .leading, spacing: 16) {
             Text("the shelf")
                 .font(DinoTheme.dinoFont(size: 20))
-                .foregroundColor(Color(hex: "#4A3520"))
+                .foregroundColor(Self.creamHeader)   // light cream on the dark sky (owner fix #4)
                 .padding(.horizontal, 20)
 
             if findings.isEmpty && keepsakes.isEmpty {
                 Text("when the star brings something back, it will rest here 🌿")
                     .font(DinoTheme.dinoFont(size: 14))
                     .italic()
-                    .foregroundColor(Color(hex: "#A89F90"))
+                    .foregroundColor(Self.creamHeader.opacity(0.72))
                     .padding(.horizontal, 20)
                     .frame(maxWidth: .infinity, alignment: .center)
                     .padding(.top, 30)

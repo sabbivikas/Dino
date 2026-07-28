@@ -556,4 +556,119 @@ final class FindingsStar: SCNNode {
             .run { node in node.removeParticleSystem(burst) }
         ]))
     }
+
+    // MARK: - Findings flight choreography (branch-owned additions)
+    //
+    // These extend the copied D-844 star for the findings tab's send-out /
+    // return story, reusing the SAME motion vocabulary already in this file —
+    // the golden trail birthRate spike from performArrival(), the overshoot
+    // settle curve and sparkle burst from reactionBurst(). No new motion
+    // systems; the originals above are untouched.
+
+    /// A quadratic-bezier arc between two points, easing baked into the block
+    /// (SCNAction.customAction ignores timingMode). The control point is lifted
+    /// above the higher endpoint so the star travels in a real arc, not a line.
+    private func arcAction(from start: SCNVector3, to end: SCNVector3,
+                           lift: Float, duration: TimeInterval,
+                           ease: @escaping (Float) -> Float) -> SCNAction {
+        let ctrl = SCNVector3((start.x + end.x) / 2,
+                              max(start.y, end.y) + lift,
+                              (start.z + end.z) / 2)
+        return SCNAction.customAction(duration: duration) { node, elapsed in
+            let raw = duration > 0 ? Float(elapsed) / Float(duration) : 1
+            let t = ease(min(1, max(0, raw)))
+            let mt = 1 - t
+            node.position = SCNVector3(
+                mt * mt * start.x + 2 * mt * t * ctrl.x + t * t * end.x,
+                mt * mt * start.y + 2 * mt * t * ctrl.y + t * t * end.y,
+                mt * mt * start.z + 2 * mt * t * ctrl.z + t * t * end.z)
+        }
+    }
+
+    private static let easeIn: (Float) -> Float = { $0 * $0 }
+    private static let easeOut: (Float) -> Float = { 1 - (1 - $0) * (1 - $0) }
+
+    /// Send the star out: it GATHERS (a brief inhale — scale-down + the glow
+    /// tightening with the body — ~0.4s), then arcs away off-screen with the
+    /// trail spiked, receding to a point. ~1.35s total. `completion` fires when
+    /// the star is off-screen so the caller can flip to the empty AWAY state.
+    /// Reduce Motion: a simple fade-out, no flight.
+    func flyAway(to exit: SCNVector3, reduceMotion: Bool, completion: @escaping () -> Void) {
+        removeAction(forKey: journeyKey)
+        floatNode.removeAction(forKey: arrivalTiltKey)
+        isHidden = false
+
+        if reduceMotion {
+            SCNTransaction.begin()
+            SCNTransaction.animationDuration = 0.35
+            SCNTransaction.completionBlock = completion
+            opacity = 0
+            SCNTransaction.commit()
+            return
+        }
+
+        let start = position
+        // 1) GATHER — inhale: the whole node scales down, so the three glow
+        //    shells tighten in with the body (the "glow tighten").
+        let inhale = SCNAction.scale(to: 0.72, duration: 0.4)
+        inhale.timingMode = .easeInEaseOut
+        // 2) ARC AWAY — spike the golden trail (like performArrival's stream),
+        //    arc off-screen while receding to a bright point.
+        let spike = SCNAction.run { [weak self] _ in self?.trailSystem?.birthRate = 90 }
+        let arc = arcAction(from: start, to: exit, lift: 2.4, duration: 0.95, ease: Self.easeIn)
+        let recede = SCNAction.scale(to: 0.16, duration: 0.95)
+        recede.timingMode = .easeIn
+        let away = SCNAction.group([arc, recede])
+        let done = SCNAction.run { [weak self] _ in
+            guard let self else { return }
+            self.trailSystem?.birthRate = self.baseTrailBirthRate
+            self.isHidden = true
+            completion()
+        }
+        runAction(.sequence([inhale, spike, away, done]), forKey: journeyKey)
+    }
+
+    /// The star returns: it streaks in from far (tiny + distant, trail spiked),
+    /// grows along an arc down to the hover point, settles with a small
+    /// overshoot bounce and a sparkle burst, then resumes idle sway/blink.
+    /// ~1.3s. Reduce Motion: a simple fade-in at the hover point, no streak.
+    func streakIn(from start: SCNVector3, to hover: SCNVector3, reduceMotion: Bool) {
+        removeAction(forKey: journeyKey)
+        floatNode.removeAction(forKey: arrivalTiltKey)
+        isHidden = false
+
+        if reduceMotion {
+            position = hover
+            scale = SCNVector3(1, 1, 1)
+            trailSystem?.birthRate = baseTrailBirthRate
+            opacity = 0
+            SCNTransaction.begin()
+            SCNTransaction.animationDuration = 0.6
+            opacity = 1
+            SCNTransaction.commit()
+            return
+        }
+
+        position = start
+        scale = SCNVector3(0.12, 0.12, 0.12)
+        opacity = 1
+        trailSystem?.birthRate = 90   // bright streak, like the arrival stream
+
+        let arc = arcAction(from: start, to: hover, lift: 1.6, duration: 1.0, ease: Self.easeOut)
+        let grow = SCNAction.scale(to: 1.08, duration: 1.0)   // slight size overshoot
+        grow.timingMode = .easeOut
+        let streak = SCNAction.group([arc, grow])
+        // Overshoot bounce — the same soft spring curve as reactionBurst's settle.
+        let settle = SCNAction.scale(to: 1.0, duration: 0.28)
+        settle.timingFunction = { t in
+            let p = t - 1.0
+            return 1.0 + p * p * p * (1.0 + 1.6 * t)
+        }
+        let land = SCNAction.run { [weak self] _ in
+            guard let self else { return }
+            self.trailSystem?.birthRate = self.baseTrailBirthRate
+            self.onSelection()   // sparkle burst on settle (reused pop/burst helper)
+        }
+        runAction(.sequence([streak, settle, land]), forKey: journeyKey)
+    }
 }

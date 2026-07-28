@@ -25,6 +25,19 @@ final class FindingsService {
 
     enum FindingsError: Error { case notEnabled, badResponse }
 
+    /// Distinguish a GATE DENIAL (the callable rejecting an unauthenticated or
+    /// unauthorized caller — e.g. the demo running on a non-owner dino) from a
+    /// genuine failure. FirebaseFunctions surfaces these as an NSError in
+    /// FunctionsErrorDomain whose code is the FunctionsErrorCode raw value.
+    /// The UI shows a distinct quiet line for a denial instead of the generic
+    /// "lost its way" (owner fix #8).
+    static func isGateDenied(_ error: Error) -> Bool {
+        let ns = error as NSError
+        guard ns.domain == FunctionsErrorDomain else { return false }
+        return ns.code == FunctionsErrorCode.unauthenticated.rawValue
+            || ns.code == FunctionsErrorCode.permissionDenied.rawValue
+    }
+
     // MARK: - server calls
 
     /// Send the star out: runs the server search+pick agent, returns the finding

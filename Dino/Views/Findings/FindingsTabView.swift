@@ -33,17 +33,17 @@ struct FindingsTabView: View {
 
     var body: some View {
         ZStack {
-            LinearGradient(
-                colors: [Color(hex: "#20264F"), Color(hex: "#3A3766"), Color(hex: "#FAF6EC")],
-                startPoint: .top, endPoint: .bottom)
-                .ignoresSafeArea()
+            // Full-bleed deep-space backdrop (owner fix #2): the star lives in a
+            // real night sky, not a flat navy fill. FindingsSpaceBackdrop is a
+            // branch-owned port of the shipping QuietSpaceBackdrop visuals.
+            FindingsSpaceBackdrop()
 
             ScrollView {
                 VStack(spacing: 18) {
                     starBlock
                         .padding(.top, 40)
 
-                    Divider().background(Color.white.opacity(0.2)).padding(.horizontal, 40)
+                            Divider().background(Color.white.opacity(0.14)).padding(.horizontal, 40)
 
                     FindingsShelfView(findings: findings, onOpenFinding: { activeReveal = $0 })
                         .padding(.bottom, 80)
@@ -61,6 +61,11 @@ struct FindingsTabView: View {
         .sheet(item: $activeReveal) { item in
             FindingRevealCard(item: item, userName: userName, onClose: { activeReveal = nil })
         }
+        .onAppear {
+            #if DEBUG
+            applyQAStateIfNeeded()
+            #endif
+        }
     }
 
     // MARK: - star + caption
@@ -68,7 +73,12 @@ struct FindingsTabView: View {
     private var starBlock: some View {
         VStack(spacing: 14) {
             FindingsStarHostView(state: starState)
-                .frame(height: 220)
+                .frame(height: 300)   // larger hero (owner fix #3); transparent, so glow can overflow
+                .overlay {
+                    // AWAY (owner fix #6): one faint, slow-drifting mote so the
+                    // empty sky still feels alive but lonely.
+                    if starState == .away { FindingsLonelyMote() }
+                }
                 .contentShape(Rectangle())
                 .onTapGesture {
                     guard starState == .idle, !isBusy, !capReached else { return }
@@ -78,12 +88,16 @@ struct FindingsTabView: View {
 
             Text(caption)
                 .font(DinoTheme.dinoFont(size: 15))
-                .foregroundColor(.white.opacity(0.9))
+                .foregroundColor(Self.creamText)   // light cream on the dark sky (owner fix #4)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 30)
                 .transition(.opacity)
         }
     }
+
+    /// The paper-family cream (mirrors RecRevealView's cream) for labels on the
+    /// dark sky — readable, still soft.
+    static let creamText = Color(red: 0.984, green: 0.965, blue: 0.922)
 
     // MARK: - send the star out
 
@@ -93,7 +107,9 @@ struct FindingsTabView: View {
         starState = .sending
 
         Task {
-            try? await Task.sleep(nanoseconds: reduceMotion ? 300_000_000 : 900_000_000)
+            // Let the gather + arc-away choreography (~1.35s) finish before the
+            // sky goes empty (owner fix #5: total ~1.2–1.6s).
+            try? await Task.sleep(nanoseconds: reduceMotion ? 350_000_000 : 1_350_000_000)
             await MainActor.run {
                 starState = .away
                 setCaption("the star is out looking")
@@ -105,15 +121,56 @@ struct FindingsTabView: View {
                 await MainActor.run {
                     starState = .back
                     isBusy = false
-                    setCaption("the star lost its way for a moment, try again")
+                    // Gate denial (unauthenticated / permission-denied) is not a
+                    // real failure — give it a distinct quiet line (owner fix #8).
+                    if FindingsService.isGateDenied(error) {
+                        setCaption("the star only flies for its own dino")
+                    } else {
+                        setCaption("the star lost its way for a moment, try again")
+                    }
+                    #if DEBUG
+                    print("[findings] startFinding failed: \(error)")
+                    #endif
+                    scheduleIdleAfterReturn()
                 }
             }
         }
     }
 
+    /// After the return streak settles, hand control back so the star is
+    /// tappable again.
+    private func scheduleIdleAfterReturn() {
+        let delay: TimeInterval = reduceMotion ? 0.7 : 1.5
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+            if starState == .back { starState = .idle }
+        }
+    }
+
+    #if DEBUG
+    /// DEBUG-only QA: `-findingsStateQA sending|away|back` forces a star state
+    /// on launch so each motion state renders for screenshots without a live
+    /// server call. Pairs with `-findingsQA -jarTabQA` to open the tab.
+    private func applyQAStateIfNeeded() {
+        let args = ProcessInfo.processInfo.arguments
+        guard let i = args.firstIndex(of: "-findingsStateQA"), i + 1 < args.count else { return }
+        switch args[i + 1] {
+        case "sending":
+            isBusy = true; starState = .sending; setCaption("the star is heading out")
+        case "away":
+            isBusy = true; starState = .away; setCaption("the star is out looking")
+        case "back":
+            isBusy = true; starState = .back; setCaption("the star came back with something")
+            scheduleIdleAfterReturn()
+        default:
+            break
+        }
+    }
+    #endif
+
     private func landResult(_ item: FindingItem) {
         isBusy = false
         starState = .back
+        scheduleIdleAfterReturn()
         if item.status != "capReached" {
             FindingsStore.upsert(item)
             findings = FindingsStore.items()

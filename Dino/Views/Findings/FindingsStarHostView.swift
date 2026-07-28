@@ -44,17 +44,28 @@ private struct FindingsStarRepresentable: UIViewRepresentable {
         view.antialiasingMode = .multisampling2X
         view.rendersContinuously = false
         view.allowsCameraControl = false
-        view.backgroundColor = .clear
         view.isUserInteractionEnabled = false
 
+        // TRANSPARENT COMPOSITING (owner fix #1): the SCNView must sit directly
+        // on the space backdrop with zero visible container edge — no opaque
+        // black rectangle. SceneKit needs all three: a clear view background, a
+        // non-opaque layer, and a clear SCENE background (the scene background
+        // is what was rendering as the black box).
+        view.backgroundColor = .clear
+        view.isOpaque = false
+
         let scene = SCNScene()
+        scene.background.contents = UIColor.clear
         view.scene = scene
 
-        // Camera: straight-on perspective, star at origin.
+        // Camera: straight-on perspective, star at origin. Pulled in close so
+        // the star at its natural scale (1.0) reads as the large centerpiece of
+        // the top area (owner fix #3) — the glow shells overflow into the now
+        // transparent bounds instead of being clipped by a small host.
         let cameraNode = SCNNode()
         cameraNode.camera = SCNCamera()
         cameraNode.camera?.fieldOfView = 40
-        cameraNode.position = SCNVector3(0, 0, 6)
+        cameraNode.position = SCNVector3(0, 0, 2.2)
         scene.rootNode.addChildNode(cameraNode)
 
         // A soft ambient so the star's own omni light isn't the only source.
@@ -66,7 +77,6 @@ private struct FindingsStarRepresentable: UIViewRepresentable {
 
         let star = FindingsStar(reduceMotion: reduceMotion)
         star.position = Self.center
-        star.scale = SCNVector3(2.0, 2.0, 2.0)   // fill the small host nicely
         scene.rootNode.addChildNode(star)
 
         context.coordinator.star = star
@@ -84,7 +94,6 @@ private struct FindingsStarRepresentable: UIViewRepresentable {
             old.removeFromParentNode()
             let fresh = FindingsStar(reduceMotion: reduceMotion)
             fresh.position = Self.center
-            fresh.scale = SCNVector3(2.0, 2.0, 2.0)
             view.scene?.rootNode.addChildNode(fresh)
             coord.star = fresh
             coord.builtForReduceMotion = reduceMotion
@@ -94,7 +103,10 @@ private struct FindingsStarRepresentable: UIViewRepresentable {
             applyState(state, coordinator: coord, animated: !reduceMotion)
             coord.appliedState = state
         }
-        view.isPlaying = !reduceMotion && (state == .idle || state == .back)
+        // Keep the render loop alive for every state that animates the star
+        // (idle sway, the fly-away, the return streak); pause only when the
+        // star is genuinely gone from the AWAY sky.
+        view.isPlaying = !reduceMotion && state != .away
     }
 
     static func dismantleUIView(_ view: SCNView, coordinator: Coordinator) {
@@ -104,47 +116,38 @@ private struct FindingsStarRepresentable: UIViewRepresentable {
     }
 
     private static let center = SCNVector3(0, 0, 0)
-    private static let offFrame = SCNVector3(3.2, 3.0, -1.0)   // up-right, out of view
+    // Off-screen exit for the fly-away: up and to the right, out of view.
+    private static let offFrame = SCNVector3(2.8, 3.4, -1.0)
+    // Far, tiny, high start for the return streak: distant and deep so it
+    // reads as coming back from a long way off.
+    private static let farStart = SCNVector3(-2.8, 3.6, -7.0)
 
     private func applyState(_ state: FindingsStarState, coordinator: Coordinator, animated: Bool) {
         guard let star = coordinator.star else { return }
         switch state {
-        case .idle, .back:
-            if state == .back {
-                // return via glide-in: start off-frame + faded, then glide home.
-                star.position = Self.offFrame
-                star.opacity = reduceMotion ? 1 : 0
-                if reduceMotion {
-                    star.position = Self.center
-                    fade(star, to: 1)
-                } else {
-                    fade(star, to: 1)
-                    star.glide(to: Self.center, duration: 0.9)
-                }
-            } else {
-                star.position = Self.center
-                star.opacity = 1
-            }
+        case .idle:
+            // Resume the calm hover — reset any flight transform.
+            star.removeAllActions()
+            star.isHidden = false
+            star.position = Self.center
+            star.scale = SCNVector3(1, 1, 1)
+            star.opacity = 1
+        case .back:
+            // RETURN (owner fix #7): streak in from far, grow along an arc,
+            // settle with an overshoot bounce + sparkle burst. Reduce Motion
+            // handled inside streakIn (a simple fade-in, no streak).
+            star.streakIn(from: Self.farStart, to: Self.center, reduceMotion: reduceMotion)
         case .sending:
-            // glide off-frame up-right + fade out.
-            if reduceMotion {
-                fade(star, to: 0)
-            } else {
-                star.glide(to: Self.offFrame, duration: 0.8)
-                fade(star, to: 0)
-            }
+            // LAUNCH (owner fix #5): gather (inhale + glow tighten), then arc
+            // away off-screen with the trail spiked. Reduce Motion → fade.
+            star.flyAway(to: Self.offFrame, reduceMotion: reduceMotion) { }
         case .away:
-            // the star is out looking — hidden entirely.
+            // AWAY (owner fix #6): the star is fully gone from the scene, not
+            // dimmed. The caller keeps the sky alive with the lonely mote.
+            star.isHidden = true
             star.opacity = 0
             star.position = Self.offFrame
         }
-    }
-
-    private func fade(_ node: SCNNode, to opacity: CGFloat) {
-        SCNTransaction.begin()
-        SCNTransaction.animationDuration = reduceMotion ? 0.3 : 0.7
-        node.opacity = opacity
-        SCNTransaction.commit()
     }
 
     final class Coordinator {
