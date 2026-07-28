@@ -10,8 +10,10 @@ import {
   buildSearchPrompt,
   buildPickPrompt,
   buildBookingPrompt,
+  summarizeAgentReply,
   MAX_AGENT_STEPS,
   MAX_TASKS_PER_DAY,
+  AGENT_REPLY_LOG_CAP,
   type AgiMessage,
 } from "./starFindings";
 
@@ -148,4 +150,65 @@ test("buildBookingPrompt embeds ONLY name+email and the hard stop rules", () => 
 test("caps are the documented values", () => {
   assert.equal(MAX_AGENT_STEPS, 30);
   assert.equal(MAX_TASKS_PER_DAY, 5);
+  assert.equal(AGENT_REPLY_LOG_CAP, 1200);
+});
+
+// ── summarizeAgentReply (the raw-reply log line's shaping) ──────────────────
+
+test("summarizeAgentReply truncates at the cap and reports the PRE-truncation length", () => {
+  const long = "x".repeat(5000);
+  const s = summarizeAgentReply(long);
+  assert.equal(s.truncated.length, AGENT_REPLY_LOG_CAP);
+  assert.equal(s.length, 5000);                 // original length, so a cap hit is obvious
+  // a custom cap is honoured; junk caps fall back to the default
+  assert.equal(summarizeAgentReply(long, 10).truncated.length, 10);
+  assert.equal(summarizeAgentReply(long, 0).truncated.length, AGENT_REPLY_LOG_CAP);
+  assert.equal(summarizeAgentReply(long, -5).truncated.length, AGENT_REPLY_LOG_CAP);
+  assert.equal(summarizeAgentReply(long, Number.NaN).truncated.length, AGENT_REPLY_LOG_CAP);
+  // under the cap is passed through whole
+  assert.equal(summarizeAgentReply("short reply").truncated, "short reply");
+});
+
+test("summarizeAgentReply flattens newlines/tabs so the reply stays ONE log entry", () => {
+  const s = summarizeAgentReply("line one\nline two\r\nline three\ttabbed");
+  assert.equal(s.truncated, "line one line two line three tabbed");
+  assert.doesNotMatch(s.truncated, /[\r\n\t]/);
+  // leading/trailing whitespace is trimmed, runs collapse to a single space
+  assert.equal(summarizeAgentReply("\n\n  a    b  \n").truncated, "a b");
+});
+
+test("summarizeAgentReply: looksJson is true for [ / { incl. behind a ```json fence", () => {
+  assert.equal(summarizeAgentReply('[{"title":"x"}]').looksJson, true);
+  assert.equal(summarizeAgentReply('{"candidates":[]}').looksJson, true);
+  assert.equal(summarizeAgentReply('```json\n[{"title":"x"}]\n```').looksJson, true);
+  assert.equal(summarizeAgentReply('```\n{"candidates":[]}\n```').looksJson, true);
+  assert.equal(summarizeAgentReply('\n\n  [{"title":"x"}]').looksJson, true);
+  // prose — the case we could not previously tell apart from a genuine "nothing found"
+  assert.equal(
+    summarizeAgentReply("I could not find any free gentle events this week.").looksJson,
+    false);
+  assert.equal(summarizeAgentReply("Here is the JSON: [{}]").looksJson, false);
+});
+
+test("summarizeAgentReply is safe on empty/undefined/non-string input", () => {
+  const empty = { truncated: "", looksJson: false, length: 0 };
+  assert.deepEqual(summarizeAgentReply(""), empty);
+  assert.deepEqual(summarizeAgentReply(undefined), empty);
+  assert.deepEqual(summarizeAgentReply(null), empty);
+  assert.deepEqual(summarizeAgentReply(42), empty);
+  assert.deepEqual(summarizeAgentReply({ a: 1 }), empty);
+  // whitespace-only is not a crash and is not JSON
+  assert.deepEqual(summarizeAgentReply("   \n  "), { truncated: "", looksJson: false, length: 6 });
+});
+
+test("summarizeAgentReply agrees with parseCandidates on the empty-vs-unparseable split", () => {
+  // genuine "nothing found": valid JSON, zero candidates → looksJson TRUE
+  const genuine = "[]";
+  assert.equal(parseCandidates(genuine).length, 0);
+  assert.equal(summarizeAgentReply(genuine).looksJson, true);
+  // malformed/prose reply: also zero candidates → looksJson FALSE. That single
+  // flag is what makes the two distinguishable in the log.
+  const prose = "Sorry, the library calendar had nothing gentle and free this week.";
+  assert.equal(parseCandidates(prose).length, 0);
+  assert.equal(summarizeAgentReply(prose).looksJson, false);
 });

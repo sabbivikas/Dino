@@ -23,8 +23,9 @@ import { debugRecForceGate, clampDelayMinutes, DEBUG_REC_FIXTURE_RECS } from "./
 // EXPERIMENTAL star-findings demo (owner + flag + uid gated) — additive.
 import { starFindingsGate, buildSearchPrompt, buildPickPrompt, buildBookingPrompt,
   parseCandidates, outcomeForFinding, outcomeForBooking, parsePreferBookable,
-  findingDeepLink, findingTaskPayload, noFindingTask,
-  MAX_TASKS_PER_DAY, MAX_AGENT_STEPS, WALL_CLOCK_MS, FINDINGS_CITY } from "./starFindings";
+  findingDeepLink, findingTaskPayload, noFindingTask, summarizeAgentReply,
+  MAX_TASKS_PER_DAY, MAX_AGENT_STEPS, WALL_CLOCK_MS, FINDINGS_CITY,
+  AGENT_REPLY_LOG_CAP } from "./starFindings";
 import { runAgentTask, type RunResult } from "./agiClient";
 
 admin.initializeApp();
@@ -2992,6 +2993,28 @@ export const startFindingTask = onCall(
     // the agent may end with a DONE or a trailing QUESTION that still carries
     // the JSON — parse the last content either way.
     const candidates = parseCandidates(searchRes.lastContent);
+
+    // RAW-REPLY LOG (every run, found and empty, so there is a baseline to
+    // compare against). Costs no agent steps — this is only what already came
+    // back. `reply` is the agent's own text about PUBLIC event listings: no user
+    // PII, single-lined so it stays one entry, and truncated at the cap. The API
+    // key and auth headers live in agiClient's request options and never appear
+    // in a message body, so nothing secret can ride along here.
+    const replyLog = summarizeAgentReply(searchRes.lastContent, AGENT_REPLY_LOG_CAP);
+    functions.logger.info("findings_agent_reply", {
+      uid,
+      task: taskRef.id,
+      candidates: candidates.length,
+      steps: searchRes.thoughts,
+      preferBookable,
+      looksJson: replyLog.looksJson,
+      replyLength: replyLog.length,
+      truncated: replyLog.length > AGENT_REPLY_LOG_CAP,
+      killReason: searchRes.killReason ?? "",
+      errored: searchRes.errored,
+      durationMs,
+      reply: replyLog.truncated,
+    });
 
     if (candidates.length === 0) {
       const outcome = searchRes.killReason === "step_cap" ? "failed:step_cap"

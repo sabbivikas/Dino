@@ -204,21 +204,41 @@ test("parsePreferBookable: absent → false, booleans pass, everything else is r
   }
 });
 
-test("preferBookable adds the registration-portal source terms ONLY when true", () => {
+test("preferBookable PREFERS registration sources and demands a fallback, ONLY when true", () => {
   const off = buildSearchPrompt();
   const on = buildSearchPrompt(undefined, true);
   const bookableOnly = [
     /BOOKABLE BIAS/,
+    // the registration sources are still named, and named FIRST
     /registration portals/,
     /library program registration pages/,
     /community education class/i,
     /parks and recreation class registration/,
     /register or sign up affordance/,
+    // …but the bias PREFERS rather than RESTRICTS: an explicit fallback to the
+    // general listings, honest flags, and "empty is a failure".
+    /PREFERENCE, not a restriction/,
+    /FALL BACK to the\n\s*general gentle event listings/,
+    /rather than returning nothing/,
+    /registrationNeeded false is far better than an empty/,
+    /Set registrationNeeded HONESTLY/,
+    /Prefer — do not require —/,
+    /Returning zero candidates when gentle free events exist is a failure/,
   ];
   for (const re of bookableOnly) {
     assert.match(on, re, `preferBookable=true must mention ${re}`);
     assert.doesNotMatch(off, re, `preferBookable=false must NOT mention ${re}`);
   }
+  // the preferred sources are introduced BEFORE the fallback escape hatch
+  assert.ok(
+    on.indexOf("library program registration pages") < on.indexOf("FALL BACK"),
+    "registration sources must be listed first, the fallback second");
+  // the two performance rules that got runs down to 5-6 steps survive the softening
+  for (const p of [off, on]) {
+    assert.match(p, /Do NOT open each event's detail page/);
+  }
+  assert.match(on, /do NOT open\neach event's detail page/);
+  assert.match(on, /emit the JSON as soon as you have a few candidates/);
   // explicit default arg parity: buildSearchPrompt() === buildSearchPrompt(city, false)
   assert.equal(off, buildSearchPrompt(undefined, false));
 });

@@ -127,3 +127,55 @@ VERIFY (fix pass, all local)
 - cold-open recovery captured via the DEBUG-only -findingsRecoverQA hook (fake
   terminal task driven through the real applyServerTask path, empty shelf, no
   server call): scratchpad v3-cold-open-recovered.png.
+
+
+PASS: RAW-REPLY LOG + SOFTENED BOOKABLE BIAS (server-only, no rebuild)
+======================================================================
+WHY: task oLCcj9OJzWwASFHIIWXp came back outcome=empty with steps=5,
+durationMs=105359, preferBookable=TRUE and zero candidates. Not a cap-kill and
+not an error, so the agent finished and produced nothing parseable — and we
+could not tell "genuinely found nothing" from "replied with prose that parsed
+to zero", because the raw reply was never logged. Bias-OFF runs found 6 in 5-6
+steps, so the narrowed registration-portal source list was the prime suspect.
+
+1. RAW-REPLY LOGGING. New pure helper summarizeAgentReply(raw, cap) in
+   starFindings.ts -> { truncated, looksJson, length }: single-lines the reply
+   (so it stays ONE log entry), truncates at AGENT_REPLY_LOG_CAP = 1200, and
+   reports the PRE-truncation length plus whether the reply looked like JSON
+   ([ or { once ```json fences are stripped, judged exactly as parseCandidates
+   sees it). startFindingTask logs "findings_agent_reply" at INFO right after
+   parseCandidates, for EVERY run (found and empty) so there is a baseline.
+   looksJson is the flag that splits a genuine "[]" from a prose reply. Adds
+   ZERO agent steps — it only logs what already came back. No user PII (the
+   agent's own text about public listings); the API key / auth headers live in
+   agiClient request options and are never in a message body.
+
+2. SOFTENED BOOKABLE BIAS (owner: "I'd rather get candidates with honest
+   registration flags than zero candidates"). The preferBookable branch of
+   buildSearchPrompt now PREFERS instead of RESTRICTS: registration portals are
+   still named FIRST as the preferred starting point, but the agent is told to
+   FALL BACK to general gentle listings rather than return nothing, to set
+   registrationNeeded HONESTLY per candidate, to prefer (not require) a
+   register/sign-up affordance, and that "returning zero candidates when gentle
+   free events exist is a failure". The two rules that got runs down to 5-6
+   steps are preserved verbatim in the branch: do NOT open each event's detail
+   page, and emit the JSON as soon as you have a few candidates. Same step
+   budget. The bias-OFF prompt is BYTE-IDENTICAL to HEAD (diffed).
+
+SERVER-ONLY / NO REBUILD: ZERO .swift files in this commit — only
+functions/src/{starFindings.ts,index.ts}, two test files and this file. The
+client contract is untouched: request stays ["preferBookable": Bool], the
+callable response stays { taskId, status, steps, outcome, finding } and the
+finding keeps title/when/venue/why/url/registrationNeeded/outcome/startISO/
+endISO/dateConfidence. The already-shipped b103 client picks this up as-is.
+
+VERIFY (this pass, all local)
+-----------------------------
+- functions: npm test -> 182 green (177 baseline + 5 new summarizeAgentReply
+  tests); tsc --noEmit clean. The existing preferBookable prompt-branch test
+  was extended (not weakened) to also assert the fallback instruction, honest
+  flags, "empty is a failure", source-list-before-fallback ordering, and the
+  do-NOT-open-each-detail-page rule in BOTH branches.
+- iOS: not built and not touched — nothing to build.
+
+REDEPLOY REQUIRED (owner runs it): startFindingTask only. No client work.

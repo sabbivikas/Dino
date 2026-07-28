@@ -24,6 +24,12 @@ export const MAX_TASKS_PER_DAY = 5;
 export const WALL_CLOCK_MS = 6 * 60 * 1000;
 /** The demo is hardcoded to one city (owner decision — English-only demo). */
 export const FINDINGS_CITY = "Saint Paul, Minnesota";
+/**
+ * How much of the agent's raw final message we mirror into ONE log line.
+ * Diagnosability only: an `outcome: empty` run is otherwise indistinguishable
+ * from "the agent replied with prose that parsed to zero candidates".
+ */
+export const AGENT_REPLY_LOG_CAP = 1200;
 
 // ── the gate (fail closed) ───────────────────────────────────────────────────
 
@@ -292,6 +298,46 @@ export function parseCandidates(
   return out;
 }
 
+// ── raw-reply summarising (diagnosability) ───────────────────────────────────
+
+export interface AgentReplySummary {
+  /** Single-line, cap-truncated copy of the reply — fits in ONE log entry. */
+  truncated: string;
+  /** Did the reply LOOK like JSON (starts with [ or { once fences are gone)? */
+  looksJson: boolean;
+  /** Length of the ORIGINAL reply, before flattening or truncation. */
+  length: number;
+}
+
+/**
+ * Shape the agent's raw final message for a log line. PURE, never throws.
+ *
+ * WHY: a task that lands on `outcome: empty` is currently ambiguous — the agent
+ * may have genuinely found nothing, or it may have replied with prose/malformed
+ * JSON that `parseCandidates` turned into zero candidates. Logging the reply
+ * (single-lined so it stays one entry, and truncated so a chatty model can't
+ * flood the log) plus `looksJson` makes the two cases distinguishable at a
+ * glance. `length` is the PRE-truncation length, so a cap hit is obvious.
+ *
+ * Only the agent's own text about public event listings goes through here — no
+ * user PII, and never any credential: the API key and auth headers live in
+ * agiClient's request options and are never part of a message body.
+ */
+export function summarizeAgentReply(
+  raw: unknown,
+  cap: number = AGENT_REPLY_LOG_CAP
+): AgentReplySummary {
+  if (typeof raw !== "string" || raw.length === 0) {
+    return { truncated: "", looksJson: false, length: 0 };
+  }
+  const limit = Number.isFinite(cap) && cap > 0 ? Math.floor(cap) : AGENT_REPLY_LOG_CAP;
+  // looksJson is judged the same way parseCandidates sees it: fences stripped.
+  const fenceless = raw.replace(/```json/gi, "").replace(/```/g, "").trim();
+  const looksJson = fenceless.startsWith("[") || fenceless.startsWith("{");
+  const flat = raw.replace(/[\r\n\t]+/g, " ").replace(/ {2,}/g, " ").trim();
+  return { truncated: flat.slice(0, limit), looksJson, length: raw.length };
+}
+
 // ── prompt builders ──────────────────────────────────────────────────────────
 
 /**
@@ -305,8 +351,14 @@ export function parseCandidates(
  * placeholder. The agent must now ALSO return startISO/endISO/dateConfidence,
  * and must say "unknown" rather than invent a time.
  *
- * `preferBookable` biases only the SOURCE LIST toward registration portals; it
- * must never cost extra steps, so the decisive early-JSON rule and the
+ * `preferBookable` PREFERS registration portals, it does not RESTRICT to them.
+ * The first shape of this bias narrowed the source list hard enough that a real
+ * run (task oLCcj9OJzWwASFHIIWXp) burned 5 steps and came back with zero
+ * candidates, while bias-off runs found 6 in the same budget. So the branch now
+ * names registration sources as the preferred STARTING point and then requires
+ * a fallback to general gentle listings — an honest candidate carrying
+ * `registrationNeeded: false` beats an empty result. The bias must still never
+ * cost extra steps, so the decisive early-JSON rule and the
  * do-not-open-each-event rule are repeated in that branch too.
  */
 export function buildSearchPrompt(
@@ -327,14 +379,25 @@ export function buildSearchPrompt(
   if (preferBookable) {
     lines.push(
       "",
-      "BOOKABLE BIAS (this run should favor things you can actually sign up for):",
-      "Bias your SOURCE LIST toward registration portals rather than plain calendars:",
-      "library program registration pages, eventbrite, community education class",
-      "catalogs, and parks and recreation class registration pages. Prefer listings",
-      "that ALREADY show a register or sign up affordance on the listing page itself.",
-      "Judge that from the listing/source page you are already on — do NOT open each",
-      "event's detail page to verify registration. The SAME step budget applies: this",
-      "bias must not cost you extra steps.",
+      "BOOKABLE BIAS (this run PREFERS things you can actually sign up for). This",
+      "is a PREFERENCE, not a restriction:",
+      "- START with registration portals rather than plain calendars:",
+      "  library program registration pages, eventbrite, community education class",
+      "  catalogs, and parks and recreation class registration pages. Those are your",
+      "  preferred first stop.",
+      "- If those sources do not give you enough gentle free options, FALL BACK to the",
+      "  general gentle event listings for the city rather than returning nothing. An",
+      "  honest candidate with registrationNeeded false is far better than an empty",
+      "  result.",
+      "- Set registrationNeeded HONESTLY for each candidate, from what its listing",
+      "  actually shows. Prefer — do not require — listings that ALREADY show a",
+      "  register or sign up affordance on the listing page itself.",
+      "- Returning zero candidates when gentle free events exist is a failure. Come",
+      "  back with something suitable.",
+      "Judge all of that from the listing/source page you are already on — do NOT open",
+      "each event's detail page to verify registration. The SAME step budget applies:",
+      "emit the JSON as soon as you have a few candidates; this bias must not cost you",
+      "extra steps.",
     );
   }
 
