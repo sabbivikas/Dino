@@ -20,6 +20,16 @@ import FirebaseAuth
 
 struct FindingsTabView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.scenePhase) private var scenePhase
+
+    /// Branch-owned deep-link route (the finding push's door). Observed here so
+    /// a push tap — cold, backgrounded, or while this tab is already open —
+    /// lands on the right task's reveal.
+    @ObservedObject private var route = FindingsRoute.shared
+
+    @State private var isVisible = false
+    @State private var reconcileTask: Task<Void, Never>?
+    @State private var pollTask: Task<Void, Never>?
 
     @State private var starState: FindingsStarState = .idle
     @State private var findings: [FindingItem] = FindingsStore.items()
@@ -62,9 +72,28 @@ struct FindingsTabView: View {
             FindingRevealCard(item: item, userName: userName, onClose: { activeReveal = nil })
         }
         .onAppear {
+            isVisible = true
             #if DEBUG
             applyQAStateIfNeeded()
+            if applyRecoverQAIfNeeded() { return }
             #endif
+            reconcile()
+            consumeDeepLinkIfNeeded()
+        }
+        .onDisappear {
+            isVisible = false
+            stopWatching()
+        }
+        .onChange(of: scenePhase) { _, phase in
+            // Foreground while the tab is up: the star may have come back (or
+            // been found) while we were away.
+            guard phase == .active, isVisible else { return }
+            reconcile()
+            consumeDeepLinkIfNeeded()
+        }
+        .onChange(of: route.pendingTaskId) { _, _ in
+            // A push tapped while this tab is ALREADY open still opens its reveal.
+            consumeDeepLinkIfNeeded()
         }
     }
 
@@ -103,6 +132,13 @@ struct FindingsTabView: View {
 
     private func sendStar() {
         isBusy = true
+        // Stop any reconcile/poll: this send now owns the choreography.
+        stopWatching()
+        // "A star is out" marker, written BEFORE the ~2 minute callable returns
+        // an id. If the app is killed mid-call there is nothing on the shelf to
+        // find, so this is the only thing that tells a cold open to ask the
+        // server what happened (the other half of bug 2).
+        FindingsStore.markPending()
         setCaption("the star is heading out")
         starState = .sending
 
@@ -116,6 +152,12 @@ struct FindingsTabView: View {
             }
             do {
                 let item = try await FindingsService.shared.startFinding()
+                // PERSIST THE MOMENT THE ID EXISTS — before any UI work — so a
+                // kill between here and the reveal cannot lose the task.
+                if !item.taskId.isEmpty {
+                    FindingsStore.upsert(item)
+                    FindingsStore.clearPending()
+                }
                 await MainActor.run { landResult(item) }
             } catch {
                 await MainActor.run {
@@ -124,8 +166,12 @@ struct FindingsTabView: View {
                     // Gate denial (unauthenticated / permission-denied) is not a
                     // real failure — give it a distinct quiet line (owner fix #8).
                     if FindingsService.isGateDenied(error) {
+                        // never left the ground — nothing for a cold open to find.
+                        FindingsStore.clearPending()
                         setCaption("the star only flies for its own dino")
                     } else {
+                        // the marker STAYS: the server task may well have been
+                        // created, and reconcile() will find it.
                         setCaption("the star lost its way for a moment, try again")
                     }
                     #if DEBUG
@@ -146,7 +192,173 @@ struct FindingsTabView: View {
         }
     }
 
+    // MARK: - reconcile with the server (the reachability fix)
+
+    /// Ask the server what actually happened to the star.
+    ///
+    /// THE BUG THIS FIXES: the tab rendered local state only — it opened on a
+    /// hardcoded idle star and the local shelf — so a task that finished while
+    /// the app was backgrounded or killed was simply invisible, even though the
+    /// server had a complete finding sitting there. Now every appear and every
+    /// foreground asks getFindingTask (no taskId → the caller's latest task).
+    private func reconcile() {
+        guard !isBusy else { return }   // a live send owns the choreography
+        // Cold open with a marker but an empty shelf: show the star as out
+        // straight away, rather than a wrong idle star, while the server answers.
+        if starState == .idle, FindingsStore.isPendingRecent() {
+            starState = .away
+            setCaption("the star is out looking")
+        }
+        reconcileTask?.cancel()
+        reconcileTask = Task {
+            guard let item = try? await FindingsService.shared.pollLatest() else { return }
+            await MainActor.run { applyServerTask(item) }
+        }
+    }
+
+    /// The decision table: server truth → what the tab shows.
+    ///   none                              → plain idle (first ever use)
+    ///   searching                         → away + the out-looking line, poll ~10s
+    ///   found/empty/booked/handoff/confirmed
+    ///     already terminal on the shelf   → nothing replays
+    ///     new to this device              → shelve it, play the return, reveal it
+    ///   failed / anything else            → quiet idle, shelf untouched
+    private func applyServerTask(_ item: FindingItem) {
+        guard !isBusy else { return }
+
+        if item.status == "none" {
+            FindingsStore.clearPending()
+            stopPolling()
+            starState = .idle
+            setCaption("tap the star to send it out looking")
+            return
+        }
+
+        if item.status == "searching" {
+            if !item.taskId.isEmpty {
+                FindingsStore.upsert(item)
+                findings = FindingsStore.items()
+            }
+            starState = .away
+            setCaption("the star is out looking")
+            startPolling(taskId: item.taskId)
+            return
+        }
+
+        guard FindingsStore.isTerminal(item.status) else {
+            // failed: the star never brought anything back. Stay quiet.
+            FindingsStore.clearPending()
+            stopPolling()
+            if starState == .away { starState = .idle }
+            return
+        }
+
+        // TERMINAL — the star came back while we weren't looking.
+        let alreadyShelved = FindingsStore.hasTerminal(taskId: item.taskId)
+        FindingsStore.clearPending()
+        stopPolling()
+        FindingsStore.upsert(item)
+        findings = FindingsStore.items()
+        guard !alreadyShelved else {
+            // reconciled on an earlier pass — don't replay the return or the card.
+            if starState == .away { starState = .idle }
+            return
+        }
+        starState = .back
+        scheduleIdleAfterReturn()
+        setCaption(item.status == "empty" ? "the star came back"
+                                          : "the star came back with something")
+        // the notification path wants the finding in front of you, not filed away.
+        if item.status == "found" || item.status == "empty" { activeReveal = item }
+    }
+
+    /// While the tab is visible and the star is still out, re-ask every ~10s
+    /// until the task is terminal. Cancelled on disappear and on a new send.
+    private func startPolling(taskId: String) {
+        guard !taskId.isEmpty, pollTask == nil else { return }
+        pollTask = Task {
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 10_000_000_000)
+                if Task.isCancelled { return }
+                guard let item = try? await FindingsService.shared.pollFinding(taskId: taskId)
+                else { continue }
+                if item.status != "searching" {
+                    await MainActor.run { applyServerTask(item) }
+                    return
+                }
+            }
+        }
+    }
+
+    private func stopPolling() {
+        pollTask?.cancel()
+        pollTask = nil
+    }
+
+    private func stopWatching() {
+        reconcileTask?.cancel()
+        reconcileTask = nil
+        stopPolling()
+    }
+
+    // MARK: - deep link (the push's door)
+
+    /// dino://finding/{taskId} → poll THAT task and open its reveal, then clear
+    /// the route. Works cold, from the background, and while the tab is open.
+    private func consumeDeepLinkIfNeeded() {
+        guard let id = route.pendingTaskId, !id.isEmpty else { return }
+        route.pendingTaskId = nil
+        // Instant: if it is already on the shelf, open it now and refresh after.
+        if let local = FindingsStore.item(taskId: id), FindingsStore.isTerminal(local.status) {
+            findings = FindingsStore.items()
+            activeReveal = local
+        }
+        Task {
+            guard let item = try? await FindingsService.shared.pollFinding(taskId: id) else { return }
+            await MainActor.run {
+                guard FindingsStore.isTerminal(item.status) else {
+                    applyServerTask(item)   // still out → away + keep polling
+                    return
+                }
+                FindingsStore.clearPending()
+                stopPolling()
+                FindingsStore.upsert(item)
+                findings = FindingsStore.items()
+                if starState != .back {
+                    starState = .back
+                    scheduleIdleAfterReturn()
+                }
+                setCaption(item.status == "empty" ? "the star came back"
+                                                  : "the star came back with something")
+                activeReveal = item
+            }
+        }
+    }
+
     #if DEBUG
+    /// DEBUG-only QA: `-findingsRecoverQA` drives a fake TERMINAL task through
+    /// the REAL reconciliation path (applyServerTask) against an emptied shelf,
+    /// so the cold-open recovery — shelve + return choreography + auto reveal —
+    /// is capturable with no live server call. Returns true when it fired, so
+    /// onAppear skips the real reconcile.
+    private func applyRecoverQAIfNeeded() -> Bool {
+        guard ProcessInfo.processInfo.arguments.contains("-findingsRecoverQA") else { return false }
+        // simulate the cold open: a star was sent out, nothing landed locally.
+        UserDefaults.standard.removeObject(forKey: FindingsStore.itemsKey)
+        FindingsStore.markPending()
+        findings = []
+        applyServerTask(FindingItem(
+            taskId: "fOBoTl257mhN96RRvEjP",
+            status: "found",
+            title: "Hatha Yoga Class",
+            whenText: "this saturday, 2pm",
+            whereText: "SPPL",
+            why: "a slow hour where nobody needs anything from you",
+            url: "https://sppl.org/events/hatha-yoga",
+            outcome: "add_to_calendar"))
+        return true
+    }
+
     /// DEBUG-only QA: `-findingsStateQA sending|away|back` forces a star state
     /// on launch so each motion state renders for screenshots without a live
     /// server call. Pairs with `-findingsQA -jarTabQA` to open the tab.
@@ -175,6 +387,7 @@ struct FindingsTabView: View {
             FindingsStore.upsert(item)
             findings = FindingsStore.items()
         }
+        FindingsStore.clearPending()
         switch item.status {
         case "capReached":
             capReached = true

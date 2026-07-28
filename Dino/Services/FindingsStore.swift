@@ -74,6 +74,55 @@ enum FindingsStore {
         items(defaults: defaults).first { $0.taskId == taskId }
     }
 
+    // MARK: - terminal status
+
+    /// The statuses that mean the star's trip is over on the SERVER. Mirrors
+    /// the server's terminal set; "failed" is deliberately excluded (nothing
+    /// came back, so there is nothing to surface).
+    static let terminalStatuses: Set<String> = ["found", "empty", "booked", "handoff", "confirmed"]
+
+    static func isTerminal(_ status: String) -> Bool { terminalStatuses.contains(status) }
+
+    /// True when this task is ALREADY on the shelf in a terminal state — the
+    /// guard that stops the return choreography + reveal from replaying on
+    /// every appear/foreground once a finding has been reconciled.
+    static func hasTerminal(taskId: String, defaults: UserDefaults = .standard) -> Bool {
+        guard let existing = item(taskId: taskId, defaults: defaults) else { return false }
+        return isTerminal(existing.status)
+    }
+
+    // MARK: - the "a star is out" marker
+
+    /// Written the moment a send BEGINS, before the ~2 minute callable returns
+    /// an id. If the app is killed mid-call the shelf holds nothing at all, so
+    /// this timestamp is the only clue a cold open has that it should ask the
+    /// server what happened. Cleared when a task lands.
+    static let pendingSinceKey = "dino.findings.pendingSince"
+    /// How long the marker is trusted (the server call itself caps well inside).
+    static let pendingWindow: TimeInterval = 15 * 60
+
+    static func markPending(now: Date = Date(), defaults: UserDefaults = .standard) {
+        defaults.set(now.timeIntervalSince1970, forKey: pendingSinceKey)
+    }
+
+    static func clearPending(defaults: UserDefaults = .standard) {
+        defaults.removeObject(forKey: pendingSinceKey)
+    }
+
+    static func pendingSince(defaults: UserDefaults = .standard) -> Date? {
+        let t = defaults.double(forKey: pendingSinceKey)
+        guard t > 0 else { return nil }
+        return Date(timeIntervalSince1970: t)
+    }
+
+    /// A star is probably still out: the marker is set and recent. Tolerates a
+    /// small backwards clock skew; a stale marker simply stops counting.
+    static func isPendingRecent(now: Date = Date(), defaults: UserDefaults = .standard) -> Bool {
+        guard let since = pendingSince(defaults: defaults) else { return false }
+        let elapsed = now.timeIntervalSince(since)
+        return elapsed > -60 && elapsed < pendingWindow
+    }
+
     /// Today's tasks (local view of the 5/day cap; the server is the real gate).
     static func countToday(now: Date = Date(), calendar: Calendar = .current,
                            defaults: UserDefaults = .standard) -> Int {

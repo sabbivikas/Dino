@@ -23,6 +23,7 @@ import { debugRecForceGate, clampDelayMinutes, DEBUG_REC_FIXTURE_RECS } from "./
 // EXPERIMENTAL star-findings demo (owner + flag + uid gated) — additive.
 import { starFindingsGate, buildSearchPrompt, buildPickPrompt, buildBookingPrompt,
   parseCandidates, outcomeForFinding, outcomeForBooking,
+  findingDeepLink, findingTaskPayload, noFindingTask,
   MAX_TASKS_PER_DAY, MAX_AGENT_STEPS, WALL_CLOCK_MS, FINDINGS_CITY } from "./starFindings";
 import { runAgentTask, type RunResult } from "./agiClient";
 
@@ -2915,8 +2916,15 @@ function interpretBookingSignal(res: RunResult): Parameters<typeof outcomeForBoo
   return {}; // ambiguous → partial
 }
 
-/** Best-effort plain-English push (content-light, no loc-keys, no catalog). */
-async function sendFindingPush(uid: string, title: string): Promise<void> {
+/**
+ * Best-effort plain-English push (content-light, no loc-keys, no catalog).
+ *
+ * The DATA payload is what makes the tap reachable: AppDelegate reads
+ * userInfo["deepLink"] first, so dino://finding/{taskId} routes to the findings
+ * tab and opens that task's reveal. Without it the tap fell through to home
+ * and the finding was invisible (bug 1).
+ */
+async function sendFindingPush(uid: string, title: string, taskId: string): Promise<void> {
   try {
     const db = admin.firestore();
     const snap = await db.collection("pushTokens").doc(uid).get();
@@ -2925,6 +2933,7 @@ async function sendFindingPush(uid: string, title: string): Promise<void> {
     await admin.messaging().send({
       token: token as string,
       notification: { title: "the star found something", body: title },
+      data: { deepLink: findingDeepLink(taskId), taskId: String(taskId ?? "") },
       apns: { headers: { "apns-priority": "10" }, payload: { aps: { sound: "default" } } },
     });
   } catch (err) {
@@ -3023,7 +3032,7 @@ export const startFindingTask = onCall(
       status: "found", finding, steps: searchRes.thoughts,
       outcome: "found", durationMs, dayKey,
     }, { merge: true });
-    await sendFindingPush(uid, picked.title);
+    await sendFindingPush(uid, picked.title, taskRef.id);
     functions.logger.info(
       `startFindingTask: uid=${uid} task=${taskRef.id} steps=${searchRes.thoughts} outcome=found durationMs=${durationMs}`);
     return { taskId: taskRef.id, status: "found", steps: searchRes.thoughts, outcome: "found", finding };
@@ -3036,17 +3045,24 @@ export const getFindingTask = onCall(
     if (!request.auth) throw new HttpsError("unauthenticated", "sign in required");
     const gate = starFindingsGate(process.env.STAR_FINDINGS_UIDS, request.auth.uid);
     if (!gate.allowed) throw new HttpsError("permission-denied", "not enabled");
-    const taskId = String(request.data?.taskId ?? "");
-    if (!taskId) throw new HttpsError("invalid-argument", "taskId required");
+    // taskId is OPTIONAL (bug 2): with no id we answer with the caller's MOST
+    // RECENT task, which is how a client that lost the id — killed mid-call,
+    // reinstalled, or simply backgrounded through the whole search — finds out
+    // the star already came back. The gate is unchanged: membership on the
+    // caller's OWN uid, never a uid parameter.
+    const taskId = String(request.data?.taskId ?? "").trim();
     const db = admin.firestore();
-    const snap = await db.collection("starFindings").doc(gate.uid)
-      .collection("tasks").doc(taskId).get();
-    if (!snap.exists) throw new HttpsError("not-found", "no such task");
-    const d = snap.data() ?? {};
-    return {
-      taskId, status: d.status ?? "failed", finding: d.finding ?? null,
-      steps: d.steps ?? 0, outcome: d.outcome ?? "",
-    };
+    const tasks = db.collection("starFindings").doc(gate.uid).collection("tasks");
+    if (taskId) {
+      const snap = await tasks.doc(taskId).get();
+      if (!snap.exists) throw new HttpsError("not-found", "no such task");
+      return findingTaskPayload(snap.id, snap.data());
+    }
+    const latest = await tasks.orderBy("createdAt", "desc").limit(1).get();
+    // never sent a star out → a quiet "none", not a not-found throw.
+    if (latest.empty) return noFindingTask();
+    const doc = latest.docs[0];
+    return findingTaskPayload(doc.id, doc.data());
   }
 );
 

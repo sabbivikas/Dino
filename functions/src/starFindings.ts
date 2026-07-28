@@ -250,6 +250,59 @@ export function buildPickPrompt(candidates: readonly FindingCandidate[]): {
   return { system, user };
 }
 
+// ── client reachability: the push's door + the task response shape ───────────
+//
+// Two bugs made a FINISHED server task unreachable from the client:
+//   1. the finding push carried no data payload, so a tap had no deep link and
+//      fell through to home;
+//   2. getFindingTask demanded a taskId, so a client that lost the id (killed
+//      mid-call, or freshly installed) could not ask "what happened?" at all.
+// These pure helpers are the fix's testable core; index.ts wires them to FCM
+// and Firestore.
+
+/** The door a finding push opens: dino://finding/{taskId}. Empty id → "". */
+export function findingDeepLink(taskId: string | undefined | null): string {
+  const id = String(taskId ?? "").trim();
+  return id ? `dino://finding/${id}` : "";
+}
+
+/** The getFindingTask response shape (identical for by-id and latest lookups). */
+export interface FindingTaskPayload {
+  taskId: string;
+  status: string;
+  finding: unknown;
+  steps: number;
+  outcome: string;
+}
+
+/**
+ * A user who has never sent a star out is NOT an error — a first-ever cold
+ * open must be quiet, so "latest task" answers with this instead of not-found.
+ */
+export function noFindingTask(): FindingTaskPayload {
+  return { taskId: "", status: "none", finding: null, steps: 0, outcome: "" };
+}
+
+/**
+ * Shape one task doc into the response. Every field is defaulted so a doc
+ * written by an older shape (or a half-written doc) still answers cleanly.
+ */
+export function findingTaskPayload(
+  id: string | undefined | null,
+  data: Record<string, unknown> | undefined | null
+): FindingTaskPayload {
+  const d = data ?? {};
+  const status = typeof d.status === "string" && d.status ? d.status : "failed";
+  const steps = Number(d.steps);
+  return {
+    taskId: String(id ?? ""),
+    status,
+    finding: d.finding ?? null,
+    steps: Number.isFinite(steps) ? steps : 0,
+    outcome: typeof d.outcome === "string" ? d.outcome : "",
+  };
+}
+
 /**
  * The booking-agent prompt: fill ONLY name + email. If the form demands DOB,
  * phone, payment, a login, or a captcha → STOP and report fields_blocked.

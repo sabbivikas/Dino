@@ -62,6 +62,18 @@ final class FindingsService {
         return Self.item(from: data)
     }
 
+    /// Ask the server for the caller's MOST RECENT task (getFindingTask with no
+    /// taskId). This is the reconciliation door: a cold open after the app was
+    /// killed mid-search, or a foreground after the push, learns that the star
+    /// already came back. A user who has never sent a star out gets a quiet
+    /// status "none" rather than an error.
+    func pollLatest() async throws -> FindingItem {
+        let functions = Functions.functions(region: region)
+        let result = try await functions.httpsCallable("getFindingTask").call([:])
+        guard let data = result.data as? [String: Any] else { throw FindingsError.badResponse }
+        return Self.item(from: data)
+    }
+
     /// Confirm/book a finding. Returns the server status (booked | handoff |
     /// confirmed | failed) and, for a handoff, the url the owner finishes at.
     func confirmFinding(taskId: String, userName: String) async throws -> (status: String, url: String) {

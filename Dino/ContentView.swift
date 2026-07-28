@@ -148,6 +148,13 @@ struct ContentView: View {
                 print("[RecReveal] deep link → \(link.deliveryId)")
                 dataManager.recRevealDeepLink = link
             }
+        case "finding":
+            // EXPERIMENTAL star findings — the finding push's door
+            // (dino://finding/{taskId}) → tab slot 3 + that task's reveal.
+            if let id = FindingsRoute.taskId(from: url) {
+                FindingsRoute.shared.pendingTaskId = id
+                dataManager.deepLinkTab = 3
+            }
         case "meditation":
             // Break-finder reminder opens meditation over the home tab.
             dataManager.deepLinkTab = 0

@@ -78,3 +78,52 @@ VERIFY (all local)
 - iOS: Debug TEST BUILD SUCCEEDED; DinoTests -> see scratchpad/findings-QA/build-verdict.md.
 - git diff vs main: only the 3 shipping files + new files. No xcstrings, no
   CrisisResources, no existing test modified.
+
+FIX PASS — CLIENT REACHABILITY (two bugs; server was already correct)
+---------------------------------------------------------------------
+A real production task (fOBoTl257mhN96RRvEjP) completed on the server — status
+found, 8 steps, Hatha Yoga Class / SPPL / add_to_calendar — and the client could
+not reach it at all. Two independent causes:
+
+BUG 1 — the push had no door. sendFindingPush sent only notification{title,body};
+AppDelegate reads userInfo["deepLink"] then userInfo["action"] and otherwise
+falls through to home, and ContentView had no "finding" case. FIX: the push now
+carries data { deepLink: "dino://finding/{taskId}", taskId }, and ContentView
+gained ONE additive case routing it to tab slot 3 + the task's reveal.
+
+BUG 2 — the tab never asked the server. FindingsTabView opened on a hardcoded
+idle star and the local shelf only; getFindingTask REQUIRED a taskId, and the
+taskId was never persisted until the ~2 minute call returned — so an app killed
+mid-search lost the task permanently and had no way to ask about it. FIX:
+getFindingTask's taskId is now OPTIONAL (absent → the caller's most recent task,
+orderBy createdAt desc limit 1; no task at all → a quiet {taskId:"",
+status:"none"} instead of a not-found throw), the client upserts the moment an
+id exists and writes a dino.findings.pendingSince marker when a send BEGINS,
+and the tab reconciles with the server on appear + on scenePhase .active
+(polling every ~10s while a task is still searching and the tab is visible).
+
+THE 4th SHIPPING FILE (owner-authorized): Dino/ContentView.swift, one additive
+`case "finding":` in handleDeepLink. SharedDataManager stays untouched — the
+published route state lives in the branch-owned FindingsRoute.shared, and only
+the already-existing deepLinkTab is set. Shipping files edited on this branch
+are now: MainTabView.swift, ContentView.swift, functions/src/index.ts,
+firestore.rules.
+
+LIVE READ-ONLY PROOF: the new latest-task query shape run directly against
+production (starFindings/{owner uid}/tasks orderBy createdAt desc limit 1)
+returns fOBoTl257mhN96RRvEjP with status found, steps 8, the Hatha Yoga finding,
+and deep link dino://finding/fOBoTl257mhN96RRvEjP. No production writes.
+
+REDEPLOY REQUIRED (owner runs it): startFindingTask (it calls the changed
+sendFindingPush) and getFindingTask (optional taskId). confirmFinding is
+unchanged. Until those two are deployed the client fix is inert: the tab's
+reconcile call will keep hitting the old taskId-required getFindingTask.
+
+VERIFY (fix pass, all local)
+----------------------------
+- functions: npm test -> 159 (154 prior UNMODIFIED + 5 new pure tests in the
+  NEW file src/findingsReach.test.ts). tsc --noEmit clean.
+- iOS: Debug BUILD SUCCEEDED; DinoTests 436 green, unmodified.
+- cold-open recovery captured via the DEBUG-only -findingsRecoverQA hook (fake
+  terminal task driven through the real applyServerTask path, empty shelf, no
+  server call): scratchpad v3-cold-open-recovered.png.
