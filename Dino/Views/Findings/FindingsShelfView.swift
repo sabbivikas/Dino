@@ -91,6 +91,17 @@ private struct FindingSlip: View {
         }
     }
 
+    /// The acted marker: a slip you have already done something with says so at
+    /// a glance, so the shelf never reads as "still waiting on you".
+    private var actedMarker: String? {
+        switch finding.status {
+        case "confirmed": return "added"
+        case "booked":    return "booked"
+        case "handoff":   return "handed off"
+        default:          return nil
+        }
+    }
+
     var body: some View {
         let seed = finding.taskId.hashValue ^ index
         let dx = findingsSeededRandom(seed: seed &+ 1, range: -6.0...6.0)
@@ -98,7 +109,18 @@ private struct FindingSlip: View {
         let rot = findingsSeededRandom(seed: seed &+ 3, range: -8.0...8.0)
 
         VStack(alignment: .leading, spacing: 6) {
-            HStack { Spacer(); Text("⭐️").font(.system(size: 18)) }
+            HStack(alignment: .top) {
+                if let actedMarker {
+                    Text(actedMarker)
+                        .font(DinoTheme.dinoFont(size: 10))
+                        .foregroundColor(Color(hex: "#2E2A24").opacity(0.72))
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 3)
+                        .background(Capsule().fill(Color.white.opacity(0.45)))
+                }
+                Spacer()
+                Text("⭐️").font(.system(size: 18))
+            }
             Text(finding.title.isEmpty ? "a gentle outing" : finding.title)
                 .font(DinoTheme.dinoFont(size: 16))
                 .foregroundColor(Color(hex: "#2E2A24"))

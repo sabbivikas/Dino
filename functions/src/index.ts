@@ -22,7 +22,7 @@ import { buildWeeklyPrompt } from "./weeklyReport";
 import { debugRecForceGate, clampDelayMinutes, DEBUG_REC_FIXTURE_RECS } from "./debugRecForce";
 // EXPERIMENTAL star-findings demo (owner + flag + uid gated) — additive.
 import { starFindingsGate, buildSearchPrompt, buildPickPrompt, buildBookingPrompt,
-  parseCandidates, outcomeForFinding, outcomeForBooking,
+  parseCandidates, outcomeForFinding, outcomeForBooking, parsePreferBookable,
   findingDeepLink, findingTaskPayload, noFindingTask,
   MAX_TASKS_PER_DAY, MAX_AGENT_STEPS, WALL_CLOCK_MS, FINDINGS_CITY } from "./starFindings";
 import { runAgentTask, type RunResult } from "./agiClient";
@@ -2948,6 +2948,11 @@ export const startFindingTask = onCall(
     const gate = starFindingsGate(process.env.STAR_FINDINGS_UIDS, request.auth.uid);
     if (!gate.allowed) throw new HttpsError("permission-denied", "not enabled");
     const uid = gate.uid;
+    // OPTIONAL bookable-source bias (client toggle). Strictly a boolean or
+    // absent; "true"/1 are rejected rather than quietly coerced.
+    const pref = parsePreferBookable(request.data?.preferBookable);
+    if (!pref.ok) throw new HttpsError("invalid-argument", "preferBookable must be a boolean");
+    const preferBookable = pref.value;
     const db = admin.firestore();
     const dayKey = findingsDayKey();
     const parentRef = db.collection("starFindings").doc(uid);
@@ -2977,7 +2982,7 @@ export const startFindingTask = onCall(
 
     // SEARCH phase (real AGI browser agent). No PII in this phase.
     const searchRes = await runAgentTask({
-      prompt: buildSearchPrompt(),
+      prompt: buildSearchPrompt(FINDINGS_CITY, preferBookable),
       startUrl: FINDINGS_SEARCH_START_URL,
       maxSteps: MAX_AGENT_STEPS,
       wallClockMs: WALL_CLOCK_MS,
@@ -2993,7 +2998,8 @@ export const startFindingTask = onCall(
         : searchRes.killReason === "timeout" ? "failed:timeout"
         : searchRes.errored ? "failed:error" : "empty";
       const status = outcome.startsWith("failed") ? "failed" : "empty";
-      await taskRef.set({ status, steps: searchRes.thoughts, outcome, durationMs, dayKey },
+      await taskRef.set(
+        { status, steps: searchRes.thoughts, outcome, durationMs, dayKey, preferBookable },
         { merge: true });
       functions.logger.info(
         `startFindingTask: uid=${uid} task=${taskRef.id} steps=${searchRes.thoughts} outcome=${outcome} durationMs=${durationMs}`);
@@ -3023,14 +3029,19 @@ export const startFindingTask = onCall(
 
     const picked = candidates[pickIndex];
     const { card } = outcomeForFinding(picked);
+    // startISO/endISO/dateConfidence ride along onto the stored finding and out
+    // through both callables — they are what the client schedules from, and a
+    // null start is the honest "no confirmed time" signal, not a placeholder.
     const finding = {
       title: picked.title, when: picked.date, venue: picked.venue,
       why: why || "a gentle little thing for your week",
       url: picked.url, registrationNeeded: picked.registrationNeeded, outcome: card,
+      startISO: picked.startISO, endISO: picked.endISO,
+      dateConfidence: picked.dateConfidence,
     };
     await taskRef.set({
       status: "found", finding, steps: searchRes.thoughts,
-      outcome: "found", durationMs, dayKey,
+      outcome: "found", durationMs, dayKey, preferBookable,
     }, { merge: true });
     await sendFindingPush(uid, picked.title, taskRef.id);
     functions.logger.info(

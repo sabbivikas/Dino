@@ -144,12 +144,90 @@ export function outcomeForBooking(signal: {
 
 // ── candidate shape + parsing ────────────────────────────────────────────────
 
-export interface FindingCandidate {
+/**
+ * How much the agent trusts the machine-readable start it reported. The agent
+ * is instructed to say "unknown" rather than guess — an invented time is worse
+ * than no time at all, because the client turns it into a real calendar event.
+ */
+export type DateConfidence = "exact" | "approximate" | "unknown";
+
+/**
+ * The human-facing half of a candidate — everything the pick prompt needs.
+ * Split out so the pick step (and its tests) stay independent of the
+ * machine-date fields.
+ */
+export interface FindingCandidateCore {
   title: string;
   date: string;         // free text as the agent reports it ("this saturday 2pm")
   venue: string;
   url: string;
   registrationNeeded: boolean;
+}
+
+export interface FindingCandidate extends FindingCandidateCore {
+  /** ISO 8601 WITH an explicit offset, or null when the listing gives no time. */
+  startISO: string | null;
+  /** Optional end; null when unknown (the client then uses a 1 hour hold). */
+  endISO: string | null;
+  dateConfidence: DateConfidence;
+}
+
+/** Explicit-offset ISO 8601 only. A bare "2026-08-02T14:00" has no offset, so
+ *  it would be re-interpreted in whatever timezone reads it — rejected. */
+const ISO_WITH_OFFSET =
+  /^\d{4}-\d{2}-\d{2}[Tt]\d{2}:\d{2}(:\d{2})?(\.\d{1,6})?([Zz]|[+-]\d{2}:\d{2})$/;
+
+/** Anything more than this far in the past is a stale/hallucinated listing. */
+const PAST_GRACE_MS = 60 * 60 * 1000;          // ~1h
+/** Anything further out than this is an absurd future (agent typo'd the year). */
+const MAX_FUTURE_MS = 365 * 24 * 60 * 60 * 1000; // 1 year
+
+/**
+ * Validate one machine-readable datetime from the agent. PURE.
+ *
+ * Accepts ONLY a well-formed ISO 8601 datetime carrying an explicit UTC offset
+ * (or Z). Rejects: non-strings, offset-less local times, unparseable garbage,
+ * anything more than ~1h in the past, and anything more than a year out.
+ * Returns the trimmed original on success, null on every rejection — never
+ * throws, so one bad candidate can never take the whole search down.
+ */
+export function sanitizeStartISO(raw: unknown, now: Date = new Date()): string | null {
+  if (typeof raw !== "string") return null;
+  const s = raw.trim();
+  if (!s || s.length > 40) return null;
+  if (!ISO_WITH_OFFSET.test(s)) return null;
+  const t = Date.parse(s);
+  if (!Number.isFinite(t)) return null;
+  const nowMs = now.getTime();
+  if (t < nowMs - PAST_GRACE_MS) return null;
+  if (t > nowMs + MAX_FUTURE_MS) return null;
+  return s;
+}
+
+/**
+ * Coerce the agent's confidence to the enum. PURE.
+ *
+ * With no valid startISO there is nothing to be confident ABOUT, so the answer
+ * is always "unknown". With a valid startISO an unrecognised/missing label
+ * lands on "approximate" — we have a real time but the agent never vouched for
+ * it, and "approximate" is the honest middle (the client says so in the event).
+ */
+export function coerceDateConfidence(raw: unknown, hasStartISO: boolean): DateConfidence {
+  if (!hasStartISO) return "unknown";
+  const v = typeof raw === "string" ? raw.trim().toLowerCase() : "";
+  if (v === "exact" || v === "approximate" || v === "unknown") return v;
+  return "approximate";
+}
+
+/**
+ * Strict validation of the startFindingTask `preferBookable` param. PURE.
+ * Absent → false. Present but not a boolean → rejected (the caller turns this
+ * into invalid-argument); "true"/1 are NOT quietly accepted.
+ */
+export function parsePreferBookable(raw: unknown): { ok: true; value: boolean } | { ok: false } {
+  if (raw === undefined || raw === null) return { ok: true, value: false };
+  if (typeof raw === "boolean") return { ok: true, value: raw };
+  return { ok: false };
 }
 
 /**
@@ -158,7 +236,10 @@ export interface FindingCandidate {
  * Never throws — a parse miss yields []. Each candidate is shape-checked and
  * capped so a chatty model can't blow the doc up.
  */
-export function parseCandidates(raw: string | undefined): FindingCandidate[] {
+export function parseCandidates(
+  raw: string | undefined,
+  now: Date = new Date()
+): FindingCandidate[] {
   if (!raw || typeof raw !== "string") return [];
   const cleaned = raw.replace(/```json/gi, "").replace(/```/g, "").trim();
   let parsed: unknown;
@@ -182,6 +263,18 @@ export function parseCandidates(raw: string | undefined): FindingCandidate[] {
     const title = typeof o.title === "string" ? o.title.trim().slice(0, 120) : "";
     const url = typeof o.url === "string" ? o.url.trim().slice(0, 400) : "";
     if (!title || !/^https?:\/\//i.test(url)) continue;
+
+    // machine-readable date: validated hard, and DISOWNED whenever the agent
+    // itself says "unknown" — a time the agent won't vouch for must never
+    // become a real calendar event on someone's phone.
+    let startISO = sanitizeStartISO(o.startISO ?? o.start_iso, now);
+    const dateConfidence = coerceDateConfidence(
+      o.dateConfidence ?? o.date_confidence, startISO !== null);
+    if (dateConfidence === "unknown") startISO = null;
+    let endISO = startISO ? sanitizeStartISO(o.endISO ?? o.end_iso, now) : null;
+    // an end that is not strictly after the start is meaningless — drop it.
+    if (endISO && startISO && Date.parse(endISO) <= Date.parse(startISO)) endISO = null;
+
     out.push({
       title,
       date: typeof o.date === "string" ? o.date.trim().slice(0, 80) : "",
@@ -190,6 +283,9 @@ export function parseCandidates(raw: string | undefined): FindingCandidate[] {
       registrationNeeded:
         o.registrationNeeded === true || o.registration_needed === true ||
         o.registrationNeeded === "true" || o.registration_needed === "true",
+      startISO,
+      endISO,
+      dateConfidence,
     });
     if (out.length >= 8) break;
   }
@@ -201,10 +297,23 @@ export function parseCandidates(raw: string | undefined): FindingCandidate[] {
 /**
  * The search-agent prompt: free + gentle + this-week + Saint Paul hardcoded.
  * Explicitly steers to official / eventbrite / library / parks pages and asks
- * for a strict JSON candidate list (title/date/venue/url/registrationNeeded).
+ * for a strict JSON candidate list.
+ *
+ * THE STRUCTURED-DATE CONTRACT (the fix for the "event landed on the wrong
+ * day" bug): the free-text `date` field is display only — the client can't
+ * schedule from "this saturday, 2pm", and used to fall back to a hardcoded
+ * placeholder. The agent must now ALSO return startISO/endISO/dateConfidence,
+ * and must say "unknown" rather than invent a time.
+ *
+ * `preferBookable` biases only the SOURCE LIST toward registration portals; it
+ * must never cost extra steps, so the decisive early-JSON rule and the
+ * do-not-open-each-event rule are repeated in that branch too.
  */
-export function buildSearchPrompt(city: string = FINDINGS_CITY): string {
-  return [
+export function buildSearchPrompt(
+  city: string = FINDINGS_CITY,
+  preferBookable: boolean = false
+): string {
+  const lines = [
     `Find gentle, FREE, low-key things a tired person could do THIS WEEK in ${city}.`,
     "Good fits: a quiet library event, a park walk or nature program, a free community",
     "gathering, a calm class, an open studio, a small local reading. Avoid anything",
@@ -213,26 +322,60 @@ export function buildSearchPrompt(city: string = FINDINGS_CITY): string {
     "Prefer OFFICIAL sources: the city or county site, the public library calendar,",
     "the parks & recreation site, eventbrite, and venue/organizer pages. Only include",
     "an item you can point at a real, currently-live page for.",
+  ];
+
+  if (preferBookable) {
+    lines.push(
+      "",
+      "BOOKABLE BIAS (this run should favor things you can actually sign up for):",
+      "Bias your SOURCE LIST toward registration portals rather than plain calendars:",
+      "library program registration pages, eventbrite, community education class",
+      "catalogs, and parks and recreation class registration pages. Prefer listings",
+      "that ALREADY show a register or sign up affordance on the listing page itself.",
+      "Judge that from the listing/source page you are already on — do NOT open each",
+      "event's detail page to verify registration. The SAME step budget applies: this",
+      "bias must not cost you extra steps.",
+    );
+  }
+
+  lines.push(
     "",
     "BE DECISIVE — you have a limited number of steps:",
     "- Read at most 2 or 3 official listing/calendar pages. Do NOT chase exact",
     "  per-event permalink URLs; the listing or calendar page url is acceptable.",
+    "- Do NOT open each event's detail page to verify anything; judge every field",
+    "  from the listing or source page you are already on.",
     "- As soon as you have up to 6 items (even 2 or 3 is fine), STOP browsing and",
     "  reply immediately with the JSON. Do not keep verifying.",
     "",
     "Return ONLY a JSON array (no prose, no markdown fence) of up to 6 candidates,",
     "each object exactly:",
-    '{ "title": string, "date": string, "venue": string, "url": string, "registrationNeeded": boolean }',
+    '{ "title": string, "date": string, "venue": string, "url": string,',
+    '  "registrationNeeded": boolean, "startISO": string|null, "endISO": string|null,',
+    '  "dateConfidence": "exact"|"approximate"|"unknown" }',
     "date is a short human phrase (e.g. \"this saturday, 2pm\"). registrationNeeded is",
     "true only if the page requires signing up / reserving a spot.",
-  ].join("\n");
+    "",
+    "THE DATE FIELDS ARE MACHINE-READ — they become a real calendar event:",
+    "- startISO: ISO 8601 local datetime WITH an explicit offset, in the",
+    `  America/Chicago timezone (${city}), e.g. "2026-08-02T14:00:00-05:00".`,
+    "  An offset is REQUIRED; a bare \"2026-08-02T14:00\" is not acceptable.",
+    "- endISO: same format for the end time. If the page does not state an end,",
+    "  omit it or set it to null. Do not estimate it.",
+    "- dateConfidence: \"exact\" only when the page states BOTH the date and the",
+    "  start time; \"approximate\" when you are inferring one of them.",
+    "- NEVER invent a time. If the listing only says something like \"see listing\"",
+    "  or gives no clear date and time, set startISO to null and dateConfidence to",
+    "  \"unknown\". An honest \"unknown\" is always better than a guessed time.",
+  );
+  return lines.join("\n");
 }
 
 /**
  * The pick prompt (gpt-4.1-mini): choose ONE gentle fit from the candidates and
  * write dino's "why" in a lowercase, warm, no-dashes voice. JSON out.
  */
-export function buildPickPrompt(candidates: readonly FindingCandidate[]): {
+export function buildPickPrompt(candidates: readonly FindingCandidateCore[]): {
   system: string;
   user: string;
 } {

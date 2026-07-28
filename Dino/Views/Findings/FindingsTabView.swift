@@ -38,6 +38,10 @@ struct FindingsTabView: View {
     @State private var activeReveal: FindingItem?
     @State private var isBusy = false
     @State private var capReached = false
+    /// Branch-owned, UserDefaults-backed source bias (default OFF). Sent to
+    /// startFindingTask, which forwards it into the search prompt only — it never
+    /// touches the 30-step kill or the 5/day cap.
+    @State private var preferBookable = FindingsPrefs.preferBookable()
 
     private var userName: String { Auth.auth().currentUser?.displayName ?? "" }
 
@@ -69,12 +73,22 @@ struct FindingsTabView: View {
             Text("it will go looking for one gentle, free thing for your week")
         }
         .sheet(item: $activeReveal) { item in
-            FindingRevealCard(item: item, userName: userName, onClose: { activeReveal = nil })
+            FindingRevealCard(
+                initialItem: item,
+                userName: userName,
+                onClose: { activeReveal = nil },
+                // an action inside the card changed the stored truth: re-read the
+                // shelf AND the presented item so neither stays stale.
+                onChanged: {
+                    findings = FindingsStore.items()
+                    if let fresh = FindingsStore.item(taskId: item.taskId) { activeReveal = fresh }
+                })
         }
         .onAppear {
             isVisible = true
             #if DEBUG
             applyQAStateIfNeeded()
+            if applyCardQAIfNeeded() { return }
             if applyRecoverQAIfNeeded() { return }
             #endif
             reconcile()
@@ -121,7 +135,35 @@ struct FindingsTabView: View {
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 30)
                 .transition(.opacity)
+
+            bookableToggle
         }
+    }
+
+    /// A small, unobtrusive source-bias control. Biases what the star LOOKS AT,
+    /// not what you tap afterwards.
+    private var bookableToggle: some View {
+        Button {
+            preferBookable.toggle()
+            FindingsPrefs.setPreferBookable(preferBookable)
+            HapticManager.shared.light()
+        } label: {
+            HStack(spacing: 7) {
+                Image(systemName: preferBookable ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 13))
+                Text("prefer events you can sign up for")
+                    .font(DinoTheme.dinoFont(size: 13))
+            }
+            .foregroundColor(Self.creamText.opacity(preferBookable ? 0.92 : 0.55))
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
+            .background(
+                Capsule().fill(Color.white.opacity(preferBookable ? 0.10 : 0.05))
+            )
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("prefer events you can sign up for")
+        .accessibilityAddTraits(preferBookable ? [.isSelected] : [])
     }
 
     /// The paper-family cream (mirrors RecRevealView's cream) for labels on the
@@ -151,7 +193,7 @@ struct FindingsTabView: View {
                 setCaption("the star is out looking")
             }
             do {
-                let item = try await FindingsService.shared.startFinding()
+                let item = try await FindingsService.shared.startFinding(preferBookable: preferBookable)
                 // PERSIST THE MOMENT THE ID EXISTS — before any UI work — so a
                 // kill between here and the reveal cannot lose the task.
                 if !item.taskId.isEmpty {
@@ -359,6 +401,62 @@ struct FindingsTabView: View {
         return true
     }
 
+    /// DEBUG-only QA: `-findingsCardQA done|unknown` seeds ONE fixture finding
+    /// into the real FindingsStore and opens its reveal, so the two card states
+    /// this fix is about are capturable with no server call:
+    ///   done    — an already-confirmed finding: the card must show the settled
+    ///             "added to your calendar" line, NOT another add button.
+    ///   unknown — a finding whose listing stated no time: dateConfidence
+    ///             "unknown" and no startISO, so the card must offer "open the
+    ///             listing" instead of writing a fabricated event.
+    /// Returns true when it fired, so onAppear skips the real reconcile.
+    private func applyCardQAIfNeeded() -> Bool {
+        let args = ProcessInfo.processInfo.arguments
+        guard let i = args.firstIndex(of: "-findingsCardQA"), i + 1 < args.count else { return false }
+        let mode = args[i + 1]
+        UserDefaults.standard.removeObject(forKey: FindingsStore.itemsKey)
+        FindingsStore.clearPending()
+        let fixture: FindingItem
+        switch mode {
+        case "done":
+            fixture = FindingItem(
+                taskId: "qaDoneTask0001",
+                status: "confirmed",
+                title: "Hatha Yoga Class",
+                whenText: "this sunday, 2pm",
+                whereText: "Rondo Community Library",
+                why: "a slow hour where nobody needs anything from you",
+                url: "https://sppl.org/events/hatha-yoga",
+                outcome: "add_to_calendar",
+                startISO: "2026-08-02T14:00:00-05:00",
+                endISO: "2026-08-02T15:00:00-05:00",
+                dateConfidence: "exact",
+                calendarWrittenAt: Date())
+        case "unknown":
+            fixture = FindingItem(
+                taskId: "qaUnknownTask001",
+                status: "found",
+                title: "Quiet Hours at the Conservatory",
+                whenText: "see listing",
+                whereText: "Como Park Conservatory",
+                why: "warm glass rooms and slow air, whenever you can get there",
+                url: "https://stpaul.gov/como/quiet-hours",
+                outcome: "add_to_calendar",
+                startISO: nil,
+                endISO: nil,
+                dateConfidence: "unknown")
+        default:
+            return false
+        }
+        FindingsStore.upsert(fixture)
+        findings = FindingsStore.items()
+        starState = .idle
+        isBusy = true          // hold off reconcile/poll for the capture
+        setCaption("the star came back with something")
+        activeReveal = fixture
+        return true
+    }
+
     /// DEBUG-only QA: `-findingsStateQA sending|away|back` forces a star state
     /// on launch so each motion state renders for screenshots without a live
     /// server call. Pairs with `-findingsQA -jarTabQA` to open the tab.
@@ -413,15 +511,33 @@ struct FindingsTabView: View {
 // MARK: - the reveal card (per-outcome action)
 
 private struct FindingRevealCard: View {
-    let item: FindingItem
+    /// The snapshot the sheet was PRESENTED with. Never rendered directly — see
+    /// `item` below.
+    let initialItem: FindingItem
     let userName: String
     let onClose: () -> Void
+    /// Tells the tab to re-read the shelf after an action, so the slips update too.
+    var onChanged: () -> Void = {}
+
+    /// THE BUG THIS FIXES: the card used to render the snapshot it was handed,
+    /// so a finding acted on in an earlier session (or a moment ago) still
+    /// showed a live "add to calendar" button. The card now renders whatever
+    /// FindingsStore currently holds for this taskId, refreshed on appear and
+    /// after every action.
+    @State private var live: FindingItem?
+    private var item: FindingItem { live ?? initialItem }
 
     @State private var note: String?
     @State private var working = false
     @State private var showBookConfirm = false
 
     private var isEmpty: Bool { item.status == "empty" || item.outcome == "empty_handed" }
+
+    /// Re-read the stored truth for this task. Called on appear (so reopening
+    /// from the shelf shows the acted state) and after every action.
+    private func refresh() {
+        if let stored = FindingsStore.item(taskId: initialItem.taskId) { live = stored }
+    }
 
     var body: some View {
         ZStack {
@@ -448,6 +564,7 @@ private struct FindingRevealCard: View {
             }
             .padding(24)
         }
+        .onAppear(perform: refresh)
     }
 
     private var emptyHanded: some View {
@@ -495,8 +612,35 @@ private struct FindingRevealCard: View {
         .padding(.top, 6)
     }
 
+    /// STATUS FIRST, outcome second.
+    ///
+    /// A finding that has already been acted on (confirmed / booked / handoff)
+    /// gets a plain DONE line, never another action — offering "add to calendar"
+    /// on something already on the calendar was how the second, duplicate event
+    /// got written. Only a not-yet-acted finding falls through to the per-outcome
+    /// action, and a finding with no confirmed time never gets a calendar button
+    /// at all.
     @ViewBuilder
     private var actionButton: some View {
+        switch item.status {
+        case "confirmed":
+            doneState("added to your calendar")
+        case "booked":
+            doneState("booked")
+        case "handoff":
+            VStack(alignment: .leading, spacing: 10) {
+                doneState("handed off to you — finish signing up")
+                secondaryButton("open the page again") {
+                    if let url = URL(string: item.url) { UIApplication.shared.open(url) }
+                }
+            }
+        default:
+            unactedAction
+        }
+    }
+
+    @ViewBuilder
+    private var unactedAction: some View {
         switch item.outcome {
         case "book_it":
             primaryButton("book it") { showBookConfirm = true }
@@ -512,8 +656,53 @@ private struct FindingRevealCard: View {
                 setNote("opened the page for you to finish")
             }
         default: // add_to_calendar
-            primaryButton("add to calendar") { addToCalendar() }
+            // HONEST: with no confirmed time on the listing there is nothing to
+            // put on a calendar, so we open the listing instead of inventing a
+            // date the way the old placeholder did.
+            if item.hasConfirmedTime {
+                primaryButton("add to calendar") { addToCalendar() }
+            } else {
+                VStack(alignment: .leading, spacing: 8) {
+                    primaryButton("open the listing") {
+                        if let url = URL(string: item.url) { UIApplication.shared.open(url) }
+                        setNote("opened the listing for you")
+                    }
+                    Text("no confirmed time on the listing, so dino will not guess one")
+                        .font(DinoTheme.dinoFont(size: 13))
+                        .foregroundColor(Color(hex: "#7A6F5F"))
+                }
+            }
         }
+    }
+
+    /// A settled, non-tappable state. Deliberately not a Button: there is
+    /// nothing left to do here.
+    private func doneState(_ label: String) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: "checkmark.circle.fill")
+                .font(.system(size: 15))
+                .foregroundColor(Color(hex: "#4A3520").opacity(0.55))
+            Text(label)
+                .font(DinoTheme.dinoFont(size: 16))
+                .foregroundColor(Color(hex: "#4A3520"))
+        }
+        .padding(.horizontal, 18)
+        .padding(.vertical, 11)
+        .background(Capsule().fill(Color(hex: "#EDE4D4")))
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(label)
+    }
+
+    private func secondaryButton(_ label: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(label)
+                .font(DinoTheme.dinoFont(size: 14))
+                .foregroundColor(Color(hex: "#4A3520"))
+                .padding(.horizontal, 16)
+                .padding(.vertical, 9)
+                .background(Capsule().stroke(Color(hex: "#4A3520").opacity(0.35), lineWidth: 1))
+        }
+        .buttonStyle(.plain)
     }
 
     private func primaryButton(_ label: String, action: @escaping () -> Void) -> some View {
@@ -535,29 +724,59 @@ private struct FindingRevealCard: View {
     // MARK: - actions
 
     private func addToCalendar() {
+        // BELT: never write twice. The card should not even be offering this on
+        // an acted finding, but a stale tap must still be a no-op, not a second
+        // event on someone's calendar.
+        let current = FindingsStore.item(taskId: item.taskId) ?? item
+        guard !FindingsStore.hasCalendarWrite(current) else {
+            refresh()
+            setNote("already on your calendar")
+            return
+        }
         working = true
         Task {
-            let ok = await FindingsService.shared.writeCalendar(for: item)
+            let result = await FindingsService.shared.writeCalendar(for: item)
             await MainActor.run {
                 working = false
-                if ok {
+                switch result {
+                case .written:
                     FindingsStore.markStatus(taskId: item.taskId, status: "confirmed")
                     setNote("added to your calendar")
-                } else {
+                case .alreadyWritten:
+                    FindingsStore.markStatus(taskId: item.taskId, status: "confirmed")
+                    setNote("already on your calendar")
+                case .noConfirmedTime:
+                    setNote("no confirmed time on the listing, so nothing was scheduled")
+                case .failed:
                     setNote("couldn't reach your calendar, no worries")
                 }
+                refresh()
+                onChanged()
             }
         }
     }
 
     private func bookIt() {
+        // Same guard on the booking path: an already-acted finding is done.
+        let currentItem = FindingsStore.item(taskId: item.taskId) ?? item
+        guard !FindingsStore.isActed(currentItem.status) else {
+            refresh()
+            return
+        }
         working = true
         Task {
             do {
                 let (status, url) = try await FindingsService.shared
                     .confirmFinding(taskId: item.taskId, userName: userName)
-                let calOK = (status == "booked" || status == "confirmed")
-                    ? await FindingsService.shared.writeCalendar(for: item) : false
+                // The calendar write here goes through the SAME duplicate guard
+                // and the same real-date rule as the plain add-to-calendar path.
+                let write: FindingsService.CalendarWrite
+                if status == "booked" || status == "confirmed" {
+                    write = await FindingsService.shared.writeCalendar(for: item)
+                } else {
+                    write = .failed
+                }
+                let calOK = (write == .written || write == .alreadyWritten)
                 await MainActor.run {
                     working = false
                     switch status {
@@ -571,10 +790,15 @@ private struct FindingRevealCard: View {
                                       : "registration handed off to you at the page")
                     case "confirmed":
                         FindingsStore.markStatus(taskId: item.taskId, status: "confirmed")
-                        setNote(calOK ? "on your calendar" : "couldn't reach your calendar, no worries")
+                        setNote(calOK ? "on your calendar"
+                                      : (write == .noConfirmedTime
+                                         ? "no confirmed time on the listing, so nothing was scheduled"
+                                         : "couldn't reach your calendar, no worries"))
                     default:
                         setNote("couldn't book it this time")
                     }
+                    refresh()
+                    onChanged()
                 }
             } catch {
                 await MainActor.run { working = false; setNote("couldn't book it this time") }

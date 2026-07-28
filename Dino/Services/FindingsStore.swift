@@ -18,7 +18,7 @@ struct FindingItem: Codable, Equatable, Identifiable {
     let taskId: String
     var status: String        // searching | found | empty | booked | handoff | confirmed | failed
     var title: String
-    var whenText: String      // "this saturday, 2pm"
+    var whenText: String      // "this saturday, 2pm" — DISPLAY ONLY, never scheduled from
     var whereText: String     // venue
     var why: String           // dino's lowercase warm line
     var url: String
@@ -26,15 +26,61 @@ struct FindingItem: Codable, Equatable, Identifiable {
     var bookedAt: Date?
     var createdAt: Date
 
+    /// THE REAL EVENT START, straight from the agent: ISO 8601 with an explicit
+    /// offset. nil means the listing gave no confirmed time — and nil is HONEST,
+    /// not a reason to invent one (the card offers the listing instead).
+    var startISO: String?
+    /// Optional end; nil → the client holds one hour.
+    var endISO: String?
+    /// "exact" | "approximate" | "unknown". Always "unknown" when startISO is nil.
+    var dateConfidence: String
+    /// Set the moment a calendar event is actually saved for this finding. The
+    /// suspenders half of the duplicate guard: CalendarService (a shipping file
+    /// this branch may not touch) returns only a Bool, so there is no event
+    /// identifier to keep — this timestamp is what refuses the second write.
+    var calendarWrittenAt: Date?
+
     var id: String { taskId }
+
+    /// True when this finding carries a time we are willing to schedule.
+    var hasConfirmedTime: Bool {
+        guard let startISO, !startISO.isEmpty else { return false }
+        return dateConfidence != "unknown"
+    }
 
     init(taskId: String, status: String, title: String = "", whenText: String = "",
          whereText: String = "", why: String = "", url: String = "",
-         outcome: String = "", bookedAt: Date? = nil, createdAt: Date = Date()) {
+         outcome: String = "", bookedAt: Date? = nil, createdAt: Date = Date(),
+         startISO: String? = nil, endISO: String? = nil,
+         dateConfidence: String = "unknown", calendarWrittenAt: Date? = nil) {
         self.taskId = taskId; self.status = status; self.title = title
         self.whenText = whenText; self.whereText = whereText; self.why = why
         self.url = url; self.outcome = outcome; self.bookedAt = bookedAt
         self.createdAt = createdAt
+        self.startISO = startISO; self.endISO = endISO
+        self.dateConfidence = dateConfidence; self.calendarWrittenAt = calendarWrittenAt
+    }
+
+    /// BACKWARD-COMPATIBLE DECODE: items cached before the structured-date fields
+    /// existed have none of the new keys. Swift's synthesized init(from:) does
+    /// NOT fall back to property defaults, so every new key is decodeIfPresent
+    /// here — an old shelf decodes unchanged instead of vanishing.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        taskId = try c.decode(String.self, forKey: .taskId)
+        status = try c.decode(String.self, forKey: .status)
+        title = try c.decodeIfPresent(String.self, forKey: .title) ?? ""
+        whenText = try c.decodeIfPresent(String.self, forKey: .whenText) ?? ""
+        whereText = try c.decodeIfPresent(String.self, forKey: .whereText) ?? ""
+        why = try c.decodeIfPresent(String.self, forKey: .why) ?? ""
+        url = try c.decodeIfPresent(String.self, forKey: .url) ?? ""
+        outcome = try c.decodeIfPresent(String.self, forKey: .outcome) ?? ""
+        bookedAt = try c.decodeIfPresent(Date.self, forKey: .bookedAt)
+        createdAt = try c.decodeIfPresent(Date.self, forKey: .createdAt) ?? Date()
+        startISO = try c.decodeIfPresent(String.self, forKey: .startISO)
+        endISO = try c.decodeIfPresent(String.self, forKey: .endISO)
+        dateConfidence = try c.decodeIfPresent(String.self, forKey: .dateConfidence) ?? "unknown"
+        calendarWrittenAt = try c.decodeIfPresent(Date.self, forKey: .calendarWrittenAt)
     }
 }
 
@@ -49,10 +95,26 @@ enum FindingsStore {
     }
 
     /// Insert or update a finding by taskId, newest first. Capped.
+    ///
+    /// A server poll does NOT know what this device already did. The plain
+    /// calendar write is entirely local, so a naive overwrite would drop the
+    /// write stamp and downgrade a locally-acted "confirmed" back to "found" —
+    /// which is exactly how a second calendar event got offered (and written).
+    /// So the merge keeps the LOCAL truth the server cannot have:
+    ///   - calendarWrittenAt survives unless the incoming item already has one;
+    ///   - a locally acted status is not downgraded by a still-"found" server
+    ///     answer (a server answer that is itself acted still wins).
     static func upsert(_ item: FindingItem, defaults: UserDefaults = .standard) {
         var all = items(defaults: defaults)
         if let idx = all.firstIndex(where: { $0.taskId == item.taskId }) {
-            all[idx] = item
+            let existing = all[idx]
+            var merged = item
+            if merged.calendarWrittenAt == nil { merged.calendarWrittenAt = existing.calendarWrittenAt }
+            if merged.bookedAt == nil { merged.bookedAt = existing.bookedAt }
+            if isActed(existing.status), !isActed(merged.status) {
+                merged.status = existing.status
+            }
+            all[idx] = merged
         } else {
             all.insert(item, at: 0)
         }
@@ -72,6 +134,32 @@ enum FindingsStore {
 
     static func item(taskId: String, defaults: UserDefaults = .standard) -> FindingItem? {
         items(defaults: defaults).first { $0.taskId == taskId }
+    }
+
+    // MARK: - the duplicate-calendar guard
+
+    /// Statuses that mean this finding has ALREADY been acted on. Tapping again
+    /// must never write a second calendar event.
+    static let actedStatuses: Set<String> = ["confirmed", "booked", "handoff"]
+
+    static func isActed(_ status: String) -> Bool { actedStatuses.contains(status) }
+
+    /// BELT + SUSPENDERS: an acted status OR a recorded write timestamp both
+    /// mean "a calendar event already exists for this finding".
+    static func hasCalendarWrite(_ item: FindingItem) -> Bool {
+        if item.calendarWrittenAt != nil { return true }
+        return item.status == "confirmed" || item.status == "booked"
+    }
+
+    /// Stamp the moment the event was actually saved. Idempotent: an existing
+    /// stamp is never overwritten, so the first write stays the record.
+    static func markCalendarWritten(taskId: String, at: Date = Date(),
+                                    defaults: UserDefaults = .standard) {
+        var all = items(defaults: defaults)
+        guard let idx = all.firstIndex(where: { $0.taskId == taskId }) else { return }
+        guard all[idx].calendarWrittenAt == nil else { return }
+        all[idx].calendarWrittenAt = at
+        persist(all, defaults: defaults)
     }
 
     // MARK: - terminal status
@@ -131,5 +219,25 @@ enum FindingsStore {
 
     private static func persist(_ all: [FindingItem], defaults: UserDefaults) {
         if let data = try? JSONEncoder().encode(all) { defaults.set(data, forKey: itemsKey) }
+    }
+}
+
+// MARK: - branch-owned findings preferences
+
+/// The findings tab's own tiny preference bag (UserDefaults, namespaced
+/// dino.findings.*, nothing here syncs). Branch-owned so no shipping settings
+/// file is touched.
+enum FindingsPrefs {
+    /// Bias the star's SOURCE LIST toward registration/signup portals. Default
+    /// OFF — the plain search is the normal one. Passed to startFindingTask,
+    /// which forwards it into the search prompt; it never changes the step cap.
+    static let preferBookableKey = "dino.findings.preferBookable"
+
+    static func preferBookable(defaults: UserDefaults = .standard) -> Bool {
+        defaults.bool(forKey: preferBookableKey)   // absent → false
+    }
+
+    static func setPreferBookable(_ on: Bool, defaults: UserDefaults = .standard) {
+        defaults.set(on, forKey: preferBookableKey)
     }
 }
