@@ -438,6 +438,20 @@ export function buildSearchPrompt(
     "the parks & recreation site, eventbrite, and venue/organizer pages. Only include",
     "an item you can point at a real, currently-live page for.",
     "",
+    // EVENTBRITE STEERING — a real run bounced off eventbrite entirely, reporting
+    // "mostly high-energy or alcohol-centered events (Pilates sculpt, Happy Hours
+    // at a brewery, Summer Party)". The platform does carry the right things; the
+    // agent was landing on its default/nightlife surface. Point it at the
+    // categories that actually match the brief instead of letting it judge the
+    // whole site by the first page it sees.
+    "ON EVENTBRITE specifically: use its FREE filter and steer to the wellness,",
+    "community, outdoor/nature, arts, and family categories. Do NOT judge",
+    "eventbrite by its default or trending page. SKIP its nightlife, bar, brewery,",
+    "club, party, singles, and 21+ listings entirely, and skip high-intensity",
+    "fitness (bootcamp, sculpt, HIIT, spin) — a gentle stretch, walk, or restorative",
+    "class is fine. If eventbrite's first page looks like nightlife, filter or",
+    "search within it rather than abandoning the source.",
+    "",
     // CLINICAL EXCLUSION — mirrors the comfort-recs system prompt's rule ("only
     // inherently gentle content … never clinical or academic works, and never
     // books or films about mental illness, therapy, self help … comfort means
