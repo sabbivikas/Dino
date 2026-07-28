@@ -15,5 +15,13 @@ import FirebaseAuth
 
 enum FindingsFeature {
     /// The owner's uid, hardcoded. Inert for everyone else.
-    static var isEnabled: Bool { Auth.auth().currentUser?.uid == "Enlkbg0saoMqvx24r7ZLsBX8ctp2" }
+    /// DEBUG builds additionally honor the -findingsQA launch arg (house QA-arg
+    /// pattern) so the tab is inspectable on a simulator without owner auth.
+    /// Release builds ignore the arg — the uid gate is the only door.
+    static var isEnabled: Bool {
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("-findingsQA") { return true }
+        #endif
+        return Auth.auth().currentUser?.uid == "Enlkbg0saoMqvx24r7ZLsBX8ctp2"
+    }
 }
