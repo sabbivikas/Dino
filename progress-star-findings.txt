@@ -1,0 +1,80 @@
+STAR FINDINGS — experimental demo (branch feature/star-findings)
+================================================================
+Status: built, verified locally. NOT for merge. NOT deployed.
+
+NOTE ON THIS FILE: the repo's progress.txt is a pre-existing TRACKED ledger for
+the comfort-recs / luna-recs arcs. To keep isolation absolute (the top
+requirement) and the diff limited to the 3 allowed shipping files + NEW files,
+this arc's progress lives in this NEW file instead of editing the tracked one.
+
+THE ARC
+-------
+An owner-only, flag-gated experimental tab. Tap the star -> it is "sent out" ->
+a real browser-agent (AGI vendor) searches the live web for ONE gentle, free
+thing to do THIS WEEK in Saint Paul, MN -> a cheap model (gpt-4.1-mini) picks
+the single best fit and writes dino's "why" in his lowercase, no-dash voice ->
+a reveal card offers one of four outcomes (add to calendar / book it / finish
+signing up / warm empty-handed). Past findings + the real comfort recs rest on
+an isolated shelf below the star. Four star states: idle, sending (glide off +
+fade), away ("the star is out looking"), back (glide-in on a result). Reduce
+Motion falls back to opacity, following the copied star class.
+
+ISOLATION RULES (this branch may NEVER merge)
+---------------------------------------------
+- Everything additive and triple-gated:
+  1. client: FindingsFeature.isEnabled == (Auth uid == owner uid), hardcoded.
+  2. server: STAR_FINDINGS_UIDS env allowlist, fail-closed, membership only
+     (no uid parameter -> firing for another account is structurally impossible).
+  3. firestore.rules: starFindings/{uid} + tasks are server-write-only,
+     owner-read-own, everyone-else denied.
+- Flag OFF -> tab slot 3 is the BYTE-IDENTICAL Gratitude Jar (content, label,
+  icon all fall through to the exact prior code).
+- Only 3 shipping files edited (additive/flag-gated): MainTabView.swift,
+  functions/src/index.ts, firestore.rules. Everything else is NEW files.
+- CrisisResources + crisisNet untouched. No .xcstrings entries added. No
+  existing test file modified (new test FILES only). No production Firestore
+  writes; no deploy. progress.txt (the tracked ledger) left untouched.
+- FindingsStar.swift is a VERBATIM copy of Onboarding3D/StarGuide.swift
+  (git bf7e3a1), renamed; main's onboarding orb is not touched.
+
+LOCALIZATION = MERGE PREREQUISITE (owner decision on record)
+------------------------------------------------------------
+English-only demo. All new user-facing copy is plain string literals (no
+String(localized:), no new .xcstrings keys). Before this could EVER merge,
+every literal in the new Swift files + the "Findings" tab label + the plain
+push title/body must move into the string catalog for en/es/ja/ko/vi. (It must
+not merge; recorded per the owner's instruction.)
+
+OWNER PII DECISION (on record)
+------------------------------
+The ONLY personal data that ever reaches the AGI vendor is the owner's OWN
+name + email, and ONLY in confirmFinding's booking phase (never search or pick).
+Name comes from the client (userName); email from admin.auth().getUser(uid).email.
+The booking prompt fills ONLY those two fields and STOPS (fields_blocked ->
+handoff) on any form demanding dob / phone / payment / login / captcha.
+Vendor: AGI (api.agi.tech) for the agent; OpenAI gpt-4.1-mini for the pick.
+
+AGI API — REAL BEHAVIOR (see scratchpad/findings-QA)
+----------------------------------------------------
+Real browser-agent sandbox, two planes: control plane api.agi.tech/v1 (session
+lifecycle) + per-session agent plane (/user_message + SSE /events + /cancel +
+/terminate). start_url is mandatory. The 30-step kill is a live THOUGHT-count
+kill on the SSE stream (cancel + terminate + DELETE); the session is ALWAYS
+deleted in a finally block. Real runs proved the kill fires at exactly the
+threshold and leaks zero sessions.
+
+SURPRISE worth the owner's attention: with the first prompt the search agent
+explored productively (found the SPPL library + parks pages) but burned all 30
+steps chasing exact per-event permalink URLs and never emitted final JSON --
+hitting the step cap with 0 candidates. A convergence tweak to buildSearchPrompt
+("be decisive, don't chase permalinks, emit JSON as soon as you have a few")
+fixed it: runs 2 & 3 returned 6 real candidates in 5-6 steps / ~90-100s. The
+Firecrawl fallback was NOT needed -- the API works; it just needed steering.
+
+VERIFY (all local)
+------------------
+- functions: npm test -> 154 (137 baseline UNMODIFIED + 17 new pure tests). tsc clean.
+- rules: 37 (31 baseline UNMODIFIED in the untouched file + 6 new in a NEW file).
+- iOS: Debug TEST BUILD SUCCEEDED; DinoTests -> see scratchpad/findings-QA/build-verdict.md.
+- git diff vs main: only the 3 shipping files + new files. No xcstrings, no
+  CrisisResources, no existing test modified.

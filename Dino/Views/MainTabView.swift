@@ -37,9 +37,17 @@ struct MainTabView: View {
                     .environmentObject(dataManager)
                     .tag(2)
 
-                GratitudeJarView()
-                    .environmentObject(dataManager)
-                    .tag(3)
+                // EXPERIMENTAL star-findings demo (owner + uid gated). Flag OFF
+                // renders the byte-identical Gratitude Jar.
+                if FindingsFeature.isEnabled {
+                    FindingsTabView()
+                        .environmentObject(dataManager)
+                        .tag(3)
+                } else {
+                    GratitudeJarView()
+                        .environmentObject(dataManager)
+                        .tag(3)
+                }
 
                 ProfileView()
                     .environmentObject(dataManager)
@@ -86,11 +94,15 @@ private struct DinoCustomTabBar: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var animatingTab: Int? = nil
 
-    private let tabs: [(label: String, tag: Int)] = [
-        (String(localized: "Home"), 0), (String(localized: "Journal"), 1),
-        (String(localized: "Mood"), 2), (String(localized: "Jar"), 3),
-        (String(localized: "Profile"), 4)
-    ]
+    // Slot 3's label follows the flag: the star-findings demo relabels "Jar" to
+    // a plain "Findings" literal (NO new .xcstrings entry — English-only demo).
+    // Flag OFF resolves to String(localized: "Jar") exactly as before.
+    private var tabs: [(label: String, tag: Int)] {
+        [(String(localized: "Home"), 0), (String(localized: "Journal"), 1),
+         (String(localized: "Mood"), 2),
+         (FindingsFeature.isEnabled ? "Findings" : String(localized: "Jar"), 3),
+         (String(localized: "Profile"), 4)]
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -165,18 +177,30 @@ private struct TabIconButton: View {
                 .offset(y: isAnimating ? -3 : 0)
                 .animation(.spring(response: 0.35, dampingFraction: 0.5), value: isAnimating)
         case 3:
-            ZStack {
-                DinoJarIcon()
-                if isAnimating {
-                    DinoJarHeartOverlay()
-                        .frame(width: 24, height: 24)
-                        .scaleEffect(1.25)
-                        .opacity(0.6)
-                        .transition(.scale.combined(with: .opacity))
+            // EXPERIMENTAL star-findings demo: a star icon when flagged,
+            // otherwise the byte-identical jar icon.
+            if FindingsFeature.isEnabled {
+                Image(systemName: "star.fill")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 22, height: 22)
+                    .scaleEffect(isAnimating ? 1.2 : 1.0)
+                    .rotationEffect(.degrees(isAnimating ? 10 : 0))
+                    .animation(.spring(response: 0.35, dampingFraction: 0.5), value: isAnimating)
+            } else {
+                ZStack {
+                    DinoJarIcon()
+                    if isAnimating {
+                        DinoJarHeartOverlay()
+                            .frame(width: 24, height: 24)
+                            .scaleEffect(1.25)
+                            .opacity(0.6)
+                            .transition(.scale.combined(with: .opacity))
+                    }
                 }
+                .scaleEffect(isAnimating ? 1.15 : 1.0)
+                .animation(.spring(response: 0.3, dampingFraction: 0.45), value: isAnimating)
             }
-            .scaleEffect(isAnimating ? 1.15 : 1.0)
-            .animation(.spring(response: 0.3, dampingFraction: 0.45), value: isAnimating)
         case 4:
             ZStack {
                 if isAnimating {

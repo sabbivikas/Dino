@@ -20,6 +20,11 @@ import { buildRecAnnouncementMessage, isPlausiblePushToken, REC_PUSH_TOKENS_COLL
 import { buildAnnouncementOutcome, announcementOutcomeId, isOutcomeDaypart, OUTCOME_RETENTION_DAYS } from "./outcomes";
 import { buildWeeklyPrompt } from "./weeklyReport";
 import { debugRecForceGate, clampDelayMinutes, DEBUG_REC_FIXTURE_RECS } from "./debugRecForce";
+// EXPERIMENTAL star-findings demo (owner + flag + uid gated) — additive.
+import { starFindingsGate, buildSearchPrompt, buildPickPrompt, buildBookingPrompt,
+  parseCandidates, outcomeForFinding, outcomeForBooking,
+  MAX_TASKS_PER_DAY, MAX_AGENT_STEPS, WALL_CLOCK_MS, FINDINGS_CITY } from "./starFindings";
+import { runAgentTask, type RunResult } from "./agiClient";
 
 admin.initializeApp();
 
@@ -2867,4 +2872,231 @@ export const nightlyPreferenceDistill = onSchedule(
     }
     functions.logger.info("prefs_nightly", { candidates: uids.length, distilled });
   });
+
+// ---------------------------------------------------------------------------
+// STAR FINDINGS (experimental owner-only demo) — additive onCalls. The star is
+// sent out by a real browser-agent (AGI) to find one gentle, free thing to do
+// this week in Saint Paul; a cheap model picks the single best fit and writes
+// dino's why. THREE gates: the client flag+uid, the env allowlist here, and
+// firestore.rules (server-write-only docs). THE 30-STEP KILL + 5/day cap live
+// in the agent loop + this counter. Every task doc logs steps/outcome/
+// durationMs/dayKey — the owner's cost/success telemetry.
+//
+// PII: the ONLY personal data that ever reaches AGI is the owner's own name +
+// email, and ONLY in confirmFinding's booking phase (never the search phase).
+// ---------------------------------------------------------------------------
+
+// The search agent needs a start_url; a plain search page lets it fan out to
+// official library/parks/eventbrite listings from there.
+const FINDINGS_SEARCH_START_URL =
+  "https://www.google.com/search?q=" +
+  encodeURIComponent(`free gentle events this week ${FINDINGS_CITY} library parks`);
+
+/** UTC yyyy-mm-dd — the per-day counter key. */
+function findingsDayKey(now: Date = new Date()): string {
+  return now.toISOString().slice(0, 10);
+}
+
+/** Interpret a finished booking agent run into the pure outcome signal. */
+function interpretBookingSignal(res: RunResult): Parameters<typeof outcomeForBooking>[0] {
+  if (res.killReason) return { killReason: res.killReason };
+  if (res.errored) return { errored: true };
+  const raw = (res.lastContent || "").replace(/```json/gi, "").replace(/```/g, "").trim();
+  let parsed: Record<string, unknown> | null = null;
+  try { parsed = JSON.parse(raw) as Record<string, unknown>; } catch { parsed = null; }
+  if (parsed?.status === "completed") return { completed: true };
+  if (parsed?.status === "fields_blocked") {
+    const fields = Array.isArray(parsed.blockedFields)
+      ? (parsed.blockedFields as unknown[]).map(String) : ["unknown"];
+    return { blockedFields: fields.length ? fields : ["unknown"] };
+  }
+  // the agent stopped to ASK (a form wanted more than name+email) — hand off.
+  if (res.outcome === "waiting") return { blockedFields: ["unknown"] };
+  return {}; // ambiguous → partial
+}
+
+/** Best-effort plain-English push (content-light, no loc-keys, no catalog). */
+async function sendFindingPush(uid: string, title: string): Promise<void> {
+  try {
+    const db = admin.firestore();
+    const snap = await db.collection("pushTokens").doc(uid).get();
+    const token = snap.data()?.token;
+    if (!isPlausiblePushToken(token)) return;
+    await admin.messaging().send({
+      token: token as string,
+      notification: { title: "the star found something", body: title },
+      apns: { headers: { "apns-priority": "10" }, payload: { aps: { sound: "default" } } },
+    });
+  } catch (err) {
+    functions.logger.warn(`sendFindingPush: uid=${uid} failed: ${err}`);
+  }
+}
+
+export const startFindingTask = onCall(
+  { secrets: [OPENAI_API_KEY], timeoutSeconds: 540, memory: "512MiB" },
+  async (request) => {
+    if (!request.auth) throw new HttpsError("unauthenticated", "sign in required");
+    const gate = starFindingsGate(process.env.STAR_FINDINGS_UIDS, request.auth.uid);
+    if (!gate.allowed) throw new HttpsError("permission-denied", "not enabled");
+    const uid = gate.uid;
+    const db = admin.firestore();
+    const dayKey = findingsDayKey();
+    const parentRef = db.collection("starFindings").doc(uid);
+
+    // 5/day cap on the parent doc's dayKey counter (transactional).
+    const cap = await db.runTransaction(async (tx) => {
+      const snap = await tx.get(parentRef);
+      const d = snap.data() ?? {};
+      const count = d.dayKey === dayKey ? Number(d.count ?? 0) : 0;
+      if (count >= MAX_TASKS_PER_DAY) return { reached: true };
+      tx.set(parentRef, {
+        dayKey, count: count + 1,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge: true });
+      return { reached: false };
+    });
+    if (cap.reached) {
+      return { taskId: "", status: "capReached", steps: 0, outcome: "cap", finding: null };
+    }
+
+    const taskRef = parentRef.collection("tasks").doc();
+    const startedAt = Date.now();
+    await taskRef.set({
+      status: "searching", dayKey,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    // SEARCH phase (real AGI browser agent). No PII in this phase.
+    const searchRes = await runAgentTask({
+      prompt: buildSearchPrompt(),
+      startUrl: FINDINGS_SEARCH_START_URL,
+      maxSteps: MAX_AGENT_STEPS,
+      wallClockMs: WALL_CLOCK_MS,
+      stepDelaySeconds: 1,
+    });
+    const durationMs = Date.now() - startedAt;
+    // the agent may end with a DONE or a trailing QUESTION that still carries
+    // the JSON — parse the last content either way.
+    const candidates = parseCandidates(searchRes.lastContent);
+
+    if (candidates.length === 0) {
+      const outcome = searchRes.killReason === "step_cap" ? "failed:step_cap"
+        : searchRes.killReason === "timeout" ? "failed:timeout"
+        : searchRes.errored ? "failed:error" : "empty";
+      const status = outcome.startsWith("failed") ? "failed" : "empty";
+      await taskRef.set({ status, steps: searchRes.thoughts, outcome, durationMs, dayKey },
+        { merge: true });
+      functions.logger.info(
+        `startFindingTask: uid=${uid} task=${taskRef.id} steps=${searchRes.thoughts} outcome=${outcome} durationMs=${durationMs}`);
+      return { taskId: taskRef.id, status, steps: searchRes.thoughts, outcome, finding: null };
+    }
+
+    // PICK phase (gpt-4.1-mini: one gentle fit + dino's why, lowercase warm).
+    const { system, user } = buildPickPrompt(candidates);
+    let pickIndex = 0;
+    let why = "";
+    try {
+      const openai = new OpenAI({ apiKey: OPENAI_API_KEY.value() });
+      const resp = await openai.chat.completions.create({
+        model: "gpt-4.1-mini", temperature: 0.7,
+        messages: [{ role: "system", content: system }, { role: "user", content: user }],
+      });
+      const content = (resp.choices[0]?.message?.content ?? "")
+        .replace(/```json/gi, "").replace(/```/g, "").trim();
+      const parsed = JSON.parse(content) as { index?: number; why?: string };
+      if (Number.isInteger(parsed.index) && parsed.index! >= 0 && parsed.index! < candidates.length) {
+        pickIndex = parsed.index!;
+      }
+      if (typeof parsed.why === "string") why = parsed.why.slice(0, 140);
+    } catch (err) {
+      functions.logger.warn(`startFindingTask: pick fell back to index 0 (uid=${uid}): ${err}`);
+    }
+
+    const picked = candidates[pickIndex];
+    const { card } = outcomeForFinding(picked);
+    const finding = {
+      title: picked.title, when: picked.date, venue: picked.venue,
+      why: why || "a gentle little thing for your week",
+      url: picked.url, registrationNeeded: picked.registrationNeeded, outcome: card,
+    };
+    await taskRef.set({
+      status: "found", finding, steps: searchRes.thoughts,
+      outcome: "found", durationMs, dayKey,
+    }, { merge: true });
+    await sendFindingPush(uid, picked.title);
+    functions.logger.info(
+      `startFindingTask: uid=${uid} task=${taskRef.id} steps=${searchRes.thoughts} outcome=found durationMs=${durationMs}`);
+    return { taskId: taskRef.id, status: "found", steps: searchRes.thoughts, outcome: "found", finding };
+  }
+);
+
+export const getFindingTask = onCall(
+  { timeoutSeconds: 30, memory: "256MiB" },
+  async (request) => {
+    if (!request.auth) throw new HttpsError("unauthenticated", "sign in required");
+    const gate = starFindingsGate(process.env.STAR_FINDINGS_UIDS, request.auth.uid);
+    if (!gate.allowed) throw new HttpsError("permission-denied", "not enabled");
+    const taskId = String(request.data?.taskId ?? "");
+    if (!taskId) throw new HttpsError("invalid-argument", "taskId required");
+    const db = admin.firestore();
+    const snap = await db.collection("starFindings").doc(gate.uid)
+      .collection("tasks").doc(taskId).get();
+    if (!snap.exists) throw new HttpsError("not-found", "no such task");
+    const d = snap.data() ?? {};
+    return {
+      taskId, status: d.status ?? "failed", finding: d.finding ?? null,
+      steps: d.steps ?? 0, outcome: d.outcome ?? "",
+    };
+  }
+);
+
+export const confirmFinding = onCall(
+  { timeoutSeconds: 540, memory: "512MiB" },
+  async (request) => {
+    if (!request.auth) throw new HttpsError("unauthenticated", "sign in required");
+    const gate = starFindingsGate(process.env.STAR_FINDINGS_UIDS, request.auth.uid);
+    if (!gate.allowed) throw new HttpsError("permission-denied", "not enabled");
+    const uid = gate.uid;
+    const taskId = String(request.data?.taskId ?? "");
+    const userName = String(request.data?.userName ?? "").slice(0, 80);
+    if (!taskId) throw new HttpsError("invalid-argument", "taskId required");
+    const db = admin.firestore();
+    const taskRef = db.collection("starFindings").doc(uid).collection("tasks").doc(taskId);
+    const snap = await taskRef.get();
+    if (!snap.exists) throw new HttpsError("not-found", "no such task");
+    const finding = snap.data()?.finding as
+      { url?: string; registrationNeeded?: boolean } | undefined;
+    if (!finding) throw new HttpsError("failed-precondition", "task has no finding");
+
+    // No registration needed — the client does the calendar write next.
+    if (!finding.registrationNeeded) {
+      await taskRef.set({ status: "confirmed", outcome: "confirmed" }, { merge: true });
+      functions.logger.info(`confirmFinding: uid=${uid} task=${taskId} outcome=confirmed`);
+      return { status: "confirmed", url: finding.url ?? "" };
+    }
+
+    // BOOKING phase — THE ONLY PII EGRESS: the owner's own name + email go to
+    // AGI, and only here. Email comes from the auth record, name from the
+    // client. The booking prompt fills ONLY those two fields and STOPS on any
+    // form that demands more (dob/phone/payment/login/captcha).
+    const email = (await admin.auth().getUser(uid)).email ?? "";
+    const startedAt = Date.now();
+    const res = await runAgentTask({
+      prompt: buildBookingPrompt(userName, email),
+      startUrl: finding.url,
+      maxSteps: MAX_AGENT_STEPS,
+      wallClockMs: WALL_CLOCK_MS,
+      stepDelaySeconds: 1,
+    });
+    const durationMs = Date.now() - startedAt;
+    const { status, outcome } = outcomeForBooking(interpretBookingSignal(res));
+    await taskRef.set({
+      status, outcome, steps: res.thoughts, durationMs,
+      bookedAt: status === "booked" ? admin.firestore.FieldValue.serverTimestamp() : null,
+    }, { merge: true });
+    functions.logger.info(
+      `confirmFinding: uid=${uid} task=${taskId} steps=${res.thoughts} outcome=${outcome} durationMs=${durationMs}`);
+    return { status, url: finding.url ?? "" };
+  }
+);
 

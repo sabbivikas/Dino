@@ -207,5 +207,19 @@ service cloud.firestore {
         && request.resource.data.reporterUid == request.auth.uid;
       allow read, update, delete: if false;
     }
+
+    // STAR FINDINGS (experimental owner-only demo) — the parent doc holds the
+    // per-day task counter and task docs hold the agent runs. Both are
+    // SERVER-WRITE-ONLY (admin SDK via the onCall functions); the owner may
+    // only READ their own. Everyone else is denied outright — the feature is
+    // additionally uid-gated at the function layer, so this is belt-and-braces.
+    match /starFindings/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow write: if false;
+      match /tasks/{taskId} {
+        allow read: if request.auth != null && request.auth.uid == uid;
+        allow write: if false;
+      }
+    }
   }
 }
