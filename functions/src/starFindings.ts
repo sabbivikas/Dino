@@ -435,7 +435,7 @@ export function buildSearchPrompt(
     "loud, crowded, ticketed, alcohol-centered, or high-energy.",
     "",
     "Prefer OFFICIAL sources: the city or county site, the public library calendar,",
-    "the parks & recreation site, eventbrite, and venue/organizer pages. Only include",
+    "the parks & recreation site, eventbrite, lu.ma, and venue/organizer pages. Only include",
     "an item you can point at a real, currently-live page for.",
     "",
     // EVENTBRITE STEERING — a real run bounced off eventbrite entirely, reporting
@@ -482,7 +482,7 @@ export function buildSearchPrompt(
       "BOOKABLE BIAS (this run PREFERS things you can actually sign up for). This",
       "is a PREFERENCE, not a restriction:",
       "- START with registration portals rather than plain calendars:",
-      "  library program registration pages, eventbrite, community education class",
+      "  library program registration pages, eventbrite, lu.ma, community education class",
       "  catalogs, and parks and recreation class registration pages. Those are your",
       "  preferred first stop.",
       "- If those sources do not give you enough gentle free options, FALL BACK to the",
