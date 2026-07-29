@@ -286,3 +286,126 @@ VERIFY (this pass, all local)
 - iOS: not built and not touched — nothing to build.
 
 REDEPLOY REQUIRED (owner runs it): startFindingTask only. No client work.
+
+
+REDESIGN: FREE-FLOATING STAR IN DEEP SPACE + TOLAN CARD + TRADING-CARD REVEAL
+============================================================================
+A full visual redesign of the findings screen. NOT for merge. NOT deployed.
+
+THE SCREEN NOW
+- Deep space; the star floats FREE (no shelf, no header, no list). When a
+  finding lands, a large Tolan card appears ABOVE the star; the star sits lower
+  and smaller beneath it with a clear gap. Nothing else on screen.
+- FindingsShelfView.swift DELETED. Past findings now rest on the EXISTING
+  profile shelf as keepsakes (see below) — zero shipping-file edits for that.
+
+THE BOX-BUG ROOT CAUSE (owner: "it STILL renders inside a visible box")
+- The box was NEVER the SCNView frame. It was the STAR'S THREE GLOW-SHELL PLANES:
+  each used material.diffuse = UIColor.black + blendMode .add. Over an OPAQUE
+  onboarding scene that black is invisible; over our TRANSPARENT SCNView it
+  composites as an OPAQUE BLACK SQUARE — the largest shell drew the biggest box.
+  FIX: FindingsStar.buildGlowShells diffuse .black -> .clear (glow only; the
+  opaque gold body/face are untouched, still exactly #FFD04D). The glow's
+  transparent falloff now stays transparent, so the deep-space backdrop shows
+  through and NO edge exists anywhere (verified per-state incl. a zoomed crop).
+- FULL-BLEED chosen (owner recommendation): star + Earth share ONE transparent
+  SCNView over the whole screen (FindingsStarHostView reworked), positioned in
+  scene coords; the star rig drops lower+smaller when a card is up. Also:
+  antialiasingMode .none + rendersContinuously true (a transparent MSAA SCNView
+  handed back a blank drawable on the sim, and a one-shot render fired at size
+  zero before layout). isUserInteractionEnabled false; SwiftUI owns the tap.
+
+BACKGROUND (FindingsSpaceBackdrop reworked)
+- Dark-violet base graded WARMER toward the bottom; THREE parallax star layers
+  with different sizes/opacities/speeds AND directions (cross-drift = depth);
+  TWO nebula washes drifting AGAINST each other; corner vignette. Seeded
+  (GradientSeed) — deterministic. Reduce Motion stops all drift.
+- EARTH in the SceneKit scene (FindingsEarth): small (~1/3 width), LOW + deep,
+  not focal. Procedural equirectangular texture via UIGraphicsImageRenderer
+  (soft blue oceans, blobby muted-green continents, cloud wisps, seeded),
+  directional key light for the terminator + a dim fill, an additive back-sphere
+  atmosphere shell (front faces culled) for the rim glow, slow Y spin stopped
+  under Reduce Motion. Its lights use a dedicated categoryBitMask so they never
+  re-light the flat gold star.
+
+THE CARD (FindingsCardView, branch-owned SwiftUI)
+- ~78% width, radius 26, translucent gradient pale-mint -> green -> warm brown.
+  Photo fills the upper portion (AsyncImage w/ graceful fallback to a seeded
+  gradient in the same shape — never a broken slot, never an invented photo).
+  Two white circular buttons over the photo top-right: share (title+url) and an
+  up-chevron that COLLAPSES the card. Bold white single-line title (ellipsis);
+  a white pill with the SOURCE DOMAIN (FindingsDomain.source, pure + tested).
+- COLLAPSE/RE-EXPAND CHOICE: the up-chevron collapses to the star-only sky plus
+  a small unobtrusive "a finding is waiting" chip near the top that re-expands.
+- ACTION PATH — OWNER COURSE-CORRECTION APPLIED (veto of the body-tap idea): the
+  card body is NOT a tap target. An EXPLICIT per-outcome button sits below the
+  source pill (cream fill + dark text, legible on the gradient):
+    add_to_calendar -> "add it to my day" (no confirmed time falls back to
+      "open the listing" — the honest structured-date rule, never a guessed date)
+    book_it         -> "save me a spot"  (name+email booking confirm dialog)
+    finish_signup   -> "open the signup page"
+  Beneath it a quiet "not this time" dismisses the card to the idle sky, leaving
+  the finding UNACTED (no keepsake, no status change) and recoverable via the
+  existing reconcile/latest-task path. An already-acted finding shows only the
+  quiet acted line ("added to your calendar" / "booked" / "handed off..."). ALL
+  honest guards intact: calendarWrittenAt duplicate guard, no second event,
+  acted-state persistence, the noConfirmedTime refusal.
+
+REVEAL CHOREOGRAPHY (light first, card second)
+- Vertical seed cracks open -> six rays fan out rotating as they expand -> a ring
+  pops through them -> eight sparks fly out and fade -> the card materializes on
+  a Y-axis flip from nearly edge-on (rotation3DEffect) with a slight overshoot ->
+  one diagonal holographic sweep -> a slow warm rim pulse while on screen. ~1.5s.
+- ROBUSTNESS NOTE: driven by a SwiftUI .transition (findingsCardReveal flip) that
+  always settles at the present state + per-element .animation(value:) light
+  burst. An earlier @State/asyncAfter/keyframeAnimator driver got STRANDED
+  mid-reveal because SwiftUI re-mounts the card once during the tab-select
+  transition (resetting @State / restarting keyframes / Color.clear collapsed
+  layout). A transition can never strand invisible — its resting state is present.
+  Reduce Motion: light + flip collapse to a plain fade; holo sweep skipped.
+
+HAPTICS (FindingsHaptics, CoreHaptics)
+- CHHapticEngine for continuous (GATHER ramp 0.2->0.6 over ~0.4s; LAUNCH .medium
+  then continuous decay to zero), UIImpactFeedbackGenerator for discrete
+  (tap .light, LANDING settle .soft, BURST .heavy exactly on the ray burst —
+  strongest in the app, CARD LOCK .rigid, EMPTY .soft once). AWAY: nothing,
+  descent: nothing until settle. Capability-check + engine-start failure ->
+  silent no-op (sim included). NEVER UINotificationFeedbackGenerator .error.
+
+PAST FINDINGS -> PROFILE SHELF (FindingsKeepsake, zero shipping edits)
+- On the ACTED moment (calendar write succeeded / booked / handoff or signup
+  page opened) branch-owned code constructs a RichRec of type "gift" and calls
+  RichRecStore.recordKeepsake(rec, kept: true) — both module-internal, callable
+  without editing ComfortRecService. Fields mirror ExpeditionGift.asKeepsakeRec
+  exactly: title = finding title, creator = venue, why = dino's why line,
+  watchLink = the listing url (a shelf tap reopens it). The profile shelf already
+  renders type "gift" (dove icon, gold tint). FindingsStore.isShelved/markShelved
+  guarantee exactly one keepsake per finding. NO fifth shipping file needed.
+
+SERVER (additive; b103 ignores the new fields)
+- imageUrl: candidate schema + buildSearchPrompt capture instruction ("the
+  event's OWN photo... never a stock/logo/avatar"), sanitizeImageUrl (https only,
+  length cap, plausible image path/host, else null), carried pick -> stored
+  finding -> both callable payloads. Client async-loads with the gradient
+  fallback. JSON_RETRY_MESSAGE schema updated too.
+- tasksRemainingToday: pure helper (5/day cap minus used), added to
+  startFindingTask + getFindingTask responses for the idle trip count.
+- New pure test file findingsImage.test.ts (imageUrl sanitizer, tasksRemaining,
+  parseCandidates imageUrl carry-through incl. snake_case aliases, prompt +
+  retry imageUrl assertions).
+
+VERIFY (all local)
+- functions: npm test -> 212 (201 baseline UNMODIFIED + 11 new). tsc clean.
+- iOS: Debug build SUCCEEDED. DinoTests -> 440 (436 baseline UNMODIFIED + 4 new
+  FindingsDomainTests). firestore.rules untouched.
+- git diff main --name-only: shipping files are exactly the FOUR (MainTabView,
+  ContentView, functions/src/index.ts, firestore.rules) + pbxproj build-number
+  lines only. New branch files auto-join via file-system-synchronized groups
+  (0 pbxproj entries). FindingsShelfView.swift deleted.
+- SCREENSHOTS (scratchpad/findings-QA, driven by extended -findingsStateQA /
+  -findingsCardQA args): v5-idle, v5-sending, v5-away, v5-landing, v5-midreveal,
+  v5-card, v5-done, v5-unknown, v5-empty, v5-star-edge-zoom — all self-reviewed,
+  no box edge in any state.
+
+REDEPLOY REQUIRED (owner runs it): startFindingTask + getFindingTask (the new
+additive imageUrl + tasksRemainingToday fields). No confirmFinding change.

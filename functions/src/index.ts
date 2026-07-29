@@ -24,7 +24,7 @@ import { debugRecForceGate, clampDelayMinutes, DEBUG_REC_FIXTURE_RECS } from "./
 import { starFindingsGate, buildSearchPrompt, buildPickPrompt, buildBookingPrompt,
   parseCandidates, outcomeForFinding, outcomeForBooking, parsePreferBookable,
   findingDeepLink, findingTaskPayload, noFindingTask, summarizeAgentReply,
-  shouldRetryForJson, JSON_RETRY_MESSAGE,
+  shouldRetryForJson, JSON_RETRY_MESSAGE, tasksRemainingToday,
   MAX_TASKS_PER_DAY, MAX_AGENT_STEPS, WALL_CLOCK_MS, FINDINGS_CITY,
   AGENT_REPLY_LOG_CAP, type AgentReplySummary } from "./starFindings";
 import { runAgentTask, type RunResult } from "./agiClient";
@@ -2964,16 +2964,20 @@ export const startFindingTask = onCall(
       const snap = await tx.get(parentRef);
       const d = snap.data() ?? {};
       const count = d.dayKey === dayKey ? Number(d.count ?? 0) : 0;
-      if (count >= MAX_TASKS_PER_DAY) return { reached: true };
+      if (count >= MAX_TASKS_PER_DAY) return { reached: true, used: count };
       tx.set(parentRef, {
         dayKey, count: count + 1,
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       }, { merge: true });
-      return { reached: false };
+      return { reached: false, used: count + 1 };
     });
     if (cap.reached) {
-      return { taskId: "", status: "capReached", steps: 0, outcome: "cap", finding: null };
+      return { taskId: "", status: "capReached", steps: 0, outcome: "cap", finding: null,
+        tasksRemainingToday: 0 };
     }
+    // ADDITIVE: how many sends are left today, for the idle-count line. b103
+    // ignores this field harmlessly.
+    const remainingToday = tasksRemainingToday(cap.used);
 
     const taskRef = parentRef.collection("tasks").doc();
     const startedAt = Date.now();
@@ -3074,7 +3078,8 @@ export const startFindingTask = onCall(
         { merge: true });
       functions.logger.info(
         `startFindingTask: uid=${uid} task=${taskRef.id} steps=${searchRes.thoughts} outcome=${outcome} durationMs=${durationMs}`);
-      return { taskId: taskRef.id, status, steps: searchRes.thoughts, outcome, finding: null };
+      return { taskId: taskRef.id, status, steps: searchRes.thoughts, outcome, finding: null,
+        tasksRemainingToday: remainingToday };
     }
 
     // PICK phase (gpt-4.1-mini: one gentle fit + dino's why, lowercase warm).
@@ -3109,6 +3114,9 @@ export const startFindingTask = onCall(
       url: picked.url, registrationNeeded: picked.registrationNeeded, outcome: card,
       startISO: picked.startISO, endISO: picked.endISO,
       dateConfidence: picked.dateConfidence,
+      // the event's own listing image (https-sanitized in parseCandidates), or
+      // null — the client shows a generated gradient card when it is null.
+      imageUrl: picked.imageUrl,
     };
     await taskRef.set({
       status: "found", finding, steps: searchRes.thoughts,
@@ -3117,7 +3125,8 @@ export const startFindingTask = onCall(
     await sendFindingPush(uid, picked.title, taskRef.id);
     functions.logger.info(
       `startFindingTask: uid=${uid} task=${taskRef.id} steps=${searchRes.thoughts} outcome=found durationMs=${durationMs}`);
-    return { taskId: taskRef.id, status: "found", steps: searchRes.thoughts, outcome: "found", finding };
+    return { taskId: taskRef.id, status: "found", steps: searchRes.thoughts, outcome: "found", finding,
+      tasksRemainingToday: remainingToday };
   }
 );
 
@@ -3134,17 +3143,23 @@ export const getFindingTask = onCall(
     // caller's OWN uid, never a uid parameter.
     const taskId = String(request.data?.taskId ?? "").trim();
     const db = admin.firestore();
-    const tasks = db.collection("starFindings").doc(gate.uid).collection("tasks");
+    const parentRef = db.collection("starFindings").doc(gate.uid);
+    const tasks = parentRef.collection("tasks");
+    // ADDITIVE: today's remaining sends (5/day cap minus used), for the idle
+    // count. Read from the parent doc's dayKey counter; b103 ignores the field.
+    const pd = (await parentRef.get()).data() ?? {};
+    const usedToday = pd.dayKey === findingsDayKey() ? Number(pd.count ?? 0) : 0;
+    const remainingToday = tasksRemainingToday(usedToday);
     if (taskId) {
       const snap = await tasks.doc(taskId).get();
       if (!snap.exists) throw new HttpsError("not-found", "no such task");
-      return findingTaskPayload(snap.id, snap.data());
+      return { ...findingTaskPayload(snap.id, snap.data()), tasksRemainingToday: remainingToday };
     }
     const latest = await tasks.orderBy("createdAt", "desc").limit(1).get();
     // never sent a star out → a quiet "none", not a not-found throw.
-    if (latest.empty) return noFindingTask();
+    if (latest.empty) return { ...noFindingTask(), tasksRemainingToday: remainingToday };
     const doc = latest.docs[0];
-    return findingTaskPayload(doc.id, doc.data());
+    return { ...findingTaskPayload(doc.id, doc.data()), tasksRemainingToday: remainingToday };
   }
 );
 

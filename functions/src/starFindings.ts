@@ -183,6 +183,10 @@ export interface FindingCandidate extends FindingCandidateCore {
   /** Optional end; null when unknown (the client then uses a 1 hour hold). */
   endISO: string | null;
   dateConfidence: DateConfidence;
+  /** The event's OWN image from the listing, https-sanitized, or null when the
+   *  listing shows none. NEVER a stock/unrelated photo — the client falls back
+   *  to a generated gradient card rather than showing an invented image. */
+  imageUrl: string | null;
 }
 
 /** Explicit-offset ISO 8601 only. A bare "2026-08-02T14:00" has no offset, so
@@ -243,6 +247,53 @@ export function parsePreferBookable(raw: unknown): { ok: true; value: boolean } 
   return { ok: false };
 }
 
+/** Longest image url we will store or pass through. */
+export const IMAGE_URL_MAX = 600;
+/** A path ending in a genuine raster image extension. */
+const IMAGE_EXT_RE = /\.(jpe?g|png|webp|gif|avif)($|[?#])/i;
+/** A path living under a plausible image / media / cdn segment. */
+const IMAGE_PATH_RE = /\/(images?|img|photos?|media|cdn|assets|uploads|thumb(?:nail)?s?)\//i;
+/** A host that is itself an image / cdn host (token at a name boundary). */
+const IMAGE_HOST_RE = /(?:^|[.-])(images?|img|cdn|media|static|assets|photos?|pics?)(?:$|[.-])/i;
+
+/**
+ * Validate the event's own listing image url. PURE, never throws.
+ *
+ * Accepts ONLY: a well-formed https url, under the length cap, on a real host,
+ * whose path either ends in a raster image extension OR sits under a plausible
+ * image/media/cdn segment. Everything else — http, data:, offsite trackers with
+ * no image shape, garbage, non-strings — returns null. A null here is HONEST:
+ * the client draws a generated gradient card, never a broken slot or an
+ * invented photo.
+ */
+export function sanitizeImageUrl(raw: unknown): string | null {
+  if (typeof raw !== "string") return null;
+  const s = raw.trim();
+  if (!s || s.length > IMAGE_URL_MAX) return null;
+  let u: URL;
+  try { u = new URL(s); } catch { return null; }
+  if (u.protocol !== "https:") return null;
+  if (!u.hostname || !u.hostname.includes(".")) return null;
+  const path = u.pathname;
+  const looksImage =
+    IMAGE_EXT_RE.test(path) || IMAGE_PATH_RE.test(path) || IMAGE_HOST_RE.test(u.hostname);
+  if (!looksImage) return null;
+  return s;
+}
+
+/**
+ * How many sends the caller has left today. PURE. `used` is the day counter
+ * (any non-finite / negative reading is treated as 0 used, i.e. full budget is
+ * NOT assumed — a bad reading counts as none used so the idle line stays
+ * generous rather than falsely at zero). Clamped to [0, cap].
+ */
+export function tasksRemainingToday(used: unknown, cap: number = MAX_TASKS_PER_DAY): number {
+  const limit = Number.isFinite(cap) && cap > 0 ? Math.floor(cap) : MAX_TASKS_PER_DAY;
+  const u = Number(used);
+  const usedN = Number.isFinite(u) && u > 0 ? Math.floor(u) : 0;
+  return Math.max(0, limit - usedN);
+}
+
 /**
  * Parse the agent's search reply into candidates. Accepts either a raw JSON
  * array or an object with a `candidates` array, and tolerates a ```json fence.
@@ -299,6 +350,7 @@ export function parseCandidates(
       startISO,
       endISO,
       dateConfidence,
+      imageUrl: sanitizeImageUrl(o.imageUrl ?? o.image_url ?? o.image),
     });
     if (out.length >= 8) break;
   }
@@ -369,7 +421,7 @@ export const JSON_RETRY_MESSAGE = [
   "Each object exactly:",
   '{ "title": string, "date": string, "venue": string, "url": string,',
   '  "registrationNeeded": boolean, "startISO": string|null, "endISO": string|null,',
-  '  "dateConfidence": "exact"|"approximate"|"unknown" }',
+  '  "dateConfidence": "exact"|"approximate"|"unknown", "imageUrl": string|null }',
   "If you truly have none, reply with [].",
 ].join("\n");
 
@@ -515,9 +567,15 @@ export function buildSearchPrompt(
     "each object exactly:",
     '{ "title": string, "date": string, "venue": string, "url": string,',
     '  "registrationNeeded": boolean, "startISO": string|null, "endISO": string|null,',
-    '  "dateConfidence": "exact"|"approximate"|"unknown" }',
+    '  "dateConfidence": "exact"|"approximate"|"unknown", "imageUrl": string|null }',
     "date is a short human phrase (e.g. \"this saturday, 2pm\"). registrationNeeded is",
     "true only if the page requires signing up / reserving a spot.",
+    "",
+    "THE EVENT IMAGE (imageUrl): if the listing shows the event's OWN photo or",
+    "poster, capture that image's direct https url in imageUrl. It must be the",
+    "event's own image from its listing, never a stock, logo, avatar, icon, or",
+    "unrelated photo. If the listing shows no such image, set imageUrl to null.",
+    "Never invent an image url and never reuse one event's image for another.",
     "",
     "THE DATE FIELDS ARE MACHINE-READ — they become a real calendar event:",
     "- startISO: ISO 8601 local datetime WITH an explicit offset, in the",

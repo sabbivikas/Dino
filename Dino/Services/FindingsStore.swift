@@ -34,6 +34,10 @@ struct FindingItem: Codable, Equatable, Identifiable {
     var endISO: String?
     /// "exact" | "approximate" | "unknown". Always "unknown" when startISO is nil.
     var dateConfidence: String
+    /// The event's OWN listing image (https-sanitized server-side), or nil. nil
+    /// is HONEST: the card draws a generated gradient in the same shape rather
+    /// than a broken slot or an invented photo.
+    var imageURL: String?
     /// Set the moment a calendar event is actually saved for this finding. The
     /// suspenders half of the duplicate guard: CalendarService (a shipping file
     /// this branch may not touch) returns only a Bool, so there is no event
@@ -52,13 +56,15 @@ struct FindingItem: Codable, Equatable, Identifiable {
          whereText: String = "", why: String = "", url: String = "",
          outcome: String = "", bookedAt: Date? = nil, createdAt: Date = Date(),
          startISO: String? = nil, endISO: String? = nil,
-         dateConfidence: String = "unknown", calendarWrittenAt: Date? = nil) {
+         dateConfidence: String = "unknown", calendarWrittenAt: Date? = nil,
+         imageURL: String? = nil) {
         self.taskId = taskId; self.status = status; self.title = title
         self.whenText = whenText; self.whereText = whereText; self.why = why
         self.url = url; self.outcome = outcome; self.bookedAt = bookedAt
         self.createdAt = createdAt
         self.startISO = startISO; self.endISO = endISO
         self.dateConfidence = dateConfidence; self.calendarWrittenAt = calendarWrittenAt
+        self.imageURL = imageURL
     }
 
     /// BACKWARD-COMPATIBLE DECODE: items cached before the structured-date fields
@@ -81,6 +87,7 @@ struct FindingItem: Codable, Equatable, Identifiable {
         endISO = try c.decodeIfPresent(String.self, forKey: .endISO)
         dateConfidence = try c.decodeIfPresent(String.self, forKey: .dateConfidence) ?? "unknown"
         calendarWrittenAt = try c.decodeIfPresent(Date.self, forKey: .calendarWrittenAt)
+        imageURL = try c.decodeIfPresent(String.self, forKey: .imageURL)
     }
 }
 
@@ -209,6 +216,30 @@ enum FindingsStore {
         guard let since = pendingSince(defaults: defaults) else { return false }
         let elapsed = now.timeIntervalSince(since)
         return elapsed > -60 && elapsed < pendingWindow
+    }
+
+    // MARK: - profile-shelf keepsake dedup (write each accepted finding once)
+
+    /// TaskIds already written to the profile shelf as a keepsake. The redesign
+    /// removed the local findings shelf; an ACCEPTED finding now rests on the
+    /// EXISTING profile shelf (alongside recs) as a type-"gift" keepsake. This
+    /// set guarantees exactly one keepsake per finding no matter how many times
+    /// the card's action path is re-entered.
+    static let shelvedKey = "dino.findings.shelved"
+
+    static func isShelved(taskId: String, defaults: UserDefaults = .standard) -> Bool {
+        guard !taskId.isEmpty else { return true }   // empty id → never shelve
+        let ids = defaults.stringArray(forKey: shelvedKey) ?? []
+        return ids.contains(taskId)
+    }
+
+    static func markShelved(taskId: String, defaults: UserDefaults = .standard) {
+        guard !taskId.isEmpty else { return }
+        var ids = defaults.stringArray(forKey: shelvedKey) ?? []
+        guard !ids.contains(taskId) else { return }
+        ids.append(taskId)
+        if ids.count > cap { ids = Array(ids.suffix(cap)) }
+        defaults.set(ids, forKey: shelvedKey)
     }
 
     /// Today's tasks (local view of the 5/day cap; the server is the real gate).

@@ -263,7 +263,12 @@ final class FindingsStar: SCNNode {
             let geo = SCNPlane(width: shell.side, height: shell.side)
             let m = SCNMaterial()
             m.lightingModel = .constant
-            m.diffuse.contents = UIColor.black
+            // CLEAR, not black: over a TRANSPARENT SCNView an additive plane with
+            // a black diffuse composites its transparent rim as OPAQUE black —
+            // that black square is the "box" the star kept rendering inside. A
+            // clear diffuse lets the glow's transparent falloff stay transparent,
+            // so the deep-space backdrop shows through instead of a black edge.
+            m.diffuse.contents = UIColor.clear
             m.emission.contents = Self.glowTexture(color: shell.color, alpha: shell.alpha)
             m.isDoubleSided = true
             m.blendMode = .add
@@ -632,7 +637,12 @@ final class FindingsStar: SCNNode {
     /// grows along an arc down to the hover point, settles with a small
     /// overshoot bounce and a sparkle burst, then resumes idle sway/blink.
     /// ~1.3s. Reduce Motion: a simple fade-in at the hover point, no streak.
-    func streakIn(from start: SCNVector3, to hover: SCNVector3, reduceMotion: Bool) {
+    ///
+    /// `arcDuration` lets the caller slow the descent: the LANDING state passes
+    /// a long value (~3.4s total with the settle) so the star decelerates the
+    /// whole way in, per the redesign; the default keeps the quick return.
+    func streakIn(from start: SCNVector3, to hover: SCNVector3, reduceMotion: Bool,
+                  arcDuration: TimeInterval = 1.0) {
         removeAction(forKey: journeyKey)
         floatNode.removeAction(forKey: arrivalTiltKey)
         isHidden = false
@@ -654,8 +664,8 @@ final class FindingsStar: SCNNode {
         opacity = 1
         trailSystem?.birthRate = 90   // bright streak, like the arrival stream
 
-        let arc = arcAction(from: start, to: hover, lift: 1.6, duration: 1.0, ease: Self.easeOut)
-        let grow = SCNAction.scale(to: 1.08, duration: 1.0)   // slight size overshoot
+        let arc = arcAction(from: start, to: hover, lift: 1.6, duration: arcDuration, ease: Self.easeOut)
+        let grow = SCNAction.scale(to: 1.08, duration: arcDuration)   // slight size overshoot
         grow.timingMode = .easeOut
         let streak = SCNAction.group([arc, grow])
         // Overshoot bounce — the same soft spring curve as reactionBurst's settle.

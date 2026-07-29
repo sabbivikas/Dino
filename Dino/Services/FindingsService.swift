@@ -23,6 +23,11 @@ final class FindingsService {
 
     private let region = "us-central1"
 
+    /// The server's ADDITIVE `tasksRemainingToday` (5/day cap minus used), from
+    /// the most recent callable. nil until a call has answered — the idle count
+    /// degrades gracefully to "no number" rather than a wrong zero.
+    private(set) var lastRemainingToday: Int?
+
     enum FindingsError: Error { case notEnabled, badResponse }
 
     /// What a calendar write actually did. `alreadyWritten` is the duplicate
@@ -58,6 +63,7 @@ final class FindingsService {
         let result = try await functions.httpsCallable("startFindingTask")
             .call(["preferBookable": preferBookable])
         guard let data = result.data as? [String: Any] else { throw FindingsError.badResponse }
+        captureRemaining(data)
         return Self.item(from: data)
     }
 
@@ -68,6 +74,7 @@ final class FindingsService {
         let result = try await functions.httpsCallable("getFindingTask")
             .call(["taskId": taskId])
         guard let data = result.data as? [String: Any] else { throw FindingsError.badResponse }
+        captureRemaining(data)
         return Self.item(from: data)
     }
 
@@ -80,6 +87,7 @@ final class FindingsService {
         let functions = Functions.functions(region: region)
         let result = try await functions.httpsCallable("getFindingTask").call([:])
         guard let data = result.data as? [String: Any] else { throw FindingsError.badResponse }
+        captureRemaining(data)
         return Self.item(from: data)
     }
 
@@ -163,6 +171,12 @@ final class FindingsService {
         return fractional.date(from: s)
     }
 
+    /// Stash the additive remaining-today count when the server sends it.
+    private func captureRemaining(_ data: [String: Any]) {
+        if let n = data["tasksRemainingToday"] as? Int { lastRemainingToday = n }
+        else if let d = data["tasksRemainingToday"] as? Double { lastRemainingToday = Int(d) }
+    }
+
     // MARK: - mapping
 
     private static func item(from data: [String: Any]) -> FindingItem {
@@ -183,6 +197,7 @@ final class FindingsService {
             // which the card reads as "no confirmed time on the listing".
             startISO: finding?["startISO"] as? String,
             endISO: finding?["endISO"] as? String,
-            dateConfidence: finding?["dateConfidence"] as? String ?? "unknown")
+            dateConfidence: finding?["dateConfidence"] as? String ?? "unknown",
+            imageURL: finding?["imageUrl"] as? String)
     }
 }
