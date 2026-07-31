@@ -36,8 +36,19 @@ export const COST_PER_STEP_USD = 0.02;
 export const IN_FLIGHT_WINDOW_MS = 10 * 60 * 1000;
 /** Daily task ceiling per uid (the starFindings/{uid} dayKey counter). */
 export const MAX_TASKS_PER_DAY = 5;
-/** Overall wall-clock ceiling for one agent phase (~6 min), same hard kill. */
-export const WALL_CLOCK_MS = 6 * 60 * 1000;
+/**
+ * Overall wall-clock ceiling for one agent phase, same hard kill.
+ *
+ * MUST STAY UNDER THE CLIENT'S CALLABLE TIMEOUT (FindingsService's 300s). The
+ * bug this closes is the one that cost real money: when the server outlives the
+ * client's patience, the client shows a failure and invites a re-tap while the
+ * agent is still running and still billing. 240s leaves ~60s of headroom for
+ * the pick step, the og:image fetch, the Firestore writes and the push, so the
+ * client always receives the real answer instead of giving up on a live run.
+ * With the 15-step cap a healthy run lands near ~100s, so this is a backstop,
+ * not a normal path.
+ */
+export const WALL_CLOCK_MS = 240 * 1000;
 /** The demo is hardcoded to one city (owner decision — English-only demo). */
 export const FINDINGS_CITY = "Saint Paul, Minnesota";
 /**
