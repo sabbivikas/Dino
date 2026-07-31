@@ -187,6 +187,7 @@ test("buildSearchPrompt demands the machine-readable date fields and forbids inv
   assert.match(p, /NEVER invent a time/);
   assert.match(p, /see listing/);
   assert.match(p, /An offset is REQUIRED/);
+  assert.match(p, /MACHINE-READ/);
   // the free-text field survives for display
   assert.match(p, /"date": string/);
 });
@@ -214,16 +215,12 @@ test("preferBookable PREFERS registration sources and demands a fallback, ONLY w
     /library program registration pages/,
     /community education class/i,
     /parks and recreation class registration/,
-    /register or sign up affordance/,
     // …but the bias PREFERS rather than RESTRICTS: an explicit fallback to the
-    // general listings, honest flags, and "empty is a failure".
+    // general listings, and an honest registrationNeeded.
     /PREFERENCE, not a restriction/,
-    /FALL BACK to the\n\s*general gentle event listings/,
+    /FALL BACK to the general gentle event listings/,
     /rather than returning nothing/,
-    /registrationNeeded false is far better than an empty/,
     /Set registrationNeeded HONESTLY/,
-    /Prefer — do not require —/,
-    /Returning zero candidates when gentle free events exist is a failure/,
   ];
   for (const re of bookableOnly) {
     assert.match(on, re, `preferBookable=true must mention ${re}`);
@@ -233,12 +230,13 @@ test("preferBookable PREFERS registration sources and demands a fallback, ONLY w
   assert.ok(
     on.indexOf("library program registration pages") < on.indexOf("FALL BACK"),
     "registration sources must be listed first, the fallback second");
-  // the two performance rules that got runs down to 5-6 steps survive the softening
+  // the performance rules that got runs down to 5-6 steps survive the softening.
+  // The bias no longer RE-STATES them (that repetition was prompt bloat); the
+  // shared BE DECISIVE block below the branch is the single place they live.
   for (const p of [off, on]) {
     assert.match(p, /Do NOT open each event's detail page/);
+    assert.match(p, /the instant you have 2 or 3 candidates/);
   }
-  assert.match(on, /do NOT open\neach event's detail page/);
-  assert.match(on, /emit the JSON as soon as you have a few candidates/);
   // explicit default arg parity: buildSearchPrompt() === buildSearchPrompt(city, false)
   assert.equal(off, buildSearchPrompt(undefined, false));
 });
@@ -247,11 +245,9 @@ test("the do-not-open-each-event rule and the step budget hold in BOTH branches"
   for (const p of [buildSearchPrompt(), buildSearchPrompt(undefined, true)]) {
     assert.match(p, /Do NOT open each event's detail page/);
     assert.match(p, /BE DECISIVE/);
-    assert.match(p, /STOP browsing and/);
+    assert.match(p, /STOP browsing and reply/);
     assert.match(p, /limited number of steps/);
   }
-  // the bias explicitly re-states that it costs no extra steps
-  assert.match(buildSearchPrompt(undefined, true), /SAME step budget applies/);
 });
 
 test("preferBookable never changes the city or the gentle/free framing", () => {

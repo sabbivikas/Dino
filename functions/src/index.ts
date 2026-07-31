@@ -24,9 +24,10 @@ import { debugRecForceGate, clampDelayMinutes, DEBUG_REC_FIXTURE_RECS } from "./
 import { starFindingsGate, buildSearchPrompt, buildPickPrompt, buildBookingPrompt,
   parseCandidates, outcomeForFinding, outcomeForBooking, parsePreferBookable,
   findingDeepLink, findingTaskPayload, noFindingTask, summarizeAgentReply,
-  shouldRetryForJson, JSON_RETRY_MESSAGE, tasksRemainingToday,
+  tasksRemainingToday, isTaskInFlight, costForSteps,
+  extractOgImage, sanitizeImageUrl,
   MAX_TASKS_PER_DAY, MAX_AGENT_STEPS, WALL_CLOCK_MS, FINDINGS_CITY,
-  AGENT_REPLY_LOG_CAP, type AgentReplySummary } from "./starFindings";
+  AGENT_REPLY_LOG_CAP } from "./starFindings";
 import { runAgentTask, type RunResult } from "./agiClient";
 
 admin.initializeApp();
@@ -2881,9 +2882,9 @@ export const nightlyPreferenceDistill = onSchedule(
 // sent out by a real browser-agent (AGI) to find one gentle, free thing to do
 // this week in Saint Paul; a cheap model picks the single best fit and writes
 // dino's why. THREE gates: the client flag+uid, the env allowlist here, and
-// firestore.rules (server-write-only docs). THE 30-STEP KILL + 5/day cap live
-// in the agent loop + this counter. Every task doc logs steps/outcome/
-// durationMs/dayKey — the owner's cost/success telemetry.
+// firestore.rules (server-write-only docs). THE 15-STEP KILL + 5/day cap + the
+// in-flight guard live in the agent loop + this counter. Every task doc logs
+// steps/outcome/costUsd/durationMs/dayKey — the owner's cost/success telemetry.
 //
 // PII: the ONLY personal data that ever reaches AGI is the owner's own name +
 // email, and ONLY in confirmFinding's booking phase (never the search phase).
@@ -2898,6 +2899,67 @@ const FINDINGS_SEARCH_START_URL =
 /** UTC yyyy-mm-dd — the per-day counter key. */
 function findingsDayKey(now: Date = new Date()): string {
   return now.toISOString().slice(0, 10);
+}
+
+// ── the post-pick og:image fetch (zero agent steps) ───────────────────────
+//
+// Asking the AGENT for each candidate's imageUrl was one of the two step sinks
+// that capped both production runs (it went visual-scrollback hunting for the
+// banner beside each listing row), so the search prompt no longer mentions
+// images at all. Instead: ONE plain fetch of the single PICKED finding's url,
+// server-side, after the pick. No Firecrawl, no vendor, no agent step.
+//
+// HONEST LIMITATION: the finding's url is usually a LISTING page
+// (e.g. sppl.org/events), not a per-event page, so the og:image is often the
+// site's generic banner or logo rather than the event's own photo. That is
+// inherent to this approach. A miss is a normal outcome — null imageUrl, and
+// the client draws its existing generated gradient card.
+
+/** Hard timeout for the og:image fetch; a slow site must never hold the call. */
+const OG_FETCH_TIMEOUT_MS = 5000;
+/** Body read ceiling — a huge page can't stall or balloon the function. */
+const OG_BODY_MAX_BYTES = 512 * 1024;
+
+/**
+ * Best-effort event photo for ONE finding. NEVER throws and never fails the
+ * task: every timeout, redirect loop, tls error, non-html body or missing tag
+ * is simply `null`.
+ */
+async function fetchOgImage(pageUrl: string): Promise<string | null> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), OG_FETCH_TIMEOUT_MS);
+  try {
+    const res = await fetch(pageUrl, {
+      method: "GET",
+      redirect: "follow",
+      signal: controller.signal,
+      headers: { Accept: "text/html,application/xhtml+xml" },
+    });
+    if (!res.ok || !res.body) return null;
+    // read the body in chunks and STOP at the cap — og:* tags live in <head>,
+    // so the first half megabyte is far more than enough.
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let html = "";
+    let bytes = 0;
+    try {
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        bytes += value?.byteLength ?? 0;
+        html += decoder.decode(value, { stream: true });
+        if (bytes >= OG_BODY_MAX_BYTES) break;
+      }
+    } finally {
+      await reader.cancel().catch(() => { /* swallow */ });
+    }
+    // sanitizeImageUrl is the gate: https only, length capped, image-shaped.
+    return sanitizeImageUrl(extractOgImage(html, res.url || pageUrl));
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 /** Interpret a finished booking agent run into the pure outcome signal. */
@@ -2959,6 +3021,31 @@ export const startFindingTask = onCall(
     const dayKey = findingsDayKey();
     const parentRef = db.collection("starFindings").doc(uid);
 
+    // IN-FLIGHT GUARD (money) — CHECKED BEFORE THE COUNTER. One ask must never
+    // become two billed agents: the client used to abandon a live ~200s run at
+    // the callable's ~70s default and invite a second launch beside the first.
+    // A rejected call does NOT increment the 5/day counter — being told "the
+    // star is already out" must not cost the owner a send.
+    const latest = await parentRef.collection("tasks")
+      .orderBy("createdAt", "desc").limit(1).get();
+    if (!latest.empty) {
+      const live = latest.docs[0];
+      const created = live.data()?.createdAt as admin.firestore.Timestamp | undefined;
+      if (isTaskInFlight({
+        status: live.data()?.status,
+        createdAtMs: typeof created?.toMillis === "function" ? created.toMillis() : undefined,
+        nowMs: Date.now(),
+      })) {
+        const pd = (await parentRef.get()).data() ?? {};
+        const used = pd.dayKey === dayKey ? Number(pd.count ?? 0) : 0;
+        functions.logger.info(
+          `startFindingTask: uid=${uid} rejected=alreadyRunning task=${live.id}`);
+        return { taskId: live.id, status: "alreadyRunning", steps: 0,
+          outcome: "alreadyRunning", finding: null,
+          tasksRemainingToday: tasksRemainingToday(used) };
+      }
+    }
+
     // 5/day cap on the parent doc's dayKey counter (transactional).
     const cap = await db.runTransaction(async (tx) => {
       const snap = await tx.get(parentRef);
@@ -2986,41 +3073,24 @@ export const startFindingTask = onCall(
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
     });
 
-    // What the FIRST reply looked like, captured inside the retry decision so
-    // the log can still show it after a follow-up replaced lastContent.
-    let firstCandidateCount: number | null = null;
-    let firstReplyLog: AgentReplySummary | null = null;
-    let stepsBeforeRetry = 0;
-
     // SEARCH phase (real AGI browser agent). No PII in this phase.
+    //
+    // NO JSON RETRY. There used to be a one-shot "you narrated, send the array"
+    // follow-up here. In production it made things WORSE: it fired around step
+    // 15/16 and, instead of complying, the agent kept browsing for the whole
+    // remaining budget — turning a ~5-step $0.10 failure into a 30-step $0.60
+    // one. The fix for a narrating agent is a shorter prompt with the output
+    // contract last, not a second turn.
     const searchRes = await runAgentTask({
       prompt: buildSearchPrompt(FINDINGS_CITY, preferBookable),
       startUrl: FINDINGS_SEARCH_START_URL,
       maxSteps: MAX_AGENT_STEPS,
       wallClockMs: WALL_CLOCK_MS,
       stepDelaySeconds: 1,
-      // ONE-SHOT JSON RETRY. A run that found six real events, narrated them,
-      // and never emitted the array is a formatting failure, not a search
-      // failure — so ask once more, in the SAME session (the events are still
-      // in its context), for just the JSON. agiClient never calls this after a
-      // kill or an error, and the follow-up's steps land on the same 30-step
-      // tally, so the existing kill still fires exactly where it did.
-      followUp: (first) => {
-        const firstCandidates = parseCandidates(first.lastContent);
-        firstCandidateCount = firstCandidates.length;
-        firstReplyLog = summarizeAgentReply(first.lastContent, AGENT_REPLY_LOG_CAP);
-        stepsBeforeRetry = first.thoughts;
-        const retry = shouldRetryForJson({
-          candidates: firstCandidates.length,
-          looksJson: firstReplyLog.looksJson,
-          stepsUsed: first.thoughts,
-          maxSteps: MAX_AGENT_STEPS,
-          alreadyRetried: false,   // agiClient calls this at most once
-        });
-        return retry ? JSON_RETRY_MESSAGE : null;
-      },
     });
     const durationMs = Date.now() - startedAt;
+    // what the run actually cost the owner (steps × the vendor's per-step rate).
+    const costUsd = costForSteps(searchRes.thoughts);
     // the agent may end with a DONE or a trailing QUESTION that still carries
     // the JSON — parse the last content either way.
     const candidates = parseCandidates(searchRes.lastContent);
@@ -3031,17 +3101,13 @@ export const startFindingTask = onCall(
     // PII, single-lined so it stays one entry, and truncated at the cap. The API
     // key and auth headers live in agiClient's request options and never appear
     // in a message body, so nothing secret can ride along here.
-    //
-    // This entry always describes the FIRST reply (identical to the final one
-    // when nothing was retried), so the prose that caused a retry is never lost;
-    // `steps` stays the TOTAL, and the retry's own reply gets the entry below.
-    const finalReplyLog = summarizeAgentReply(searchRes.lastContent, AGENT_REPLY_LOG_CAP);
-    const replyLog: AgentReplySummary = firstReplyLog ?? finalReplyLog;
+    const replyLog = summarizeAgentReply(searchRes.lastContent, AGENT_REPLY_LOG_CAP);
     functions.logger.info("findings_agent_reply", {
       uid,
       task: taskRef.id,
-      candidates: firstCandidateCount ?? candidates.length,
+      candidates: candidates.length,
       steps: searchRes.thoughts,
+      costUsd,
       preferBookable,
       looksJson: replyLog.looksJson,
       replyLength: replyLog.length,
@@ -3049,24 +3115,8 @@ export const startFindingTask = onCall(
       killReason: searchRes.killReason ?? "",
       errored: searchRes.errored,
       durationMs,
-      retried: searchRes.retried,
       reply: replyLog.truncated,
     });
-    if (searchRes.retried) {
-      functions.logger.info("findings_agent_reply_retry", {
-        uid,
-        task: taskRef.id,
-        retryCandidates: candidates.length,
-        retryLooksJson: finalReplyLog.looksJson,
-        retryReplyLength: finalReplyLog.length,
-        retryTruncated: finalReplyLog.length > AGENT_REPLY_LOG_CAP,
-        stepsBeforeRetry,
-        stepsTotal: searchRes.thoughts,
-        killReason: searchRes.killReason ?? "",
-        retryError: searchRes.retryError ?? "",
-        retryReply: finalReplyLog.truncated,
-      });
-    }
 
     if (candidates.length === 0) {
       const outcome = searchRes.killReason === "step_cap" ? "failed:step_cap"
@@ -3074,10 +3124,10 @@ export const startFindingTask = onCall(
         : searchRes.errored ? "failed:error" : "empty";
       const status = outcome.startsWith("failed") ? "failed" : "empty";
       await taskRef.set(
-        { status, steps: searchRes.thoughts, outcome, durationMs, dayKey, preferBookable },
+        { status, steps: searchRes.thoughts, outcome, costUsd, durationMs, dayKey, preferBookable },
         { merge: true });
       functions.logger.info(
-        `startFindingTask: uid=${uid} task=${taskRef.id} steps=${searchRes.thoughts} outcome=${outcome} durationMs=${durationMs}`);
+        `startFindingTask: uid=${uid} task=${taskRef.id} steps=${searchRes.thoughts} outcome=${outcome} costUsd=${costUsd} durationMs=${durationMs}`);
       return { taskId: taskRef.id, status, steps: searchRes.thoughts, outcome, finding: null,
         tasksRemainingToday: remainingToday };
     }
@@ -3105,6 +3155,22 @@ export const startFindingTask = onCall(
 
     const picked = candidates[pickIndex];
     const { card } = outcomeForFinding(picked);
+
+    // THE EVENT PHOTO — one cheap server-side fetch of the PICKED page, zero
+    // agent steps (see fetchOgImage). Never fails the task: any miss is null,
+    // and the client already draws a generated gradient card for null.
+    let imageUrl = picked.imageUrl;
+    if (!imageUrl && picked.url) {
+      try {
+        imageUrl = await fetchOgImage(picked.url);
+      } catch (err) {
+        imageUrl = null;
+        functions.logger.warn(`startFindingTask: og:image fetch threw (uid=${uid}): ${err}`);
+      }
+      functions.logger.info("findings_og_image", {
+        uid, task: taskRef.id, found: imageUrl !== null,
+      });
+    }
     // startISO/endISO/dateConfidence ride along onto the stored finding and out
     // through both callables — they are what the client schedules from, and a
     // null start is the honest "no confirmed time" signal, not a placeholder.
@@ -3114,17 +3180,17 @@ export const startFindingTask = onCall(
       url: picked.url, registrationNeeded: picked.registrationNeeded, outcome: card,
       startISO: picked.startISO, endISO: picked.endISO,
       dateConfidence: picked.dateConfidence,
-      // the event's own listing image (https-sanitized in parseCandidates), or
-      // null — the client shows a generated gradient card when it is null.
-      imageUrl: picked.imageUrl,
+      // the page's og:image (https-sanitized), or null — the client shows a
+      // generated gradient card when it is null.
+      imageUrl,
     };
     await taskRef.set({
       status: "found", finding, steps: searchRes.thoughts,
-      outcome: "found", durationMs, dayKey, preferBookable,
+      outcome: "found", costUsd, durationMs, dayKey, preferBookable,
     }, { merge: true });
     await sendFindingPush(uid, picked.title, taskRef.id);
     functions.logger.info(
-      `startFindingTask: uid=${uid} task=${taskRef.id} steps=${searchRes.thoughts} outcome=found durationMs=${durationMs}`);
+      `startFindingTask: uid=${uid} task=${taskRef.id} steps=${searchRes.thoughts} outcome=found costUsd=${costUsd} durationMs=${durationMs}`);
     return { taskId: taskRef.id, status: "found", steps: searchRes.thoughts, outcome: "found", finding,
       tasksRemainingToday: remainingToday };
   }
@@ -3202,13 +3268,14 @@ export const confirmFinding = onCall(
       stepDelaySeconds: 1,
     });
     const durationMs = Date.now() - startedAt;
+    const bookingCostUsd = costForSteps(res.thoughts);
     const { status, outcome } = outcomeForBooking(interpretBookingSignal(res));
     await taskRef.set({
-      status, outcome, steps: res.thoughts, durationMs,
+      status, outcome, steps: res.thoughts, costUsd: bookingCostUsd, durationMs,
       bookedAt: status === "booked" ? admin.firestore.FieldValue.serverTimestamp() : null,
     }, { merge: true });
     functions.logger.info(
-      `confirmFinding: uid=${uid} task=${taskId} steps=${res.thoughts} outcome=${outcome} durationMs=${durationMs}`);
+      `confirmFinding: uid=${uid} task=${taskId} steps=${res.thoughts} outcome=${outcome} costUsd=${bookingCostUsd} durationMs=${durationMs}`);
     return { status, url: finding.url ?? "" };
   }
 );

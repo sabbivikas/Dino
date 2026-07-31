@@ -23,6 +23,15 @@ final class FindingsService {
 
     private let region = "us-central1"
 
+    /// How long the client waits for `startFindingTask` before giving up.
+    ///
+    /// THE BUG THIS FIXES: the callable default is ~70s while a real run takes
+    /// ~200s, so the client abandoned a LIVE, BILLING run and showed "the star
+    /// lost its way, try again" — inviting a second launch beside the first.
+    /// With the 15-step cap a real run should land near ~100s; this leaves room
+    /// for the server's own 540s ceiling to be the thing that decides.
+    private static let startFindingTimeout: TimeInterval = 300
+
     /// The server's ADDITIVE `tasksRemainingToday` (5/day cap minus used), from
     /// the most recent callable. nil until a call has answered — the idle count
     /// degrades gracefully to "no number" rather than a wrong zero.
@@ -60,8 +69,10 @@ final class FindingsService {
     /// 5/day cap are untouched by it.
     func startFinding(preferBookable: Bool = false) async throws -> FindingItem {
         let functions = Functions.functions(region: region)
-        let result = try await functions.httpsCallable("startFindingTask")
-            .call(["preferBookable": preferBookable])
+        let callable = functions.httpsCallable("startFindingTask")
+        // wait for the REAL answer instead of abandoning a run we are paying for.
+        callable.timeoutInterval = Self.startFindingTimeout
+        let result = try await callable.call(["preferBookable": preferBookable])
         guard let data = result.data as? [String: Any] else { throw FindingsError.badResponse }
         captureRemaining(data)
         return Self.item(from: data)
@@ -191,7 +202,10 @@ final class FindingsService {
             whereText: finding?["venue"] as? String ?? "",
             why: finding?["why"] as? String ?? "",
             url: finding?["url"] as? String ?? "",
-            outcome: finding?["outcome"] as? String ?? "",
+            // the CARD outcome when there is a finding; otherwise the TASK-level
+            // outcome ("failed:step_cap", "alreadyRunning", …) so the screen can
+            // say what actually happened instead of guessing.
+            outcome: finding?["outcome"] as? String ?? (data["outcome"] as? String ?? ""),
             createdAt: Date(),
             // the structured date the agent vouched for. Absent/NSNull → nil,
             // which the card reads as "no confirmed time on the listing".

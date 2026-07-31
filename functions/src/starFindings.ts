@@ -9,15 +9,31 @@
 // firing for another account is structurally impossible). Missing/empty env,
 // or a caller not on the list, denies.
 //
-// THE 30-STEP KILL: billing is per thinking step, so the agent loop tallies
+// THE 15-STEP KILL: billing is per thinking step, so the agent loop tallies
 // THOUGHT messages and kills (cancel + DELETE session) the instant the tally
 // reaches MAX_AGENT_STEPS. killDecision is the pure decision the loop calls on
 // every poll; the actual cancel/DELETE lives in agiClient.ts.
 
 // ── caps / constants ────────────────────────────────────────────────────────
 
-/** Per-thinking-step kill: the agent is cancelled the instant THOUGHTs hit 30. */
-export const MAX_AGENT_STEPS = 30;
+/**
+ * Per-thinking-step kill: the agent is cancelled the instant THOUGHTs hit this.
+ *
+ * WAS 30. Two production runs both burned the full 30 for zero candidates ($0.60
+ * each at the owner's $0.02/step) while sitting on ONE listing page they had
+ * already mined by step 15. The converging shape of this prompt finished in 5-6
+ * steps, so 15 is twice the budget a good run has ever needed and halves the
+ * worst case to $0.30.
+ */
+export const MAX_AGENT_STEPS = 15;
+/** What one thinking step costs the owner, in USD (vendor's per-step rate). */
+export const COST_PER_STEP_USD = 0.02;
+/**
+ * How long a task doc may sit in `searching` before a NEW send is allowed
+ * again. The client used to abandon a live run at the callable's ~70s default
+ * and invite a second launch — two billed agents for one ask.
+ */
+export const IN_FLIGHT_WINDOW_MS = 10 * 60 * 1000;
 /** Daily task ceiling per uid (the starFindings/{uid} dayKey counter). */
 export const MAX_TASKS_PER_DAY = 5;
 /** Overall wall-clock ceiling for one agent phase (~6 min), same hard kill. */
@@ -30,13 +46,48 @@ export const FINDINGS_CITY = "Saint Paul, Minnesota";
  * from "the agent replied with prose that parsed to zero candidates".
  */
 export const AGENT_REPLY_LOG_CAP = 1200;
+
 /**
- * Step margin the ONE-SHOT json retry needs before it is allowed to run. The
- * retry's thinking steps land on the SAME 30-step tally, so it may only start
- * while at least this many steps remain — the existing kill must never be
- * pushed past by the retry itself.
+ * What one run cost the owner, in USD. PURE. Unreadable/negative step tallies
+ * read as 0 rather than NaN, so a log line can never carry a broken number.
+ * Rounded to 4dp so a float tail never lands in a log or a task doc.
  */
-export const JSON_RETRY_STEP_MARGIN = 5;
+export function costForSteps(steps: unknown, perStep: number = COST_PER_STEP_USD): number {
+  const n = Number(steps);
+  if (!Number.isFinite(n) || n <= 0) return 0;
+  const rate = Number.isFinite(perStep) && perStep > 0 ? perStep : COST_PER_STEP_USD;
+  return Math.round(n * rate * 10000) / 10000;
+}
+
+/**
+ * Is the caller's most recent task still a LIVE, billing run? PURE.
+ *
+ * The guard that stops one ask from becoming two billed agents: a client that
+ * gave up on a slow callable and tapped again used to launch a second run
+ * beside the first. Only a doc that is BOTH `searching` AND young counts — a
+ * crashed function leaves a doc stuck in `searching` forever, and that must not
+ * lock the feature out for good.
+ *
+ * FAILS OPEN on an unreadable createdAt (a half-written doc must not be a
+ * permanent block); the 5/day counter is still the hard money ceiling.
+ */
+export function isTaskInFlight(params: {
+  status: unknown;
+  createdAtMs: unknown;
+  nowMs: number;
+  windowMs?: number;
+}): boolean {
+  if (params.status !== "searching") return false;
+  const created = Number(params.createdAtMs);
+  const now = Number(params.nowMs);
+  if (!Number.isFinite(created) || !Number.isFinite(now)) return false;
+  const windowMs = Number.isFinite(params.windowMs as number) && (params.windowMs as number) > 0
+    ? (params.windowMs as number) : IN_FLIGHT_WINDOW_MS;
+  const age = now - created;
+  // a future createdAt is clock skew on a doc written moments ago — still live.
+  if (age < 0) return true;
+  return age <= windowMs;
+}
 
 // ── the gate (fail closed) ───────────────────────────────────────────────────
 
@@ -281,6 +332,84 @@ export function sanitizeImageUrl(raw: unknown): string | null {
   return s;
 }
 
+// ── og:image AFTER the search (zero agent steps) ──────────────────────────
+//
+// WHY THIS EXISTS: asking the agent for `imageUrl` was one of the two step
+// sinks that capped both production runs — it went visual-scrollback hunting
+// for the banner next to each listing row. So the search prompt no longer
+// mentions images at all; instead the SERVER fetches the ONE picked finding's
+// url once and reads its og:image. Costs no agent steps and no vendor call.
+//
+// HONEST LIMITATION: the finding's url is usually a LISTING page (sppl.org/
+// events), not a per-event page, so og:image is frequently the SITE's generic
+// banner or logo rather than the event's own photo. That is inherent to this
+// approach, not a bug — and a miss simply yields null, which the client already
+// renders as its generated gradient card.
+
+/** Longest raw meta content we will even look at (before resolution). */
+const OG_CONTENT_MAX = 2000;
+
+/** Minimal HTML entity decode for a url sitting in a meta content attribute. */
+function decodeEntities(s: string): string {
+  return s
+    .replace(/&(?:amp|#38|#x26);/gi, "&")
+    .replace(/&(?:quot|#34|#x22);/gi, "\"")
+    .replace(/&(?:apos|#39|#x27);/gi, "'")
+    .replace(/&(?:lt|#60|#x3c);/gi, "<")
+    .replace(/&(?:gt|#62|#x3e);/gi, ">");
+}
+
+/** Read one attribute out of a single `<meta ...>` tag (quoted or bare). */
+function metaAttr(tag: string, name: string): string | null {
+  const re = new RegExp(`\\b${name}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s"'>]+))`, "i");
+  const m = re.exec(tag);
+  if (!m) return null;
+  return (m[1] ?? m[2] ?? m[3] ?? "").trim();
+}
+
+/** Resolve a possibly relative / protocol-relative url against the page url. */
+function resolveAgainstPage(raw: string, pageUrl: unknown): string | null {
+  const s = decodeEntities(raw).trim();
+  if (!s || s.length > OG_CONTENT_MAX) return null;
+  const base = typeof pageUrl === "string" ? pageUrl.trim() : "";
+  // `new URL(s, base)` already handles absolute, protocol-relative (//x) and
+  // root-relative (/x) forms; the bare-absolute retry covers a junk base.
+  if (base) {
+    try { return new URL(s, base).toString(); } catch { /* fall through */ }
+  }
+  try { return new URL(s).toString(); } catch { return null; }
+}
+
+/**
+ * Pull the page's og:image (falling back to twitter:image) out of raw HTML and
+ * resolve it to an absolute url. PURE, never throws.
+ *
+ * Returns the FIRST og:image when several are present, and only falls back to
+ * twitter:image when there is no og:image at all. The result is NOT trusted —
+ * the caller runs it through sanitizeImageUrl, which is what enforces https,
+ * the length cap, and a plausible image shape.
+ */
+export function extractOgImage(html: unknown, pageUrl: unknown): string | null {
+  if (typeof html !== "string" || !html) return null;
+  let og: string | null = null;
+  let tw: string | null = null;
+  const tags = html.match(/<meta\b[^>]*>/gi);
+  if (!tags) return null;
+  for (const tag of tags) {
+    const key = (metaAttr(tag, "property") ?? metaAttr(tag, "name") ?? "").toLowerCase();
+    const isOg = key === "og:image" || key === "og:image:url" || key === "og:image:secure_url";
+    const isTw = key === "twitter:image" || key === "twitter:image:src";
+    if (!isOg && !isTw) continue;
+    const content = metaAttr(tag, "content");
+    if (!content) continue;
+    if (isOg && og === null) og = content;
+    else if (isTw && tw === null) tw = content;
+    if (og !== null) break;   // an og:image always wins; stop at the first one
+  }
+  const raw = og ?? tw;
+  return raw ? resolveAgainstPage(raw, pageUrl) : null;
+}
+
 /**
  * How many sends the caller has left today. PURE. `used` is the day counter
  * (any non-finite / negative reading is treated as 0 used, i.e. full budget is
@@ -397,212 +526,104 @@ export function summarizeAgentReply(
   return { truncated: flat.slice(0, limit), looksJson, length: raw.length };
 }
 
-// ── the ONE-SHOT json retry (the "agent narrated instead of emitting" fix) ───
-//
-// THE BUG (task opPrIgf6Akl3TpIrXdjD): the agent SUCCEEDED — 4 steps of 30, six
-// real gentle free Saint Paul events with dates, times and venues — then wrote
-// them out in PROSE, said it would "compile the results now", and the session
-// ended before the JSON array ever appeared. parseCandidates saw no array, the
-// run reported `empty`, and 26 steps of budget went unused. Pure output-format
-// failure, not a search failure. So: ask ONCE more, in the SAME session, for
-// just the JSON — the events are already in the agent's context, so this is a
-// formatting turn, not a second search.
-
-/**
- * The follow-up message sent to the SAME session when the agent narrated
- * instead of emitting. The candidate schema is restated so the agent does not
- * have to reach back to the original prompt to re-format what it already found.
- */
-export const JSON_RETRY_MESSAGE = [
-  "STOP. Do not browse any further and do not describe anything in words.",
-  "Reply with ONLY the JSON array of the candidates you just listed: no prose,",
-  "no markdown fence, no explanation, no commentary before or after it.",
-  "Your entire message must start with [ and end with ].",
-  "Each object exactly:",
-  '{ "title": string, "date": string, "venue": string, "url": string,',
-  '  "registrationNeeded": boolean, "startISO": string|null, "endISO": string|null,',
-  '  "dateConfidence": "exact"|"approximate"|"unknown", "imageUrl": string|null }',
-  "If you truly have none, reply with [].",
-].join("\n");
-
-/**
- * The retry decision. PURE, never throws.
- *
- * Retry ONLY when all of these hold:
- *   • nothing parsed (candidates === 0) — a good reply is never re-asked;
- *   • the reply did NOT look like JSON — a genuine "[]" is an honest empty and
- *     asking again would just burn steps on the same answer;
- *   • we have not already retried — this is one-shot by contract;
- *   • at least JSON_RETRY_STEP_MARGIN steps of the cap remain, so the retry
- *     cannot be what pushes the run into the kill.
- */
-export function shouldRetryForJson(params: {
-  candidates: number;
-  looksJson: boolean;
-  stepsUsed: number;
-  maxSteps?: number;
-  alreadyRetried: boolean;
-}): boolean {
-  if (params.alreadyRetried) return false;
-  if (!Number.isFinite(params.candidates) || params.candidates > 0) return false;
-  if (params.looksJson) return false;
-  const maxSteps = Number.isFinite(params.maxSteps as number)
-    ? (params.maxSteps as number) : MAX_AGENT_STEPS;
-  // an unreadable step tally is treated as "no budget left" (fail closed).
-  if (!Number.isFinite(params.stepsUsed) || params.stepsUsed < 0) return false;
-  return params.stepsUsed <= maxSteps - JSON_RETRY_STEP_MARGIN;
-}
-
 // ── prompt builders ──────────────────────────────────────────────────────────
 
 /**
  * The search-agent prompt: free + gentle + this-week + Saint Paul hardcoded.
- * Explicitly steers to official / eventbrite / library / parks pages and asks
- * for a strict JSON candidate list.
  *
- * THE STRUCTURED-DATE CONTRACT (the fix for the "event landed on the wrong
- * day" bug): the free-text `date` field is display only — the client can't
- * schedule from "this saturday, 2pm", and used to fall back to a hardcoded
- * placeholder. The agent must now ALSO return startISO/endISO/dateConfidence,
- * and must say "unknown" rather than invent a time.
+ * KEPT DELIBERATELY SHORT. This prompt grew from ~1.2k chars (a shape that
+ * converged in 5-6 steps with 6 candidates) to ~6k, and at 6k it stopped
+ * converging at all: two production runs sat on ONE listing page and burned the
+ * whole 30-step cap for zero candidates. Every line here has to earn its place,
+ * because the agent reads length as licence to keep working.
  *
- * `preferBookable` PREFERS registration portals, it does not RESTRICT to them.
- * The first shape of this bias narrowed the source list hard enough that a real
- * run (task oLCcj9OJzWwASFHIIWXp) burned 5 steps and came back with zero
- * candidates, while bias-off runs found 6 in the same budget. So the branch now
- * names registration sources as the preferred STARTING point and then requires
- * a fallback to general gentle listings — an honest candidate carrying
- * `registrationNeeded: false` beats an empty result. The bias must still never
- * cost extra steps, so the decisive early-JSON rule and the
- * do-not-open-each-event rule are repeated in that branch too.
+ * The two step sinks the long version created, both removed:
+ *   • `imageUrl` capture — sent the agent visual-scrollback hunting for the
+ *     banner beside each listing row. Images now come from a server-side
+ *     og:image fetch AFTER the pick (see extractOgImage), at zero agent steps.
+ *   • "up to 6 items" — read as a QUOTA ("I need one more from Saturday").
+ *     The target is now an unambiguous hard stop at 2 or 3.
+ *
+ * WHAT SURVIVED, and why: the do-NOT-open-each-detail-page rule and the
+ * emit-immediately rule (they are what got runs down to 5-6 steps); the
+ * structured-date contract (it is the fix for events landing on the wrong day);
+ * the clinical exclusion (safety, mirrors the comfort-recs rule); and the
+ * JSON-only output contract, still LAST for recency.
+ *
+ * `preferBookable` PREFERS registration portals, it does not RESTRICT to them:
+ * a restrictive earlier shape burned 5 steps for zero candidates while bias-off
+ * runs found 6 in the same budget, so the fallback to general listings is part
+ * of the bias, not an escape from it.
  */
 export function buildSearchPrompt(
   city: string = FINDINGS_CITY,
   preferBookable: boolean = false
 ): string {
   const lines = [
-    `Find gentle, FREE, low-key things a tired person could do THIS WEEK in ${city}.`,
-    "Good fits: a quiet library event, a park walk or nature program, a free community",
-    "gathering, a calm class, an open studio, a small local reading. Avoid anything",
-    "loud, crowded, ticketed, alcohol-centered, or high-energy.",
+    `Find gentle, FREE, low-key things a tired person could do THIS WEEK in ${city}:`,
+    "a quiet library event, a park or nature walk, a calm class, an open studio, a",
+    "small reading, a free community gathering. Avoid anything loud, crowded,",
+    "ticketed, alcohol-centered, or high-energy.",
     "",
-    "Prefer OFFICIAL sources: the city or county site, the public library calendar,",
-    "the parks & recreation site, eventbrite, lu.ma, and venue/organizer pages. Only include",
-    "an item you can point at a real, currently-live page for.",
+    "Sources: city/county site, public library calendar, parks & recreation,",
+    "eventbrite, lu.ma, venue/organizer pages; only a real, currently-live page. On",
+    "eventbrite use its FREE filter and the wellness, community, outdoor, arts and",
+    "family categories; skip nightlife, bar, brewery, 21+, high-intensity fitness.",
     "",
-    // EVENTBRITE STEERING — a real run bounced off eventbrite entirely, reporting
-    // "mostly high-energy or alcohol-centered events (Pilates sculpt, Happy Hours
-    // at a brewery, Summer Party)". The platform does carry the right things; the
-    // agent was landing on its default/nightlife surface. Point it at the
-    // categories that actually match the brief instead of letting it judge the
-    // whole site by the first page it sees.
-    "ON EVENTBRITE specifically: use its FREE filter and steer to the wellness,",
-    "community, outdoor/nature, arts, and family categories. Do NOT judge",
-    "eventbrite by its default or trending page. SKIP its nightlife, bar, brewery,",
-    "club, party, singles, and 21+ listings entirely, and skip high-intensity",
-    "fitness (bootcamp, sculpt, HIIT, spin) — a gentle stretch, walk, or restorative",
-    "class is fine. If eventbrite's first page looks like nightlife, filter or",
-    "search within it rather than abandoning the source.",
-    "",
-    // CLINICAL EXCLUSION — mirrors the comfort-recs system prompt's rule ("only
-    // inherently gentle content … never clinical or academic works, and never
-    // books or films about mental illness, therapy, self help … comfort means
-    // escape and warmth, not a mirror of what they are feeling"), adapted from
-    // media to events so the two systems say the same thing. Owner-reported:
-    // "Talk with a Mental Health Professional" surfaced twice as a finding.
-    "NOT CARE SERVICES — dino brings small gentle outings, never care delivery.",
-    "Only inherently gentle outings: nothing graphic, violent, frightening, grief",
-    "centered, or otherwise distressing. EXCLUDE every clinical, therapeutic, or",
-    "medical-service event, even a free and kind-sounding one:",
-    "- therapy or counseling sessions, and \"talk with a mental health professional\"",
-    "  style services, psychiatric or psychological consultations,",
-    "- support groups, recovery or twelve step meetings, grief or bereavement",
-    "  circles, caregiver support sessions,",
-    "- health screenings, vaccination or flu shot clinics, blood drives, medical or",
-    "  dental clinics, health fairs, and any medical advice or diagnosis session,",
-    "- talks and workshops centered on mental illness, addiction, or illness.",
-    "KEEP the genuinely gentle non-clinical things: storytime, gardens and nature",
-    "walks, crafts and open studios, music, writing and other creative classes,",
-    "library programs, museum hours, quiet community gatherings.",
-    "A gentle outing is an escape and a little warmth, not a mirror of what someone",
-    "is going through.",
+    // CLINICAL EXCLUSION — mirrors the comfort-recs system prompt's rule ("never
+    // clinical … comfort means escape and warmth, not a mirror of what they are
+    // feeling"), adapted from media to events. Compressed, NOT relaxed: every
+    // excluded class below is the same one the long version named.
+    "NOT CARE SERVICES — dino brings gentle outings, never care delivery. EXCLUDE",
+    "every clinical, therapeutic, or medical-service event even when free and kind",
+    "sounding: therapy or counseling, \"talk with a mental health professional\"",
+    "services, support groups, recovery meetings, grief circles, health screenings,",
+    "clinics, health fairs, illness-centered talks. KEEP the genuinely gentle",
+    "non-clinical things: storytime, gardens and nature walks, crafts and open",
+    "studios, music, writing classes, library programs, museum hours.",
   ];
 
   if (preferBookable) {
     lines.push(
       "",
-      "BOOKABLE BIAS (this run PREFERS things you can actually sign up for). This",
-      "is a PREFERENCE, not a restriction:",
-      "- START with registration portals rather than plain calendars:",
-      "  library program registration pages, eventbrite, lu.ma, community education class",
-      "  catalogs, and parks and recreation class registration pages. Those are your",
-      "  preferred first stop.",
-      "- If those sources do not give you enough gentle free options, FALL BACK to the",
-      "  general gentle event listings for the city rather than returning nothing. An",
-      "  honest candidate with registrationNeeded false is far better than an empty",
-      "  result.",
-      "- Set registrationNeeded HONESTLY for each candidate, from what its listing",
-      "  actually shows. Prefer — do not require — listings that ALREADY show a",
-      "  register or sign up affordance on the listing page itself.",
-      "- Returning zero candidates when gentle free events exist is a failure. Come",
-      "  back with something suitable.",
-      "Judge all of that from the listing/source page you are already on — do NOT open",
-      "each event's detail page to verify registration. The SAME step budget applies:",
-      "emit the JSON as soon as you have a few candidates; this bias must not cost you",
-      "extra steps.",
+      "BOOKABLE BIAS (a PREFERENCE, not a restriction): START with registration portals",
+      "— library program registration pages, eventbrite, lu.ma,",
+      "community education class catalogs, parks and recreation class registration.",
+      "If those run dry, FALL BACK to the general gentle event listings",
+      "rather than returning nothing. Set registrationNeeded HONESTLY from the listing.",
     );
   }
 
   lines.push(
     "",
-    "BE DECISIVE — you have a limited number of steps:",
-    "- Read at most 2 or 3 official listing/calendar pages. Do NOT chase exact",
-    "  per-event permalink URLs; the listing or calendar page url is acceptable.",
-    "- Do NOT open each event's detail page to verify anything; judge every field",
-    "  from the listing or source page you are already on.",
-    "- As soon as you have up to 6 items (even 2 or 3 is fine), STOP browsing and",
-    "  reply immediately with the JSON. Do not keep verifying.",
+    "BE DECISIVE — you have a limited number of steps and each costs money:",
+    "- Read at most 2 or 3 listing/calendar pages; the listing url is fine, do NOT",
+    "  chase per-event permalinks.",
+    "- Do NOT open each event's detail page; judge every field from the listing",
+    "  page you are already on.",
+    "- STOP browsing and reply the instant you have 2 or 3 candidates. Do not look",
+    "  for more. More than 3 is a failure, not thoroughness.",
     "",
-    "Return ONLY a JSON array (no prose, no markdown fence) of up to 6 candidates,",
-    "each object exactly:",
+    "Each object exactly:",
     '{ "title": string, "date": string, "venue": string, "url": string,',
     '  "registrationNeeded": boolean, "startISO": string|null, "endISO": string|null,',
-    '  "dateConfidence": "exact"|"approximate"|"unknown", "imageUrl": string|null }',
-    "date is a short human phrase (e.g. \"this saturday, 2pm\"). registrationNeeded is",
-    "true only if the page requires signing up / reserving a spot.",
-    "",
-    "THE EVENT IMAGE (imageUrl): if the listing shows the event's OWN photo or",
-    "poster, capture that image's direct https url in imageUrl. It must be the",
-    "event's own image from its listing, never a stock, logo, avatar, icon, or",
-    "unrelated photo. If the listing shows no such image, set imageUrl to null.",
-    "Never invent an image url and never reuse one event's image for another.",
-    "",
-    "THE DATE FIELDS ARE MACHINE-READ — they become a real calendar event:",
-    "- startISO: ISO 8601 local datetime WITH an explicit offset, in the",
-    `  America/Chicago timezone (${city}), e.g. "2026-08-02T14:00:00-05:00".`,
-    "  An offset is REQUIRED; a bare \"2026-08-02T14:00\" is not acceptable.",
-    "- endISO: same format for the end time. If the page does not state an end,",
-    "  omit it or set it to null. Do not estimate it.",
-    "- dateConfidence: \"exact\" only when the page states BOTH the date and the",
-    "  start time; \"approximate\" when you are inferring one of them.",
-    "- NEVER invent a time. If the listing only says something like \"see listing\"",
-    "  or gives no clear date and time, set startISO to null and dateConfidence to",
-    "  \"unknown\". An honest \"unknown\" is always better than a guessed time.",
+    '  "dateConfidence": "exact"|"approximate"|"unknown" }',
+    "date is a short human phrase (\"this saturday, 2pm\"); registrationNeeded is",
+    "true only if the page requires signing up. startISO/endISO are MACHINE-READ",
+    "into a real calendar event: ISO 8601 in America/Chicago, e.g.",
+    "\"2026-08-02T14:00:00-05:00\". An offset is REQUIRED; endISO is null when the",
+    "page states no end. dateConfidence is \"exact\" only when the page states BOTH",
+    "the date and the start time. NEVER invent a time: if the listing only says",
+    "\"see listing\", startISO is null and dateConfidence \"unknown\".",
     "",
     // THE OUTPUT CONTRACT LIVES LAST ON PURPOSE — recency. A run that had found
-    // six good events narrated them in prose ("let me compile the results now")
-    // and never emitted the array; the whole search was thrown away by a
-    // formatting slip. Restating the contract as the final thing the agent reads
-    // is the cheapest place to prevent that.
-    "OUTPUT CONTRACT — a machine reads your answer, not a person:",
-    "- Your FINAL message must be ONLY the JSON array. Nothing else.",
-    "- Do not describe what you found in words. Your entire final message must",
-    "  start with [ and end with ].",
-    "- No prose before it, no summary after it, no markdown fence, no commentary,",
-    "  and never a \"let me compile the results now\" style narration. Listing the",
-    "  events in words instead of emitting the JSON is a FAILED run, even when you",
-    "  found perfect events.",
-    "- If you truly found nothing, your entire final message is exactly: []",
+    // six good events narrated them in prose and never emitted the array; the
+    // whole search was thrown away by a formatting slip. Restating the contract
+    // as the final thing the agent reads is the cheapest place to prevent that.
+    "OUTPUT CONTRACT: Your FINAL message must be ONLY the JSON array, starting with",
+    "[ and ending with ]. Do not describe what you found in words: no prose, no",
+    "fence, no narration around it.",
+    "If you truly found nothing, your entire final message is exactly: []",
   );
   return lines.join("\n");
 }
@@ -629,12 +650,12 @@ export function buildPickPrompt(candidates: readonly FindingCandidateCore[]): {
     "sounding one: no therapy or counseling session, no \"talk with a mental health",
     "professional\" style service, no support group or recovery meeting, no grief",
     "circle, no health screening, clinic, or medical advice session. dino brings",
-    "small gentle outings, not care services, so reach for the storytime, the",
-    "garden, the walk, the craft table, the library or museum hour instead. if",
-    "every option looks clinical, pick the least clinical one.",
+    "gentle outings, not care services: reach for the storytime, the garden, the",
+    "walk, the craft table, the library or museum hour. if every option looks",
+    "clinical, pick the least clinical one.",
     'reply with ONLY json: { "index": number, "why": string }.',
-    "index is the 0-based position of your pick in the list. why is one soft",
-    "sentence (<= 140 chars, lowercase, no dashes) about why it fits a quiet day.",
+    "index is the 0-based position of your pick. why is one soft sentence",
+    "(<= 140 chars, lowercase, no dashes) about why it fits a quiet day.",
   ].join("\n");
   const list = candidates
     .map((c, i) => `${i}. ${c.title} — ${c.date} @ ${c.venue} (${c.url})`)

@@ -14,6 +14,10 @@ import {
   MAX_AGENT_STEPS,
   MAX_TASKS_PER_DAY,
   AGENT_REPLY_LOG_CAP,
+  COST_PER_STEP_USD,
+  IN_FLIGHT_WINDOW_MS,
+  costForSteps,
+  isTaskInFlight,
   type AgiMessage,
 } from "./starFindings";
 
@@ -148,9 +152,140 @@ test("buildBookingPrompt embeds ONLY name+email and the hard stop rules", () => 
 });
 
 test("caps are the documented values", () => {
-  assert.equal(MAX_AGENT_STEPS, 30);
+  // 30 → 15 (money): two production runs burned the full 30 for zero candidates
+  // at $0.02/step. Halving the cap halves the worst case, $0.60 → $0.30.
+  assert.equal(MAX_AGENT_STEPS, 15);
   assert.equal(MAX_TASKS_PER_DAY, 5);
   assert.equal(AGENT_REPLY_LOG_CAP, 1200);
+  assert.equal(COST_PER_STEP_USD, 0.02);
+  // the worst case one run can cost the owner
+  assert.equal(costForSteps(MAX_AGENT_STEPS), 0.3);
+});
+
+// ── cost telemetry ───────────────────────────────────────────────────
+
+test("costForSteps multiplies steps by the per-step rate and rounds to 4dp", () => {
+  assert.equal(costForSteps(0), 0);
+  assert.equal(costForSteps(1), 0.02);
+  assert.equal(costForSteps(5), 0.1);
+  assert.equal(costForSteps(15), 0.3);
+  assert.equal(costForSteps(30), 0.6);        // what the old cap used to allow
+  assert.equal(costForSteps(3, 0.015), 0.045);
+});
+
+test("costForSteps never yields NaN or a negative from a junk tally", () => {
+  for (const bad of [undefined, null, NaN, -1, "nope", {}, []]) {
+    assert.equal(costForSteps(bad), 0, `should read ${JSON.stringify(bad)} as 0`);
+  }
+  // a junk rate falls back to the documented one
+  assert.equal(costForSteps(2, Number.NaN), 0.04);
+  assert.equal(costForSteps(2, -1), 0.04);
+});
+
+// ── the in-flight guard (one ask must never become two billed agents) ──────
+
+test("isTaskInFlight: a young `searching` task blocks a second launch", () => {
+  const now = 1_000_000_000;
+  assert.equal(isTaskInFlight({ status: "searching", createdAtMs: now - 1000, nowMs: now }), true);
+  // right at the window edge is still live; one ms past it is not
+  assert.equal(isTaskInFlight({
+    status: "searching", createdAtMs: now - IN_FLIGHT_WINDOW_MS, nowMs: now }), true);
+  assert.equal(isTaskInFlight({
+    status: "searching", createdAtMs: now - IN_FLIGHT_WINDOW_MS - 1, nowMs: now }), false);
+  // clock skew: a createdAt in the future is a doc written moments ago
+  assert.equal(isTaskInFlight({ status: "searching", createdAtMs: now + 5000, nowMs: now }), true);
+});
+
+test("isTaskInFlight: only `searching` counts — a settled task never blocks", () => {
+  const now = 1_000_000_000;
+  for (const status of ["found", "empty", "failed", "booked", "confirmed", "handoff", "", undefined]) {
+    assert.equal(
+      isTaskInFlight({ status, createdAtMs: now - 1000, nowMs: now }), false,
+      `status ${String(status)} must not block`);
+  }
+});
+
+test("isTaskInFlight: FAILS OPEN on an unreadable createdAt (never a permanent lockout)", () => {
+  const now = 1_000_000_000;
+  for (const bad of [undefined, null, NaN, "nope", {}]) {
+    assert.equal(isTaskInFlight({ status: "searching", createdAtMs: bad, nowMs: now }), false);
+  }
+  assert.equal(isTaskInFlight({ status: "searching", createdAtMs: now, nowMs: Number.NaN }), false);
+  // an explicit window override is honoured
+  assert.equal(isTaskInFlight({
+    status: "searching", createdAtMs: now - 5000, nowMs: now, windowMs: 1000 }), false);
+});
+
+// ── prompt safety rules (MOVED here when findingsJsonRetry.test.ts was deleted;
+//    the retry is gone, these rules are not) ──────────────────────────────
+
+test("the JSON-only output contract is present in BOTH bias branches", () => {
+  for (const p of [buildSearchPrompt(), buildSearchPrompt(undefined, true)]) {
+    assert.match(p, /OUTPUT CONTRACT/);
+    assert.match(p, /Your FINAL message must be ONLY the JSON array/);
+    assert.match(p, /Do not describe what you found in words/);
+    assert.match(p, /starting with\s+\[ and ending with \]/);
+    assert.match(p, /your entire final message is exactly: \[\]/);
+  }
+});
+
+test("the output contract sits at the END of the prompt (recency)", () => {
+  for (const p of [buildSearchPrompt(), buildSearchPrompt(undefined, true)]) {
+    assert.ok(
+      p.trimEnd().endsWith("If you truly found nothing, your entire final message is exactly: []"),
+      "the contract's closing line must be the prompt's last line");
+    assert.ok(p.indexOf("OUTPUT CONTRACT") > p.indexOf("NEVER invent a time"));
+    assert.ok(p.indexOf("OUTPUT CONTRACT") > p.indexOf("BE DECISIVE"));
+    assert.ok(p.indexOf("OUTPUT CONTRACT") > p.indexOf("NOT CARE SERVICES"));
+    assert.ok(p.indexOf("OUTPUT CONTRACT") > p.length * 0.8);
+  }
+});
+
+test("the search prompt excludes clinical/therapeutic/medical events in BOTH branches", () => {
+  for (const p of [buildSearchPrompt(), buildSearchPrompt(undefined, true)]) {
+    assert.match(p, /NOT CARE SERVICES/);
+    assert.match(p, /never care delivery/);
+    assert.match(p, /clinical, therapeutic, or\s+medical-service event/);
+    assert.match(p, /therapy or counseling/);
+    assert.match(p, /talk with a mental health professional/i);
+    assert.match(p, /support groups/);
+    assert.match(p, /recovery meetings/);
+    assert.match(p, /health screenings/);
+    assert.match(p, /clinics/);
+    assert.match(p, /health fairs/);
+    assert.match(p, /illness-centered talks/);
+    // …while the gentle non-clinical things are explicitly KEPT
+    assert.match(p, /KEEP the genuinely gentle/);
+    assert.match(p, /storytime/);
+    assert.match(p, /gardens and nature/);
+    assert.match(p, /crafts and open/);
+    assert.match(p, /library programs, museum hours/);
+  }
+});
+
+test("the PICK prompt is a second gate on clinical candidates", () => {
+  const { system } = buildPickPrompt([
+    { title: "A", date: "sat", venue: "V", url: "https://a", registrationNeeded: false },
+  ]);
+  assert.match(system, /never pick a clinical, therapeutic, or medical event/);
+  assert.match(system, /talk with a mental health/i);
+  assert.match(system, /no therapy or counseling session/);
+  assert.match(system, /no support group or recovery meeting/);
+  assert.match(system, /no health screening, clinic, or medical advice session/);
+  assert.match(system, /not care services/);
+  // dino's voice survives: still lowercase, still asks for the same json
+  assert.match(system, /lowercase/);
+  assert.match(system, /"index": number, "why": string/);
+});
+
+test("the search prompt hard-stops at 2 or 3 candidates (no quota to fill)", () => {
+  for (const p of [buildSearchPrompt(), buildSearchPrompt(undefined, true)]) {
+    assert.match(p, /the instant you have 2 or 3 candidates/);
+    assert.match(p, /Do not look\s+for more/);
+    assert.match(p, /More than 3 is a failure, not thoroughness/);
+    // the old "up to 6" quota language is GONE — it was read as a target
+    assert.doesNotMatch(p, /up to 6/);
+  }
 });
 
 // ── summarizeAgentReply (the raw-reply log line's shaping) ──────────────────

@@ -261,12 +261,30 @@ struct FindingsTabView: View {
                 FindingsHaptics.shared.emptyHanded()
                 setCaption("the star came back with open paws tonight. nothing gentle turned up, it will try again another day")
             }
+        case "alreadyRunning":
+            // The server's in-flight guard: a star is already out and billing.
+            // Show the away sky and WATCH that task — never launch a second one.
+            isBusy = false
+            starState = .away
+            setCaption(FindingsCopy.alreadyRunningLine)
+            if !item.taskId.isEmpty { startPolling(taskId: item.taskId) }
         default:
+            // FAILED (step cap / timeout / error). NOT the warm empty-handed
+            // line: nothing was "not found", the trip was cut short and it was
+            // billed. Honest, quiet, and no nudge to send again immediately.
             isBusy = false
             starState = .landing
-            setCaption("the star came back empty pawed tonight")
+            logFailure(item)
+            setCaption(FindingsCopy.failedLine(outcome: item.outcome))
             scheduleIdleAfterLanding()
         }
+    }
+
+    /// Surface the real outcome for the owner without putting it on screen.
+    private func logFailure(_ item: FindingItem) {
+        #if DEBUG
+        print("[findings] task=\(item.taskId) status=\(item.status) outcome=\(item.outcome)")
+        #endif
     }
 
     private func presentFinding(_ item: FindingItem) {
@@ -306,6 +324,24 @@ struct FindingsTabView: View {
             starState = .away
             setCaption("the star is out looking")
             startPolling(taskId: item.taskId)
+            return
+        }
+        // FAILED reconciles honestly too — the same non-alarming line as a live
+        // landing, never the warm empty-handed copy and never silence.
+        if item.status == "failed" {
+            // ...once. A reconcile fires on every appear + foreground, so a
+            // failure already on the shelf must not replay its landing.
+            let alreadySeen = FindingsStore.item(taskId: item.taskId)?.status == "failed"
+            FindingsStore.clearPending(); stopPolling()
+            if !item.taskId.isEmpty { FindingsStore.upsert(item) }
+            guard !alreadySeen else {
+                if starState == .away { starState = .idle }
+                return
+            }
+            logFailure(item)
+            starState = .landing
+            let line = FindingsCopy.failedLine(outcome: item.outcome)
+            scheduleIdleAfterLanding { setCaption(line) }
             return
         }
         guard FindingsStore.isTerminal(item.status) else {

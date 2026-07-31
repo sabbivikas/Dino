@@ -1,8 +1,8 @@
 // findingsImage.test.ts — pure tests for the REDESIGN additions:
-//   • sanitizeImageUrl   — the event's own listing image, https-sanitized
-//   • parseCandidates    — imageUrl rides through onto the candidate
-//   • buildSearchPrompt  — the agent is told to capture the event's own image
-//   • JSON_RETRY_MESSAGE — the re-ask schema carries imageUrl too
+//   • sanitizeImageUrl   — the image url gate, https-sanitized
+//   • extractOgImage     — the POST-SEARCH og:image read (zero agent steps)
+//   • parseCandidates    — imageUrl still rides through when volunteered
+//   • buildSearchPrompt  — the agent is NO LONGER asked for images at all
 //   • tasksRemainingToday — the idle-count helper (5/day cap minus used)
 //
 // New test FILE (no existing test file is modified).
@@ -11,10 +11,10 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   sanitizeImageUrl,
+  extractOgImage,
   tasksRemainingToday,
   parseCandidates,
   buildSearchPrompt,
-  JSON_RETRY_MESSAGE,
   MAX_TASKS_PER_DAY,
   IMAGE_URL_MAX,
 } from "./starFindings";
@@ -107,18 +107,86 @@ test("parseCandidates also accepts snake_case image_url / image aliases", () => 
 
 // ── the search prompt asks for the event's own image ─────────────────────────
 
-test("buildSearchPrompt tells the agent to capture the event's own image url", () => {
-  const p = buildSearchPrompt();
-  assert.match(p, /imageUrl/);
-  assert.match(p, /event's OWN photo or/i);
-  assert.match(p, /never a stock, logo, avatar, icon, or/i);
-  assert.match(p, /set imageUrl to null/i);
-  // the schema line itself carries the field
-  assert.match(p, /"imageUrl": string\|null/);
+// Collecting imageUrl per candidate was one of the two step sinks that capped
+// both production runs — the agent went visual-scrollback hunting for the
+// banner beside each listing row. The photo now comes from a server-side
+// og:image fetch AFTER the pick, so the prompt must not mention it at all.
+test("buildSearchPrompt never asks the agent for an image (the step sink is gone)", () => {
+  for (const p of [buildSearchPrompt(), buildSearchPrompt(undefined, true)]) {
+    assert.doesNotMatch(p, /imageUrl/);
+    assert.doesNotMatch(p, /THE EVENT IMAGE/);
+    assert.doesNotMatch(p, /photo or\s+poster/i);
+  }
 });
 
-test("JSON_RETRY_MESSAGE schema carries imageUrl so a re-format keeps it", () => {
-  assert.match(JSON_RETRY_MESSAGE, /"imageUrl": string\|null/);
+// ── extractOgImage (the post-pick photo, at zero agent steps) ──────────────
+
+const PAGE = "https://sppl.org/events/storytime";
+
+test("extractOgImage reads og:image and resolves an absolute url", () => {
+  const html = `<html><head><meta property="og:image" content="https://cdn.sppl.org/images/a.jpg">` +
+    "</head><body>x</body></html>";
+  assert.equal(extractOgImage(html, PAGE), "https://cdn.sppl.org/images/a.jpg");
+});
+
+test("extractOgImage resolves protocol-relative and root-relative urls against the page", () => {
+  assert.equal(
+    extractOgImage('<meta property="og:image" content="//cdn.sppl.org/images/a.jpg">', PAGE),
+    "https://cdn.sppl.org/images/a.jpg");
+  assert.equal(
+    extractOgImage('<meta property="og:image" content="/media/hero.png">', PAGE),
+    "https://sppl.org/media/hero.png");
+  // a plain relative path resolves against the page's directory
+  assert.equal(
+    extractOgImage('<meta property="og:image" content="hero.png">', "https://sppl.org/events/"),
+    "https://sppl.org/events/hero.png");
+});
+
+test("extractOgImage falls back to twitter:image only when there is no og:image", () => {
+  const twOnly = '<meta name="twitter:image" content="https://x.org/images/t.jpg">';
+  assert.equal(extractOgImage(twOnly, PAGE), "https://x.org/images/t.jpg");
+  // og wins even when twitter comes first in the document
+  const both = twOnly + '<meta property="og:image" content="https://x.org/images/o.jpg">';
+  assert.equal(extractOgImage(both, PAGE), "https://x.org/images/o.jpg");
+});
+
+test("extractOgImage takes the FIRST og:image when several are present", () => {
+  const html =
+    '<meta property="og:image" content="https://x.org/images/1.jpg">' +
+    '<meta property="og:image" content="https://x.org/images/2.jpg">';
+  assert.equal(extractOgImage(html, PAGE), "https://x.org/images/1.jpg");
+});
+
+test("extractOgImage tolerates single quotes, attribute order, and &amp; entities", () => {
+  assert.equal(
+    extractOgImage("<meta content='https://x.org/images/a.jpg' property='og:image'>", PAGE),
+    "https://x.org/images/a.jpg");
+  assert.equal(
+    extractOgImage('<meta property="og:image" content="https://x.org/i.jpg?a=1&amp;b=2">', PAGE),
+    "https://x.org/i.jpg?a=1&b=2");
+});
+
+test("extractOgImage returns null for a missing tag, malformed html, and wrong types", () => {
+  assert.equal(extractOgImage("<html><head><title>x</title></head></html>", PAGE), null);
+  assert.equal(extractOgImage("", PAGE), null);
+  assert.equal(extractOgImage("<<<not html", PAGE), null);
+  assert.equal(extractOgImage('<meta property="og:image">', PAGE), null);       // no content
+  assert.equal(extractOgImage('<meta property="og:image" content="">', PAGE), null);
+  assert.equal(extractOgImage('<meta property="og:image" content="not a url">', ""), null);
+  assert.equal(extractOgImage(undefined, PAGE), null);
+  assert.equal(extractOgImage(null, PAGE), null);
+  assert.equal(extractOgImage(42, PAGE), null);
+  assert.equal(extractOgImage('<meta property="description" content="https://x/a.jpg">', PAGE), null);
+});
+
+test("extractOgImage output is NOT trusted — sanitizeImageUrl is still the gate", () => {
+  // http og:image resolves fine here, and is then rejected downstream
+  const raw = extractOgImage('<meta property="og:image" content="http://x.org/images/a.jpg">', PAGE);
+  assert.equal(raw, "http://x.org/images/a.jpg");
+  assert.equal(sanitizeImageUrl(raw), null);
+  // …and a real https image survives the round trip
+  const ok = extractOgImage('<meta property="og:image" content="//cdn.x.org/images/a.jpg">', PAGE);
+  assert.equal(sanitizeImageUrl(ok), "https://cdn.x.org/images/a.jpg");
 });
 
 // ── tasksRemainingToday ──────────────────────────────────────────────────────

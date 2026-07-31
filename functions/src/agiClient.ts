@@ -1,5 +1,5 @@
 // agiClient.ts — fetch-based client for the AGI browser-agent vendor, plus the
-// event-stream orchestrator that enforces the 30-step kill. The pure decision
+// event-stream orchestrator that enforces the step kill. The pure decision
 // (killDecision) + THOUGHT tally live in starFindings.ts; this module does the
 // IO and the cancel / terminate / DELETE.
 //
@@ -179,19 +179,6 @@ export interface RunResult {
   lastContent: string;      // terminal DONE content, or the last message's content
   question: string | null;  // the QUESTION content when waiting_for_input
   errored: boolean;
-  /** Did the one-shot follow-up actually run in this same session? */
-  retried: boolean;
-  /** Why the follow-up could not be sent, when one was asked for. */
-  retryError: string | null;
-}
-
-/** What `followUp` is shown about the first attempt before it decides. */
-export interface FollowUpContext {
-  lastContent: string;
-  thoughts: number;
-  outcome: RunResult["outcome"];
-  killReason: KillReason;
-  errored: boolean;
 }
 
 export interface RunParams {
@@ -203,20 +190,6 @@ export interface RunParams {
   stepDelaySeconds?: number;
   transport?: AgiTransport;
   now?: () => number;
-  /**
-   * ONE-SHOT follow-up in the SAME session. Called at most once, after the
-   * first reply settles, and only when the run neither errored nor was killed.
-   * Return the message to send, or null/undefined to finish as-is.
-   *
-   * WHY IT HAS TO LIVE HERE: the session is terminated + DELETEd in the finally
-   * block, so a caller cannot re-open it — and a fresh session has no memory of
-   * what the agent just found, which is the entire point of the retry.
-   *
-   * BILLING: the follow-up's THOUGHTs land on the SAME cumulative tally, so the
-   * 30-step kill still fires exactly where it did before; the cap is not raised
-   * and the vendor is handed only the REMAINING steps as its own max_steps.
-   */
-  followUp?: (ctx: FollowUpContext) => string | null | undefined;
 }
 
 function lastOfType(messages: readonly AgiMessage[], type: AgiMessageType): AgiMessage | undefined {
@@ -252,16 +225,12 @@ export async function runAgentTask(params: RunParams): Promise<RunResult> {
 
   const controller = new AbortController();
   let timedOut = false;
-  let retried = false;
-  let retryError: string | null = null;
   const wallTimer = setTimeout(() => { timedOut = true; controller.abort(); }, wallClockMs);
 
   // One pass over the event stream, ending on a terminal message or a kill.
-  // Called a second time for the follow-up: `all` is cumulative, so the THOUGHT
-  // tally (and therefore the kill) spans BOTH turns. If the vendor were ever to
-  // replay earlier events on a re-opened stream we would over-count, which errs
-  // toward killing sooner — the safe direction for a per-step bill, so there is
-  // deliberately no de-duplication here.
+  // `all` is cumulative and there is deliberately no de-duplication: if the
+  // vendor ever replayed events we would over-count, which errs toward killing
+  // sooner — the safe direction for a per-step bill.
   const consume = async (h: SessionHandle): Promise<RunResult["outcome"]> => {
     for await (const msg of transport.streamEvents(h, controller.signal)) {
       all.push(msg);
@@ -290,37 +259,7 @@ export async function runAgentTask(params: RunParams): Promise<RunResult> {
       stepDelaySeconds: params.stepDelaySeconds,
     });
 
-    const firstOutcome = await consume(handle);
-
-    // THE ONE-SHOT FOLLOW-UP. Never after a kill or an error: a killed run has
-    // no budget left by definition and a dead session cannot answer.
-    if (params.followUp && firstOutcome !== "killed" && firstOutcome !== "error") {
-      const message = params.followUp({
-        lastContent: terminalContent(all),
-        thoughts: countThoughts(all),
-        outcome: firstOutcome,
-        killReason,
-        errored,
-      });
-      if (message) {
-        retried = true;
-        try {
-          await transport.startTask(handle, {
-            // NO startUrl: this continues the session, it does not re-navigate.
-            content: message,
-            // hand the vendor only what is LEFT of our cap, never a fresh 30.
-            maxSteps: Math.max(1, maxSteps - countThoughts(all)),
-            stepDelaySeconds: params.stepDelaySeconds,
-          });
-          question = null;      // the follow-up answers any trailing QUESTION
-          await consume(handle);
-        } catch (err) {
-          if (timedOut) throw err;   // the wall clock is still the wall clock
-          // a failed follow-up must never downgrade the first attempt's result.
-          retryError = err instanceof Error ? err.message : String(err);
-        }
-      }
-    }
+    await consume(handle);
   } catch (err) {
     if (timedOut) {
       outcome = "killed";
@@ -349,7 +288,5 @@ export async function runAgentTask(params: RunParams): Promise<RunResult> {
     lastContent: terminalContent(all),
     question,
     errored,
-    retried,
-    retryError,
   };
 }

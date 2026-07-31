@@ -409,3 +409,112 @@ VERIFY (all local)
 
 REDEPLOY REQUIRED (owner runs it): startFindingTask + getFindingTask (the new
 additive imageUrl + tasksRemainingToday fields). No confirmFinding change.
+
+================================================================================
+CONVERGENCE + MONEY-SAFETY PASS (2026-07-31)
+================================================================================
+
+THE DIAGNOSIS (from production logs, not re-investigated): both runs that day
+capped at 30 steps / 0 candidates / $0.60 each. The agent was NOT wandering — it
+sat on ONE page (SPPL library events), had 5-6 good candidates by step 15, then
+burned the rest on (a) hunting banner images for imageUrl and (b) treating "up
+to 6 items" as a quota. The one-shot JSON retry made it worse: it fired at step
+15/16 and the agent kept browsing for the remaining ~15 steps, converting a
+~5-step $0.10 failure into a 30-step $0.60 one.
+
+1. LEAN PROMPT (starFindings.ts buildSearchPrompt / buildPickPrompt)
+   MEASURED from the compiled lib, buildSearchPrompt(FINDINGS_CITY, x):
+     preferBookable=false  4,766 chars / 77 lines -> 2,515 / 42   (-47%)
+     preferBookable=true   5,943 chars / 97 lines -> 2,877 / 48   (-52%)
+     buildPickPrompt.system  863 / 12            ->   834 / 12
+     50abb5e baseline (the shape that converged): 1,209 / 20.
+   The <=1,800 target is NOT reachable while keeping the three blocks the brief
+   says to keep: clinical exclusion (~490 chars), structured-date contract
+   (~430), output contract (~250) — 50abb5e had none of them. 2,515 is the
+   floor with them in. Flagged, not silently missed.
+   CUT: the whole imageUrl capture instruction (owner-approved; photos now come
+   from a post-pick og:image fetch); "up to 6 items" quota language -> hard stop
+   at 2 or 3 ("More than 3 is a failure, not thoroughness"); the eventbrite
+   paragraph -> one clause; the bookable branch's repetition of the decisive
+   rules; the "let me compile the results now" example.
+   KEPT: do-NOT-open-each-detail-page, emit-immediately, the JSON-only contract
+   (still LAST, for recency), the clinical exclusion (compressed, substance
+   unchanged — same excluded classes, same KEEP list), the structured-date
+   contract, the source list + a one-clause eventbrite steer, preferBookable's
+   prefer-not-restrict semantics with its fallback.
+
+2. JSON RETRY DELETED end to end
+   - starFindings.ts: shouldRetryForJson, JSON_RETRY_MESSAGE,
+     JSON_RETRY_STEP_MARGIN removed.
+   - agiClient.ts: RunParams.followUp, FollowUpContext, RunResult.retried +
+     retryError, and the second consume() turn removed. The no-followUp path is
+     otherwise unchanged.
+   - index.ts: the followUp call site, firstReplyLog/firstCandidateCount/
+     stepsBeforeRetry, the `retried` log field and the whole
+     findings_agent_reply_retry entry removed.
+   - functions/src/findingsJsonRetry.test.ts DELETED.
+
+3. og:image AFTER the pick (zero agent steps)
+   - starFindings.ts extractOgImage(html, pageUrl): og:image (og:image:url /
+     :secure_url too), falls back to twitter:image only when there is no
+     og:image, first tag wins, resolves protocol-relative + root-relative +
+     plain-relative against the page url, decodes &amp; entities. PURE.
+   - index.ts fetchOgImage(): plain GET, redirect follow, 5s AbortController
+     hard timeout, body read capped at 512KB, result piped through the EXISTING
+     sanitizeImageUrl. try/catch + finally; any failure is null. One log line
+     (findings_og_image { found }).
+   - HONEST LIMITATION: the finding's url is usually a LISTING page
+     (sppl.org/events), not a per-event page, so og:image is often the site's
+     generic banner/logo, not the event photo. Inherent to this approach.
+
+4. MONEY SAFETY
+   (a) MAX_AGENT_STEPS 30 -> 15. Worst case per run $0.60 -> $0.30. Applies to
+       confirmFinding's booking phase too (it derives from the same constant).
+   (b) FindingsService.startFinding sets HTTPSCallable.timeoutInterval = 300s
+       (was the ~70s default while runs take ~200s — the client was abandoning a
+       live billing run and showing "lost its way", inviting a duplicate).
+   (c) failed no longer borrows the warm empty-pawed line. FindingsCopy
+       .failedLine(outcome:) gives failed:step_cap / failed:timeout / other
+       their own honest lowercase lines, no "try again", no error styling, no
+       .error haptic. Wired into BOTH landResult and applyServerTask (a failed
+       reconcile used to be silent); DEBUG log of taskId/status/outcome.
+   (d) In-flight guard: isTaskInFlight() (pure) + a latest-task read in
+       startFindingTask BEFORE the counter transaction. A live `searching` task
+       under 10 min returns { status: "alreadyRunning" } and does NOT increment
+       the 5/day counter. Client renders it as the AWAY state ("the star is
+       already out looking") and watches that task; never auto-launches.
+   (e) costUsd = steps x $0.02 (costForSteps, pure) on the findings_agent_reply
+       log, both startFindingTask summary lines, confirmFinding's line, and the
+       task doc.
+
+RESIDUAL GAP (flagged, not silently changed): WALL_CLOCK_MS is still 6 min, so
+a pathological run could out-live the client's 300s wait. The in-flight guard is
+what closes the money hole in that case — a re-tap returns alreadyRunning rather
+than launching a second billed agent. At 15 steps a real run lands near ~100s.
+
+VERIFY (all local; NO live AGI runs — no startFindingTask was ever invoked)
+- functions: tsc --noEmit clean; npm test -> 209 pass / 0 fail (was 212).
+  Delta: -19 (findingsJsonRetry.test.ts deleted: 7 retry-decision/message tests
+  + 8 follow-up transport tests, plus 4 prompt-safety tests MOVED, not lost),
+  -2 (findingsImage.test.ts: the imageUrl-capture prompt test and the
+  JSON_RETRY_MESSAGE schema test — both assert deliberately removed code),
+  +4 moved back into starFindings.test.ts (output contract in both branches,
+  contract-sits-last, clinical exclusion in both branches, pick-prompt clinical
+  gate), +6 new in starFindings.test.ts (costForSteps x2, isTaskInFlight x3,
+  hard-stop-at-2-or-3 x1), +8 new in findingsImage.test.ts (prompt-never-asks-
+  for-an-image x1, extractOgImage x7). 212-19-2+4+6+8 = 209.
+  NO assertion was weakened to make anything pass. Prompt-text assertions that
+  named prose deliberately deleted were removed with their subject; three
+  line-wrap-dependent regexes were made whitespace-tolerant (same substance).
+  MAX_AGENT_STEPS 30->15 in the caps test is the constant change itself.
+- iOS: Debug build SUCCEEDED. DinoTests -> 443 pass / 0 fail (440 before: 436
+  baseline UNMODIFIED + 4 findings; +3 new FindingsCopy tests).
+- git diff main --name-only: shipping files still exactly the FOUR (MainTabView,
+  ContentView, functions/src/index.ts, firestore.rules) + pbxproj
+  CURRENT_PROJECT_VERSION lines only. CrisisResources untouched. Zero .xcstrings.
+
+REDEPLOY REQUIRED (owner runs it): startFindingTask (lean prompt, no retry,
+15-step cap, in-flight guard, og:image, costUsd) and confirmFinding (15-step cap
++ costUsd). getFindingTask is unchanged but shares the module — deploying all
+three is the safe move. A NEW CLIENT BUILD IS REQUIRED: the 300s callable
+timeout, the honest failed copy, and the alreadyRunning state are all client-side.

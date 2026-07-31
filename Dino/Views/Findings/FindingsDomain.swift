@@ -30,3 +30,29 @@ enum FindingsDomain {
         return lower.hasPrefix("www.") ? String(lower.dropFirst(4)) : lower
     }
 }
+
+/// The screen's honest copy for the outcomes that are NOT a finding.
+///
+/// WHY THIS IS SEPARATE FROM `empty`: a `failed` task used to borrow the warm
+/// empty-handed line ("came back empty pawed tonight"). That reads as "there
+/// was nothing to find", when what actually happened is the star hit its step
+/// cap mid-search and the owner was billed for it. The lines below say so
+/// plainly, in dino's voice, WITHOUT inviting an immediate retry (every retry
+/// is another billed run) and with no error styling and no error haptic.
+enum FindingsCopy {
+    /// The line for a task-level `failed:*` outcome. `empty` never comes here.
+    static func failedLine(outcome: String) -> String {
+        switch outcome.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+        case "failed:step_cap":
+            return "the star searched as long as it could tonight and ran out of time"
+        case "failed:timeout":
+            return "the star was out a long while and had to turn back"
+        default:
+            return "the star could not finish its trip this time"
+        }
+    }
+
+    /// A send refused because one is already in flight (the server's in-flight
+    /// guard). Not an error, and never an invitation to send again.
+    static let alreadyRunningLine = "the star is already out looking"
+}
