@@ -25,8 +25,9 @@ import { starFindingsGate, buildSearchPrompt, buildPickPrompt, buildBookingPromp
   parseCandidates, outcomeForFinding, outcomeForBooking, parsePreferBookable,
   findingDeepLink, findingTaskPayload, noFindingTask, summarizeAgentReply,
   tasksRemainingToday, isTaskInFlight, costForSteps,
-  extractOgImage, sanitizeImageUrl,
-  MAX_TASKS_PER_DAY, MAX_AGENT_STEPS, WALL_CLOCK_MS, FINDINGS_CITY,
+  extractOgImage, sanitizeImageUrl, isPerEventUrl, unwrapImageProxyUrl,
+  MAX_TASKS_PER_DAY, MAX_AGENT_STEPS, MAX_BOOKING_STEPS, WALL_CLOCK_MS, FINDINGS_CITY,
+  MAX_SEARCH_COST_USD, MAX_BOOKING_COST_USD,
   AGENT_REPLY_LOG_CAP } from "./starFindings";
 import { runAgentTask, type RunResult } from "./agiClient";
 
@@ -2882,9 +2883,16 @@ export const nightlyPreferenceDistill = onSchedule(
 // sent out by a real browser-agent (AGI) to find one gentle, free thing to do
 // this week in Saint Paul; a cheap model picks the single best fit and writes
 // dino's why. THREE gates: the client flag+uid, the env allowlist here, and
-// firestore.rules (server-write-only docs). THE 15-STEP KILL + 5/day cap + the
+// firestore.rules (server-write-only docs). THE STEP KILL + 5/day cap + the
 // in-flight guard live in the agent loop + this counter. Every task doc logs
 // steps/outcome/costUsd/durationMs/dayKey — the owner's cost/success telemetry.
+//
+// TWO CAPS, TWO COSTS, REPORTED SEPARATELY: search is capped at 15 steps
+// ($0.30 worst case) and booking at 25 ($0.50), because a booking run starts on
+// a listing page and needs 8-14 steps before it reaches a form. Worst case for
+// one finding plus a booking on it is $0.80. Each phase logs its OWN costUsd
+// (phase=search on startFindingTask, phase=booking on confirmFinding) so the
+// two exposures never blur into one number.
 //
 // PII: the ONLY personal data that ever reaches AGI is the owner's own name +
 // email, and ONLY in confirmFinding's booking phase (never the search phase).
@@ -2909,11 +2917,20 @@ function findingsDayKey(now: Date = new Date()): string {
 // images at all. Instead: ONE plain fetch of the single PICKED finding's url,
 // server-side, after the pick. No Firecrawl, no vendor, no agent step.
 //
-// HONEST LIMITATION: the finding's url is usually a LISTING page
-// (e.g. sppl.org/events), not a per-event page, so the og:image is often the
-// site's generic banner or logo rather than the event's own photo. That is
-// inherent to this approach. A miss is a normal outcome — null imageUrl, and
-// the client draws its existing generated gradient card.
+// LISTING PAGES ARE SKIPPED ENTIRELY (isPerEventUrl). A listing page's og:image
+// is the site's social card for the WHOLE calendar — very likely a different
+// event's photo — and putting that on this finding's card would break the rule
+// this feature already states: the event's OWN image, never a stock or
+// unrelated one. So a listing url costs zero requests and yields null.
+//
+// PROXIED IMAGES ARE UNWRAPPED FIRST (unwrapImageProxyUrl). The genuine
+// per-event photo usually arrives through a resizer — eventbrite serves
+// `…/_next/image?url=<encoded>` and `img.evbuc.com/<encoded>` — which carry no
+// raster extension and were being dropped by sanitizeImageUrl. Unwrap, THEN
+// sanitize, so the real image survives.
+//
+// A miss is a normal outcome — null imageUrl, and the client draws its existing
+// generated gradient card.
 
 /** Hard timeout for the og:image fetch; a slow site must never hold the call. */
 const OG_FETCH_TIMEOUT_MS = 5000;
@@ -2953,8 +2970,9 @@ async function fetchOgImage(pageUrl: string): Promise<string | null> {
     } finally {
       await reader.cancel().catch(() => { /* swallow */ });
     }
-    // sanitizeImageUrl is the gate: https only, length capped, image-shaped.
-    return sanitizeImageUrl(extractOgImage(html, res.url || pageUrl));
+    // unwrap the resizing proxy FIRST, then gate: sanitizeImageUrl enforces
+    // https only, the length cap, and a plausible image shape.
+    return sanitizeImageUrl(unwrapImageProxyUrl(extractOgImage(html, res.url || pageUrl)));
   } catch {
     return null;
   } finally {
@@ -3089,7 +3107,8 @@ export const startFindingTask = onCall(
       stepDelaySeconds: 1,
     });
     const durationMs = Date.now() - startedAt;
-    // what the run actually cost the owner (steps × the vendor's per-step rate).
+    // SEARCH-PHASE COST, reported on its own so search and booking exposure stay
+    // independently visible: steps × $0.02, worst case 15 × $0.02 = $0.30.
     const costUsd = costForSteps(searchRes.thoughts);
     // the agent may end with a DONE or a trailing QUESTION that still carries
     // the JSON — parse the last content either way.
@@ -3109,6 +3128,8 @@ export const startFindingTask = onCall(
       steps: searchRes.thoughts,
       costUsd,
       preferBookable,
+      phase: "search",
+      maxCostUsd: MAX_SEARCH_COST_USD,   // 15 steps × $0.02
       looksJson: replyLog.looksJson,
       replyLength: replyLog.length,
       truncated: replyLog.length > AGENT_REPLY_LOG_CAP,
@@ -3127,7 +3148,7 @@ export const startFindingTask = onCall(
         { status, steps: searchRes.thoughts, outcome, costUsd, durationMs, dayKey, preferBookable },
         { merge: true });
       functions.logger.info(
-        `startFindingTask: uid=${uid} task=${taskRef.id} steps=${searchRes.thoughts} outcome=${outcome} costUsd=${costUsd} durationMs=${durationMs}`);
+        `startFindingTask: uid=${uid} task=${taskRef.id} phase=search steps=${searchRes.thoughts}/${MAX_AGENT_STEPS} outcome=${outcome} costUsd=${costUsd} maxCostUsd=${MAX_SEARCH_COST_USD} durationMs=${durationMs}`);
       return { taskId: taskRef.id, status, steps: searchRes.thoughts, outcome, finding: null,
         tasksRemainingToday: remainingToday };
     }
@@ -3161,14 +3182,24 @@ export const startFindingTask = onCall(
     // and the client already draws a generated gradient card for null.
     let imageUrl = picked.imageUrl;
     if (!imageUrl && picked.url) {
-      try {
-        imageUrl = await fetchOgImage(picked.url);
-      } catch (err) {
-        imageUrl = null;
-        functions.logger.warn(`startFindingTask: og:image fetch threw (uid=${uid}): ${err}`);
+      // ONLY a per-event page. A listing page's og:image is the site's social
+      // card for the whole calendar and is very likely a DIFFERENT event's
+      // photo, so we skip the fetch entirely rather than show a wrong picture.
+      const perEvent = isPerEventUrl(picked.url);
+      if (perEvent) {
+        try {
+          imageUrl = await fetchOgImage(picked.url);
+        } catch (err) {
+          imageUrl = null;
+          functions.logger.warn(`startFindingTask: og:image fetch threw (uid=${uid}): ${err}`);
+        }
       }
+      // ONE line either way, so a gradient card is always explainable: either
+      // the url was a listing (skipped, zero requests) or the fetch missed.
       functions.logger.info("findings_og_image", {
-        uid, task: taskRef.id, found: imageUrl !== null,
+        uid, task: taskRef.id, perEvent, fetched: perEvent,
+        found: imageUrl !== null,
+        skipReason: perEvent ? "" : "listing_url_not_per_event",
       });
     }
     // startISO/endISO/dateConfidence ride along onto the stored finding and out
@@ -3190,7 +3221,7 @@ export const startFindingTask = onCall(
     }, { merge: true });
     await sendFindingPush(uid, picked.title, taskRef.id);
     functions.logger.info(
-      `startFindingTask: uid=${uid} task=${taskRef.id} steps=${searchRes.thoughts} outcome=found costUsd=${costUsd} durationMs=${durationMs}`);
+      `startFindingTask: uid=${uid} task=${taskRef.id} phase=search steps=${searchRes.thoughts}/${MAX_AGENT_STEPS} outcome=found costUsd=${costUsd} maxCostUsd=${MAX_SEARCH_COST_USD} durationMs=${durationMs}`);
     return { taskId: taskRef.id, status: "found", steps: searchRes.thoughts, outcome: "found", finding,
       tasksRemainingToday: remainingToday };
   }
@@ -3260,14 +3291,21 @@ export const confirmFinding = onCall(
     // form that demands more (dob/phone/payment/login/captcha).
     const email = (await admin.auth().getUser(uid)).email ?? "";
     const startedAt = Date.now();
+    // THE BOOKING CAP IS ITS OWN (25, not the search's 15). A booking run starts
+    // on a listing page and needs 8-14 steps before it even reaches a form, so
+    // the search cap made it structurally likely to die before filling a field.
+    // 25 × ~6.6s ≈ 165s, inside WALL_CLOCK_MS (240s), inside the client's 300s.
     const res = await runAgentTask({
       prompt: buildBookingPrompt(userName, email),
       startUrl: finding.url,
-      maxSteps: MAX_AGENT_STEPS,
+      maxSteps: MAX_BOOKING_STEPS,
       wallClockMs: WALL_CLOCK_MS,
       stepDelaySeconds: 1,
     });
     const durationMs = Date.now() - startedAt;
+    // BOOKING-PHASE COST, reported separately from the search's: steps × $0.02,
+    // worst case 25 × $0.02 = $0.50. Worst case for a finding AND a booking on
+    // it is $0.30 + $0.50 = $0.80.
     const bookingCostUsd = costForSteps(res.thoughts);
     const { status, outcome } = outcomeForBooking(interpretBookingSignal(res));
     await taskRef.set({
@@ -3275,7 +3313,7 @@ export const confirmFinding = onCall(
       bookedAt: status === "booked" ? admin.firestore.FieldValue.serverTimestamp() : null,
     }, { merge: true });
     functions.logger.info(
-      `confirmFinding: uid=${uid} task=${taskId} steps=${res.thoughts} outcome=${outcome} costUsd=${bookingCostUsd} durationMs=${durationMs}`);
+      `confirmFinding: uid=${uid} task=${taskId} phase=booking steps=${res.thoughts}/${MAX_BOOKING_STEPS} outcome=${outcome} costUsd=${bookingCostUsd} maxCostUsd=${MAX_BOOKING_COST_USD} durationMs=${durationMs}`);
     return { status, url: finding.url ?? "" };
   }
 );

@@ -9,9 +9,11 @@
 // firing for another account is structurally impossible). Missing/empty env,
 // or a caller not on the list, denies.
 //
-// THE 15-STEP KILL: billing is per thinking step, so the agent loop tallies
+// THE STEP KILL: billing is per thinking step, so the agent loop tallies
 // THOUGHT messages and kills (cancel + DELETE session) the instant the tally
-// reaches MAX_AGENT_STEPS. killDecision is the pure decision the loop calls on
+// reaches the phase's cap — MAX_AGENT_STEPS (15) for SEARCH, MAX_BOOKING_STEPS
+// (25) for BOOKING, which starts on a listing page and needs 8-14 steps before
+// it even reaches a form. killDecision is the pure decision the loop calls on
 // every poll; the actual cancel/DELETE lives in agiClient.ts.
 
 // ── caps / constants ────────────────────────────────────────────────────────
@@ -26,8 +28,30 @@
  * worst case to $0.30.
  */
 export const MAX_AGENT_STEPS = 15;
+/**
+ * Per-thinking-step kill for the BOOKING phase only (confirmFinding).
+ *
+ * SEARCH AND BOOKING MUST NOT SHARE A CAP. A search converges in 6-8 steps, so
+ * 15 is generous for it. A booking run starts on a LISTING page and realistically
+ * needs 8-14 steps just to reach a registration form — under the search cap it
+ * is structurally likely to die before it ever fills a field, and in fact the
+ * booking path has never once executed to completion. 25 is the smallest cap
+ * that leaves a real form-fill inside the budget.
+ *
+ * MONEY: 25 × $0.02 = $0.50 worst case for one booking, and $0.30 + $0.50 =
+ * $0.80 for the worst-case pair (one search that finds + one booking on it).
+ * TIME: ~165s at the observed ~6.6s/step, comfortably under WALL_CLOCK_MS
+ * (240s), which is itself under the client's 300s callable timeout.
+ */
+export const MAX_BOOKING_STEPS = 25;
 /** What one thinking step costs the owner, in USD (vendor's per-step rate). */
 export const COST_PER_STEP_USD = 0.02;
+/** Worst case for ONE search run: 15 × $0.02. Logged as costUsd on the search. */
+export const MAX_SEARCH_COST_USD = 0.30;
+/** Worst case for ONE booking run: 25 × $0.02. Logged as costUsd on the booking. */
+export const MAX_BOOKING_COST_USD = 0.50;
+/** Worst case for one finding AND a booking on it: $0.30 + $0.50. */
+export const MAX_FINDING_PLUS_BOOKING_COST_USD = 0.80;
 /**
  * How long a task doc may sit in `searching` before a NEW send is allowed
  * again. The client used to abandon a live run at the callable's ~70s default
@@ -343,6 +367,123 @@ export function sanitizeImageUrl(raw: unknown): string | null {
   return s;
 }
 
+// ── is this url ONE event, or a listing? ───────────────────────────────
+//
+// THE HONESTY BUG THIS CLOSES: the og:image of a LISTING page is the site's
+// social card for the whole calendar — very often a photo of some OTHER event,
+// or a stock banner. Accepting it puts a picture of a thing that is not the
+// finding on the finding's card, which is exactly what the code's own rule
+// ("the event's OWN image, NEVER a stock/unrelated photo") forbids. So the
+// fetch now only runs when the url identifies a SINGLE event.
+//
+// CONSERVATIVE BY CONSTRUCTION: every unrecognised shape answers false. A card
+// with no photo falls back to the generated gradient, which is fine; a card
+// carrying the wrong event's photo is a lie, which is not.
+
+/** A path segment that, when it is the LAST one, means "a list of things". */
+const LISTING_SEGMENTS = new Set([
+  "events", "event", "calendar", "calendars", "programs", "program",
+  "classes", "class", "search", "browse", "listings", "listing",
+  "activities", "things-to-do", "whats-on", "explore", "all", "d",
+]);
+/** A collection segment that can be followed by ONE event's id/slug. */
+const EVENT_COLLECTION_SEGMENTS = new Set([
+  "events", "event", "programs", "program", "calendar", "classes",
+]);
+
+/**
+ * Does this url identify ONE event (rather than a listing/calendar/search page)?
+ * PURE, never throws. FALSE WHENEVER IN DOUBT.
+ *
+ * true  → eventbrite.com/e/<slug>-tickets-<id>, lu.ma/<slug>,
+ *          <host>/…/events/<id> (bibliocommons and every CMS shaped like it)
+ * false → sppl.org/events, …/v2/events, eventbrite.com/d/<place>/free--events/,
+ *          anything ending at a bare /events, /calendar or /programs, anything
+ *          that is only a host plus query filters, and every shape not listed.
+ */
+export function isPerEventUrl(raw: unknown): boolean {
+  if (typeof raw !== "string") return false;
+  const s = raw.trim();
+  if (!s) return false;
+  let u: URL;
+  try { u = new URL(s); } catch { return false; }
+  if (u.protocol !== "https:" && u.protocol !== "http:") return false;
+  const host = u.hostname.toLowerCase();
+  if (!host || !host.includes(".")) return false;
+  const segs = u.pathname.split("/")
+    .map((p) => { try { return decodeURIComponent(p); } catch { return p; } })
+    .map((p) => p.trim().toLowerCase())
+    .filter(Boolean);
+  // a bare host (with or without query filters) is never one event.
+  if (segs.length === 0) return false;
+  // a path that ENDS at a collection word is a listing, whatever the host and
+  // whatever query filters ride along.
+  if (LISTING_SEGMENTS.has(segs[segs.length - 1])) return false;
+
+  // eventbrite: /e/<slug>-tickets-<id> is its ONE per-event shape. /d/… is the
+  // city/category BROWSE surface — many events, never one.
+  if (/(^|\.)eventbrite\./.test(host)) {
+    return segs[0] === "e" && segs.length >= 2;
+  }
+  // lu.ma/<slug>: a single meaningful segment IS the event page.
+  if (host === "lu.ma" || host === "www.lu.ma") {
+    return segs.length === 1;
+  }
+  // generic <collection>/<id>: bibliocommons' /v2/events/<id> and every library
+  // or parks CMS with the same shape. The collection word must sit immediately
+  // before the final segment, so /events/<id>/register does NOT qualify.
+  return segs.length >= 2 && EVENT_COLLECTION_SEGMENTS.has(segs[segs.length - 2]);
+}
+
+// ── image proxies: unwrap before sanitizing ────────────────────────────
+//
+// THE OTHER HALF OF THE INVERSION: a genuine per-event og:image is usually
+// served through a resizing proxy — eventbrite hands out
+// `…/_next/image?url=<encoded>` and `img.evbuc.com/<encoded>`. Those paths carry
+// no raster extension, so sanitizeImageUrl dropped the real photo. Unwrapping
+// the inner url first means the REAL image is what gets sanitized.
+
+/** Query params a resizing proxy hides the real image url in. */
+const IMAGE_PROXY_PARAMS = ["url", "u", "image", "src"] as const;
+/** An absolute http(s) url, encoded once or not at all. */
+const ENCODED_ABSOLUTE_RE = /^https?(:\/\/|%3a%2f%2f|%253a%252f%252f)/i;
+
+/**
+ * Unwrap an image-proxy url to the real image it carries. PURE, never throws.
+ *
+ * Handles the two shapes seen in production: the inner url in a query param
+ * (`…/_next/image?url=https%3A%2F%2F…`) and the inner url AS the path
+ * (`img.evbuc.com/https%3A%2F%2F…`), including double-encoding. Anything that
+ * is not a proxy is returned UNCHANGED, so this is always safe to call before
+ * sanitizeImageUrl. Non-strings and empties return null.
+ */
+export function unwrapImageProxyUrl(raw: unknown, maxHops: number = 3): string | null {
+  if (typeof raw !== "string") return null;
+  let cur = raw.trim();
+  if (!cur) return null;
+  const hops = Number.isFinite(maxHops) && maxHops > 0 ? Math.floor(maxHops) : 3;
+  for (let i = 0; i < hops; i++) {
+    let u: URL;
+    try { u = new URL(cur); } catch { return cur; }
+    let inner: string | null = null;
+    for (const key of IMAGE_PROXY_PARAMS) {
+      const v = (u.searchParams.get(key) ?? "").trim();
+      if (v && ENCODED_ABSOLUTE_RE.test(v)) { inner = v; break; }
+    }
+    if (!inner) {
+      // the payload can BE the path (img.evbuc.com/<encoded absolute url>).
+      const path = u.pathname.replace(/^\/+/, "");
+      if (path && ENCODED_ABSOLUTE_RE.test(path)) inner = path;
+    }
+    if (!inner) return cur;                       // not a proxy — unchanged
+    let decoded = inner;
+    try { decoded = decodeURIComponent(inner); } catch { /* keep as-is */ }
+    if (decoded === cur) return cur;              // no progress — stop
+    cur = decoded;
+  }
+  return cur;
+}
+
 // ── og:image AFTER the search (zero agent steps) ──────────────────────────
 //
 // WHY THIS EXISTS: asking the agent for `imageUrl` was one of the two step
@@ -351,11 +492,13 @@ export function sanitizeImageUrl(raw: unknown): string | null {
 // mentions images at all; instead the SERVER fetches the ONE picked finding's
 // url once and reads its og:image. Costs no agent steps and no vendor call.
 //
-// HONEST LIMITATION: the finding's url is usually a LISTING page (sppl.org/
-// events), not a per-event page, so og:image is frequently the SITE's generic
-// banner or logo rather than the event's own photo. That is inherent to this
-// approach, not a bug — and a miss simply yields null, which the client already
-// renders as its generated gradient card.
+// THE LISTING-PAGE RULE: the finding's url is often a LISTING page (sppl.org/
+// events), whose og:image is the SITE's social card for the whole calendar —
+// very likely a DIFFERENT event's photo. Taking it would break the code's own
+// "the event's OWN image, NEVER a stock/unrelated photo" rule, so the fetch is
+// now gated on isPerEventUrl and simply does not run for a listing. A skip (and
+// any other miss) yields null, which the client renders as its generated
+// gradient card.
 
 /** Longest raw meta content we will even look at (before resolution). */
 const OG_CONTENT_MAX = 2000;
@@ -561,6 +704,15 @@ export function summarizeAgentReply(
  * the clinical exclusion (safety, mirrors the comfort-recs rule); and the
  * JSON-only output contract, still LAST for recency.
  *
+ * WHAT THE COMPRESSION PASS SILENTLY DROPPED, and is now back: the general
+ * gentleness rule ("nothing graphic, violent, frightening, grief centered…"),
+ * the "escape and a little warmth, not a mirror" framing, the blood-drive /
+ * caregiver / psychiatric / medical-advice clinical classes, and the definition
+ * of dateConfidence "approximate". Nothing caught it at the time because the
+ * tests had been rewritten to assert the COMPRESSED set. The SAFETY test in
+ * starFindings.test.ts now pins all of it. Compress the wording if you must;
+ * never compress a rule out of existence.
+ *
  * `preferBookable` PREFERS registration portals, it does not RESTRICT to them:
  * a restrictive earlier shape burned 5 steps for zero candidates while bias-off
  * runs found 6 in the same budget, so the fallback to general listings is part
@@ -581,17 +733,36 @@ export function buildSearchPrompt(
     "eventbrite use its FREE filter and the wellness, community, outdoor, arts and",
     "family categories; skip nightlife, bar, brewery, 21+, high-intensity fitness.",
     "",
+    // GENERAL GENTLENESS — an INDEPENDENT rule, NOT a clause of the clinical
+    // block below, and it must survive any future compression of that block.
+    // It mirrors the comfort-recs system prompt's "only inherently gentle
+    // content" rule, and it catches everything the clinical list cannot: a true
+    // crime walking tour, a war memorial vigil, a horror film night and a
+    // disaster-preparedness talk are all perfectly NON-clinical and all wrong.
+    // A compression pass once deleted both of these sentences outright — see
+    // the SAFETY regression test in starFindings.test.ts.
+    "Only inherently gentle outings: nothing graphic, violent, frightening, grief",
+    "centered, or otherwise distressing. A gentle outing is an escape and a little",
+    "warmth, not a mirror of what someone is going through.",
+    "",
     // CLINICAL EXCLUSION — mirrors the comfort-recs system prompt's rule ("never
     // clinical … comfort means escape and warmth, not a mirror of what they are
     // feeling"), adapted from media to events. Compressed, NOT relaxed: every
-    // excluded class below is the same one the long version named.
+    // excluded class below is the same one the long version named. BLOOD DRIVES
+    // are called out by name because they are the trap: a blood drive is not a
+    // clinic, not a screening and not a health fair, so it slips every other
+    // token here while reading exactly like a free, kind community event.
     "NOT CARE SERVICES — dino brings gentle outings, never care delivery. EXCLUDE",
     "every clinical, therapeutic, or medical-service event even when free and kind",
     "sounding: therapy or counseling, \"talk with a mental health professional\"",
-    "services, support groups, recovery meetings, grief circles, health screenings,",
-    "clinics, health fairs, illness-centered talks. KEEP the genuinely gentle",
-    "non-clinical things: storytime, gardens and nature walks, crafts and open",
-    "studios, music, writing classes, library programs, museum hours.",
+    "services, psychiatric or psychological consultations, support groups,",
+    "recovery meetings and twelve step meetings, grief circles and bereavement",
+    "groups, caregiver support sessions, health screenings, vaccination clinics,",
+    "blood drives (a blood drive is a medical service, not a gentle outing),",
+    "medical clinics, health fairs, medical advice or diagnosis sessions, and",
+    "addiction or illness-centered talks. KEEP the genuinely gentle non-clinical",
+    "things: storytime, gardens and nature walks, crafts and open studios, music,",
+    "writing classes, library programs, museum hours.",
   ];
 
   if (preferBookable) {
@@ -623,9 +794,17 @@ export function buildSearchPrompt(
     "true only if the page requires signing up. startISO/endISO are MACHINE-READ",
     "into a real calendar event: ISO 8601 in America/Chicago, e.g.",
     "\"2026-08-02T14:00:00-05:00\". An offset is REQUIRED; endISO is null when the",
+    // ALL THREE dateConfidence values are DEFINED here, not merely listed in the
+    // schema line above. A compressed version defined only "exact" and
+    // "unknown", so an agent that INFERRED a time had no word for what it had
+    // done and reached for "exact" — which suppresses the client's "this time is
+    // approximate" note and puts a confidently-wrong time on a real calendar.
     "page states no end. dateConfidence is \"exact\" only when the page states BOTH",
-    "the date and the start time. NEVER invent a time: if the listing only says",
-    "\"see listing\", startISO is null and dateConfidence \"unknown\".",
+    "the date and the start time, \"approximate\" when you are inferring either of",
+    "them, and \"unknown\" when the page gives no clear date or time at all.",
+    "NEVER invent a time: if the listing only says \"see listing\", \"TBD\", \"check",
+    "back\", or gives no clear date and time, startISO is null and dateConfidence",
+    "is \"unknown\". An honest \"unknown\" is always better than a guessed time.",
     "",
     // THE OUTPUT CONTRACT LIVES LAST ON PURPOSE — recency. A run that had found
     // six good events narrated them in prose and never emitted the array; the

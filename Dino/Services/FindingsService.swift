@@ -32,6 +32,17 @@ final class FindingsService {
     /// for the server's own 540s ceiling to be the thing that decides.
     private static let startFindingTimeout: TimeInterval = 300
 
+    /// How long the client waits for `confirmFinding` before giving up.
+    ///
+    /// THE SAME BUG, ON THE BOOKING PATH: this callable was still on the ~70s
+    /// Firebase default while a booking run is capped at 25 steps (~165s), so
+    /// the client would abandon a LIVE, BILLING booking agent and invite a
+    /// re-tap — a second billed booking on the same event, possibly a second
+    /// real registration. The ordering that has to hold is
+    /// booking wall clock (240s) < this timeout (300s), and a full 25-step run
+    /// (~165s) sits under both.
+    private static let confirmFindingTimeout: TimeInterval = 300
+
     /// The server's ADDITIVE `tasksRemainingToday` (5/day cap minus used), from
     /// the most recent callable. nil until a call has answered — the idle count
     /// degrades gracefully to "no number" rather than a wrong zero.
@@ -65,8 +76,8 @@ final class FindingsService {
     /// search phase never sees the owner's name/email (that egress is booking
     /// only, in confirmFinding).
     /// `preferBookable` biases the SERVER's source list toward registration /
-    /// signup portals. It is a prompt-level bias only: the 30-step kill and the
-    /// 5/day cap are untouched by it.
+    /// signup portals. It is a prompt-level bias only: the 15-step search kill
+    /// and the 5/day cap are untouched by it.
     func startFinding(preferBookable: Bool = false) async throws -> FindingItem {
         let functions = Functions.functions(region: region)
         let callable = functions.httpsCallable("startFindingTask")
@@ -106,8 +117,11 @@ final class FindingsService {
     /// confirmed | failed) and, for a handoff, the url the owner finishes at.
     func confirmFinding(taskId: String, userName: String) async throws -> (status: String, url: String) {
         let functions = Functions.functions(region: region)
-        let result = try await functions.httpsCallable("confirmFinding")
-            .call(["taskId": taskId, "userName": userName])
+        let callable = functions.httpsCallable("confirmFinding")
+        // wait for the REAL answer instead of abandoning a booking we are paying
+        // for (and that may already have registered the owner for the event).
+        callable.timeoutInterval = Self.confirmFindingTimeout
+        let result = try await callable.call(["taskId": taskId, "userName": userName])
         guard let data = result.data as? [String: Any],
               let status = data["status"] as? String else { throw FindingsError.badResponse }
         let url = data["url"] as? String ?? ""

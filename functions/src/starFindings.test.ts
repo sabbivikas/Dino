@@ -263,6 +263,95 @@ test("the search prompt excludes clinical/therapeutic/medical events in BOTH bra
   }
 });
 
+// ══════════════════════════════════════════════════════════════════════════
+// SAFETY REGRESSION PINS.
+//
+// WHY THESE EXIST: a compression pass on buildSearchPrompt silently deleted the
+// general gentleness rule ("nothing graphic, violent, frightening, grief
+// centered, or otherwise distressing"), the "escape and a little warmth, not a
+// mirror" framing, and four clinical classes including BLOOD DRIVES — and the
+// tests were rewritten in the same pass to assert the COMPRESSED set, so
+// nothing caught it. A safety rule vanishing with green tests is worse than the
+// bug it was guarding against. These pins assert the rules THEMSELVES, in BOTH
+// bias branches, and they are whitespace-tolerant (\s+, never \n) so a future
+// re-wrap of the prompt lines can never be mistaken for a deletion.
+//
+// If one of these fails: RESTORE THE RULE. Do not adjust the assertion.
+// ══════════════════════════════════════════════════════════════════════════
+
+test("SAFETY: the gentleness + clinical rules are present in BOTH branches — do not compress these away", () => {
+  for (const [label, p] of [
+    ["bias off", buildSearchPrompt()],
+    ["bias on", buildSearchPrompt(undefined, true)],
+  ] as const) {
+    // ── 1. the GENERAL gentleness rule. This is INDEPENDENT of the clinical
+    // list below: it is what excludes a true crime walking tour, a war
+    // memorial vigil or a horror film night, none of which are clinical.
+    assert.match(
+      p,
+      /Only\s+inherently\s+gentle\s+outings:\s+nothing\s+graphic,\s+violent,\s+frightening,\s+grief\s+centered,\s+or\s+otherwise\s+distressing\./,
+      `${label}: the general-gentleness sentence must be present VERBATIM`);
+
+    // ── 2. the "escape and a little warmth, not a mirror" framing — the same
+    // sentence the comfort-recs system prompt carries, adapted to events.
+    assert.match(
+      p,
+      /A\s+gentle\s+outing\s+is\s+an\s+escape\s+and\s+a\s+little\s+warmth,\s+not\s+a\s+mirror\s+of\s+what\s+someone\s+is\s+going\s+through\./,
+      `${label}: the escape-not-a-mirror framing must be present`);
+
+    // ── 3. every clinical class needs its OWN token. A class with no token is
+    // a class the agent has no instruction about. "blood drive" is the one
+    // that matters most: a blood drive is not a clinic, not a screening and
+    // not a health fair, so every other token here misses it, while it reads
+    // exactly like a free, kind community event.
+    const CLINICAL_TOKENS = [
+      "therapy", "counseling", "mental health professional", "support group",
+      "recovery", "grief", "caregiver", "psychiatric", "screening",
+      "blood drive", "health fair", "medical advice", "illness",
+      "twelve step", "bereavement", "addiction",
+    ];
+    for (const token of CLINICAL_TOKENS) {
+      assert.match(
+        p, new RegExp(token.replace(/ /g, "\\s+"), "i"),
+        `${label}: the clinical class "${token}" lost its token`);
+    }
+    // vaccination OR clinic — one of the two must name the shot-clinic class.
+    assert.ok(
+      /vaccination/i.test(p) || /clinic/i.test(p),
+      `${label}: neither "vaccination" nor "clinic" is present`);
+  }
+});
+
+test("SAFETY: all THREE dateConfidence values are DEFINED in BOTH branches, not just listed", () => {
+  // WHY: the compressed date block defined "exact" and "unknown" but never said
+  // when to use "approximate", so an agent that INFERRED a time had no word for
+  // what it had done and reached for "exact" — which suppresses the client's
+  // "this time is approximate" honesty note and puts a confidently-wrong time
+  // on a real calendar. Listing the enum in the schema line is NOT a definition.
+  for (const [label, p] of [
+    ["bias off", buildSearchPrompt()],
+    ["bias on", buildSearchPrompt(undefined, true)],
+  ] as const) {
+    assert.match(
+      p, /"exact"\s+only\s+when\s+the\s+page\s+states\s+BOTH\s+the\s+date\s+and\s+the\s+start\s+time/,
+      `${label}: "exact" must be defined`);
+    assert.match(
+      p, /"approximate"\s+when\s+you\s+are\s+inferring\s+either\s+of\s+them/,
+      `${label}: "approximate" must be DEFINED, not merely listed in the schema`);
+    assert.match(
+      p, /"unknown"\s+when\s+the\s+page\s+gives\s+no\s+clear\s+date\s+or\s+time/,
+      `${label}: "unknown" must be defined`);
+    // the unknown trigger is WIDER than the one literal phrase "see listing".
+    assert.match(p, /"TBD"/, `${label}: "TBD" must trigger unknown`);
+    assert.match(p, /"check\s+back"/, `${label}: "check back" must trigger unknown`);
+    assert.match(
+      p, /or\s+gives\s+no\s+clear\s+date\s+and\s+time/,
+      `${label}: a listing with no clear date/time at all must trigger unknown`);
+    // and the honest-unknown rule that all of it serves
+    assert.match(p, /NEVER\s+invent\s+a\s+time/, `${label}: the never-invent rule`);
+  }
+});
+
 test("the PICK prompt is a second gate on clinical candidates", () => {
   const { system } = buildPickPrompt([
     { title: "A", date: "sat", venue: "V", url: "https://a", registrationNeeded: false },

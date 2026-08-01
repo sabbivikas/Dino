@@ -92,6 +92,7 @@ struct FindingsTabView: View {
             isVisible = true
             #if DEBUG
             if applyCardQAIfNeeded() { return }
+            if applyOutcomeQAIfNeeded() { return }
             if applyStateQAIfNeeded() { return }
             if applyRecoverQAIfNeeded() { return }
             #endif
@@ -483,6 +484,35 @@ struct FindingsTabView: View {
         activeFinding = base
         collapsed = false
         setCaption("the star came back with something")
+        return true
+    }
+
+    /// `-findingsOutcomeQA stepcap|timeout|alreadyrunning` drives a fixture
+    /// SERVER RESULT through the REAL `landResult(_:)` switch, so the rendering
+    /// under test is the production branch, not a QA re-implementation. No
+    /// network: the fixture stands in for the callable's return value.
+    ///
+    /// `alreadyrunning` deliberately carries an EMPTY taskId so the branch's own
+    /// `if !item.taskId.isEmpty` guard short-circuits `startPolling` — the state
+    /// renders with zero server calls while still running the real branch.
+    private func applyOutcomeQAIfNeeded() -> Bool {
+        let args = ProcessInfo.processInfo.arguments
+        guard let i = args.firstIndex(of: "-findingsOutcomeQA"), i + 1 < args.count else { return false }
+        UserDefaults.standard.removeObject(forKey: FindingsStore.itemsKey)
+        FindingsStore.clearPending()
+        tripsRemaining = 4
+        switch args[i + 1] {
+        case "stepcap":
+            landResult(FindingItem(taskId: "qaOutcome-stepcap", status: "failed",
+                                   outcome: "failed:step_cap"))
+        case "timeout":
+            landResult(FindingItem(taskId: "qaOutcome-timeout", status: "failed",
+                                   outcome: "failed:timeout"))
+        case "alreadyrunning":
+            landResult(FindingItem(taskId: "", status: "alreadyRunning",
+                                   outcome: "alreadyRunning"))
+        default: return false
+        }
         return true
     }
 

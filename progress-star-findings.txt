@@ -518,3 +518,119 @@ REDEPLOY REQUIRED (owner runs it): startFindingTask (lean prompt, no retry,
 + costUsd). getFindingTask is unchanged but shares the module — deploying all
 three is the safe move. A NEW CLIENT BUILD IS REQUIRED: the 300s callable
 timeout, the honest failed copy, and the alreadyRunning state are all client-side.
+
+
+PASS 4 — SAFETY RESTORE + THE APPROXIMATE DEFINITION + og:image INVERSION +
+THE SPLIT BOOKING CAP (build 105+, NO live AGI run was ever invoked)
+================================================================================
+
+FIX 1 (HIGHEST) — a compression pass silently deleted safety content from
+buildSearchPrompt, and the tests were rewritten in the same pass to assert the
+COMPRESSED set, so nothing caught it. A general safety rule vanishing with green
+tests is worse than the bug it guarded. RESTORED, both bias branches:
+  (a) VERBATIM, as an INDEPENDENT general-gentleness paragraph placed BEFORE the
+      clinical block (it is not a clause of that block — it is what excludes a
+      true crime walking tour, a war memorial vigil, a horror film night, none
+      of which are clinical):
+        "Only inherently gentle outings: nothing graphic, violent, frightening,
+         grief centered, or otherwise distressing."
+        "A gentle outing is an escape and a little warmth, not a mirror of what
+         someone is going through."
+  (b) Clinical classes that had lost explicit coverage, added in the COMPRESSED
+      style (block grew 7 -> 11 lines, +4): BLOOD DRIVES (the important one — a
+      blood drive is not a clinic, not a screening and not a health fair, so
+      every other token missed it while it reads exactly like a free, kind
+      community event; it carries its own parenthetical), caregiver support
+      sessions, psychiatric or psychological consultations, medical advice or
+      diagnosis sessions, plus the twelve step / bereavement / addiction tokens.
+  (c) REGRESSION PINS so this can never silently vanish again — the named test
+      "SAFETY: the gentleness + clinical rules are present in BOTH branches — do
+      not compress these away" in starFindings.test.ts, with the why in a
+      comment and a "RESTORE THE RULE, do not adjust the assertion" instruction.
+      Asserts both sentences VERBATIM and all 16 clinical tokens, in BOTH
+      branches, whitespace-tolerant (\s+, never \n) so a re-wrap can never be
+      mistaken for a deletion.
+
+FIX 2 — the compressed date block defined "exact" and "unknown" but never said
+when to use "approximate", so an agent that INFERRED a time had no word for what
+it had done and could reach for "exact" — suppressing the client's honesty note
+("this time is approximate. the listing is the authority…") and putting a
+confidently-wrong time on a real calendar. All three values are now DEFINED (not
+merely listed in the schema line), and the unknown trigger is wider than the one
+literal phrase "see listing": "TBD", "check back", or no clear date/time at all.
+Pinned by a second named SAFETY test in both branches.
+
+FIX 3 — the og:image INVERSION (an honesty bug): the pipeline ACCEPTED a listing
+page's og:image (the site's social card for the whole calendar — very likely a
+DIFFERENT event's photo, exactly the "stock/unrelated photo" this feature
+forbids) and REJECTED a per-event page's image (eventbrite's
+/e/_next/image?url=… carries no raster extension, so sanitizeImageUrl dropped
+the real photo). Both halves fixed, with two new PURE helpers:
+  (a) isPerEventUrl(url) — true only for urls identifying ONE event
+      (eventbrite /e/<slug>-tickets-<id>, lu.ma/<slug>, any <collection>/<id>
+      incl. bibliocommons /v2/events/<id>); false for /events, /calendar,
+      /programs, eventbrite /d/…, query-only filters, and EVERY unrecognised
+      shape. Conservative by construction — a missing photo is fine, a wrong
+      event's photo is not.
+  (b) the fetch now runs ONLY when isPerEventUrl is true; a listing costs zero
+      requests and logs skipReason="listing_url_not_per_event", so a gradient
+      card is always explainable from one log line.
+  (c) unwrapImageProxyUrl(url) — decodes the real image out of a resizing proxy
+      (param form …/_next/image?url=<encoded>, path form img.evbuc.com/<encoded>,
+      and double-encoding), THEN sanitizes. Not a bypass: an unwrapped non-https
+      target is still rejected.
+  The 5s AbortController, the 512KB body cap, the try/catch and the gradient
+  fallback on any miss are all unchanged.
+
+FIX 4 — SEARCH AND BOOKING NO LONGER SHARE A CAP. A search converges in 6-8
+steps; a booking starts on a LISTING page and realistically needs 8-14 steps
+before it even reaches a form, so 15 made booking structurally likely to fail —
+and the booking path has never once executed to completion.
+  (a) MAX_AGENT_STEPS stays 15 for SEARCH. New MAX_BOOKING_STEPS = 25, used for
+      confirmFinding's booking run ONLY.
+  (b) THE SAME CLIENT-TIMEOUT BUG existed on the booking path: FindingsService
+      .confirmFinding was still on the ~70s Firebase default while a 25-step run
+      takes ~165s — the client would abandon a LIVE, BILLING booking agent and
+      invite a re-tap (a second billed booking, possibly a second real
+      registration). It now sets timeoutInterval = 300s, matching startFinding.
+      THE ORDERING HOLDS: 25 steps ~165s < WALL_CLOCK_MS 240s < client 300s.
+  (c) COST TELEMETRY PER OUTCOME, reported separately, so search and booking
+      exposure are independently visible:
+        search max  = 15 x $0.02 = $0.30
+        booking max = 25 x $0.02 = $0.50
+        worst case one finding + one booking = $0.80
+      Named constants (MAX_SEARCH_COST_USD / MAX_BOOKING_COST_USD /
+      MAX_FINDING_PLUS_BOOKING_COST_USD) + phase=search / phase=booking and
+      maxCostUsd on both summary log lines; costUsd was already distinct per
+      phase and stays so.
+
+PROMPT SIZE (rendered from the COMPILED lib, both branches):
+  bias off 2515 chars / 42 lines -> 3234 / 53   (+719 chars, +11 lines)
+  bias on  2877 chars / 48 lines -> 3596 / 59   (+719 chars, +11 lines)
+  Still roughly half the ~6k shape that stopped converging; the do-NOT-open-
+  each-detail-page rule, the 2-or-3 hard stop and the LAST-position output
+  contract are all untouched.
+
+VERIFY (all local; NO live AGI run — no startFindingTask/confirmFinding was
+ever invoked, no real agent session, no deploy)
+- functions: tsc --noEmit clean; npm test -> 242 pass / 0 fail (226 before).
+  +16: 2 SAFETY pins (gentleness+clinical, dateConfidence trio) in
+  starFindings.test.ts; 8 in findingsImage.test.ts (isPerEventUrl x3,
+  unwrapImageProxyUrl x5 incl. unwrap-then-sanitize and not-a-bypass); 6 in
+  findingsStepCap.test.ts (split cap x3, cost figures, timing ordering).
+  NO pre-existing assertion was weakened or edited.
+- Both prompt branches rendered from lib/starFindings.js: every restored
+  sentence present VERBATIM in both; the pre-fix build is missing all 13.
+- iOS: Debug build SUCCEEDED. DinoTests -> 443 pass / 0 fail (unchanged).
+- git diff main --name-only: shipping files still exactly the FOUR (MainTabView,
+  ContentView, functions/src/index.ts, firestore.rules) + pbxproj build lines.
+  Everything else touched is a NEW file this branch already owns. CrisisResources
+  untouched. English only. Zero .xcstrings.
+
+REDEPLOY REQUIRED (owner runs it): startFindingTask (restored safety prompt,
+the approximate definition, per-event-only og:image + proxy unwrap, phase/cost
+logging) and confirmFinding (the 25-step booking cap + its own cost line).
+getFindingTask is unchanged but shares the module — deploying all three is the
+safe move. A NEW CLIENT BUILD IS REQUIRED: the 300s confirmFinding timeout is
+client-side (and without it the split cap makes the abandonment MORE likely, not
+less, because booking runs now legitimately last longer).
