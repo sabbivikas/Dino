@@ -221,5 +221,66 @@ service cloud.firestore {
         allow write: if false;
       }
     }
+
+    // MONTHLY STORY — dormant control-plane foundation. No current client
+    // references these paths. Control, jobs, spend, and tombstones are fully
+    // server-owned; signal writes are reserved for a future guarded callable.
+    match /featureFlags/monthlyStory {
+      allow read, write: if false;
+    }
+
+    match /monthlyStorySettings/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow create, update: if request.auth != null && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly([
+          'enabled', 'useJournalThemes', 'useHealthPatterns', 'audioEnabled',
+          'timezone', 'timezoneEffectiveMonth', 'settingsVersion', 'updatedAt'
+        ])
+        && request.resource.data.keys().hasAll([
+          'enabled', 'useJournalThemes', 'useHealthPatterns', 'audioEnabled',
+          'timezone', 'timezoneEffectiveMonth', 'settingsVersion', 'updatedAt'
+        ])
+        && request.resource.data.enabled is bool
+        && request.resource.data.useJournalThemes is bool
+        && request.resource.data.useHealthPatterns is bool
+        && request.resource.data.audioEnabled is bool
+        && request.resource.data.timezone is string
+        && request.resource.data.timezone.size() >= 1
+        && request.resource.data.timezone.size() <= 64
+        && request.resource.data.timezoneEffectiveMonth is string
+        && request.resource.data.timezoneEffectiveMonth.matches('^[0-9]{4}-(0[1-9]|1[0-2])$')
+        && request.resource.data.settingsVersion == 1
+        && request.resource.data.updatedAt == request.time;
+      allow delete: if request.auth != null && request.auth.uid == uid;
+    }
+
+    match /monthlyStorySignals/{uid}/months/{monthKey} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow write: if false;
+    }
+
+    match /monthlyStories/{uid}/months/{monthKey} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow write: if false;
+    }
+
+    match /monthlyStoryDeleted/{uid}/months/{monthKey} {
+      allow read, write: if false;
+    }
+
+    match /monthlyStoryJobs/{jobId} {
+      allow read, write: if false;
+    }
+
+    match /monthlyStorySpend/{monthKey} {
+      allow read, write: if false;
+      match /reservations/{reservationId} {
+        allow read, write: if false;
+      }
+    }
+
+    match /monthlyStoryDailySpend/{dayKey} {
+      allow read, write: if false;
+    }
   }
 }

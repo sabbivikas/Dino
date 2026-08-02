@@ -9,6 +9,12 @@ service firebase.storage {
         && request.resource.size < 5 * 1024 * 1024
         && request.resource.contentType.matches('image/.*');
     }
+    // Dormant monthly-story audio path. Only the Admin SDK may create/delete;
+    // an authenticated owner may read a future finalized object.
+    match /monthlyStories/{uid}/{monthKey}/{generationVersion}/story.m4a {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow write: if false;
+    }
     // Everything else is closed.
     match /{allPaths=**} {
       allow read, write: if false;
