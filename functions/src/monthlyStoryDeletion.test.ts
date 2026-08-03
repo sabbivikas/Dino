@@ -9,6 +9,8 @@ test("deletion inventory explicitly covers every future monthly-story surface", 
   ]);
   assert.ok(MONTHLY_STORY_ACCOUNT_DELETION_INVENTORY.serverQueries.some((item) => item.includes("monthlyStoryJobs")));
   assert.ok(MONTHLY_STORY_ACCOUNT_DELETION_INVENTORY.serverQueries.some((item) => item.includes("reservations")));
+  assert.ok(MONTHLY_STORY_ACCOUNT_DELETION_INVENTORY.serverQueries.some((item) =>
+    item.includes("deterministicJobs")));
   assert.deepEqual(MONTHLY_STORY_ACCOUNT_DELETION_INVENTORY.storagePrefixes, ["monthlyStories/{uid}/"]);
   assert.ok(MONTHLY_STORY_ACCOUNT_DELETION_INVENTORY.localCaches.some((item) => item.includes("MonthlyStories")));
   assert.equal(MONTHLY_STORY_ACCOUNT_DELETION_INVENTORY.integrationStatus,
@@ -26,13 +28,16 @@ test("future deletion hook enumerates jobs, reservations, trees, and storage", a
       return jobs;
     },
     deleteSpendReservationsForJob: async (jobId) => { calls.push(`reservation:${jobId}`); },
+    deleteDeterministicUsageForJob: async (jobId) => { calls.push(`usage:${jobId}`); },
     deleteJob: async (jobId) => { calls.push(`job:${jobId}`); },
     deleteStoragePrefix: async (prefix) => { calls.push(`storage:${prefix}`); },
   });
   for (const expected of ["tree:monthlyStorySettings/synthetic-user-a",
     "tree:monthlyStorySignals/synthetic-user-a", "tree:monthlyStories/synthetic-user-a",
     "tree:monthlyStoryDeleted/synthetic-user-a", "storage:monthlyStories/synthetic-user-a/",
-    ...jobs.flatMap((job) => [`reservation:${job}`, `job:${job}`])]) assert.ok(calls.includes(expected));
+    ...jobs.flatMap((job) => [`reservation:${job}`, `usage:${job}`, `job:${job}`])]) {
+    assert.ok(calls.includes(expected));
+  }
 });
 
 test("future deletion hook stops before tombstone removal when earlier cleanup fails", async () => {
@@ -44,6 +49,7 @@ test("future deletion hook stops before tombstone removal when earlier cleanup f
     },
     findJobIdsByOwnerKey: async () => [],
     deleteSpendReservationsForJob: async () => undefined,
+    deleteDeterministicUsageForJob: async () => undefined,
     deleteJob: async () => undefined,
     deleteStoragePrefix: async () => undefined,
   }), /synthetic-failure/);

@@ -8,6 +8,9 @@ import { completeMonthlyStoryStorageCleanup, createMonthlyStoryRetentionMetadata
 test("story retention expires twelve months after month end", () => {
   assert.equal(new Date(monthlyStoryExpiresAtMillis("2026-07")).toISOString(), "2027-08-01T00:00:00.000Z");
   assert.equal(new Date(monthlyStoryExpiresAtMillis("2028-02")).toISOString(), "2029-03-01T00:00:00.000Z");
+  assert.equal(new Date(monthlyStoryExpiresAtMillis("2026-12")).toISOString(), "2028-01-01T00:00:00.000Z");
+  assert.throws(() => createMonthlyStoryRetentionMetadata("2024-02",
+    Date.parse("2025-03-01T00:00:00Z")), /finalization-after-expiry/);
 });
 
 test("retention is timezone independent after finalization", () => {
@@ -31,6 +34,8 @@ test("deletion request makes a story eligible before retention expiry", () => {
 test("deleted tombstones retain for fifteen months after month end", () => {
   assert.equal(new Date(monthlyStoryTombstoneExpiresAtMillis("2026-07")).toISOString(),
     "2027-11-01T00:00:00.000Z");
+  assert.equal(new Date(monthlyStoryTombstoneExpiresAtMillis("2026-12")).toISOString(),
+    "2028-04-01T00:00:00.000Z");
 });
 
 test("storage cleanup markers support pending and complete states", () => {

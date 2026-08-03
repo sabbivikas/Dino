@@ -14,6 +14,7 @@ export const MONTHLY_STORY_ACCOUNT_DELETION_INVENTORY = Object.freeze({
   serverQueries: [
     "monthlyStoryJobs where ownerKey == hash(uid)",
     "monthlyStorySpend/{month}/reservations where jobId is in owned jobs",
+    "monthlyStorySpend/{month}/deterministicJobs where jobId is in owned jobs",
   ],
   storagePrefixes: ["monthlyStories/{uid}/"],
   localCaches: ["Library/Caches/MonthlyStories/{uid}/"],
@@ -24,6 +25,7 @@ export interface MonthlyStoryDeletionDependencies {
   deleteDocumentTree(path: string): Promise<void>;
   findJobIdsByOwnerKey(ownerKey: string): Promise<string[]>;
   deleteSpendReservationsForJob(jobId: string): Promise<void>;
+  deleteDeterministicUsageForJob(jobId: string): Promise<void>;
   deleteJob(jobId: string): Promise<void>;
   deleteStoragePrefix(prefix: string): Promise<void>;
 }
@@ -49,6 +51,7 @@ export async function deleteMonthlyStoryAccountResources(
     dependencies.deleteDocumentTree(`monthlyStorySignals/${uid}`),
     dependencies.deleteDocumentTree(`monthlyStories/${uid}`),
     ...jobIds.map((jobId) => dependencies.deleteSpendReservationsForJob(jobId)),
+    ...jobIds.map((jobId) => dependencies.deleteDeterministicUsageForJob(jobId)),
     dependencies.deleteStoragePrefix(`monthlyStories/${uid}/`),
   ]);
   const firstFailure = firstPass.find((result): result is PromiseRejectedResult => result.status === "rejected");

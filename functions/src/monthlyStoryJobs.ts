@@ -8,7 +8,7 @@ export type MonthlyStoryJobStatus = typeof MONTHLY_STORY_JOB_STATUSES[number];
 export type MonthlyStoryJobStage = "text" | "audio";
 
 export const MONTHLY_STORY_RETRIABLE_FAILURE_CODES = ["providerTimeout", "rateLimited",
-  "transientProvider", "leaseExpired"] as const;
+  "transientProvider", "leaseExpired", "persistenceFailure"] as const;
 export const MONTHLY_STORY_TERMINAL_FAILURE_CODES = ["schemaInvalid", "safetyRejected",
   "budgetDenied", "attemptLimit", "providerRejected"] as const;
 export type MonthlyStoryRetriableFailureCode = typeof MONTHLY_STORY_RETRIABLE_FAILURE_CODES[number];
