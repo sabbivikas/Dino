@@ -89,7 +89,7 @@ export const MONTHLY_STORY_SYNTHETIC_CORPUS = Object.freeze([
 export type MonthlyStoryGolden = { id: string; signal: Record<string, unknown>; script: string;
   claimedEvidenceIds: string[]; claimKeys: string[] };
 
-const richScript = `this month held both hard and lighter moments. work seemed to take a lot out of you, and i think you were missing home too. those feelings could sit beside each other without needing a neat explanation. they both deserved room without becoming the whole story. still, the month was not only about what felt difficult.
+const richScript = `this month held both hard and lighter moments. work seemed to take a lot out of you, and i think you were missing home too. those feelings could sit beside each other without needing a neat explanation. work and missing home were both present, without one explaining the other. they both deserved room without becoming the whole story. still, the month was not only about what felt difficult.
 
 you seemed happiest when you had time for your own ideas. those personal pockets also seemed to give you a quiet place to pause when everything felt crowded. they did not have to fix the whole month to matter. they were simply places where there was a little more room to be yourself and let the pressure soften for a while.
 
@@ -97,13 +97,15 @@ i sent you something when things felt heavy. i hope it gave you a little break, 
 
 next month, try to protect a little more time where work is actually over. save a small pocket of time for your own ideas before everything else fills the space. keep that time easy to return to, without turning it into another task. the goal is not to make every day lighter. it is to leave a few more openings for rest, home, and the parts of you that felt most alive.`;
 
-const moodOnlyScript = `this month seemed heavy, though it did not feel the same all the way through. some stretches may have felt quieter, while others carried more weight. there is no need to force a reason onto that shape. a month can be difficult without offering a clear story about why, and it can shift without becoming a lesson.
+const moodOnlyScript = `this month seemed heavy.
 
-what matters here is giving that heaviness an honest amount of room. you did not need to turn it into progress, prove that you handled it well, or find a bright side before you were ready. there were still changes in the feeling of the month, even if they were small or hard to name. those changes can be held gently without pretending they explain anything.
+some days looked harder than others, and the difficult feeling stayed present across much of the month. i do not know exactly what was behind it. i will not guess at a reason or turn it into a lesson when the cause is not clear.
 
-next month, try to protect a little more room for real rest. that might mean leaving a quiet evening less crowded, letting a plan stay optional, or choosing a slower start when you can. keep the choice simple enough that it does not become another demand.
+next month, choose a part of the weekend before other plans arrive, and keep that time open rather than filling it with another task. it does not have to become a routine or a goal. it can simply be time when nothing is expected from you.
 
-you do not need a grand reset. it may be enough to notice when a day asks for less and give it less when life allows. let the next month arrive without asking it to repair this one. you can meet it a little at a time, with some space left open for whatever it actually feels like.`;
+if the week becomes crowded, decide what can wait until later instead of using the open time first. that gives the rest a fair chance to remain on the calendar without asking it to solve how the month felt.
+
+i hope the coming weeks feel a little easier to move through than the last ones did.`;
 
 const recommendationScript = `this month held a mix of strain and quieter moments. work seemed to take a lot out of you, and there were times when rest felt especially valuable. the difficult parts do not need to be exaggerated, but they also do not need to be brushed aside. work was weighing on you, and the need for a little room seemed real.
 
@@ -115,15 +117,15 @@ next month, try to protect a little more room for real rest before the week beco
 
 the next month does not have to be perfect to feel kinder. a few clearer boundaries and a little more unclaimed time may be enough to make it feel more livable.`;
 
-const simpleScript = `this month held both heavy and lighter moments, and the movement between them seemed important. there is no need to explain every change. some parts of a month are clear, while others are simply felt and then carried forward. what stands out is that you kept finding small ways to make a little room.
+const simpleScript = `this month held both hard and lighter moments.
 
-breathing gave you a quiet place to pause. it did not have to solve anything to be useful as a moment with less noise around it. that kind of pause can matter because it asks very little and can be returned to when the day feels crowded.
+breathing gave you a quiet place to pause. it was a brief practice you could return to without needing it to change the rest of the day. that pause stood on its own as something steady during a month that did not feel the same all the way through. a brief calm moment can matter without becoming proof that everything around it changed.
 
-i sent you a few things, but you left them alone. that is okay. sometimes we do not need anything, and sometimes the timing is simply not right. there is no unfinished task waiting there and nothing you need to catch up on.
+i sent you a few things, but you left them alone. that is okay. leaving them unopened does not mean you missed an opportunity or owe them another look. they can stay where they are unless you decide you want something from them later. nothing about that choice needs to be judged or corrected.
 
-next month, keep a quiet practice easy to return to. you could make it brief, leave it available without a schedule, and use it only when it feels welcome. try to protect it from becoming another expectation. it might also help to leave a little empty space in the week, with no demand to fill it well.
+next month, keep the quiet practice easy to reach on stressful days. choose a simple moment when a brief pause already fits, rather than building a large routine around it. the aim is to keep something familiar nearby without turning it into another obligation. a small practice is enough when that is all the day has room for.
 
-you do not need to carry a perfect understanding of this month into the next one. take the parts that gave you room, leave the rest without judgment, and let the next month be met as it comes.`;
+there were different kinds of days this month, and the next one can begin without extra pressure.`;
 
 export const MONTHLY_STORY_GOLDENS: readonly MonthlyStoryGolden[] = Object.freeze([
   { id: "rich-month", signal: SYNTHETIC_RICH_SIGNAL, script: richScript,

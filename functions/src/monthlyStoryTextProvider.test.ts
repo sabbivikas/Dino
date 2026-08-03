@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert";
-import { buildMonthlyStoryNarrativePlan, monthlyStoryPlanClaimOptions } from "./monthlyStoryNarrativePlan";
+import { buildMonthlyStoryNarrativePlan, monthlyStoryPlanClaimOptions,
+  monthlyStoryWordTarget } from "./monthlyStoryNarrativePlan";
 import { buildMonthlyStoryWriterPrompt } from "./monthlyStoryPrompts";
 import { parseMonthlyStorySignal } from "./monthlyStorySchema";
 import { FailureMonthlyStoryTextProvider, FakeMonthlyStoryTextProvider,
@@ -11,7 +12,7 @@ import { MONTHLY_STORY_GOLDENS, SYNTHETIC_RICH_SIGNAL } from "./monthlyStoryWrit
 const signal = parseMonthlyStorySignal(SYNTHETIC_RICH_SIGNAL);
 const plan = buildMonthlyStoryNarrativePlan(signal);
 const prompt = buildMonthlyStoryWriterPrompt({ plan, allowedClaims: monthlyStoryPlanClaimOptions(plan),
-  storyMode: plan.storyMode, wordTarget: { minimum: 220, preferredMaximum: 290, absoluteMaximum: 300 },
+  storyMode: plan.storyMode, wordTarget: monthlyStoryWordTarget(plan),
   language: "en", promptVersion: "writer-v1" });
 const request = { operation: "writer" as const, prompt, modelSnapshot: "fake-snapshot-v1",
   promptVersion: "writer-v1", timeoutMillis: 1_000, maximumInputTokens: 2_000, maximumOutputTokens: 1_000 };

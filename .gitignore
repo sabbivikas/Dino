@@ -32,3 +32,6 @@ Secrets.xcconfig
 
 # Safety net: local-only secrets file should never be tracked
 Dino/LocalSecrets.swift
+
+# Synthetic monthly-story provider evaluations (local review artifacts only)
+.local/monthly-story-evaluation/

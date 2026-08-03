@@ -1,17 +1,23 @@
 import { MonthlyStoryTextArtifact, createMonthlyStoryTextArtifact } from "./monthlyStoryArtifact";
+import { MonthlyStoryDeterministicComposerInput, MonthlyStoryDeterministicComposition,
+  composeMonthlyStoryDeterministically } from "./monthlyStoryDeterministicComposer";
 import { MonthlyStoryBudgetRepository, commitMonthlyStoryBudget, markMonthlyStoryProviderCallStarted,
   monthlyStoryBudgetPolicy, releaseMonthlyStoryBudget, reserveMonthlyStoryBudget } from "./monthlyStoryBudget";
 import { MonthlyStoryControl, monthlyStoryGenerationIsFailClosed } from "./monthlyStoryControl";
 import { MonthlyStoryCriticResult, parseMonthlyStoryCriticResult } from "./monthlyStoryCritic";
-import { buildMonthlyStoryNarrativePlan, monthlyStoryPlanClaimOptions } from "./monthlyStoryNarrativePlan";
+import { buildMonthlyStoryNarrativePlan, monthlyStoryPlanClaimOptions,
+  monthlyStoryWordTarget } from "./monthlyStoryNarrativePlan";
 import { MonthlyStoryPromptInput, buildMonthlyStoryCriticPrompt, buildMonthlyStoryRepairPrompt,
   buildMonthlyStoryWriterPrompt } from "./monthlyStoryPrompts";
-import { MonthlyStoryScriptValidationResult, validateMonthlyStoryScript } from "./monthlyStoryScriptValidator";
+import { MonthlyStoryScriptValidationResult, monthlyStoryValidationCanBeRepaired,
+  validateMonthlyStoryScript } from "./monthlyStoryScriptValidator";
 import { MonthlyStorySignal, parseMonthlyStorySignal } from "./monthlyStorySchema";
 import { MonthlyStoryTextProvider, MonthlyStoryTextProviderRequest, MonthlyStoryWriterOutput,
   parseMonthlyStoryWriterOutput } from "./monthlyStoryTextProvider";
 
 export const MONTHLY_STORY_WRITTEN_PIPELINE_VERSION = "written-v1";
+export const MONTHLY_STORY_DEFAULT_WRITTEN_MODE = "deterministic" as const;
+export type MonthlyStoryWrittenMode = "deterministic" | "modelEvaluation";
 
 export type MonthlyStoryWrittenPipelineInput = {
   control: MonthlyStoryControl;
@@ -37,6 +43,15 @@ export type MonthlyStoryWrittenPipelineResult = {
   syntheticCommittedMicros: number;
 };
 
+export type MonthlyStoryCompositionPipelineInput =
+  { mode?: "deterministic"; deterministicInput: MonthlyStoryDeterministicComposerInput } |
+  { mode: "modelEvaluation"; modelEvaluationInput: MonthlyStoryWrittenPipelineInput };
+
+export type MonthlyStoryCompositionPipelineResult =
+  { mode: "deterministic"; composition: MonthlyStoryDeterministicComposition; providerCallCount: 0;
+    estimatedProviderCostMicros: 0 } |
+  { mode: "modelEvaluation"; result: MonthlyStoryWrittenPipelineResult };
+
 export type MonthlyStoryPipelineErrorCode = "feature-disabled" | "signal-version-mismatch" |
   "insufficient-material" | "duplicate-generation" | "provider-failure" | "provider-timeout" |
   "malformed-response" | "critic-rejected" | "validation-failed" | "repair-failed" |
@@ -59,12 +74,8 @@ function providerRequest(operation: "writer" | "critic" | "repair",
 function promptInput(signal: MonthlyStorySignal, input: MonthlyStoryWrittenPipelineInput): MonthlyStoryPromptInput {
   const plan = buildMonthlyStoryNarrativePlan(signal);
   return { plan, allowedClaims: monthlyStoryPlanClaimOptions(plan), storyMode: plan.storyMode,
-    wordTarget: { minimum: 220, preferredMaximum: 290, absoluteMaximum: 300 }, language: input.language,
+    wordTarget: monthlyStoryWordTarget(plan), language: input.language,
     promptVersion: input.control.scriptPromptVersion };
-}
-
-function preferredLength(validation: MonthlyStoryScriptValidationResult): boolean {
-  return validation.wordCount >= 220 && validation.wordCount <= 290;
 }
 
 function errorCode(error: unknown): MonthlyStoryPipelineErrorCode {
@@ -134,31 +145,43 @@ Promise<MonthlyStoryWrittenPipelineResult> {
     let output = parseMonthlyStoryWriterOutput(await input.provider.generate(
       providerRequest("writer", writerPrompt, input)));
     let validation = validateOutput(output, signal, prompt);
-    const criticPrompt = buildMonthlyStoryCriticPrompt({ ...prompt,
-      promptVersion: input.control.criticPromptVersion }, output.script,
-    output.claimedEvidenceIds, output.claimKeys);
-    const critic = parseMonthlyStoryCriticResult(await input.provider.generate(
-      providerRequest("critic", criticPrompt, input)));
-    if (critic.decision === "reject") throw new MonthlyStoryPipelineError("critic-rejected");
-
-    const needsRepair = !validation.isValid || !preferredLength(validation) || critic.decision === "repairable";
     let repaired = false;
-    let totalCost = output.syntheticCostMicros + critic.syntheticCostMicros;
-    if (needsRepair) {
+    let totalCost = output.syntheticCostMicros;
+    const repair = async (criticErrors: readonly string[]): Promise<void> => {
       const repairPrompt = buildMonthlyStoryRepairPrompt(prompt, output.script,
-        [...validation.errors, ...(!preferredLength(validation) ? ["outsidePreferredWordRange"] : [])],
-        critic.reasons);
+        validation.errors, criticErrors, output.claimedEvidenceIds, output.claimKeys);
       output = parseMonthlyStoryWriterOutput(await input.provider.generate(
         providerRequest("repair", repairPrompt, input)));
       totalCost += output.syntheticCostMicros;
       validation = validateOutput(output, signal, prompt);
       repaired = true;
-      if (!validation.isValid || !preferredLength(validation)) {
-        throw new MonthlyStoryPipelineError("repair-failed");
+      if (!validation.isValid) throw new MonthlyStoryPipelineError("repair-failed");
+    };
+
+    if (!validation.isValid) {
+      if (!monthlyStoryValidationCanBeRepaired(validation)) {
+        throw new MonthlyStoryPipelineError("validation-failed");
       }
+      await repair([]);
     }
-    if (!validation.isValid || !preferredLength(validation)) {
-      throw new MonthlyStoryPipelineError("validation-failed");
+
+    const criticInput = { ...prompt, promptVersion: input.control.criticPromptVersion };
+    let critic = parseMonthlyStoryCriticResult(await input.provider.generate(
+      providerRequest("critic", buildMonthlyStoryCriticPrompt(criticInput, output.script,
+        output.claimedEvidenceIds, output.claimKeys), input)));
+    totalCost += critic.syntheticCostMicros;
+    if (critic.decision === "reject") throw new MonthlyStoryPipelineError("critic-rejected");
+    if (critic.decision === "repairable") {
+      if (repaired) throw new MonthlyStoryPipelineError("repair-failed");
+      await repair(critic.reasons);
+      critic = parseMonthlyStoryCriticResult(await input.provider.generate(
+        providerRequest("critic", buildMonthlyStoryCriticPrompt(criticInput, output.script,
+          output.claimedEvidenceIds, output.claimKeys), input)));
+      totalCost += critic.syntheticCostMicros;
+      if (critic.decision !== "pass") {
+        throw new MonthlyStoryPipelineError(critic.decision === "reject" ?
+          "critic-rejected" : "repair-failed");
+      }
     }
     const artifact = createMonthlyStoryTextArtifact({ monthKey: signal.monthKey,
       generationVersion: input.control.generationVersion, promptVersion: input.control.scriptPromptVersion,
@@ -180,4 +203,14 @@ Promise<MonthlyStoryWrittenPipelineResult> {
     }
     throw new MonthlyStoryPipelineError(code);
   }
+}
+
+export async function runMonthlyStoryCompositionPipeline(input: MonthlyStoryCompositionPipelineInput):
+Promise<MonthlyStoryCompositionPipelineResult> {
+  if (input.mode !== "modelEvaluation") {
+    return { mode: MONTHLY_STORY_DEFAULT_WRITTEN_MODE,
+      composition: composeMonthlyStoryDeterministically(input.deterministicInput),
+      providerCallCount: 0, estimatedProviderCostMicros: 0 };
+  }
+  return { mode: input.mode, result: await runMonthlyStoryWrittenPipeline(input.modelEvaluationInput) };
 }

@@ -7,7 +7,8 @@ import { passingMonthlyStoryCriticResult } from "./monthlyStoryCritic";
 import { FakeMonthlyStoryTextProvider, FailureMonthlyStoryTextProvider,
   MalformedMonthlyStoryTextProvider, MonthlyStoryTextProvider, MonthlyStoryTextProviderRequest,
   TimeoutMonthlyStoryTextProvider } from "./monthlyStoryTextProvider";
-import { MonthlyStoryPipelineError, runMonthlyStoryWrittenPipeline } from "./monthlyStoryWrittenPipeline";
+import { MonthlyStoryPipelineError, runMonthlyStoryCompositionPipeline,
+  runMonthlyStoryWrittenPipeline } from "./monthlyStoryWrittenPipeline";
 import { MONTHLY_STORY_GOLDENS, SYNTHETIC_RICH_SIGNAL } from "./monthlyStoryWrittenFixtures";
 
 class FakeBudgetRepository implements MonthlyStoryBudgetRepository {
@@ -71,6 +72,16 @@ test("successful writer and critic produce a text-only artifact and commit synth
   assert.deepEqual(provider.calls.map((call) => call.operation), ["writer", "critic"]);
   assert.equal(repository.reservations.get(result.reservationId)?.status, "committed");
   assert.equal(Object.prototype.hasOwnProperty.call(result.artifact, "audio"), false);
+});
+
+test("legacy full-story generation requires the explicit modelEvaluation mode", async () => {
+  const repository = new FakeBudgetRepository();
+  const provider = new FakeMonthlyStoryTextProvider({ writer: writer(),
+    critic: passingMonthlyStoryCriticResult(20) });
+  const result = await runMonthlyStoryCompositionPipeline({ mode: "modelEvaluation",
+    modelEvaluationInput: baseInput(repository, provider) });
+  assert.equal(result.mode, "modelEvaluation");
+  assert.deepEqual(provider.calls.map((call) => call.operation), ["writer", "critic"]);
 });
 
 test("budget is reserved and marked started before the first provider request", async () => {
@@ -141,14 +152,27 @@ test("critic rejection is terminal and never fabricates a fallback", async () =>
 
 test("repairable output receives exactly one repair and commits only after validation", async () => {
   const repository = new FakeBudgetRepository();
-  const provider = new FakeMonthlyStoryTextProvider({ writer: writer(), critic: {
-    ...passingMonthlyStoryCriticResult(20), decision: "repairable", reasons: ["unnatural"] },
+  const provider = new FakeMonthlyStoryTextProvider({ writer: writer(), critic: [
+    { ...passingMonthlyStoryCriticResult(20), decision: "repairable", reasons: ["unnatural"] },
+    passingMonthlyStoryCriticResult(20),
+  ],
   repair: writer(golden.script, 30) });
   const result = await runMonthlyStoryWrittenPipeline(baseInput(repository, provider));
   assert.equal(result.repaired, true);
   assert.equal(result.artifact.textAttemptCount, 2);
-  assert.equal(result.syntheticCommittedMicros, 100);
-  assert.deepEqual(provider.calls.map((call) => call.operation), ["writer", "critic", "repair"]);
+  assert.equal(result.syntheticCommittedMicros, 120);
+  assert.deepEqual(provider.calls.map((call) => call.operation), ["writer", "critic", "repair", "critic"]);
+});
+
+test("a too-short draft gets one completeness repair before critic review", async () => {
+  const repository = new FakeBudgetRepository();
+  const short = writer("this month felt mixed. next month, try to protect a little more rest.", 20);
+  const provider = new FakeMonthlyStoryTextProvider({ writer: short,
+    repair: writer(golden.script, 30), critic: passingMonthlyStoryCriticResult(20) });
+  const result = await runMonthlyStoryWrittenPipeline(baseInput(repository, provider));
+  assert.equal(result.repaired, true);
+  assert.equal(result.syntheticCommittedMicros, 70);
+  assert.deepEqual(provider.calls.map((call) => call.operation), ["writer", "repair", "critic"]);
 });
 
 test("a failed repair is terminal, releases budget, and cannot request another repair", async () => {

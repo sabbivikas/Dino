@@ -3,6 +3,18 @@ import { MonthlyStoryEvidence, MonthlyStorySignal } from "./monthlyStorySchema";
 
 export type MonthlyStoryMode = "standard" | "moodOnly";
 export type MonthlyStoryClosingDirection = "gentleForwardLook" | "quietCompanionship";
+export type MonthlyStoryNarrativeClass = "rich" | "standard" | "moodOnly";
+
+export type MonthlyStoryWordTarget = {
+  narrativeClass: MonthlyStoryNarrativeClass;
+  acceptanceMinimum: number;
+  preferredMinimum: number;
+  preferredMaximum: number;
+  productionMaximum: number;
+  absoluteMaximum: number;
+  availableNarrativeBeats: number;
+  minimumNarrativeBeats: number;
+};
 
 export type MonthlyStoryNarrativePlan = {
   monthKey: string;
@@ -112,4 +124,28 @@ export function monthlyStoryPlanClaimOptions(plan: MonthlyStoryNarrativePlan): M
   return [plan.overallMonthTone, plan.strongestDifficulty, plan.secondDifficulty,
     plan.strongestReliefOrEnergy, plan.recommendationReflection, ...plan.nextMonthSuggestionBases]
     .filter((value): value is MonthlyStoryClaimOption => value !== null);
+}
+
+export function monthlyStoryWordTarget(plan: MonthlyStoryNarrativePlan): MonthlyStoryWordTarget {
+  if (plan.storyMode === "moodOnly") {
+    if (plan.nextMonthSuggestionBases.length < 1) {
+      throw new MonthlyStoryNarrativePlanError("insufficient-meaningful-material");
+    }
+    return { narrativeClass: "moodOnly", acceptanceMinimum: 150, preferredMinimum: 150,
+      preferredMaximum: 210, productionMaximum: 290, absoluteMaximum: 300,
+      availableNarrativeBeats: 2, minimumNarrativeBeats: 2 };
+  }
+  const observations = [plan.strongestDifficulty, plan.secondDifficulty,
+    plan.strongestReliefOrEnergy, plan.recommendationReflection].filter(Boolean).length;
+  if (observations < 2) {
+    throw new MonthlyStoryNarrativePlanError("insufficient-meaningful-material");
+  }
+  if (observations >= 3) {
+    return { narrativeClass: "rich", acceptanceMinimum: 220, preferredMinimum: 220,
+      preferredMaximum: 275, productionMaximum: 290, absoluteMaximum: 300,
+      availableNarrativeBeats: observations, minimumNarrativeBeats: 3 };
+  }
+  return { narrativeClass: "standard", acceptanceMinimum: 190, preferredMinimum: 190,
+    preferredMaximum: 260, productionMaximum: 290, absoluteMaximum: 300,
+    availableNarrativeBeats: observations, minimumNarrativeBeats: 2 };
 }

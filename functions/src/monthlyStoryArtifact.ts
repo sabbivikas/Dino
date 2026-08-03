@@ -33,7 +33,8 @@ export function createMonthlyStoryTextArtifact(input: { monthKey: string; genera
   usedEvidenceIds: string[]; textAttemptCount: number; validation: MonthlyStoryScriptValidationResult;
   createdAtMillis: number; expiresAtMillis: number }): MonthlyStoryTextArtifact {
   if (!input.validation.isValid || input.validation.errors.length !== 0 ||
-      input.validation.wordCount < 220 || input.validation.wordCount > 290 ||
+      input.validation.wordCount < input.validation.minimumWordCount ||
+      input.validation.wordCount > 290 ||
       !Number.isSafeInteger(input.textAttemptCount) || input.textAttemptCount < 1 || input.textAttemptCount > 2 ||
       !Number.isSafeInteger(input.createdAtMillis) || !Number.isSafeInteger(input.expiresAtMillis) ||
       input.createdAtMillis < 0 || input.expiresAtMillis <= input.createdAtMillis ||

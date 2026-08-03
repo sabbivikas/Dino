@@ -4,6 +4,10 @@ export const MONTHLY_STORY_CRITIC_REASON_CODES = [
   "unnatural", "evidenceMismatch", "unsupportedCertainty", "repetitive", "clinicalTone",
   "motivationalTone", "reportTone", "insufficientWarmth", "weakSuggestions",
   "notMonthReflection", "notSpokenLanguage", "overlyPoetic", "outsidePreferredWordRange",
+  "therapistTone", "abstractFiller", "duplicatedOpeningClosing", "genericAdvice",
+  "tooCompressed", "unusedSupportedEvidence", "missingNarrativeSection",
+  "insufficientProgression", "metaCommentary", "repeatedSuggestion", "paddedExplanation",
+  "redundantUncertainty", "closingRestatesStory",
 ] as const;
 export type MonthlyStoryCriticReasonCode = typeof MONTHLY_STORY_CRITIC_REASON_CODES[number];
 export type MonthlyStoryCriticDecision = "pass" | "repairable" | "reject";
