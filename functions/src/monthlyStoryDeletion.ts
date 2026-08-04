@@ -6,6 +6,7 @@ import { monthlyStoryOwnerKey } from "./monthlyStoryRollout";
  */
 export const MONTHLY_STORY_ACCOUNT_DELETION_INVENTORY = Object.freeze({
   documentTrees: [
+    "monthlyStoryInternalTesters/{uid}",
     "monthlyStorySettings/{uid}",
     "monthlyStorySignals/{uid}",
     "monthlyStories/{uid}",
@@ -47,6 +48,7 @@ export async function deleteMonthlyStoryAccountResources(
   }
 
   const firstPass = await Promise.allSettled([
+    dependencies.deleteDocumentTree(`monthlyStoryInternalTesters/${uid}`),
     dependencies.deleteDocumentTree(`monthlyStorySettings/${uid}`),
     dependencies.deleteDocumentTree(`monthlyStorySignals/${uid}`),
     dependencies.deleteDocumentTree(`monthlyStories/${uid}`),

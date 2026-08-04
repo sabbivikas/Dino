@@ -55,8 +55,11 @@ export type MonthlyStoryDeletionEnumeration = {
 
 export interface MonthlyStoryRepository {
   loadControlDocument(): Promise<unknown | null>;
+  loadInternalTesterDocument(uid: string): Promise<unknown | null>;
   loadSettingsDocument(uid: string): Promise<unknown | null>;
+  saveSettingsDocument(uid: string, settings: unknown): Promise<void>;
   loadSignalDocument(uid: string, monthKey: string): Promise<unknown | null>;
+  saveSignalDocument(uid: string, monthKey: string, signal: unknown): Promise<void>;
   loadDeletedTombstone(uid: string, monthKey: string): Promise<MonthlyStoryDeletedTombstone | null>;
   loadStory(uid: string, monthKey: string): Promise<MonthlyStoryPersistedText | null>;
   jobRepository(uid: string, expectedOwnerKey: string): MonthlyStoryJobRepository;
@@ -64,6 +67,8 @@ export interface MonthlyStoryRepository {
   persistStoryAndCompleteJob(input: { uid: string; story: MonthlyStoryPersistedText; jobId: string;
     leaseOwner: string; nowMillis: number }): Promise<{ story: MonthlyStoryPersistedText; duplicate: boolean }>;
   deleteStoryMetadata(uid: string, monthKey: string): Promise<void>;
+  deleteStoryAndCreateTombstone(input: { uid: string; monthKey: string; generationVersion: string;
+    nowMillis: number; expiresAtMillis: number }): Promise<void>;
   enumerateAccountDeletion(uid: string, ownerKeyVersion: string): Promise<MonthlyStoryDeletionEnumeration>;
 }
 
@@ -147,7 +152,8 @@ export function parseMonthlyStoryPersistedText(value: unknown): MonthlyStoryPers
 }
 
 type FirestoreSnapshot = { exists: boolean; id?: string; data(): unknown };
-type FirestoreDocument = { get(): Promise<FirestoreSnapshot>; delete(): Promise<void> };
+type FirestoreDocument = { get(): Promise<FirestoreSnapshot>; delete(): Promise<void>;
+  set(data: unknown): Promise<void> };
 type FirestoreTransaction = { get(reference: unknown): Promise<FirestoreSnapshot>;
   create(reference: unknown, data: unknown): void; set(reference: unknown, data: unknown): void;
   delete(reference: unknown): void };
@@ -170,12 +176,21 @@ export class FirestoreMonthlyStoryRepository implements MonthlyStoryRepository {
   async loadControlDocument(): Promise<unknown | null> {
     return snapshotData(await this.firestore.doc(MONTHLY_STORY_CONTROL_PATH).get());
   }
+  async loadInternalTesterDocument(uid: string): Promise<unknown | null> {
+    return snapshotData(await this.firestore.doc(`monthlyStoryInternalTesters/${uidToken(uid)}`).get());
+  }
   async loadSettingsDocument(uid: string): Promise<unknown | null> {
     return snapshotData(await this.firestore.doc(MONTHLY_STORY_PATHS.settings(uidToken(uid))).get());
+  }
+  async saveSettingsDocument(uid: string, settings: unknown): Promise<void> {
+    await this.firestore.doc(MONTHLY_STORY_PATHS.settings(uidToken(uid))).set(settings);
   }
   async loadSignalDocument(uid: string, monthKey: string): Promise<unknown | null> {
     return snapshotData(await this.firestore.doc(MONTHLY_STORY_PATHS.signal(uidToken(uid),
       requireMonthKey(monthKey))).get());
+  }
+  async saveSignalDocument(uid: string, monthKey: string, signal: unknown): Promise<void> {
+    await this.firestore.doc(MONTHLY_STORY_PATHS.signal(uidToken(uid), requireMonthKey(monthKey))).set(signal);
   }
   async loadDeletedTombstone(uid: string, monthKey: string): Promise<MonthlyStoryDeletedTombstone | null> {
     const value = snapshotData(await this.firestore.doc(MONTHLY_STORY_PATHS.tombstone(uidToken(uid),
@@ -282,6 +297,22 @@ export class FirestoreMonthlyStoryRepository implements MonthlyStoryRepository {
     }
   }
 
+  async deleteStoryAndCreateTombstone(input: { uid: string; monthKey: string; generationVersion: string;
+    nowMillis: number; expiresAtMillis: number }): Promise<void> {
+    const uid = uidToken(input.uid); const monthKey = requireMonthKey(input.monthKey);
+    const generationVersion = requireGenerationVersion(input.generationVersion);
+    millis(input.nowMillis); millis(input.expiresAtMillis);
+    if (input.expiresAtMillis <= input.nowMillis) throw new MonthlyStoryRepositoryError("invalid-repository-input");
+    await this.firestore.runTransaction(async (transaction) => {
+      const story = this.firestore.doc(MONTHLY_STORY_PATHS.story(uid, monthKey));
+      const tombstone = this.firestore.doc(MONTHLY_STORY_PATHS.tombstone(uid, monthKey));
+      transaction.delete(story);
+      transaction.set(tombstone, { monthKey, generationVersion, reason: "userRequest",
+        deletedAtMillis: input.nowMillis, expiresAtMillis: input.expiresAtMillis,
+        storageCleanup: { state: "notRequired", updatedAtMillis: input.nowMillis } });
+    });
+  }
+
   async enumerateAccountDeletion(uid: string, ownerKeyVersion: string): Promise<MonthlyStoryDeletionEnumeration> {
     const safeUid = uidToken(uid); const ownerKey = monthlyStoryOwnerKey(safeUid, ownerKeyVersion);
     const jobs = await this.firestore.collection("monthlyStoryJobs").where("ownerKey", "==", ownerKey).get();
@@ -295,6 +326,7 @@ export class FirestoreMonthlyStoryRepository implements MonthlyStoryRepository {
 
 export class InMemoryMonthlyStoryRepository implements MonthlyStoryRepository {
   controlDocument: unknown | null = null;
+  readonly internalTesters = new Map<string, unknown>();
   readonly settings = new Map<string, unknown>();
   readonly signals = new Map<string, unknown>();
   readonly tombstones = new Map<string, MonthlyStoryDeletedTombstone>();
@@ -313,11 +345,21 @@ export class InMemoryMonthlyStoryRepository implements MonthlyStoryRepository {
     return run;
   }
   loadControlDocument(): Promise<unknown | null> { return Promise.resolve(structuredClone(this.controlDocument)); }
+  loadInternalTesterDocument(uid: string): Promise<unknown | null> {
+    return Promise.resolve(structuredClone(this.internalTesters.get(uidToken(uid)) ?? null));
+  }
   loadSettingsDocument(uid: string): Promise<unknown | null> {
     return Promise.resolve(structuredClone(this.settings.get(uidToken(uid)) ?? null));
   }
+  saveSettingsDocument(uid: string, settings: unknown): Promise<void> {
+    this.settings.set(uidToken(uid), structuredClone(settings)); return Promise.resolve();
+  }
   loadSignalDocument(uid: string, monthKey: string): Promise<unknown | null> {
     return Promise.resolve(structuredClone(this.signals.get(`${uidToken(uid)}/${requireMonthKey(monthKey)}`) ?? null));
+  }
+  saveSignalDocument(uid: string, monthKey: string, signal: unknown): Promise<void> {
+    this.signals.set(`${uidToken(uid)}/${requireMonthKey(monthKey)}`, structuredClone(signal));
+    return Promise.resolve();
   }
   loadDeletedTombstone(uid: string, monthKey: string): Promise<MonthlyStoryDeletedTombstone | null> {
     return Promise.resolve(structuredClone(this.tombstones.get(`${uidToken(uid)}/${requireMonthKey(monthKey)}`) ?? null));
@@ -384,6 +426,16 @@ export class InMemoryMonthlyStoryRepository implements MonthlyStoryRepository {
   async deleteStoryMetadata(uid: string, monthKey: string): Promise<void> {
     if (this.failDeletion) throw new MonthlyStoryRepositoryError("persistence-failure");
     this.stories.delete(`${uidToken(uid)}/${requireMonthKey(monthKey)}`);
+  }
+  async deleteStoryAndCreateTombstone(input: { uid: string; monthKey: string; generationVersion: string;
+    nowMillis: number; expiresAtMillis: number }): Promise<void> {
+    if (this.failDeletion) throw new MonthlyStoryRepositoryError("persistence-failure");
+    const uid = uidToken(input.uid); const monthKey = requireMonthKey(input.monthKey);
+    this.stories.delete(`${uid}/${monthKey}`);
+    this.tombstones.set(`${uid}/${monthKey}`, { monthKey,
+      generationVersion: requireGenerationVersion(input.generationVersion), reason: "userRequest",
+      deletedAtMillis: input.nowMillis, expiresAtMillis: input.expiresAtMillis,
+      storageCleanup: { state: "notRequired", updatedAtMillis: input.nowMillis } });
   }
   enumerateAccountDeletion(uid: string, ownerKeyVersion: string): Promise<MonthlyStoryDeletionEnumeration> {
     const safeUid = uidToken(uid); const ownerKey = monthlyStoryOwnerKey(safeUid, ownerKeyVersion);

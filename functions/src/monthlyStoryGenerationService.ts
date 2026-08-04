@@ -147,10 +147,6 @@ function dayKey(nowMillis: number): string {
   return new Date(nowMillis).toISOString().slice(0, 10);
 }
 
-function monthlyOperationalCap(control: MonthlyStoryControl): number {
-  return Math.min(1_000_000, control.dailyTextGenerationCap * 31);
-}
-
 function persistedStory(input: { composition: MonthlyStoryDeterministicComposition; signal: MonthlyStorySignal;
   control: MonthlyStoryControl; nowMillis: number }): MonthlyStoryPersistedText {
   const retention = createMonthlyStoryRetentionMetadata(input.signal.monthKey, input.nowMillis);
@@ -272,7 +268,7 @@ Promise<MonthlyStoryGenerationServiceResult> {
       maximumAttempts: control.maxTextAttempts });
     leaseAcquired = true;
     await input.repository.reserveDeterministicGenerationSlot({ jobId, monthKey, dayKey: dayKey(nowMillis),
-      dailyCap: control.dailyTextGenerationCap, monthlyCap: monthlyOperationalCap(control), nowMillis });
+      dailyCap: control.dailyTextGenerationCap, monthlyCap: control.monthlyTextGenerationCap, nowMillis });
     const plan = buildMonthlyStoryNarrativePlan(signal);
     const compose = input.composer ?? composeMonthlyStoryDeterministically;
     const composition = compose({ plan, profile: monthlyStoryWordTarget(plan).narrativeClass,

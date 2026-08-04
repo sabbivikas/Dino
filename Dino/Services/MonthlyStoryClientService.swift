@@ -4,6 +4,10 @@ import Combine
 
 struct MonthlyStoryFeatureAvailability: Equatable, Sendable {
     let visible: Bool
+    var signalUploadEnabled = false
+    var textGenerationEnabled = false
+    var generationVersion = ""
+    var signalSchemaVersion = 0
 }
 
 enum MonthlyStoryStoryLoadResult: Equatable, Sendable {
@@ -20,6 +24,9 @@ enum MonthlyStoryClientError: Error, Equatable {
     case malformedStory
     case unsupportedSchemaVersion
     case deletionFailed
+    case featureDisabled
+    case invalidSignal
+    case generationFailed
 }
 
 @MainActor
@@ -28,6 +35,7 @@ protocol MonthlyStoryClientService: AnyObject {
     func loadSettings() async throws -> MonthlyStorySettings
     func updateSettings(_ settings: MonthlyStorySettings) async throws -> MonthlyStorySettings
     func loadAvailableStory() async throws -> MonthlyStoryStoryLoadResult
+    func prepareDeterministicStory(signal: MonthlyStorySignal) async throws -> MonthlyStoryDocument
     func deleteStory(monthKey: MonthlyStoryMonthKey) async throws
     func clearLocalStoryCache(monthKey: MonthlyStoryMonthKey) async
 }
@@ -46,6 +54,7 @@ final class InMemoryMonthlyStoryClientService: MonthlyStoryClientService {
     private(set) var settingsUpdateCount = 0
     private(set) var storyLoadCount = 0
     private(set) var deleteCount = 0
+    private(set) var generationCount = 0
     private(set) var cacheClearCount = 0
 
     init(availability: MonthlyStoryFeatureAvailability = .init(visible: false),
@@ -82,6 +91,18 @@ final class InMemoryMonthlyStoryClientService: MonthlyStoryClientService {
         return storyResult
     }
 
+    func prepareDeterministicStory(signal: MonthlyStorySignal) async throws -> MonthlyStoryDocument {
+        generationCount += 1
+        guard availability.signalUploadEnabled, availability.textGenerationEnabled,
+              signal.isUploadable else { throw MonthlyStoryClientError.featureDisabled }
+        if case .story(let story) = storyResult { return story }
+        guard let story = try? MonthlyStoryPreviewData.story() else {
+            throw MonthlyStoryClientError.generationFailed
+        }
+        storyResult = .story(story)
+        return story
+    }
+
     func deleteStory(monthKey: MonthlyStoryMonthKey) async throws {
         deleteCount += 1
         if let deletionError { throw deletionError }
@@ -109,7 +130,7 @@ private enum MonthlyStoryDefaultClientService {
             )
         }
         #endif
-        return InMemoryMonthlyStoryClientService()
+        return FirestoreMonthlyStoryClientService()
     }()
 }
 
@@ -161,6 +182,8 @@ func resolveMonthlyStoryExperience(localGate: MonthlyStoryInternalGate,
         return MonthlyStoryExperienceSnapshot(isVisible: true,
                                               settings: .disabled,
                                               state: .unavailable(.unsupportedVersion))
+    } catch MonthlyStoryClientError.featureDisabled {
+        return .hidden
     } catch {
         return MonthlyStoryExperienceSnapshot(isVisible: true, settings: .disabled, state: .failed)
     }
@@ -183,10 +206,10 @@ final class MonthlyStoryReaderModel: ObservableObject {
 
     func refreshRemoteAvailability() async {
         do {
-            let availability = try await service.loadFeatureAvailability()
-            if !availability.visible { state = .unavailable(.remoteDisabled) }
+            _ = try await service.loadFeatureAvailability()
         } catch {
-            state = .unavailable(.network)
+            // Preserve an already-open, user-owned story. Remote disable only
+            // prevents future enrollment, upload, and generation actions.
         }
     }
 

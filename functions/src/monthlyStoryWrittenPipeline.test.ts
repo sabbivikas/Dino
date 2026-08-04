@@ -48,7 +48,8 @@ class FakeBudgetRepository implements MonthlyStoryBudgetRepository {
 
 const control: MonthlyStoryControl = { ...SAFE_DISABLED_MONTHLY_STORY_CONTROL,
   visible: true, enrollmentEnabled: true, textGenerationEnabled: true, rolloutBasisPoints: 10_000,
-  dailyTextGenerationCap: 5, monthlyBudgetMicros: 1_000, monthlyTextBudgetMicros: 1_000,
+  dailyTextGenerationCap: 5, monthlyTextGenerationCap: 100,
+  monthlyBudgetMicros: 1_000, monthlyTextBudgetMicros: 1_000,
   monthlyAudioBudgetMicros: 0, maxTextAttempts: 2, generationVersion: "gen-v1", signalSchemaVersion: 1,
   scriptPromptVersion: "writer-v1", criticPromptVersion: "critic-v1", updatedAtMillis: 1 };
 const golden = MONTHLY_STORY_GOLDENS[0];

@@ -28,6 +28,13 @@ describe("monthly story Firestore rules", () => {
     await assertFails(setDoc(doc(alice, "featureFlags", "monthlyStory"), { visible: true }));
   });
 
+  it("keeps the internal tester allowlist server-only", async () => {
+    const alice = testEnv.authenticatedContext("synthetic-user-a").firestore();
+    const tester = doc(alice, "monthlyStoryInternalTesters", "synthetic-user-a");
+    await assertFails(getDoc(tester));
+    await assertFails(setDoc(tester, { enabled: true }));
+  });
+
   it("allows strict owner settings only and rejects cross-user or unknown fields", async () => {
     const alice = testEnv.authenticatedContext("synthetic-user-a").firestore();
     const bob = testEnv.authenticatedContext("synthetic-user-b").firestore();

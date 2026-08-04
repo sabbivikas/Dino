@@ -30,6 +30,8 @@ import { starFindingsGate, buildSearchPrompt, buildPickPrompt, buildBookingPromp
   MAX_SEARCH_COST_USD, MAX_BOOKING_COST_USD,
   AGENT_REPLY_LOG_CAP } from "./starFindings";
 import { runAgentTask, type RunResult } from "./agiClient";
+import { createMonthlyStoryInternalApi, MonthlyStoryInternalApiError } from "./monthlyStoryInternalApi";
+import { FirestoreMonthlyStoryRepository, MonthlyStoryFirestoreDependency } from "./monthlyStoryRepository";
 
 admin.initializeApp();
 
@@ -44,6 +46,84 @@ const META_MODEL_API_KEY = defineSecret("META_MODEL_API_KEY");
 const META_API_BASE = defineString("META_API_BASE", { default: "https://api.meta.ai/v1" });
 
 const DAILY_LIMIT = 5;
+
+const monthlyStoryInternalApi = createMonthlyStoryInternalApi(new FirestoreMonthlyStoryRepository(
+  admin.firestore() as unknown as MonthlyStoryFirestoreDependency));
+
+function monthlyStoryCallableContext(request: { auth?: { uid: string }; data?: unknown }) {
+  const data = request.data as Record<string, unknown> | null | undefined;
+  const appVersion = data && typeof data.appVersion === "string" ? data.appVersion : "";
+  return { auth: request.auth ?? null, appVersion, nowMillis: Date.now() };
+}
+
+function monthlyStoryPayload(request: { data?: unknown }, fields: readonly string[]): Record<string, unknown> {
+  if (typeof request.data !== "object" || request.data === null || Array.isArray(request.data)) {
+    throw new HttpsError("invalid-argument", "request unavailable");
+  }
+  const data = request.data as Record<string, unknown>;
+  const allowed = new Set(["appVersion", ...fields]);
+  if (Object.keys(data).length !== allowed.size || [...allowed].some((key) => !(key in data)) ||
+      Object.keys(data).some((key) => !allowed.has(key))) {
+    throw new HttpsError("invalid-argument", "request unavailable");
+  }
+  return Object.fromEntries(fields.map((field) => [field, data[field]]));
+}
+
+function monthlyStoryHttpsError(error: unknown): HttpsError {
+  if (error instanceof HttpsError) return error;
+  if (error instanceof MonthlyStoryInternalApiError) {
+    return new HttpsError(error.code, "monthly story unavailable");
+  }
+  return new HttpsError("internal", "monthly story unavailable");
+}
+
+export const getMonthlyStoryInternalAvailability = onCall(
+  { timeoutSeconds: 15, memory: "256MiB" }, async (request) => {
+    try {
+      monthlyStoryPayload(request, []);
+      return await monthlyStoryInternalApi.availability(monthlyStoryCallableContext(request));
+    } catch (error) { throw monthlyStoryHttpsError(error); }
+  });
+
+export const getMonthlyStoryInternalSettings = onCall(
+  { timeoutSeconds: 15, memory: "256MiB" }, async (request) => {
+    try {
+      monthlyStoryPayload(request, []);
+      return await monthlyStoryInternalApi.loadSettings(monthlyStoryCallableContext(request));
+    } catch (error) { throw monthlyStoryHttpsError(error); }
+  });
+
+export const updateMonthlyStoryInternalSettings = onCall(
+  { timeoutSeconds: 15, memory: "256MiB" }, async (request) => {
+    try {
+      const payload = monthlyStoryPayload(request, ["settings"]);
+      return await monthlyStoryInternalApi.updateSettings(monthlyStoryCallableContext(request), payload.settings);
+    } catch (error) { throw monthlyStoryHttpsError(error); }
+  });
+
+export const loadMonthlyStoryInternalStory = onCall(
+  { timeoutSeconds: 15, memory: "256MiB" }, async (request) => {
+    try {
+      const payload = monthlyStoryPayload(request, ["monthKey"]);
+      return await monthlyStoryInternalApi.loadStory(monthlyStoryCallableContext(request), payload);
+    } catch (error) { throw monthlyStoryHttpsError(error); }
+  });
+
+export const generateMonthlyStoryInternal = onCall(
+  { timeoutSeconds: 60, memory: "512MiB" }, async (request) => {
+    try {
+      const payload = monthlyStoryPayload(request, ["monthKey", "generationVersion", "signal"]);
+      return await monthlyStoryInternalApi.generate(monthlyStoryCallableContext(request), payload);
+    } catch (error) { throw monthlyStoryHttpsError(error); }
+  });
+
+export const deleteMonthlyStoryInternal = onCall(
+  { timeoutSeconds: 30, memory: "256MiB" }, async (request) => {
+    try {
+      const payload = monthlyStoryPayload(request, ["monthKey", "generationVersion"]);
+      return await monthlyStoryInternalApi.deleteStory(monthlyStoryCallableContext(request), payload);
+    } catch (error) { throw monthlyStoryHttpsError(error); }
+  });
 
 export const generateMoodPainting = onCall(
   { secrets: [OPENAI_API_KEY], timeoutSeconds: 120, memory: "512MiB" },
@@ -2877,7 +2957,6 @@ export const nightlyPreferenceDistill = onSchedule(
     }
     functions.logger.info("prefs_nightly", { candidates: uids.length, distilled });
   });
-
 // ---------------------------------------------------------------------------
 // STAR FINDINGS (experimental owner-only demo) — additive onCalls. The star is
 // sent out by a real browser-agent (AGI) to find one gentle, free thing to do
@@ -3317,4 +3396,3 @@ export const confirmFinding = onCall(
     return { status, url: finding.url ?? "" };
   }
 );
-

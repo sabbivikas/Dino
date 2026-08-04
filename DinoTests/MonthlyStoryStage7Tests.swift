@@ -150,7 +150,7 @@ final class MonthlyStoryStage7Tests: XCTestCase {
         XCTAssertEqual(service.cacheClearCount, 0)
     }
 
-    func testRemoteDisableWhileReaderOpenHidesStory() async throws {
+    func testRemoteDisableWhileReaderOpenPreservesOwnedStory() async throws {
         let story = try MonthlyStoryPreviewData.story()
         let service = InMemoryMonthlyStoryClientService(
             availability: .init(visible: true),
@@ -161,7 +161,7 @@ final class MonthlyStoryStage7Tests: XCTestCase {
 
         await model.refreshRemoteAvailability()
 
-        XCTAssertEqual(model.state, .unavailable(.remoteDisabled))
+        XCTAssertEqual(model.state, .ready(story))
     }
 
     func testStage7SourceHasNoFirebaseAnalyticsHealthOrAudioIntegration() throws {
@@ -198,7 +198,7 @@ final class MonthlyStoryStage7Tests: XCTestCase {
         )
 
         XCTAssertFalse(appSource.contains("MonthlyStory"))
-        XCTAssertEqual(profileSource.components(separatedBy: "MonthlyStoryCardHost()").count - 1, 1)
+        XCTAssertEqual(profileSource.components(separatedBy: "MonthlyStoryCardHost(").count - 1, 1)
         XCTAssertFalse(profileSource.contains("MonthlyStoryClientService"))
         XCTAssertFalse(profileSource.contains("monthlyStoryInternal"))
     }

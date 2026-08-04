@@ -11,6 +11,7 @@ export type MonthlyStoryControl = {
   rolloutBasisPoints: number;
   minimumAppVersion: string;
   dailyTextGenerationCap: number;
+  monthlyTextGenerationCap: number;
   dailyAudioGenerationCap: number;
   monthlyBudgetMicros: number;
   monthlyTextBudgetMicros: number;
@@ -28,7 +29,7 @@ export type MonthlyStoryControl = {
 const CONTROL_FIELDS = [
   "visible", "enrollmentEnabled", "signalUploadEnabled",
   "textGenerationEnabled", "audioGenerationEnabled", "rolloutBasisPoints",
-  "minimumAppVersion", "dailyTextGenerationCap", "dailyAudioGenerationCap",
+  "minimumAppVersion", "dailyTextGenerationCap", "monthlyTextGenerationCap", "dailyAudioGenerationCap",
   "monthlyBudgetMicros", "monthlyTextBudgetMicros", "monthlyAudioBudgetMicros",
   "maxTextAttempts", "maxAudioAttempts", "generationVersion",
   "signalSchemaVersion", "scriptPromptVersion", "criticPromptVersion",
@@ -44,6 +45,7 @@ export const SAFE_DISABLED_MONTHLY_STORY_CONTROL: Readonly<MonthlyStoryControl> 
   rolloutBasisPoints: 0,
   minimumAppVersion: "",
   dailyTextGenerationCap: 0,
+  monthlyTextGenerationCap: 0,
   dailyAudioGenerationCap: 0,
   monthlyBudgetMicros: 0,
   monthlyTextBudgetMicros: 0,
@@ -118,6 +120,7 @@ export function parseMonthlyStoryControl(
       !integerIn(value.rolloutBasisPoints, 0, 10_000) ||
       !validMinimumAppVersion(value.minimumAppVersion) ||
       !integerIn(value.dailyTextGenerationCap, 0, 1_000_000) ||
+      !integerIn(value.monthlyTextGenerationCap, 0, 1_000_000) ||
       !integerIn(value.dailyAudioGenerationCap, 0, 1_000_000) ||
       !integerIn(value.monthlyBudgetMicros, 0, Number.MAX_SAFE_INTEGER) ||
       !integerIn(value.monthlyTextBudgetMicros, 0, Number.MAX_SAFE_INTEGER) ||
@@ -146,6 +149,7 @@ export function parseMonthlyStoryControl(
       rolloutBasisPoints: value.rolloutBasisPoints as number,
       minimumAppVersion: value.minimumAppVersion as string,
       dailyTextGenerationCap: value.dailyTextGenerationCap as number,
+      monthlyTextGenerationCap: value.monthlyTextGenerationCap as number,
       dailyAudioGenerationCap: value.dailyAudioGenerationCap as number,
       monthlyBudgetMicros: value.monthlyBudgetMicros as number,
       monthlyTextBudgetMicros: value.monthlyTextBudgetMicros as number,
@@ -165,6 +169,7 @@ export function parseMonthlyStoryControl(
 export function monthlyStoryGenerationIsFailClosed(control: MonthlyStoryControl): boolean {
   return !control.enrollmentEnabled || !control.textGenerationEnabled ||
     control.rolloutBasisPoints === 0 || control.dailyTextGenerationCap === 0 ||
+    control.monthlyTextGenerationCap === 0 ||
     control.monthlyBudgetMicros === 0 || control.monthlyTextBudgetMicros === 0 ||
     control.maxTextAttempts === 0;
 }

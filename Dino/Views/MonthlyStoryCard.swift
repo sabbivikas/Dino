@@ -87,6 +87,8 @@ private extension MonthlyStoryViewState {
         switch self {
         case .ready: "read story"
         case .settingsDisabled: "choose what to include"
+        case .noStory: "prepare my story"
+        case .preparing: "preparing…"
         default: "view details"
         }
     }
@@ -105,6 +107,14 @@ struct MonthlyStoryCardHost: View {
     @Environment(\.monthlyStoryClientService) private var service
     @State private var snapshot = MonthlyStoryExperienceSnapshot.hidden
     @State private var route: Route?
+    @State private var isPreparing = false
+    let dataManager: SharedDataManager?
+    let journalThemeLearningEnabled: Bool
+
+    init(dataManager: SharedDataManager? = nil, journalThemeLearningEnabled: Bool = false) {
+        self.dataManager = dataManager
+        self.journalThemeLearningEnabled = journalThemeLearningEnabled
+    }
 
     private enum Route: Identifiable {
         case setup
@@ -149,12 +159,42 @@ struct MonthlyStoryCardHost: View {
     private func openPrimaryDestination() {
         if case .ready(let story) = snapshot.state {
             route = .reader(story)
+        } else if case .noStory = snapshot.state {
+            Task { await prepareStory() }
         } else {
             route = .setup
         }
     }
 
     private func refresh() async {
-        snapshot = await resolveMonthlyStoryExperience(localGate: localGate, service: service)
+        let refreshed = await resolveMonthlyStoryExperience(localGate: localGate, service: service)
+        if !refreshed.isVisible, case .ready = snapshot.state {
+            return
+        }
+        snapshot = refreshed
+    }
+
+    private func prepareStory() async {
+        guard !isPreparing, let dataManager, snapshot.settings.enabled else { return }
+        isPreparing = true
+        snapshot = MonthlyStoryExperienceSnapshot(isVisible: true, settings: snapshot.settings, state: .preparing)
+        defer { isPreparing = false }
+        do {
+            let availability = try await service.loadFeatureAvailability()
+            guard availability.visible, availability.signalUploadEnabled,
+                  availability.textGenerationEnabled else { throw MonthlyStoryClientError.featureDisabled }
+            let coordinator = MonthlyStorySignalCoordinator(dataManager: dataManager,
+                journalThemeLearningEnabled: journalThemeLearningEnabled)
+            let signal = try await coordinator.buildSignal(settings: snapshot.settings)
+            let story = try await service.prepareDeterministicStory(signal: signal)
+            snapshot = MonthlyStoryExperienceSnapshot(isVisible: true, settings: snapshot.settings,
+                                                      state: .ready(story))
+        } catch MonthlyStorySignalCoordinatorError.insufficientEvidence {
+            snapshot = MonthlyStoryExperienceSnapshot(isVisible: true, settings: snapshot.settings,
+                                                      state: .noStory)
+        } catch {
+            snapshot = MonthlyStoryExperienceSnapshot(isVisible: true, settings: snapshot.settings,
+                                                      state: .failed)
+        }
     }
 }

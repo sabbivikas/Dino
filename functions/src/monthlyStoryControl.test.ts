@@ -7,7 +7,8 @@ const now = Date.parse("2026-08-02T12:00:00Z");
 const validControl = (overrides: Record<string, unknown> = {}): Record<string, unknown> => ({
   visible: false, enrollmentEnabled: true, signalUploadEnabled: true,
   textGenerationEnabled: true, audioGenerationEnabled: true, rolloutBasisPoints: 500,
-  minimumAppVersion: "1.2.3", dailyTextGenerationCap: 10, dailyAudioGenerationCap: 5,
+  minimumAppVersion: "1.2.3", dailyTextGenerationCap: 10, monthlyTextGenerationCap: 100,
+  dailyAudioGenerationCap: 5,
   monthlyBudgetMicros: 1_000_000, monthlyTextBudgetMicros: 600_000,
   monthlyAudioBudgetMicros: 400_000, maxTextAttempts: 2, maxAudioAttempts: 2,
   generationVersion: "v1", signalSchemaVersion: 1, scriptPromptVersion: "script-v1",
@@ -34,7 +35,7 @@ test("a complete fresh control parses but zero gates still fail closed", () => {
   assert.equal(parsed.accepted, true);
   assert.equal(monthlyStoryGenerationIsFailClosed(parsed.control), false);
 
-  for (const field of ["rolloutBasisPoints", "dailyTextGenerationCap", "monthlyBudgetMicros",
+  for (const field of ["rolloutBasisPoints", "dailyTextGenerationCap", "monthlyTextGenerationCap", "monthlyBudgetMicros",
     "monthlyTextBudgetMicros", "maxTextAttempts"] as const) {
     const zero = parseMonthlyStoryControl(validControl({ [field]: 0,
       ...(field === "monthlyBudgetMicros" ? { monthlyTextBudgetMicros: 0, monthlyAudioBudgetMicros: 0 } : {}) }), now);

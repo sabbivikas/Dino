@@ -4,7 +4,7 @@ import { MONTHLY_STORY_ACCOUNT_DELETION_INVENTORY, deleteMonthlyStoryAccountReso
 
 test("deletion inventory explicitly covers every future monthly-story surface", () => {
   assert.deepEqual(MONTHLY_STORY_ACCOUNT_DELETION_INVENTORY.documentTrees, [
-    "monthlyStorySettings/{uid}", "monthlyStorySignals/{uid}",
+    "monthlyStoryInternalTesters/{uid}", "monthlyStorySettings/{uid}", "monthlyStorySignals/{uid}",
     "monthlyStories/{uid}", "monthlyStoryDeleted/{uid}",
   ]);
   assert.ok(MONTHLY_STORY_ACCOUNT_DELETION_INVENTORY.serverQueries.some((item) => item.includes("monthlyStoryJobs")));
@@ -32,7 +32,8 @@ test("future deletion hook enumerates jobs, reservations, trees, and storage", a
     deleteJob: async (jobId) => { calls.push(`job:${jobId}`); },
     deleteStoragePrefix: async (prefix) => { calls.push(`storage:${prefix}`); },
   });
-  for (const expected of ["tree:monthlyStorySettings/synthetic-user-a",
+  for (const expected of ["tree:monthlyStoryInternalTesters/synthetic-user-a",
+    "tree:monthlyStorySettings/synthetic-user-a",
     "tree:monthlyStorySignals/synthetic-user-a", "tree:monthlyStories/synthetic-user-a",
     "tree:monthlyStoryDeleted/synthetic-user-a", "storage:monthlyStories/synthetic-user-a/",
     ...jobs.flatMap((job) => [`reservation:${job}`, `usage:${job}`, `job:${job}`])]) {

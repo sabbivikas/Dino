@@ -18,7 +18,8 @@ const nowMillis = Date.parse("2026-08-04T12:00:00.000Z");
 function control(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return { visible: true, enrollmentEnabled: true, signalUploadEnabled: true,
     textGenerationEnabled: true, audioGenerationEnabled: false, rolloutBasisPoints: 10_000,
-    minimumAppVersion: "1.0.0", dailyTextGenerationCap: 10, dailyAudioGenerationCap: 0,
+    minimumAppVersion: "1.0.0", dailyTextGenerationCap: 10, monthlyTextGenerationCap: 100,
+    dailyAudioGenerationCap: 0,
     monthlyBudgetMicros: 1, monthlyTextBudgetMicros: 1, monthlyAudioBudgetMicros: 0,
     maxTextAttempts: 3, maxAudioAttempts: 0, generationVersion, signalSchemaVersion: 1,
     scriptPromptVersion: "deterministic-v1", criticPromptVersion: "none-v1", ttsVersion: "none-v1",

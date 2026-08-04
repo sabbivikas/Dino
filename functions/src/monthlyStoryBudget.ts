@@ -11,6 +11,7 @@ export type MonthlyStoryBudgetPolicy = {
   monthlyTextBudgetMicros: number;
   monthlyAudioBudgetMicros: number;
   dailyTextGenerationCap: number;
+  monthlyTextGenerationCap: number;
   dailyAudioGenerationCap: number;
 };
 
@@ -28,6 +29,7 @@ export type MonthlyStoryMonthlySpend = {
   reservedMicros: number;
   committedMicros: number;
   releasedMicros: number;
+  textGenerationCount?: number;
   text: MonthlyStoryStageTotals;
   audio: MonthlyStoryStageTotals;
   updatedAtMillis: number;
@@ -87,6 +89,7 @@ export function monthlyStoryBudgetPolicy(control: MonthlyStoryControl): MonthlyS
     monthlyTextBudgetMicros: control.monthlyTextBudgetMicros,
     monthlyAudioBudgetMicros: control.monthlyAudioBudgetMicros,
     dailyTextGenerationCap: control.dailyTextGenerationCap,
+    monthlyTextGenerationCap: control.monthlyTextGenerationCap,
     dailyAudioGenerationCap: control.dailyAudioGenerationCap,
   };
 }
@@ -97,7 +100,7 @@ function validNonNegative(value: number): boolean {
 
 function validPolicy(policy: MonthlyStoryBudgetPolicy | null): policy is MonthlyStoryBudgetPolicy {
   return policy !== null && [policy.monthlyBudgetMicros, policy.monthlyTextBudgetMicros,
-    policy.monthlyAudioBudgetMicros, policy.dailyTextGenerationCap,
+    policy.monthlyAudioBudgetMicros, policy.dailyTextGenerationCap, policy.monthlyTextGenerationCap,
     policy.dailyAudioGenerationCap].every(validNonNegative) &&
     policy.monthlyTextBudgetMicros + policy.monthlyAudioBudgetMicros <= policy.monthlyBudgetMicros;
 }
@@ -129,6 +132,7 @@ function emptyMonthly(monthKey: string, policy: MonthlyStoryBudgetPolicy, nowMil
   return { monthKey, ceilingMicros: policy.monthlyBudgetMicros,
     textCeilingMicros: policy.monthlyTextBudgetMicros, audioCeilingMicros: policy.monthlyAudioBudgetMicros,
     reservedMicros: 0, committedMicros: 0, releasedMicros: 0,
+    textGenerationCount: 0,
     text: totals(), audio: totals(), updatedAtMillis: nowMillis };
 }
 
@@ -192,7 +196,13 @@ export async function reserveMonthlyStoryBudget(
       }
       return { reservation: existing, duplicate: true };
     }
-    const monthly = await transaction.getMonthlySpend(monthKey) ?? emptyMonthly(monthKey, policy, input.nowMillis);
+    const storedMonthly = await transaction.getMonthlySpend(monthKey) ??
+      emptyMonthly(monthKey, policy, input.nowMillis);
+    const monthly: MonthlyStoryMonthlySpend & { textGenerationCount: number } = {
+      ...storedMonthly,
+      textGenerationCount: typeof storedMonthly.textGenerationCount === "number" &&
+        validNonNegative(storedMonthly.textGenerationCount) ? storedMonthly.textGenerationCount : 0,
+    };
     const daily = await transaction.getDailySpend(dayKey) ?? emptyDaily(dayKey, input.nowMillis);
     verifyLedgerPolicy(monthly, policy);
     const stage = stageTotals(monthly, input.stage);
@@ -205,6 +215,10 @@ export async function reserveMonthlyStoryBudget(
     if (dailyCount(daily, input.stage) >= dailyCap(policy, input.stage)) {
       throw new MonthlyStoryBudgetError("daily-cap");
     }
+    if (input.stage === "text" && (policy.monthlyTextGenerationCap === 0 ||
+        monthly.textGenerationCount >= policy.monthlyTextGenerationCap)) {
+      throw new MonthlyStoryBudgetError("monthly-cap");
+    }
     const reservation: MonthlyStoryBudgetReservation = { reservationId, jobId: input.jobId,
       monthKey, dayKey,
       stage: input.stage, attempt: input.attempt, amountMicros: input.amountMicros,
@@ -213,6 +227,7 @@ export async function reserveMonthlyStoryBudget(
       updatedAtMillis: input.nowMillis };
     const updatedStage = { ...stage, reservedMicros: stage.reservedMicros + input.amountMicros };
     const updatedMonthly = { ...monthly, reservedMicros: monthly.reservedMicros + input.amountMicros,
+      textGenerationCount: monthly.textGenerationCount + (input.stage === "text" ? 1 : 0),
       [input.stage]: updatedStage, updatedAtMillis: input.nowMillis } as MonthlyStoryMonthlySpend;
     const updatedDaily = { ...daily,
       textGenerationCount: daily.textGenerationCount + (input.stage === "text" ? 1 : 0),
