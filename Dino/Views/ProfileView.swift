@@ -856,6 +856,7 @@ struct ProfileView: View {
                 .padding(.vertical, 2)
             }
             .buttonStyle(.plain)
+            MonthlyStoryCardHost()
             // the little shelf — reuses the shelf's own gentle voice
             SBRow(
                 icon: "books.vertical.fill",
