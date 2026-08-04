@@ -6,9 +6,13 @@ struct MonthlyStoryInternalGate: Equatable, Sendable {
     static let disabled = MonthlyStoryInternalGate(isEnabled: false)
 
     static var processDefault: MonthlyStoryInternalGate {
+        #if MONTHLY_STORY_INTERNAL_BUILD
+        MonthlyStoryInternalGate(isEnabled: true)
+        #else
         MonthlyStoryInternalGate(
-            isEnabled: ProcessInfo.processInfo.arguments.contains("-monthlyStoryInternal")
+            isEnabled: false
         )
+        #endif
     }
 
     func permits(remoteVisible: Bool) -> Bool {

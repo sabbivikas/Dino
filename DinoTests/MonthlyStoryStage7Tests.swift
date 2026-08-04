@@ -3,6 +3,29 @@ import XCTest
 
 @MainActor
 final class MonthlyStoryStage7Tests: XCTestCase {
+    func testCompiledInternalGateMatchesBuildConfiguration() {
+        #if MONTHLY_STORY_INTERNAL_BUILD
+        XCTAssertTrue(MonthlyStoryInternalGate.processDefault.isEnabled)
+        #else
+        XCTAssertFalse(MonthlyStoryInternalGate.processDefault.isEnabled)
+        #endif
+    }
+
+    func testInternalTestFlightConfigurationOnlyEnablesCompilationGate() throws {
+        let source = try String(
+            contentsOf: repositoryRoot().appendingPathComponent("MonthlyStoryInternalTestFlight.xcconfig"),
+            encoding: .utf8
+        )
+
+        XCTAssertTrue(source.contains("MONTHLY_STORY_INTERNAL_BUILD"))
+        for forbidden in [
+            "GoogleService-Info", "PRODUCT_BUNDLE_IDENTIFIER", "FIREBASE", "POSTHOG",
+            "OPENAI", "HUME", "TTS", "API_KEY", "SECRET"
+        ] {
+            XCTAssertFalse(source.uppercased().contains(forbidden.uppercased()))
+        }
+    }
+
     func testInternalGateHiddenSkipsRemoteService() async {
         let service = InMemoryMonthlyStoryClientService(
             availability: .init(visible: true)
