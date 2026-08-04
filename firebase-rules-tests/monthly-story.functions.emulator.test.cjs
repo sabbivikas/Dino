@@ -1,9 +1,10 @@
 const { initializeApp, deleteApp } = require("firebase/app");
-const { getAuth, connectAuthEmulator, createUserWithEmailAndPassword } = require("firebase/auth");
+const { getAuth, connectAuthEmulator, signInWithEmailAndPassword } = require("firebase/auth");
 const { createRequire } = require("node:module");
 const path = require("node:path");
 const functionsRequire = createRequire(path.resolve(__dirname, "../functions/package.json"));
 const { initializeApp: initializeAdminApp, deleteApp: deleteAdminApp } = functionsRequire("firebase-admin/app");
+const { getAuth: getAdminAuth } = functionsRequire("firebase-admin/auth");
 const { getFirestore } = functionsRequire("firebase-admin/firestore");
 const { approvedMonthlyStoryEvaluationFixture } = require("../functions/lib/monthlyStorySyntheticEvaluationFixtures");
 
@@ -105,16 +106,20 @@ suite("monthly-story callable envelopes", () => {
   }
 
   beforeAll(async () => {
+    adminApp = initializeAdminApp({ projectId: PROJECT_ID }, "stage9-admin");
+    await getAdminAuth(adminApp).createUser({ uid: "synthetic-user-a",
+      email: "internal-stage9@example.test", password: "synthetic-password-1!" });
+    await getAdminAuth(adminApp).createUser({ uid: "synthetic-user-b",
+      email: "normal-stage9@example.test", password: "synthetic-password-2!" });
     clientApp = initializeApp({ projectId: PROJECT_ID, apiKey: "synthetic-emulator-key" }, "stage9-client");
     const auth = getAuth(clientApp);
     connectAuthEmulator(auth, `http://${process.env.FIREBASE_AUTH_EMULATOR_HOST}`, { disableWarnings: true });
-    const internal = await createUserWithEmailAndPassword(auth, "internal-stage9@example.test", "synthetic-password-1!");
+    const internal = await signInWithEmailAndPassword(auth, "internal-stage9@example.test", "synthetic-password-1!");
     internalUid = internal.user.uid;
     internalToken = await internal.user.getIdToken();
-    const normal = await createUserWithEmailAndPassword(auth, "normal-stage9@example.test", "synthetic-password-2!");
+    const normal = await signInWithEmailAndPassword(auth, "normal-stage9@example.test", "synthetic-password-2!");
     normalUid = normal.user.uid;
     normalToken = await normal.user.getIdToken();
-    adminApp = initializeAdminApp({ projectId: PROJECT_ID }, "stage9-admin");
     db = getFirestore(adminApp);
   });
 

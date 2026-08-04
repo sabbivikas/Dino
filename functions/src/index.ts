@@ -3,7 +3,6 @@ import * as functions from "firebase-functions/v1";
 import { onCall, onRequest, HttpsError } from "firebase-functions/v2/https";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { onDocumentCreated, onDocumentUpdated } from "firebase-functions/v2/firestore";
-import { defineSecret, defineString } from "firebase-functions/params";
 import { setGlobalOptions } from "firebase-functions/v2";
 import OpenAI from "openai";
 import { createHash } from "node:crypto";
@@ -37,13 +36,21 @@ admin.initializeApp();
 
 setGlobalOptions({ region: "us-central1", maxInstances: 10 });
 
-const OPENAI_API_KEY = defineSecret("OPENAI_API_KEY");
-const FIRECRAWL_API_KEY = defineSecret("FIRECRAWL_API_KEY");
-const TMDB_API_TOKEN = defineSecret("TMDB_API_TOKEN");
-const META_MODEL_API_KEY = defineSecret("META_MODEL_API_KEY");
 // meta's openai compatible endpoint — base url verified live against
 // dev.meta.ai docs (200 + valid json with reasoning_effort low).
-const META_API_BASE = defineString("META_API_BASE", { default: "https://api.meta.ai/v1" });
+const DEFAULT_META_API_BASE = "https://api.meta.ai/v1";
+
+type RuntimeSecretName =
+  | "OPENAI_API_KEY"
+  | "FIRECRAWL_API_KEY"
+  | "TMDB_API_TOKEN"
+  | "META_MODEL_API_KEY";
+
+function requiredSecret(name: RuntimeSecretName): string {
+  const value = process.env[name];
+  if (!value) throw new Error(`missing required secret: ${name}`);
+  return value;
+}
 
 const DAILY_LIMIT = 5;
 
@@ -126,7 +133,7 @@ export const deleteMonthlyStoryInternal = onCall(
   });
 
 export const generateMoodPainting = onCall(
-  { secrets: [OPENAI_API_KEY], timeoutSeconds: 120, memory: "512MiB" },
+  { secrets: ["OPENAI_API_KEY"], timeoutSeconds: 120, memory: "512MiB" },
   async (request) => {
     if (!request.auth) {
       throw new HttpsError("unauthenticated", "sign in required");
@@ -158,7 +165,7 @@ export const generateMoodPainting = onCall(
     });
 
     try {
-      const openai = new OpenAI({ apiKey: OPENAI_API_KEY.value() });
+      const openai = new OpenAI({ apiKey: requiredSecret("OPENAI_API_KEY") });
       const resp = await openai.images.generate({
         model: "dall-e-3",
         prompt,
@@ -193,7 +200,7 @@ export const generateMoodPainting = onCall(
 const FOREST_LETTER_DAILY_LIMIT = 3;
 
 export const generateForestLetter = onCall(
-  { secrets: [OPENAI_API_KEY], timeoutSeconds: 30, memory: "256MiB" },
+  { secrets: ["OPENAI_API_KEY"], timeoutSeconds: 30, memory: "256MiB" },
   async (request) => {
     if (!request.auth) {
       throw new HttpsError("unauthenticated", "sign in required");
@@ -237,7 +244,7 @@ export const generateForestLetter = onCall(
     const userPrompt = `Write today's forest letter. Today is ${weekday}, ${monthName}.`;
 
     try {
-      const openai = new OpenAI({ apiKey: OPENAI_API_KEY.value() });
+      const openai = new OpenAI({ apiKey: requiredSecret("OPENAI_API_KEY") });
       const resp = await openai.chat.completions.create({
         model: "gpt-4o",
         max_tokens: 200,
@@ -289,7 +296,7 @@ function getLanguageInstruction(locale: string): string {
 }
 
 export const generateRhythmsLetter = onCall(
-  { secrets: [OPENAI_API_KEY], timeoutSeconds: 30, memory: "256MiB" },
+  { secrets: ["OPENAI_API_KEY"], timeoutSeconds: 30, memory: "256MiB" },
   async (request) => {
     if (!request.auth) {
       throw new HttpsError("unauthenticated", "sign in required");
@@ -384,7 +391,7 @@ export const generateRhythmsLetter = onCall(
     ].filter(Boolean).join(" ");
 
     try {
-      const openai = new OpenAI({ apiKey: OPENAI_API_KEY.value() });
+      const openai = new OpenAI({ apiKey: requiredSecret("OPENAI_API_KEY") });
       const resp = await openai.chat.completions.create({
         model: "gpt-4o",
         max_tokens: 200,
@@ -421,7 +428,7 @@ export const generateRhythmsLetter = onCall(
 const BREAK_SLOT_DAILY_LIMIT = 5;
 
 export const suggestBreakSlot = onCall(
-  { secrets: [OPENAI_API_KEY], timeoutSeconds: 30, memory: "256MiB" },
+  { secrets: ["OPENAI_API_KEY"], timeoutSeconds: 30, memory: "256MiB" },
   async (request) => {
     if (!request.auth) {
       throw new HttpsError("unauthenticated", "sign in required");
@@ -523,7 +530,7 @@ export const suggestBreakSlot = onCall(
       : `now: ${nowTime || timeOfDay}. mood: ${currentMood}. (no message). day: ${dayOfWeek || "today"} ${timeOfDay}. free slots (earliest first): ${slotList}.`;
 
     try {
-      const openai = new OpenAI({ apiKey: OPENAI_API_KEY.value() });
+      const openai = new OpenAI({ apiKey: requiredSecret("OPENAI_API_KEY") });
       const resp = await openai.chat.completions.create({
         model: "gpt-4o",
         max_tokens: 200,
@@ -591,7 +598,7 @@ function isoWeekKey(date: Date): string {
 const THEME_EXTRACT_DAILY_LIMIT = 12;
 
 export const extractJournalTheme = onCall(
-  { secrets: [OPENAI_API_KEY], timeoutSeconds: 20, memory: "256MiB" },
+  { secrets: ["OPENAI_API_KEY"], timeoutSeconds: 20, memory: "256MiB" },
   async (request) => {
     if (!request.auth) {
       throw new HttpsError("unauthenticated", "sign in required");
@@ -629,7 +636,7 @@ export const extractJournalTheme = onCall(
       "never quote, repeat, or store the entry; output only the JSON.";
 
     try {
-      const openai = new OpenAI({ apiKey: OPENAI_API_KEY.value() });
+      const openai = new OpenAI({ apiKey: requiredSecret("OPENAI_API_KEY") });
       const resp = await openai.chat.completions.create({
         model: "gpt-4o-mini",
         max_tokens: 20,
@@ -675,7 +682,7 @@ import { DISTILLER_PROMPT, buildDistillerInput, validatePrefs, LedgerEntry,
          PREF_MIN_OUTCOMES, PREF_MAX_ENTRIES } from "./preferences";
 
 export const suggestBreathingSession = onCall(
-  { secrets: [OPENAI_API_KEY], timeoutSeconds: 15, memory: "256MiB" },
+  { secrets: ["OPENAI_API_KEY"], timeoutSeconds: 15, memory: "256MiB" },
   async (request) => {
     if (!request.auth) {
       throw new HttpsError("unauthenticated", "sign in required");
@@ -751,7 +758,7 @@ export const suggestBreathingSession = onCall(
       "- never quote or repeat the user's words in the reason";
 
     try {
-      const openai = new OpenAI({ apiKey: OPENAI_API_KEY.value() });
+      const openai = new OpenAI({ apiKey: requiredSecret("OPENAI_API_KEY") });
       const resp = await openai.chat.completions.create({
         model: "gpt-4o-mini",
         max_tokens: 80,
@@ -802,7 +809,7 @@ export const suggestBreathingSession = onCall(
 const DAILY_NUDGE_LIMIT = 3;
 
 export const generateDailyNudge = onCall(
-  { secrets: [OPENAI_API_KEY], timeoutSeconds: 20, memory: "256MiB" },
+  { secrets: ["OPENAI_API_KEY"], timeoutSeconds: 20, memory: "256MiB" },
   async (request) => {
     if (!request.auth) {
       throw new HttpsError("unauthenticated", "sign in required");
@@ -871,7 +878,7 @@ export const generateDailyNudge = onCall(
     const userPrompt = parts.join(" ");
 
     try {
-      const openai = new OpenAI({ apiKey: OPENAI_API_KEY.value() });
+      const openai = new OpenAI({ apiKey: requiredSecret("OPENAI_API_KEY") });
       const resp = await openai.chat.completions.create({
         model: "gpt-4o-mini",
         max_tokens: 60,
@@ -899,7 +906,7 @@ export const generateDailyNudge = onCall(
 );
 
 export const generateWeeklyReport = onCall(
-  { secrets: [OPENAI_API_KEY], timeoutSeconds: 60, memory: "512MiB" },
+  { secrets: ["OPENAI_API_KEY"], timeoutSeconds: 60, memory: "512MiB" },
   async (request) => {
     if (!request.auth) {
       throw new HttpsError("unauthenticated", "must be signed in");
@@ -956,7 +963,7 @@ export const generateWeeklyReport = onCall(
         questionsAndAnswers,
         previousScores
       );
-      const openai = new OpenAI({ apiKey: OPENAI_API_KEY.value() });
+      const openai = new OpenAI({ apiKey: requiredSecret("OPENAI_API_KEY") });
       const resp = await openai.chat.completions.create({
         model: "gpt-4o",
         max_tokens: 800,
@@ -1034,7 +1041,7 @@ export const onWorldMoodCreated = onDocumentCreated("worldMoods/{docId}", async 
 const WEEKLY_NOTICED_LIMIT = 2;
 
 export const generateWeeklyNoticed = onCall(
-  { secrets: [OPENAI_API_KEY], timeoutSeconds: 20, memory: "256MiB" },
+  { secrets: ["OPENAI_API_KEY"], timeoutSeconds: 20, memory: "256MiB" },
   async (request) => {
     if (!request.auth) {
       throw new HttpsError("unauthenticated", "sign in required");
@@ -1107,7 +1114,7 @@ export const generateWeeklyNoticed = onCall(
     const userPrompt = parts.join(" ");
 
     try {
-      const openai = new OpenAI({ apiKey: OPENAI_API_KEY.value() });
+      const openai = new OpenAI({ apiKey: requiredSecret("OPENAI_API_KEY") });
       const resp = await openai.chat.completions.create({
         model: "gpt-4o-mini",
         max_tokens: 160,
@@ -1232,7 +1239,7 @@ async function scrapeRecSource(url: string, apiKey: string): Promise<string> {
 // validate + dedupe by link, and replace recPool/current — unless the run is
 // thin, in which case the previous pool is kept (a stale pool beats a bad one).
 export const refreshRecommendationPool = onSchedule(
-  { schedule: "every monday 06:00", secrets: [FIRECRAWL_API_KEY, OPENAI_API_KEY], timeoutSeconds: 540, memory: "512MiB" },
+  { schedule: "every monday 06:00", secrets: ["FIRECRAWL_API_KEY", "OPENAI_API_KEY"], timeoutSeconds: 540, memory: "512MiB" },
   async () => {
     const db = admin.firestore();
 
@@ -1254,7 +1261,7 @@ export const refreshRecommendationPool = onSchedule(
       return;
     }
 
-    const openai = new OpenAI({ apiKey: OPENAI_API_KEY.value() });
+    const openai = new OpenAI({ apiKey: requiredSecret("OPENAI_API_KEY") });
     const items: Record<string, unknown>[] = [];
     const seenLinks = new Set<string>();
 
@@ -1276,7 +1283,7 @@ export const refreshRecommendationPool = onSchedule(
     for (const source of activeSources) {
       try {
         scraped += 1;   // count the attempt — conservative: assume it billed
-        const md = await scrapeRecSource(source.url, FIRECRAWL_API_KEY.value());
+        const md = await scrapeRecSource(source.url, requiredSecret("FIRECRAWL_API_KEY"));
         const resp = await openai.chat.completions.create({
           model: "gpt-4o-mini",
           max_tokens: 1400,
@@ -1343,7 +1350,7 @@ export const refreshRecommendationPool = onSchedule(
 // delivery line. Inputs are enum buckets only. The client's moment engine
 // (crisis window, 3-day scarcity, time fit, ignore-learning) gates every call.
 export const pickGentleRec = onCall(
-  { secrets: [OPENAI_API_KEY], timeoutSeconds: 20, memory: "256MiB" },
+  { secrets: ["OPENAI_API_KEY"], timeoutSeconds: 20, memory: "256MiB" },
   async (request) => {
     if (!request.auth) {
       throw new HttpsError("unauthenticated", "sign in required");
@@ -1428,7 +1435,7 @@ export const pickGentleRec = onCall(
         }))),
       ].filter(Boolean).join("\n");
 
-      const openai = new OpenAI({ apiKey: OPENAI_API_KEY.value() });
+      const openai = new OpenAI({ apiKey: requiredSecret("OPENAI_API_KEY") });
       const resp = await openai.chat.completions.create({
         model: "gpt-4o-mini",
         max_tokens: 120,
@@ -1520,7 +1527,7 @@ const LANTERN_DAILY_SEND_LIMIT = 3;
 const LANTERN_MAX_CHARS = 140;
 
 export const moderateLantern = onCall(
-  { secrets: [OPENAI_API_KEY], timeoutSeconds: 30, memory: "256MiB" },
+  { secrets: ["OPENAI_API_KEY"], timeoutSeconds: 30, memory: "256MiB" },
   async (request) => {
     if (!request.auth) {
       throw new HttpsError("unauthenticated", "sign in required");
@@ -1575,7 +1582,7 @@ export const moderateLantern = onCall(
       "never rewrite, correct, or quote the message.";
 
     try {
-      const openai = new OpenAI({ apiKey: OPENAI_API_KEY.value() });
+      const openai = new OpenAI({ apiKey: requiredSecret("OPENAI_API_KEY") });
       const resp = await openai.chat.completions.create({
         model: "gpt-4o-mini",
         max_tokens: 60,
@@ -1939,7 +1946,7 @@ async function attemptMission(
                 result = "search budget spent";
               } else {
                 searches++;
-                const s = await firecrawlSearch(String(args.query ?? ""), FIRECRAWL_API_KEY.value());
+                const s = await firecrawlSearch(String(args.query ?? ""), requiredSecret("FIRECRAWL_API_KEY"));
                 seenUrls.push(...s.urls);
                 result = s.text;
               }
@@ -1950,7 +1957,7 @@ async function attemptMission(
               } else {
                 reads++;
                 seenUrls.push(url);
-                result = await firecrawlRead(url, FIRECRAWL_API_KEY.value());
+                result = await firecrawlRead(url, requiredSecret("FIRECRAWL_API_KEY"));
               }
             }
           } catch {
@@ -1974,7 +1981,7 @@ async function attemptMission(
       let dinoLine = FALLBACK_DINO_LINE[userLocale] ?? FALLBACK_DINO_LINE.en;
       try {
         const dw = aiRoute("deliveredWords");
-        const dwClient = aiClientFor(dw, { openai: OPENAI_API_KEY.value() });
+        const dwClient = aiClientFor(dw, { openai: requiredSecret("OPENAI_API_KEY") });
         const dwResp = await dwClient.chat.completions.create({
           model: dw.model, max_tokens: dw.maxTokens, temperature: dw.temperature,
           messages: [
@@ -2020,9 +2027,9 @@ async function runExpeditionMission(db: admin.firestore.Firestore, uid: string, 
                                     keptKinds: string[] = []): Promise<boolean> {
   if (!(await grantMissionBudget(db, uid))) return false;
   const keys = {
-    openai: OPENAI_API_KEY.value(),
-    metaKey: META_MODEL_API_KEY.value(),
-    metaBase: META_API_BASE.value(),
+    openai: requiredSecret("OPENAI_API_KEY"),
+    metaKey: requiredSecret("META_MODEL_API_KEY"),
+    metaBase: process.env.META_API_BASE || DEFAULT_META_API_BASE,
   };
   const sources = trustedSourcesFor(needKind, recentSources);
   const chain = aiRouteChain("mission");
@@ -2047,7 +2054,7 @@ async function runExpeditionMission(db: admin.firestore.Firestore, uid: string, 
 }
 
 export const nightlyExpeditionWatch = onSchedule(
-  { schedule: "7 4 * * *", secrets: [OPENAI_API_KEY, META_MODEL_API_KEY, FIRECRAWL_API_KEY], timeoutSeconds: 540, memory: "256MiB" },
+  { schedule: "7 4 * * *", secrets: ["OPENAI_API_KEY", "META_MODEL_API_KEY", "FIRECRAWL_API_KEY"], timeoutSeconds: 540, memory: "256MiB" },
   async () => {
     const db = admin.firestore();
     const cutoff = admin.firestore.Timestamp.fromMillis(Date.now() - 48 * 3600 * 1000);
@@ -2102,7 +2109,7 @@ export const nightlyExpeditionWatch = onSchedule(
       const recThresholdAdjustment = sanitizeRecThresholdAdjustment(prefs.recThresholdAdjustment);
       try {
         const r = aiRoute("watching");
-        const client = aiClientFor(r, { openai: OPENAI_API_KEY.value() });
+        const client = aiClientFor(r, { openai: requiredSecret("OPENAI_API_KEY") });
         const resp = await client.chat.completions.create({
           model: r.model,
           // gpt-5 family: max_completion_tokens, default temperature only
@@ -2381,7 +2388,7 @@ async function runComfortRecGeneration(
     ].filter(Boolean).join(" ");
 
     try {
-      const openai = new OpenAI({ apiKey: OPENAI_API_KEY.value() });
+      const openai = new OpenAI({ apiKey: requiredSecret("OPENAI_API_KEY") });
       const resp = await openai.chat.completions.create({
         // mid tier for the pick step: regional attributions must be RIGHT —
         // a misattributed beloved work reads as dino not knowing them.
@@ -2432,7 +2439,7 @@ async function runComfortRecGeneration(
       // any failure leaves the rec untouched.
       const film = recs.find((r: any) => r && r.type === "film") as any;
       if (film && userCountry) {
-        const w = await tmdbWatchInfo(film.title, film.year, userCountry, TMDB_API_TOKEN.value());
+        const w = await tmdbWatchInfo(film.title, film.year, userCountry, requiredSecret("TMDB_API_TOKEN"));
         if (w) {
           if (w.link) {
             film.watchProvider = w.provider;
@@ -2497,7 +2504,7 @@ async function runComfortRecGeneration(
 // runComfortRecGeneration: same auth guard, same allow-list rejection, same
 // coercion the client relied on, then hand-off. Byte-identical behavior.
 export const generateComfortRecs = onCall(
-  { secrets: [OPENAI_API_KEY, TMDB_API_TOKEN], timeoutSeconds: 30, memory: "256MiB" },
+  { secrets: ["OPENAI_API_KEY", "TMDB_API_TOKEN"], timeoutSeconds: 30, memory: "256MiB" },
   async (request) => {
     if (!request.auth) {
       throw new HttpsError("unauthenticated", "sign in required");
@@ -2876,7 +2883,7 @@ async function grantDistillBudget(db: admin.firestore.Firestore): Promise<boolea
 }
 
 export const nightlyPreferenceDistill = onSchedule(
-  { schedule: "23 4 * * *", secrets: [OPENAI_API_KEY], timeoutSeconds: 540, memory: "256MiB" },
+  { schedule: "23 4 * * *", secrets: ["OPENAI_API_KEY"], timeoutSeconds: 540, memory: "256MiB" },
   async () => {
     const db = admin.firestore();
     const cutoff = admin.firestore.Timestamp.fromMillis(Date.now() - 26 * 3600 * 1000);
@@ -2925,7 +2932,7 @@ export const nightlyPreferenceDistill = onSchedule(
         if (!(await grantDistillBudget(db))) break;   // monthly cap reached — quiet stop
 
         const r = aiRoute("preferences");
-        const client = aiClientFor(r, { openai: OPENAI_API_KEY.value() });
+        const client = aiClientFor(r, { openai: requiredSecret("OPENAI_API_KEY") });
         const resp = await client.chat.completions.create({
           model: r.model,
           // gpt-5 family: max_completion_tokens, default temperature only
