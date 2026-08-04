@@ -108,6 +108,9 @@ struct MonthlyStoryCardHost: View {
     @State private var snapshot = MonthlyStoryExperienceSnapshot.hidden
     @State private var route: Route?
     @State private var isPreparing = false
+    #if MONTHLY_STORY_INTERNAL_BUILD
+    @State private var internalDiagnostic = "local gate disabled"
+    #endif
     let dataManager: SharedDataManager?
     let journalThemeLearningEnabled: Bool
 
@@ -129,13 +132,20 @@ struct MonthlyStoryCardHost: View {
     }
 
     var body: some View {
-        Group {
+        VStack(alignment: .leading, spacing: 6) {
             if snapshot.isVisible {
                 MonthlyStoryCard(state: snapshot.state,
                                  onOpen: openPrimaryDestination,
                                  onSettings: { route = .setup })
                     .transition(.opacity)
             }
+            #if MONTHLY_STORY_INTERNAL_BUILD
+            Text("monthly story internal: \(internalDiagnostic)")
+                .font(.caption2)
+                .foregroundStyle(DinoTheme.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityLabel("monthly story internal status: \(internalDiagnostic)")
+            #endif
         }
         .task { await refresh() }
         .sheet(item: $route, onDismiss: { Task { await refresh() } }) { route in
@@ -168,11 +178,26 @@ struct MonthlyStoryCardHost: View {
 
     private func refresh() async {
         let refreshed = await resolveMonthlyStoryExperience(localGate: localGate, service: service)
+        #if MONTHLY_STORY_INTERNAL_BUILD
+        internalDiagnostic = diagnosticStatus(for: refreshed)
+        #endif
         if !refreshed.isVisible, case .ready = snapshot.state {
             return
         }
         snapshot = refreshed
     }
+
+    #if MONTHLY_STORY_INTERNAL_BUILD
+    private func diagnosticStatus(for refreshed: MonthlyStoryExperienceSnapshot) -> String {
+        guard localGate.isEnabled else { return "local gate disabled" }
+        guard refreshed.isVisible else { return "visibility disabled" }
+        switch refreshed.state {
+        case .unavailable(.network): return "network failure"
+        case .failed: return "callable unavailable"
+        default: return "availability allowed"
+        }
+    }
+    #endif
 
     private func prepareStory() async {
         guard !isPreparing, let dataManager, snapshot.settings.enabled else { return }

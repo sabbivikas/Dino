@@ -3110,7 +3110,7 @@ async function sendFindingPush(uid: string, title: string, taskId: string): Prom
 }
 
 export const startFindingTask = onCall(
-  { secrets: [OPENAI_API_KEY], timeoutSeconds: 540, memory: "512MiB" },
+  { secrets: ["OPENAI_API_KEY"], timeoutSeconds: 540, memory: "512MiB" },
   async (request) => {
     if (!request.auth) throw new HttpsError("unauthenticated", "sign in required");
     const gate = starFindingsGate(process.env.STAR_FINDINGS_UIDS, request.auth.uid);
@@ -3244,7 +3244,7 @@ export const startFindingTask = onCall(
     let pickIndex = 0;
     let why = "";
     try {
-      const openai = new OpenAI({ apiKey: OPENAI_API_KEY.value() });
+      const openai = new OpenAI({ apiKey: requiredSecret("OPENAI_API_KEY") });
       const resp = await openai.chat.completions.create({
         model: "gpt-4.1-mini", temperature: 0.7,
         messages: [{ role: "system", content: system }, { role: "user", content: user }],

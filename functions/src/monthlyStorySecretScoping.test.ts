@@ -32,6 +32,7 @@ const providerBindings = new Map<string, readonly string[]>([
   ["nightlyExpeditionWatch", ["OPENAI_API_KEY", "META_MODEL_API_KEY", "FIRECRAWL_API_KEY"]],
   ["generateComfortRecs", ["OPENAI_API_KEY", "TMDB_API_TOKEN"]],
   ["nightlyPreferenceDistill", ["OPENAI_API_KEY"]],
+  ["startFindingTask", ["OPENAI_API_KEY"]],
 ]);
 
 function exportBlock(name: string): string {
