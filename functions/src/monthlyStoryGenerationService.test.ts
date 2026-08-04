@@ -51,14 +51,14 @@ async function rejectsCode(promise: Promise<unknown>, code: string): Promise<voi
     error instanceof MonthlyStoryGenerationError && error.code === code);
 }
 
-test("disabled, missing, malformed, stale, zero-rollout, and zero-budget controls fail before jobs", async () => {
+test("disabled, missing, malformed, stale, zero-rollout, and zero-cap controls fail before jobs", async () => {
   const variants: [unknown, string][] = [
     [null, "control-invalid"],
     [{ visible: true }, "control-invalid"],
     [control({ updatedAt: nowMillis - 24 * 60 * 60 * 1000 - 1 }), "control-invalid"],
     [control({ textGenerationEnabled: false }), "control-disabled"],
     [control({ rolloutBasisPoints: 0 }), "control-disabled"],
-    [control({ monthlyBudgetMicros: 0, monthlyTextBudgetMicros: 0 }), "control-disabled"],
+    [control({ monthlyTextGenerationCap: 0 }), "control-disabled"],
   ];
   for (const [value, code] of variants) {
     const repo = repository(); repo.controlDocument = value;
@@ -114,6 +114,16 @@ test("successful deterministic persistence creates one valid story and completes
   assert.equal(repo.jobs.get(result.jobId)?.status, "ready");
   assert.equal(repo.jobs.get(result.jobId)?.textArtifactHash, result.story.scriptHash);
   assert.equal(repo.generationSlots.size, 1);
+});
+
+test("deterministic persistence requires generation caps but no provider budget", async () => {
+  const repo = repository();
+  repo.controlDocument = control({ monthlyBudgetMicros: 0, monthlyTextBudgetMicros: 0,
+    monthlyAudioBudgetMicros: 0 });
+  const result = await request(repo);
+  assert.equal(result.providerRequestCount, 0);
+  assert.equal(result.providerCostMicros, 0);
+  assert.equal(result.story.status, "textReady");
 });
 
 test("same owner and generation inputs produce byte-stable persisted content", async () => {

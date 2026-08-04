@@ -1,6 +1,5 @@
 import { monthlyStoryScriptHash } from "./monthlyStoryArtifact";
-import { MonthlyStoryControl, monthlyStoryGenerationIsFailClosed,
-  parseMonthlyStoryControl } from "./monthlyStoryControl";
+import { MonthlyStoryControl, parseMonthlyStoryControl } from "./monthlyStoryControl";
 import { MonthlyStoryDeterministicComposerError, MonthlyStoryDeterministicComposerInput,
   MonthlyStoryDeterministicComposition,
   composeMonthlyStoryDeterministically } from "./monthlyStoryDeterministicComposer";
@@ -133,7 +132,9 @@ export function recalculateMonthlyStoryEligibility(signal: MonthlyStorySignal, n
 
 function controlAllowsGeneration(control: MonthlyStoryControl): boolean {
   return control.visible && control.enrollmentEnabled && control.signalUploadEnabled &&
-    control.textGenerationEnabled && !monthlyStoryGenerationIsFailClosed(control) &&
+    control.textGenerationEnabled && control.rolloutBasisPoints > 0 &&
+    control.dailyTextGenerationCap > 0 && control.monthlyTextGenerationCap > 0 &&
+    control.maxTextAttempts > 0 &&
     control.generationVersion.length > 0 && control.signalSchemaVersion > 0;
 }
 

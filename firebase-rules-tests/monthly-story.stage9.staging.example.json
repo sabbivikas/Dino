@@ -1,0 +1,37 @@
+{
+  "projectId": "REPLACE_WITH_STAGING_PROJECT_ID",
+  "control": {
+    "path": "featureFlags/monthlyStory",
+    "data": {
+      "visible": true,
+      "enrollmentEnabled": true,
+      "signalUploadEnabled": true,
+      "textGenerationEnabled": true,
+      "audioGenerationEnabled": false,
+      "rolloutBasisPoints": 10000,
+      "minimumAppVersion": "REPLACE_WITH_INTERNAL_BUILD_VERSION",
+      "dailyTextGenerationCap": 2,
+      "monthlyTextGenerationCap": 2,
+      "dailyAudioGenerationCap": 0,
+      "monthlyBudgetMicros": 0,
+      "monthlyTextBudgetMicros": 0,
+      "monthlyAudioBudgetMicros": 0,
+      "maxTextAttempts": 2,
+      "maxAudioAttempts": 0,
+      "generationVersion": "deterministic-v1",
+      "signalSchemaVersion": 1,
+      "scriptPromptVersion": "deterministic-v1",
+      "criticPromptVersion": "none-v1",
+      "ttsVersion": "none-v1",
+      "updatedAt": "SERVER_TIMESTAMP_REQUIRED"
+    }
+  },
+  "internalTester": {
+    "path": "monthlyStoryInternalTesters/REPLACE_WITH_APPROVED_INTERNAL_UID",
+    "data": {
+      "enabled": true,
+      "updatedAt": "SERVER_TIMESTAMP_REQUIRED",
+      "expiresAt": "EXPIRING_SERVER_TIMESTAMP_REQUIRED"
+    }
+  }
+}

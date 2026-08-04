@@ -2,7 +2,8 @@
   "name": "dino-firestore-rules-tests",
   "private": true,
   "scripts": {
-    "test": "cd .. && firebase emulators:exec --only firestore,storage --project demo-dino-rules-test \"cd firebase-rules-tests && npx jest --runInBand\""
+    "test": "cd .. && firebase emulators:exec --only firestore,storage --project demo-dino-rules-test \"cd firebase-rules-tests && npx jest --runInBand\"",
+    "test:functions": "cd .. && firebase emulators:exec --only auth,firestore,functions --project demo-dino-stage9 \"cd firebase-rules-tests && FIREBASE_AUTH_EMULATOR_HOST=127.0.0.1:9099 FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 FUNCTIONS_EMULATOR_HOST=127.0.0.1:5001 node_modules/.bin/jest --runInBand monthly-story.functions.emulator.test.cjs\""
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "^4.0.1",
