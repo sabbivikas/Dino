@@ -19,10 +19,12 @@ function control(overrides: Record<string, unknown> = {}): Record<string, unknow
   return { visible: true, enrollmentEnabled: true, signalUploadEnabled: true,
     textGenerationEnabled: true, audioGenerationEnabled: false, rolloutBasisPoints: 10_000,
     minimumAppVersion: "1.0.0", dailyTextGenerationCap: 10, monthlyTextGenerationCap: 100,
-    dailyAudioGenerationCap: 0,
+    dailyAudioGenerationCap: 0, monthlyAudioGenerationCap: 0,
     monthlyBudgetMicros: 1, monthlyTextBudgetMicros: 1, monthlyAudioBudgetMicros: 0,
     maxTextAttempts: 3, maxAudioAttempts: 0, generationVersion, signalSchemaVersion: 1,
     scriptPromptVersion: "deterministic-v1", criticPromptVersion: "none-v1", ttsVersion: "none-v1",
+    humeConfigurationVersion: "none-v1", approvedVoiceKey: "disabled", maximumAudioScriptCharacters: 0,
+    audioRequestTimeoutSeconds: 0, humeCostMicrosPerThousandCharacters: 0,
     updatedAt: nowMillis, ...overrides };
 }
 
@@ -111,7 +113,7 @@ test("successful deterministic persistence creates one valid story and completes
   assert.equal(result.story.audioStatus, "notRequested");
   assert.equal(result.story.storageCleanup.state, "notRequired");
   assert.equal(repo.stories.size, 1);
-  assert.equal(repo.jobs.get(result.jobId)?.status, "ready");
+  assert.equal(repo.jobs.get(result.jobId)?.status, "textReady");
   assert.equal(repo.jobs.get(result.jobId)?.textArtifactHash, result.story.scriptHash);
   assert.equal(repo.generationSlots.size, 1);
 });

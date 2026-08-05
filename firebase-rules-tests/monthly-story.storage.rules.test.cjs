@@ -7,7 +7,7 @@ const RULES_PATH = path.join(__dirname, "..", "storage.rules");
 
 describe("monthly story Storage rules", () => {
   let testEnv;
-  const audioPath = "monthlyStories/synthetic-user-a/2026-07/v1/story.m4a";
+  const audioPath = "monthlyStories/synthetic-user-a/2026-07/v1/story.mp3";
 
   beforeAll(async () => {
     testEnv = await initializeTestEnvironment({
@@ -36,7 +36,7 @@ describe("monthly story Storage rules", () => {
 
   it("denies every client create, overwrite, and delete", async () => {
     const alice = testEnv.authenticatedContext("synthetic-user-a").storage();
-    await assertFails(uploadBytes(ref(alice, "monthlyStories/synthetic-user-a/2026-08/v1/story.m4a"),
+    await assertFails(uploadBytes(ref(alice, "monthlyStories/synthetic-user-a/2026-08/v1/story.mp3"),
       new Uint8Array([3]), { contentType: "audio/mp4" }));
     await assertFails(uploadBytes(ref(alice, audioPath), new Uint8Array([4]), { contentType: "audio/mp4" }));
     await assertFails(deleteObject(ref(alice, audioPath)));

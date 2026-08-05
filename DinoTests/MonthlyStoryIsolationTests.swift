@@ -4,12 +4,17 @@ final class MonthlyStoryIsolationTests: XCTestCase {
     func testFoundationSourcesHaveNoExternalServiceImportsOrCalls() throws {
         let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
         let root = testsDirectory.deletingLastPathComponent()
-        let sourceDirectories = [root.appendingPathComponent("Dino/Models"), root.appendingPathComponent("Dino/Services")]
-        let files = try sourceDirectories.flatMap { directory in
-            try FileManager.default.contentsOfDirectory(at: directory,
-                                                        includingPropertiesForKeys: nil)
-                .filter { $0.lastPathComponent.hasPrefix("MonthlyStory") && $0.pathExtension == "swift" }
-        }
+        let paths = [
+            "Dino/Models/MonthlyStoryBudget.swift",
+            "Dino/Models/MonthlyStoryEvidence.swift",
+            "Dino/Models/MonthlyStoryGenerationKey.swift",
+            "Dino/Models/MonthlyStoryNarrativePlan.swift",
+            "Dino/Models/MonthlyStorySignal.swift",
+            "Dino/Services/MonthlyStoryCalendar.swift",
+            "Dino/Services/MonthlyStoryEligibility.swift",
+            "Dino/Services/MonthlyStoryScriptValidator.swift"
+        ]
+        let files = paths.map { root.appendingPathComponent($0) }
         let forbidden = ["import Firebase", "import PostHog", "import HealthKit", "import OpenAI", "URLSession", "https://", "Functions.functions", "Firestore.firestore", "Storage.storage", "AnalyticsManager", "NotificationCenter"]
         XCTAssertFalse(files.isEmpty)
         for file in files {

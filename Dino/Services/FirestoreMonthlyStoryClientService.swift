@@ -32,6 +32,7 @@ final class FirestoreMonthlyStoryClientService: MonthlyStoryClientService {
             visible: data["visible"] as? Bool == true,
             signalUploadEnabled: data["signalUploadEnabled"] as? Bool == true,
             textGenerationEnabled: data["textGenerationEnabled"] as? Bool == true,
+            audioGenerationEnabled: data["audioGenerationEnabled"] as? Bool == true,
             generationVersion: data["generationVersion"] as? String ?? "",
             signalSchemaVersion: data["signalSchemaVersion"] as? Int ?? 0
         )
@@ -51,12 +52,13 @@ final class FirestoreMonthlyStoryClientService: MonthlyStoryClientService {
     }
 
     func updateSettings(_ requested: MonthlyStorySettings) async throws -> MonthlyStorySettings {
-        let sanitized = requested.sanitizedForWrittenOnlyStage
+        let audioAvailable = availability?.audioGenerationEnabled == true
+        let sanitized = requested.sanitized(audioAvailable: audioAvailable)
         let payload: [String: Any] = [
             "enabled": sanitized.enabled,
             "useJournalThemes": sanitized.useJournalThemes,
             "useHealthPatterns": sanitized.useHealthPatterns,
-            "audioEnabled": false,
+            "audioEnabled": sanitized.audioEnabled,
             "timezone": sanitized.timezone,
             "timezoneEffectiveMonth": sanitized.timezoneEffectiveMonth,
             "settingsVersion": sanitized.settingsVersion
@@ -156,7 +158,7 @@ final class FirestoreMonthlyStoryClientService: MonthlyStoryClientService {
         guard let enabled = data["enabled"] as? Bool,
               let journal = data["useJournalThemes"] as? Bool,
               let health = data["useHealthPatterns"] as? Bool,
-              data["audioEnabled"] as? Bool == false,
+              let audioEnabled = data["audioEnabled"] as? Bool,
               let timezone = data["timezone"] as? String,
               TimeZone(identifier: timezone) != nil,
               let effective = data["timezoneEffectiveMonth"] as? String,
@@ -166,7 +168,7 @@ final class FirestoreMonthlyStoryClientService: MonthlyStoryClientService {
             throw MonthlyStoryClientError.malformedStory
         }
         return MonthlyStorySettings(enabled: enabled, useJournalThemes: journal,
-            useHealthPatterns: health, audioEnabled: false, timezone: timezone,
+            useHealthPatterns: health, audioEnabled: audioEnabled, timezone: timezone,
             timezoneEffectiveMonth: effective, settingsVersion: version)
     }
 

@@ -161,13 +161,17 @@ export function validateMonthlyStorySettingsContract(
   if (settingsVersion !== MONTHLY_STORY_SETTINGS_VERSION) {
     throw new MonthlyStoryValidationError("unsupported-settings-version");
   }
+  const audioEnabled = bool(data.audioEnabled);
+  if (audioEnabled && !control.audioGenerationEnabled) {
+    throw new MonthlyStoryValidationError("feature-disabled");
+  }
   return {
     uid,
     settings: {
       enabled: bool(data.enabled),
       useJournalThemes: bool(data.useJournalThemes),
       useHealthPatterns: bool(data.useHealthPatterns),
-      audioEnabled: bool(data.audioEnabled),
+      audioEnabled,
       timezone: data.timezone,
       timezoneEffectiveMonth: requireMonthKey(data.timezoneEffectiveMonth),
       settingsVersion,
@@ -477,5 +481,5 @@ export const MONTHLY_STORY_PATHS = Object.freeze({
   story: (uid: string, monthKey: string) => `monthlyStories/${uid}/months/${monthKey}`,
   tombstone: (uid: string, monthKey: string) => `monthlyStoryDeleted/${uid}/months/${monthKey}`,
   audio: (uid: string, monthKey: string, generationVersion: string) =>
-    `monthlyStories/${uid}/${monthKey}/${generationVersion}/story.m4a`,
+    `monthlyStories/${uid}/${monthKey}/${generationVersion}/story.mp3`,
 });

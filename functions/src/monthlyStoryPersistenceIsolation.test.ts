@@ -22,7 +22,8 @@ test("Stage 6 persistence is reachable only through the approved Stage 8 interna
 test("Stage 6 persistence modules contain no provider, network, SDK initialization, or logging", () => {
   const combined = [read("monthlyStoryRepository.ts"), read("monthlyStoryGenerationService.ts")].join("\n");
   for (const prohibited of ["from \"openai\"", "firebase-admin", "initializeApp(", "getFirestore(",
-    "fetch(", "axios", "https://", "OPENAI_API_KEY", "console.log", "logger.", "posthog", "tts"]) {
+    "fetch(", "axios", "https://", "OPENAI_API_KEY", "HUME_API_KEY", "monthlyStoryHumeProvider",
+    "console.log", "logger.", "posthog"]) {
     assert.equal(combined.toLowerCase().includes(prohibited.toLowerCase()), false, prohibited);
   }
   assert.match(combined, /providerRequestCount: 0/);

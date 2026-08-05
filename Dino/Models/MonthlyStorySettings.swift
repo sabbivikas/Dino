@@ -22,7 +22,7 @@ struct MonthlyStorySettings: Codable, Equatable, Sendable {
         self.enabled = enabled
         self.useJournalThemes = useJournalThemes
         self.useHealthPatterns = useHealthPatterns
-        self.audioEnabled = false
+        self.audioEnabled = audioEnabled
         self.timezone = timezone
         self.timezoneEffectiveMonth = timezoneEffectiveMonth
         self.settingsVersion = settingsVersion
@@ -34,6 +34,17 @@ struct MonthlyStorySettings: Codable, Equatable, Sendable {
         if !value.enabled {
             value.useJournalThemes = false
             value.useHealthPatterns = false
+        }
+        return value
+    }
+
+    func sanitized(audioAvailable: Bool) -> Self {
+        var value = self
+        if !audioAvailable { value.audioEnabled = false }
+        if !value.enabled {
+            value.useJournalThemes = false
+            value.useHealthPatterns = false
+            value.audioEnabled = false
         }
         return value
     }

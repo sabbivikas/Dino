@@ -31,6 +31,10 @@ import { starFindingsGate, buildSearchPrompt, buildPickPrompt, buildBookingPromp
 import { runAgentTask, type RunResult } from "./agiClient";
 import { createMonthlyStoryInternalApi, MonthlyStoryInternalApiError } from "./monthlyStoryInternalApi";
 import { FirestoreMonthlyStoryRepository, MonthlyStoryFirestoreDependency } from "./monthlyStoryRepository";
+import { FirestoreMonthlyStoryAudioRepository } from "./monthlyStoryAudioRepository";
+import { FirebaseMonthlyStoryAudioObjectStore, MonthlyStoryStorageBucket } from "./monthlyStoryFirebaseAudioStore";
+import { createMonthlyStoryInternalAudioApi } from "./monthlyStoryInternalAudioApi";
+import { HumeMonthlyStoryAudioProvider } from "./monthlyStoryHumeProvider";
 
 admin.initializeApp();
 
@@ -44,7 +48,8 @@ type RuntimeSecretName =
   | "OPENAI_API_KEY"
   | "FIRECRAWL_API_KEY"
   | "TMDB_API_TOKEN"
-  | "META_MODEL_API_KEY";
+  | "META_MODEL_API_KEY"
+  | "HUME_API_KEY";
 
 function requiredSecret(name: RuntimeSecretName): string {
   const value = process.env[name];
@@ -54,8 +59,14 @@ function requiredSecret(name: RuntimeSecretName): string {
 
 const DAILY_LIMIT = 5;
 
-const monthlyStoryInternalApi = createMonthlyStoryInternalApi(new FirestoreMonthlyStoryRepository(
-  admin.firestore() as unknown as MonthlyStoryFirestoreDependency));
+const monthlyStoryFirestore = admin.firestore() as unknown as MonthlyStoryFirestoreDependency;
+const monthlyStoryRepository = new FirestoreMonthlyStoryRepository(monthlyStoryFirestore);
+const monthlyStoryInternalApi = createMonthlyStoryInternalApi(monthlyStoryRepository);
+
+function monthlyStoryAudioObjectStore(): FirebaseMonthlyStoryAudioObjectStore {
+  return new FirebaseMonthlyStoryAudioObjectStore(
+    admin.storage().bucket() as unknown as MonthlyStoryStorageBucket);
+}
 
 function monthlyStoryCallableContext(request: { auth?: { uid: string }; data?: unknown }) {
   const data = request.data as Record<string, unknown> | null | undefined;
@@ -128,7 +139,24 @@ export const deleteMonthlyStoryInternal = onCall(
   { timeoutSeconds: 30, memory: "256MiB" }, async (request) => {
     try {
       const payload = monthlyStoryPayload(request, ["monthKey", "generationVersion"]);
-      return await monthlyStoryInternalApi.deleteStory(monthlyStoryCallableContext(request), payload);
+      return await createMonthlyStoryInternalApi(monthlyStoryRepository, monthlyStoryAudioObjectStore())
+        .deleteStory(monthlyStoryCallableContext(request), payload);
+    } catch (error) { throw monthlyStoryHttpsError(error); }
+  });
+
+export const generateMonthlyStoryInternalAudio = onCall(
+  { secrets: ["HUME_API_KEY"], timeoutSeconds: 180, memory: "512MiB" }, async (request) => {
+    try {
+      const payload = monthlyStoryPayload(request, ["monthKey", "generationVersion"]);
+      const objectStore = monthlyStoryAudioObjectStore();
+      const api = createMonthlyStoryInternalAudioApi({ repository: monthlyStoryRepository,
+        audioRepository: new FirestoreMonthlyStoryAudioRepository(monthlyStoryFirestore),
+        objectStore,
+        providerFactory: (control) => new HumeMonthlyStoryAudioProvider({
+          apiKey: requiredSecret("HUME_API_KEY"),
+          microsPerThousandCharacters: control.humeCostMicrosPerThousandCharacters,
+        }) });
+      return await api(monthlyStoryCallableContext(request), payload);
     } catch (error) { throw monthlyStoryHttpsError(error); }
   });
 

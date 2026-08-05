@@ -170,5 +170,5 @@ test("story and tombstone schemas are metadata-only and strict", () => {
   assert.equal(MONTHLY_STORY_PATHS.story("synthetic-user-a", "2026-07"),
     "monthlyStories/synthetic-user-a/months/2026-07");
   assert.equal(MONTHLY_STORY_PATHS.audio("synthetic-user-a", "2026-07", "v1"),
-    "monthlyStories/synthetic-user-a/2026-07/v1/story.m4a");
+    "monthlyStories/synthetic-user-a/2026-07/v1/story.mp3");
 });

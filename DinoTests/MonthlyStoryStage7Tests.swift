@@ -187,7 +187,7 @@ final class MonthlyStoryStage7Tests: XCTestCase {
         XCTAssertEqual(model.state, .ready(story))
     }
 
-    func testStage7SourceHasNoFirebaseAnalyticsHealthOrAudioIntegration() throws {
+    func testStage7SourceHasNoFirebaseAnalyticsOrHealthIntegration() throws {
         let sources = try stage7ProductionSources()
         let joined = sources.values.joined(separator: "\n")
 
@@ -199,9 +199,6 @@ final class MonthlyStoryStage7Tests: XCTestCase {
             "AnalyticsManager",
             "HealthKit",
             "HealthService",
-            "AVAudio",
-            "AudioPlayer",
-            "NotificationCenter",
             "URLSession",
             "https://"
         ] {
@@ -233,7 +230,7 @@ final class MonthlyStoryStage7Tests: XCTestCase {
         let reader = try XCTUnwrap(sources["MonthlyStoryView.swift"])
 
         XCTAssertTrue(setup.contains("accessibilityHint"))
-        XCTAssertTrue(setup.contains("coming later"))
+        XCTAssertTrue(setup.contains("Allows you to explicitly create a private spoken version"))
         XCTAssertTrue(card.contains("accessibilityLabel"))
         XCTAssertTrue(reader.contains("accessibilityElement(children: .contain)"))
         XCTAssertTrue(reader.contains("accessibilityLabel(\"delete this monthly story\")"))

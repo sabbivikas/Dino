@@ -27,7 +27,18 @@ export type MonthlyStoryPersistedText = {
   createdAtMillis: number;
   finalizedAtMillis: number;
   expiresAtMillis: number;
-  audioStatus: "notRequested";
+  audioStatus: "notRequested" | "generating" | "ready" | "failed" | "deleted";
+  audioStoragePath?: string;
+  audioFormat?: "mp3";
+  audioDurationMillis?: number | null;
+  audioHash?: string;
+  audioTtsVersion?: string;
+  audioVoiceKey?: string;
+  audioGeneratedAtMillis?: number;
+  audioProviderRequestCount?: number;
+  audioEstimatedCostMicros?: number;
+  audioRetryCount?: number;
+  audioFailureCode?: string | null;
   deletionState: "active";
   validationVersion: typeof MONTHLY_STORY_PERSISTENCE_VALIDATION_VERSION;
   compositionMode: "deterministic";
@@ -68,7 +79,7 @@ export interface MonthlyStoryRepository {
     leaseOwner: string; nowMillis: number }): Promise<{ story: MonthlyStoryPersistedText; duplicate: boolean }>;
   deleteStoryMetadata(uid: string, monthKey: string): Promise<void>;
   deleteStoryAndCreateTombstone(input: { uid: string; monthKey: string; generationVersion: string;
-    nowMillis: number; expiresAtMillis: number }): Promise<void>;
+    nowMillis: number; expiresAtMillis: number; storageCleanupState?: "notRequired" | "complete" }): Promise<void>;
   enumerateAccountDeletion(uid: string, ownerKeyVersion: string): Promise<MonthlyStoryDeletionEnumeration>;
 }
 
@@ -103,16 +114,20 @@ function stringList(value: unknown, maximum: number, pattern: RegExp): string[] 
 }
 
 export function parseMonthlyStoryPersistedText(value: unknown): MonthlyStoryPersistedText {
-  const fields = ["monthKey", "generationVersion", "compositionVersion", "signalSchemaVersion", "status",
+  const requiredFields = ["monthKey", "generationVersion", "compositionVersion", "signalSchemaVersion", "status",
     "script", "paragraphs", "wordCount", "profile", "usedEvidenceIds", "usedClaimKeys",
     "usedSuggestionKeys", "scriptHash", "createdAtMillis", "finalizedAtMillis", "expiresAtMillis",
     "audioStatus", "deletionState", "validationVersion", "compositionMode", "providerRequestCount",
     "providerCostMicros", "storageCleanup"];
+  const audioFields = ["audioStoragePath", "audioFormat", "audioDurationMillis", "audioHash", "audioTtsVersion",
+    "audioVoiceKey", "audioGeneratedAtMillis", "audioProviderRequestCount", "audioEstimatedCostMicros",
+    "audioRetryCount", "audioFailureCode"];
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
     throw new MonthlyStoryRepositoryError("persistence-failure");
   }
   const data = value as Record<string, unknown>;
-  if (Object.keys(data).length !== fields.length || Object.keys(data).some((key) => !fields.includes(key))) {
+  if (requiredFields.some((key) => !Object.prototype.hasOwnProperty.call(data, key)) ||
+      Object.keys(data).some((key) => !requiredFields.includes(key) && !audioFields.includes(key))) {
     throw new MonthlyStoryRepositoryError("persistence-failure");
   }
   const createdAtMillis = millis(data.createdAtMillis as number);
@@ -129,7 +144,7 @@ export function parseMonthlyStoryPersistedText(value: unknown): MonthlyStoryPers
       !Number.isSafeInteger(data.wordCount) || (data.wordCount as number) < 80 || (data.wordCount as number) > 300 ||
       !["rich", "standard", "moodOnly"].includes(String(data.profile)) || data.status !== "textReady" ||
       typeof data.scriptHash !== "string" || !/^[a-f0-9]{64}$/.test(data.scriptHash) ||
-      data.audioStatus !== "notRequested" || data.deletionState !== "active" ||
+      !["notRequested", "generating", "ready", "failed", "deleted"].includes(String(data.audioStatus)) ||
       data.validationVersion !== MONTHLY_STORY_PERSISTENCE_VALIDATION_VERSION ||
       data.compositionMode !== "deterministic" || data.providerRequestCount !== 0 || data.providerCostMicros !== 0 ||
       createdAtMillis > finalizedAtMillis || finalizedAtMillis >= expiresAtMillis ||
@@ -138,6 +153,27 @@ export function parseMonthlyStoryPersistedText(value: unknown): MonthlyStoryPers
       usedSuggestionKeys.some((key) => !isMonthlyStoryClaimKey(key))) {
     throw new MonthlyStoryRepositoryError("persistence-failure");
   }
+  const audioStatus = data.audioStatus as MonthlyStoryPersistedText["audioStatus"];
+  const hasAudioFields = audioFields.some((key) => Object.prototype.hasOwnProperty.call(data, key));
+  if (audioStatus === "notRequested" && hasAudioFields) throw new MonthlyStoryRepositoryError("persistence-failure");
+  if (audioStatus !== "notRequested") {
+    const count = data.audioProviderRequestCount;
+    const retry = data.audioRetryCount;
+    const cost = data.audioEstimatedCostMicros;
+    if (typeof count !== "number" || !Number.isSafeInteger(count) || count < 0 || count > 2 ||
+        typeof retry !== "number" || !Number.isSafeInteger(retry) || retry < 0 || retry > 1 ||
+        typeof cost !== "number" || !Number.isSafeInteger(cost) || cost < 0 ||
+        typeof data.audioTtsVersion !== "string" || !/^[A-Za-z0-9._-]{1,32}$/.test(data.audioTtsVersion) ||
+        typeof data.audioVoiceKey !== "string" || !/^[A-Za-z0-9._:-]{1,128}$/.test(data.audioVoiceKey) ||
+        (data.audioFailureCode !== null && typeof data.audioFailureCode !== "string")) {
+      throw new MonthlyStoryRepositoryError("persistence-failure");
+    }
+    if (audioStatus === "ready" && (data.audioFormat !== "mp3" || typeof data.audioHash !== "string" ||
+        !/^[a-f0-9]{64}$/.test(data.audioHash) || typeof data.audioStoragePath !== "string" ||
+        typeof data.audioGeneratedAtMillis !== "number" || !Number.isSafeInteger(data.audioGeneratedAtMillis))) {
+      throw new MonthlyStoryRepositoryError("persistence-failure");
+    }
+  }
   return { monthKey: requireMonthKey(data.monthKey),
     generationVersion: requireGenerationVersion(data.generationVersion),
     compositionVersion: data.compositionVersion, signalSchemaVersion: data.signalSchemaVersion as number,
@@ -145,16 +181,29 @@ export function parseMonthlyStoryPersistedText(value: unknown): MonthlyStoryPers
     wordCount: data.wordCount as number, profile: data.profile as MonthlyStoryNarrativeClass,
     usedEvidenceIds, usedClaimKeys: usedClaimKeys as MonthlyStoryClaimKey[],
     usedSuggestionKeys: usedSuggestionKeys as MonthlyStoryClaimKey[], scriptHash: data.scriptHash,
-    createdAtMillis, finalizedAtMillis, expiresAtMillis, audioStatus: "notRequested",
+    createdAtMillis, finalizedAtMillis, expiresAtMillis, audioStatus,
     deletionState: "active", validationVersion: MONTHLY_STORY_PERSISTENCE_VALIDATION_VERSION,
     compositionMode: "deterministic", providerRequestCount: 0, providerCostMicros: 0,
-    storageCleanup: { state: "notRequired", updatedAtMillis: finalizedAtMillis } };
+    storageCleanup: { state: "notRequired", updatedAtMillis: finalizedAtMillis },
+    ...(hasAudioFields ? {
+      audioStoragePath: data.audioStoragePath as string | undefined,
+      audioFormat: data.audioFormat as "mp3" | undefined,
+      audioDurationMillis: data.audioDurationMillis as number | null | undefined,
+      audioHash: data.audioHash as string | undefined,
+      audioTtsVersion: data.audioTtsVersion as string,
+      audioVoiceKey: data.audioVoiceKey as string,
+      audioGeneratedAtMillis: data.audioGeneratedAtMillis as number | undefined,
+      audioProviderRequestCount: data.audioProviderRequestCount as number,
+      audioEstimatedCostMicros: data.audioEstimatedCostMicros as number,
+      audioRetryCount: data.audioRetryCount as number,
+      audioFailureCode: data.audioFailureCode as string | null,
+    } : {}) };
 }
 
-type FirestoreSnapshot = { exists: boolean; id?: string; data(): unknown };
-type FirestoreDocument = { get(): Promise<FirestoreSnapshot>; delete(): Promise<void>;
+export type FirestoreSnapshot = { exists: boolean; id?: string; data(): unknown };
+export type FirestoreDocument = { get(): Promise<FirestoreSnapshot>; delete(): Promise<void>;
   set(data: unknown): Promise<void> };
-type FirestoreTransaction = { get(reference: unknown): Promise<FirestoreSnapshot>;
+export type FirestoreTransaction = { get(reference: unknown): Promise<FirestoreSnapshot>;
   create(reference: unknown, data: unknown): void; set(reference: unknown, data: unknown): void;
   delete(reference: unknown): void };
 type FirestoreQuerySnapshot = { docs: { id: string; data(): unknown }[] };
@@ -166,7 +215,7 @@ export interface MonthlyStoryFirestoreDependency {
   runTransaction<T>(operation: (transaction: FirestoreTransaction) => Promise<T>): Promise<T>;
 }
 
-function snapshotData(snapshot: FirestoreSnapshot): unknown | null {
+export function snapshotData(snapshot: FirestoreSnapshot): unknown | null {
   return snapshot.exists ? snapshot.data() : null;
 }
 
@@ -282,8 +331,8 @@ export class FirestoreMonthlyStoryRepository implements MonthlyStoryRepository {
         throw new MonthlyStoryRepositoryError("lease-conflict");
       }
       transaction.create(storyRef, story);
-      transaction.set(jobRef, { ...job, status: "ready", leaseOwner: null, leaseExpiresAtMillis: null,
-        textArtifactHash: story.scriptHash, audioTerminal: true, failureCode: null,
+      transaction.set(jobRef, { ...job, status: "textReady", leaseOwner: null, leaseExpiresAtMillis: null,
+        textArtifactHash: story.scriptHash, audioTerminal: false, failureCode: null,
         nextAttemptAtMillis: null, updatedAtMillis: input.nowMillis });
       return { story, duplicate: false };
     });
@@ -298,7 +347,7 @@ export class FirestoreMonthlyStoryRepository implements MonthlyStoryRepository {
   }
 
   async deleteStoryAndCreateTombstone(input: { uid: string; monthKey: string; generationVersion: string;
-    nowMillis: number; expiresAtMillis: number }): Promise<void> {
+    nowMillis: number; expiresAtMillis: number; storageCleanupState?: "notRequired" | "complete" }): Promise<void> {
     const uid = uidToken(input.uid); const monthKey = requireMonthKey(input.monthKey);
     const generationVersion = requireGenerationVersion(input.generationVersion);
     millis(input.nowMillis); millis(input.expiresAtMillis);
@@ -309,7 +358,7 @@ export class FirestoreMonthlyStoryRepository implements MonthlyStoryRepository {
       transaction.delete(story);
       transaction.set(tombstone, { monthKey, generationVersion, reason: "userRequest",
         deletedAtMillis: input.nowMillis, expiresAtMillis: input.expiresAtMillis,
-        storageCleanup: { state: "notRequired", updatedAtMillis: input.nowMillis } });
+        storageCleanup: { state: input.storageCleanupState ?? "notRequired", updatedAtMillis: input.nowMillis } });
     });
   }
 
@@ -417,8 +466,8 @@ export class InMemoryMonthlyStoryRepository implements MonthlyStoryRepository {
       }
       const story = parseMonthlyStoryPersistedText(input.story);
       this.stories.set(key, structuredClone(story));
-      this.jobs.set(input.jobId, { ...job, status: "ready", leaseOwner: null, leaseExpiresAtMillis: null,
-        textArtifactHash: story.scriptHash, audioTerminal: true, failureCode: null,
+      this.jobs.set(input.jobId, { ...job, status: "textReady", leaseOwner: null, leaseExpiresAtMillis: null,
+        textArtifactHash: story.scriptHash, audioTerminal: false, failureCode: null,
         nextAttemptAtMillis: null, updatedAtMillis: input.nowMillis });
       return { story: structuredClone(story), duplicate: false };
     });
@@ -428,14 +477,14 @@ export class InMemoryMonthlyStoryRepository implements MonthlyStoryRepository {
     this.stories.delete(`${uidToken(uid)}/${requireMonthKey(monthKey)}`);
   }
   async deleteStoryAndCreateTombstone(input: { uid: string; monthKey: string; generationVersion: string;
-    nowMillis: number; expiresAtMillis: number }): Promise<void> {
+    nowMillis: number; expiresAtMillis: number; storageCleanupState?: "notRequired" | "complete" }): Promise<void> {
     if (this.failDeletion) throw new MonthlyStoryRepositoryError("persistence-failure");
     const uid = uidToken(input.uid); const monthKey = requireMonthKey(input.monthKey);
     this.stories.delete(`${uid}/${monthKey}`);
     this.tombstones.set(`${uid}/${monthKey}`, { monthKey,
       generationVersion: requireGenerationVersion(input.generationVersion), reason: "userRequest",
       deletedAtMillis: input.nowMillis, expiresAtMillis: input.expiresAtMillis,
-      storageCleanup: { state: "notRequired", updatedAtMillis: input.nowMillis } });
+      storageCleanup: { state: input.storageCleanupState ?? "notRequired", updatedAtMillis: input.nowMillis } });
   }
   enumerateAccountDeletion(uid: string, ownerKeyVersion: string): Promise<MonthlyStoryDeletionEnumeration> {
     const safeUid = uidToken(uid); const ownerKey = monthlyStoryOwnerKey(safeUid, ownerKeyVersion);

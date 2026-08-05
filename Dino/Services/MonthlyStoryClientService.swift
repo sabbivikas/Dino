@@ -6,6 +6,7 @@ struct MonthlyStoryFeatureAvailability: Equatable, Sendable {
     let visible: Bool
     var signalUploadEnabled = false
     var textGenerationEnabled = false
+    var audioGenerationEnabled = false
     var generationVersion = ""
     var signalSchemaVersion = 0
 }
@@ -61,7 +62,7 @@ final class InMemoryMonthlyStoryClientService: MonthlyStoryClientService {
          settings: MonthlyStorySettings = .disabled,
          storyResult: MonthlyStoryStoryLoadResult = .notFound) {
         self.availability = availability
-        self.settings = settings.sanitizedForWrittenOnlyStage
+        self.settings = settings.sanitized(audioAvailable: availability.audioGenerationEnabled)
         self.storyResult = storyResult
     }
 
@@ -80,7 +81,7 @@ final class InMemoryMonthlyStoryClientService: MonthlyStoryClientService {
     func updateSettings(_ settings: MonthlyStorySettings) async throws -> MonthlyStorySettings {
         settingsUpdateCount += 1
         if let updateError { throw updateError }
-        let sanitized = settings.sanitizedForWrittenOnlyStage
+        let sanitized = settings.sanitized(audioAvailable: availability.audioGenerationEnabled)
         self.settings = sanitized
         return sanitized
     }
@@ -196,11 +197,14 @@ final class MonthlyStoryReaderModel: ObservableObject {
     @Published var showsDeletionError = false
 
     private let service: any MonthlyStoryClientService
+    private let audioService: any MonthlyStoryAudioService
     private let originalStory: MonthlyStoryDocument
 
-    init(story: MonthlyStoryDocument, service: any MonthlyStoryClientService) {
+    init(story: MonthlyStoryDocument, service: any MonthlyStoryClientService,
+         audioService: any MonthlyStoryAudioService = InMemoryMonthlyStoryAudioService()) {
         originalStory = story
         self.service = service
+        self.audioService = audioService
         state = .ready(story)
     }
 
@@ -220,6 +224,7 @@ final class MonthlyStoryReaderModel: ObservableObject {
         do {
             try await service.deleteStory(monthKey: originalStory.monthKey)
             await service.clearLocalStoryCache(monthKey: originalStory.monthKey)
+            await audioService.clearCache(monthKey: originalStory.monthKey)
             state = .deleted
         } catch {
             state = .ready(originalStory)

@@ -7,6 +7,7 @@ struct MonthlyStorySetupView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var draft: MonthlyStorySettings
     @State private var remoteVisible = true
+    @State private var remoteAudioAvailable = false
     @State private var isSaving = false
     @State private var showsError = false
 
@@ -15,7 +16,7 @@ struct MonthlyStorySetupView: View {
          onSaved: @escaping (MonthlyStorySettings) -> Void) {
         self.service = service
         self.onSaved = onSaved
-        _draft = State(initialValue: initialSettings.sanitizedForWrittenOnlyStage)
+        _draft = State(initialValue: initialSettings)
     }
 
     var body: some View {
@@ -37,10 +38,11 @@ struct MonthlyStorySetupView: View {
                             Toggle("use health patterns", isOn: $draft.useHealthPatterns)
                                 .disabled(!draft.enabled)
                                 .accessibilityHint("Does not request or change health permissions.")
-                            Toggle("create spoken version", isOn: .constant(false))
-                                .disabled(true)
-                                .accessibilityHint("Coming later. No audio will be created.")
-                            Text("spoken stories are coming later")
+                            Toggle("create spoken version", isOn: $draft.audioEnabled)
+                                .disabled(!draft.enabled || !remoteAudioAvailable)
+                                .accessibilityHint("Allows you to explicitly create a private spoken version after your written story is ready.")
+                            Text(remoteAudioAvailable ?
+                                 "audio is created only when you ask for it" : "spoken stories are unavailable right now")
                                 .font(.footnote)
                                 .foregroundStyle(.secondary)
                         }
@@ -84,7 +86,10 @@ struct MonthlyStorySetupView: View {
 
     private func refreshAvailability() async {
         do {
-            remoteVisible = try await service.loadFeatureAvailability().visible
+            let availability = try await service.loadFeatureAvailability()
+            remoteVisible = availability.visible
+            remoteAudioAvailable = availability.audioGenerationEnabled
+            if !remoteAudioAvailable { draft.audioEnabled = false }
         } catch {
             remoteVisible = false
         }
@@ -95,7 +100,7 @@ struct MonthlyStorySetupView: View {
         isSaving = true
         defer { isSaving = false }
         do {
-            let saved = try await service.updateSettings(draft.sanitizedForWrittenOnlyStage)
+            let saved = try await service.updateSettings(draft.sanitized(audioAvailable: remoteAudioAvailable))
             onSaved(saved)
             dismiss()
         } catch {

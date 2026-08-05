@@ -13,6 +13,7 @@ export type MonthlyStoryControl = {
   dailyTextGenerationCap: number;
   monthlyTextGenerationCap: number;
   dailyAudioGenerationCap: number;
+  monthlyAudioGenerationCap: number;
   monthlyBudgetMicros: number;
   monthlyTextBudgetMicros: number;
   monthlyAudioBudgetMicros: number;
@@ -23,6 +24,11 @@ export type MonthlyStoryControl = {
   scriptPromptVersion: string;
   criticPromptVersion: string;
   ttsVersion: string;
+  humeConfigurationVersion: string;
+  approvedVoiceKey: string;
+  maximumAudioScriptCharacters: number;
+  audioRequestTimeoutSeconds: number;
+  humeCostMicrosPerThousandCharacters: number;
   updatedAtMillis: number | null;
 };
 
@@ -30,10 +36,12 @@ const CONTROL_FIELDS = [
   "visible", "enrollmentEnabled", "signalUploadEnabled",
   "textGenerationEnabled", "audioGenerationEnabled", "rolloutBasisPoints",
   "minimumAppVersion", "dailyTextGenerationCap", "monthlyTextGenerationCap", "dailyAudioGenerationCap",
+  "monthlyAudioGenerationCap",
   "monthlyBudgetMicros", "monthlyTextBudgetMicros", "monthlyAudioBudgetMicros",
   "maxTextAttempts", "maxAudioAttempts", "generationVersion",
   "signalSchemaVersion", "scriptPromptVersion", "criticPromptVersion",
-  "ttsVersion", "updatedAt",
+  "ttsVersion", "humeConfigurationVersion", "approvedVoiceKey", "maximumAudioScriptCharacters",
+  "audioRequestTimeoutSeconds", "humeCostMicrosPerThousandCharacters", "updatedAt",
 ] as const;
 
 export const SAFE_DISABLED_MONTHLY_STORY_CONTROL: Readonly<MonthlyStoryControl> = Object.freeze({
@@ -47,6 +55,7 @@ export const SAFE_DISABLED_MONTHLY_STORY_CONTROL: Readonly<MonthlyStoryControl> 
   dailyTextGenerationCap: 0,
   monthlyTextGenerationCap: 0,
   dailyAudioGenerationCap: 0,
+  monthlyAudioGenerationCap: 0,
   monthlyBudgetMicros: 0,
   monthlyTextBudgetMicros: 0,
   monthlyAudioBudgetMicros: 0,
@@ -57,6 +66,11 @@ export const SAFE_DISABLED_MONTHLY_STORY_CONTROL: Readonly<MonthlyStoryControl> 
   scriptPromptVersion: "",
   criticPromptVersion: "",
   ttsVersion: "",
+  humeConfigurationVersion: "",
+  approvedVoiceKey: "",
+  maximumAudioScriptCharacters: 0,
+  audioRequestTimeoutSeconds: 0,
+  humeCostMicrosPerThousandCharacters: 0,
   updatedAtMillis: null,
 });
 
@@ -122,6 +136,7 @@ export function parseMonthlyStoryControl(
       !integerIn(value.dailyTextGenerationCap, 0, 1_000_000) ||
       !integerIn(value.monthlyTextGenerationCap, 0, 1_000_000) ||
       !integerIn(value.dailyAudioGenerationCap, 0, 1_000_000) ||
+      !integerIn(value.monthlyAudioGenerationCap, 0, 1_000_000) ||
       !integerIn(value.monthlyBudgetMicros, 0, Number.MAX_SAFE_INTEGER) ||
       !integerIn(value.monthlyTextBudgetMicros, 0, Number.MAX_SAFE_INTEGER) ||
       !integerIn(value.monthlyAudioBudgetMicros, 0, Number.MAX_SAFE_INTEGER) ||
@@ -130,7 +145,14 @@ export function parseMonthlyStoryControl(
       !integerIn(value.maxTextAttempts, 0, 10) ||
       !integerIn(value.maxAudioAttempts, 0, 10) ||
       !integerIn(value.signalSchemaVersion, 1, 1_000) ||
-      !versions.every(boundedVersion) || updatedAtMillis === null) {
+      !versions.every(boundedVersion) ||
+      !boundedVersion(value.humeConfigurationVersion) ||
+      typeof value.approvedVoiceKey !== "string" ||
+      !/^[A-Za-z0-9._:-]{1,128}$/.test(value.approvedVoiceKey) ||
+      !integerIn(value.maximumAudioScriptCharacters, 0, 5_000) ||
+      !integerIn(value.audioRequestTimeoutSeconds, 0, 300) ||
+      !integerIn(value.humeCostMicrosPerThousandCharacters, 0, 10_000_000) ||
+      updatedAtMillis === null) {
     return disabled("malformed");
   }
 
@@ -151,6 +173,7 @@ export function parseMonthlyStoryControl(
       dailyTextGenerationCap: value.dailyTextGenerationCap as number,
       monthlyTextGenerationCap: value.monthlyTextGenerationCap as number,
       dailyAudioGenerationCap: value.dailyAudioGenerationCap as number,
+      monthlyAudioGenerationCap: value.monthlyAudioGenerationCap as number,
       monthlyBudgetMicros: value.monthlyBudgetMicros as number,
       monthlyTextBudgetMicros: value.monthlyTextBudgetMicros as number,
       monthlyAudioBudgetMicros: value.monthlyAudioBudgetMicros as number,
@@ -161,9 +184,24 @@ export function parseMonthlyStoryControl(
       scriptPromptVersion: value.scriptPromptVersion as string,
       criticPromptVersion: value.criticPromptVersion as string,
       ttsVersion: value.ttsVersion as string,
+      humeConfigurationVersion: value.humeConfigurationVersion as string,
+      approvedVoiceKey: value.approvedVoiceKey as string,
+      maximumAudioScriptCharacters: value.maximumAudioScriptCharacters as number,
+      audioRequestTimeoutSeconds: value.audioRequestTimeoutSeconds as number,
+      humeCostMicrosPerThousandCharacters: value.humeCostMicrosPerThousandCharacters as number,
       updatedAtMillis,
     },
   };
+}
+
+export function monthlyStoryAudioGenerationIsFailClosed(control: MonthlyStoryControl): boolean {
+  return !control.enrollmentEnabled || !control.audioGenerationEnabled ||
+    control.rolloutBasisPoints === 0 || control.dailyAudioGenerationCap === 0 ||
+    control.monthlyAudioGenerationCap === 0 || control.monthlyBudgetMicros === 0 ||
+    control.monthlyAudioBudgetMicros === 0 || control.maxAudioAttempts === 0 ||
+    control.maximumAudioScriptCharacters === 0 || control.audioRequestTimeoutSeconds === 0 ||
+    control.humeCostMicrosPerThousandCharacters === 0 || !control.humeConfigurationVersion ||
+    !control.approvedVoiceKey || !control.ttsVersion;
 }
 
 export function monthlyStoryGenerationIsFailClosed(control: MonthlyStoryControl): boolean {

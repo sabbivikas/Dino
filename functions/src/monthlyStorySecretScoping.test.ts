@@ -15,6 +15,7 @@ const monthlyStoryExports = [
   "generateMonthlyStoryInternal",
   "deleteMonthlyStoryInternal",
 ] as const;
+const monthlyStoryAudioExport = "generateMonthlyStoryInternalAudio";
 
 const providerBindings = new Map<string, readonly string[]>([
   ["generateMoodPainting", ["OPENAI_API_KEY"]],
@@ -33,6 +34,7 @@ const providerBindings = new Map<string, readonly string[]>([
   ["generateComfortRecs", ["OPENAI_API_KEY", "TMDB_API_TOKEN"]],
   ["nightlyPreferenceDistill", ["OPENAI_API_KEY"]],
   ["startFindingTask", ["OPENAI_API_KEY"]],
+  [monthlyStoryAudioExport, ["HUME_API_KEY"]],
 ]);
 
 function exportBlock(name: string): string {
@@ -42,12 +44,17 @@ function exportBlock(name: string): string {
   return indexSource.slice(start, next === -1 ? indexSource.length : next);
 }
 
-test("monthly-story exports bind no provider secrets and retain their export names", () => {
+test("written monthly-story exports bind no provider secrets and retain their export names", () => {
   for (const name of monthlyStoryExports) {
     const block = exportBlock(name);
     assert.doesNotMatch(block, /secrets\s*:/, name);
     assert.doesNotMatch(block, /OPENAI|META_MODEL|FIRECRAWL|TMDB|HUME|TTS/i, name);
   }
+});
+
+test("only the audio callable binds HUME_API_KEY", () => {
+  assert.equal(exportBlock(monthlyStoryAudioExport).includes('secrets: ["HUME_API_KEY"]'), true);
+  assert.equal((indexSource.match(/secrets: \["HUME_API_KEY"\]/g) ?? []).length, 1);
 });
 
 test("provider-backed exports retain their exact secret-name bindings", () => {
@@ -71,9 +78,9 @@ test("index import registers no global params, reads no secret, and initializes 
       } }, children: [], paths: []
     };
     for (const name of ["OPENAI_API_KEY", "FIRECRAWL_API_KEY", "TMDB_API_TOKEN",
-      "META_MODEL_API_KEY", "META_API_BASE"]) delete process.env[name];
+      "META_MODEL_API_KEY", "META_API_BASE", "HUME_API_KEY"]) delete process.env[name];
     const loaded = require(${JSON.stringify(compiledIndex)});
-    const expected = ${JSON.stringify(monthlyStoryExports)};
+    const expected = ${JSON.stringify([...monthlyStoryExports, monthlyStoryAudioExport])};
     if (!expected.every((name) => typeof loaded[name] === "function")) process.exit(2);
     process.stdout.write("monthly-story-import-ok");
     process.exit(0);
@@ -86,7 +93,7 @@ test("index import registers no global params, reads no secret, and initializes 
 });
 
 test("monthly-story entry point cannot reach provider-evaluation code", () => {
-  const monthlyImports = ["monthlyStoryInternalApi", "monthlyStoryRepository"];
+  const monthlyImports = ["monthlyStoryInternalApi", "monthlyStoryRepository", "monthlyStoryInternalAudioApi"];
   for (const required of monthlyImports) assert.equal(indexSource.includes(`from "./${required}"`), true, required);
   for (const prohibited of ["monthlyStoryOpenAIProvider", "monthlyStoryWrittenPipeline",
     "monthlyStorySyntheticEvaluation", "monthlyStoryTextProvider"]) {

@@ -12,7 +12,7 @@ test("deletion inventory explicitly covers every future monthly-story surface", 
   assert.ok(MONTHLY_STORY_ACCOUNT_DELETION_INVENTORY.serverQueries.some((item) =>
     item.includes("deterministicJobs")));
   assert.deepEqual(MONTHLY_STORY_ACCOUNT_DELETION_INVENTORY.storagePrefixes, ["monthlyStories/{uid}/"]);
-  assert.ok(MONTHLY_STORY_ACCOUNT_DELETION_INVENTORY.localCaches.some((item) => item.includes("MonthlyStories")));
+  assert.ok(MONTHLY_STORY_ACCOUNT_DELETION_INVENTORY.localCaches.some((item) => item.includes("MonthlyStoryAudio")));
   assert.equal(MONTHLY_STORY_ACCOUNT_DELETION_INVENTORY.integrationStatus,
     "not-integrated-with-current-account-deletion");
 });

@@ -18,7 +18,7 @@ export const MONTHLY_STORY_ACCOUNT_DELETION_INVENTORY = Object.freeze({
     "monthlyStorySpend/{month}/deterministicJobs where jobId is in owned jobs",
   ],
   storagePrefixes: ["monthlyStories/{uid}/"],
-  localCaches: ["Library/Caches/MonthlyStories/{uid}/"],
+  localCaches: ["Library/Caches/MonthlyStoryAudio/{monthKey}_{generationVersion}_{audioHash}.mp3"],
   integrationStatus: "not-integrated-with-current-account-deletion",
 } as const);
 

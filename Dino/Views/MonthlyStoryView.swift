@@ -5,13 +5,20 @@ struct MonthlyStoryView: View {
 
     @Environment(\.dismiss) private var dismiss
     @StateObject private var model: MonthlyStoryReaderModel
+    @StateObject private var audioPlayer: MonthlyStoryAudioPlayer
     @State private var showsDeleteConfirmation = false
 
     init(story: MonthlyStoryDocument,
          service: any MonthlyStoryClientService,
+         audioService: any MonthlyStoryAudioService = InMemoryMonthlyStoryAudioService(),
+         audioOptIn: Bool = false,
          onDeleted: @escaping () -> Void) {
         self.onDeleted = onDeleted
-        _model = StateObject(wrappedValue: MonthlyStoryReaderModel(story: story, service: service))
+        _model = StateObject(wrappedValue: MonthlyStoryReaderModel(story: story, service: service,
+                                                                   audioService: audioService))
+        _audioPlayer = StateObject(wrappedValue: MonthlyStoryAudioPlayer(story: story,
+                                                                         audioOptIn: audioOptIn,
+                                                                         service: audioService))
     }
 
     var body: some View {
@@ -50,12 +57,12 @@ struct MonthlyStoryView: View {
                 Button("delete story", role: .destructive) {
                     Task {
                         await model.deleteStory()
-                        if model.state == .deleted { onDeleted() }
+                        if model.state == .deleted { audioPlayer.markDeleted(); onDeleted() }
                     }
                 }
                 Button("keep story", role: .cancel) {}
             } message: {
-                Text("the written story and any future audio for this month will be removed. it will not be regenerated for this month in this version of dino.")
+                Text("the written story and its private spoken version will be removed. it will not be regenerated for this month in this version of dino.")
             }
             .alert("couldn't delete story", isPresented: $model.showsDeletionError) {
                 Button("ok", role: .cancel) {}
@@ -80,6 +87,8 @@ struct MonthlyStoryView: View {
                 }
                 .accessibilityElement(children: .combine)
                 .accessibilityLabel("Your \(story.displayMonth) monthly story")
+
+                MonthlyStoryAudioPlayerView(player: audioPlayer)
 
                 ForEach(Array(story.paragraphs.enumerated()), id: \.offset) { index, paragraph in
                     Text(paragraph)

@@ -1,6 +1,7 @@
 import { runMonthlyStoryGenerationInternal } from "./monthlyStoryGenerationService";
 import { requireMonthlyStoryInternalAccount, requireMonthlyStoryInternalAvailability } from "./monthlyStoryInternalAccess";
 import { MonthlyStoryRepository } from "./monthlyStoryRepository";
+import { MonthlyStoryAudioObjectStore, monthlyStoryAudioStoragePath } from "./monthlyStoryAudioService";
 import { monthlyStoryTombstoneExpiresAtMillis } from "./monthlyStoryRetention";
 import { MonthlyStoryValidationError, parseMonthlyStorySettingsDocument,
   requireGenerationVersion, requireMonthKey, validateMonthlyStorySettingsContract,
@@ -33,7 +34,7 @@ function mapError(error: unknown): MonthlyStoryInternalApiError {
   const code = error instanceof Error && "code" in error ? String((error as { code: unknown }).code) : "";
   if (code === "authentication-required") return new MonthlyStoryInternalApiError("unauthenticated");
   if (code === "internal-access-denied") return new MonthlyStoryInternalApiError("permission-denied");
-  if (["feature-unavailable", "app-version-unsupported", "control-disabled", "control-invalid",
+  if (["feature-unavailable", "feature-disabled", "app-version-unsupported", "control-disabled", "control-invalid",
     "settings-disabled", "signal-upload-disabled", "settings-mismatch", "safety-hold", "safety-ineligible",
     "month-not-closed", "eligibility-failed"].includes(code)) return new MonthlyStoryInternalApiError("failed-precondition");
   if (["invalid-input", "invalid-object", "unknown-field", "missing-field", "invalid-token",
@@ -47,13 +48,15 @@ function mapError(error: unknown): MonthlyStoryInternalApiError {
   return new MonthlyStoryInternalApiError("internal");
 }
 
-export function createMonthlyStoryInternalApi(repository: MonthlyStoryRepository) {
+export function createMonthlyStoryInternalApi(repository: MonthlyStoryRepository,
+  audioObjectStore?: MonthlyStoryAudioObjectStore) {
   return {
     availability: async (context: MonthlyStoryInternalApiContext) => {
       try {
         const { control } = await requireMonthlyStoryInternalAvailability({ ...context, repository });
         return { visible: true, enrollmentEnabled: true, signalUploadEnabled: control.signalUploadEnabled,
-          textGenerationEnabled: control.textGenerationEnabled, generationVersion: control.generationVersion,
+          textGenerationEnabled: control.textGenerationEnabled,
+          audioGenerationEnabled: control.audioGenerationEnabled, generationVersion: control.generationVersion,
           signalSchemaVersion: control.signalSchemaVersion };
       } catch (error) { throw mapError(error); }
     },
@@ -70,7 +73,8 @@ export function createMonthlyStoryInternalApi(repository: MonthlyStoryRepository
           access.control, context.nowMillis);
         const settings: Record<string, unknown> = { enabled: validated.settings.enabled,
           useJournalThemes: validated.settings.useJournalThemes,
-          useHealthPatterns: validated.settings.useHealthPatterns, audioEnabled: false,
+          useHealthPatterns: validated.settings.useHealthPatterns,
+          audioEnabled: validated.settings.audioEnabled && access.control.audioGenerationEnabled,
           timezone: validated.settings.timezone,
           timezoneEffectiveMonth: validated.settings.timezoneEffectiveMonth,
           settingsVersion: validated.settings.settingsVersion, updatedAt: context.nowMillis };
@@ -123,9 +127,14 @@ export function createMonthlyStoryInternalApi(repository: MonthlyStoryRepository
         const data = exactPayload(payload, ["monthKey", "generationVersion"]);
         const uid = await requireMonthlyStoryInternalAccount({ ...context, repository });
         const monthKey = requireMonthKey(data.monthKey);
+        const generationVersion = requireGenerationVersion(data.generationVersion);
+        if (audioObjectStore) {
+          await audioObjectStore.delete(monthlyStoryAudioStoragePath(uid, monthKey, generationVersion));
+        }
         await repository.deleteStoryAndCreateTombstone({ uid, monthKey,
-          generationVersion: requireGenerationVersion(data.generationVersion), nowMillis: context.nowMillis,
-          expiresAtMillis: monthlyStoryTombstoneExpiresAtMillis(monthKey) });
+          generationVersion, nowMillis: context.nowMillis,
+          expiresAtMillis: monthlyStoryTombstoneExpiresAtMillis(monthKey),
+          storageCleanupState: audioObjectStore ? "complete" : "notRequired" });
         return { deleted: true };
       } catch (error) { throw mapError(error); }
     },

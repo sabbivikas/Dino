@@ -8,11 +8,13 @@ const validControl = (overrides: Record<string, unknown> = {}): Record<string, u
   visible: false, enrollmentEnabled: true, signalUploadEnabled: true,
   textGenerationEnabled: true, audioGenerationEnabled: true, rolloutBasisPoints: 500,
   minimumAppVersion: "1.2.3", dailyTextGenerationCap: 10, monthlyTextGenerationCap: 100,
-  dailyAudioGenerationCap: 5,
+  dailyAudioGenerationCap: 5, monthlyAudioGenerationCap: 25,
   monthlyBudgetMicros: 1_000_000, monthlyTextBudgetMicros: 600_000,
   monthlyAudioBudgetMicros: 400_000, maxTextAttempts: 2, maxAudioAttempts: 2,
   generationVersion: "v1", signalSchemaVersion: 1, scriptPromptVersion: "script-v1",
-  criticPromptVersion: "critic-v1", ttsVersion: "tts-v1", updatedAt: now,
+  criticPromptVersion: "critic-v1", ttsVersion: "tts-v1", humeConfigurationVersion: "hume-v1",
+  approvedVoiceKey: "synthetic-voice", maximumAudioScriptCharacters: 5_000,
+  audioRequestTimeoutSeconds: 30, humeCostMicrosPerThousandCharacters: 150_000, updatedAt: now,
   ...overrides,
 });
 

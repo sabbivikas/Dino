@@ -11,7 +11,7 @@ service firebase.storage {
     }
     // Dormant monthly-story audio path. Only the Admin SDK may create/delete;
     // an authenticated owner may read a future finalized object.
-    match /monthlyStories/{uid}/{monthKey}/{generationVersion}/story.m4a {
+    match /monthlyStories/{uid}/{monthKey}/{generationVersion}/story.mp3 {
       allow read: if request.auth != null && request.auth.uid == uid;
       allow write: if false;
     }

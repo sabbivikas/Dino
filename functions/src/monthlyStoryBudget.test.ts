@@ -43,7 +43,8 @@ class FakeBudgetRepository implements MonthlyStoryBudgetRepository {
 
 const policy: MonthlyStoryBudgetPolicy = { textGenerationEnabled: true, audioGenerationEnabled: true,
   monthlyBudgetMicros: 1_000, monthlyTextBudgetMicros: 600, monthlyAudioBudgetMicros: 400,
-  dailyTextGenerationCap: 2, monthlyTextGenerationCap: 4, dailyAudioGenerationCap: 1 };
+  dailyTextGenerationCap: 2, monthlyTextGenerationCap: 4, dailyAudioGenerationCap: 1,
+  monthlyAudioGenerationCap: 2 };
 const jobId = `ms_${"a".repeat(64)}`;
 const base = { jobId, stage: "text" as const, attempt: 1, monthKey: "2026-07",
   dayKey: "2026-07-05", amountMicros: 200, nowMillis: 100, expiresAtMillis: 200, policy };

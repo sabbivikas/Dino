@@ -105,6 +105,7 @@ private extension MonthlyStoryViewState {
 struct MonthlyStoryCardHost: View {
     @Environment(\.monthlyStoryInternalGate) private var localGate
     @Environment(\.monthlyStoryClientService) private var service
+    @Environment(\.monthlyStoryAudioService) private var audioService
     @State private var snapshot = MonthlyStoryExperienceSnapshot.hidden
     @State private var route: Route?
     @State private var isPreparing = false
@@ -157,7 +158,8 @@ struct MonthlyStoryCardHost: View {
                                                               state: settings.enabled ? .noStory : .settingsDisabled)
                 }
             case .reader(let story):
-                MonthlyStoryView(story: story, service: service) {
+                MonthlyStoryView(story: story, service: service, audioService: audioService,
+                                 audioOptIn: snapshot.settings.audioEnabled) {
                     snapshot = MonthlyStoryExperienceSnapshot(isVisible: true,
                                                               settings: snapshot.settings,
                                                               state: .deleted)

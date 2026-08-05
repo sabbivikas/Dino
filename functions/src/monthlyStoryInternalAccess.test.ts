@@ -9,10 +9,13 @@ const control = (overrides: Record<string, unknown> = {}) => ({ visible: true,
   enrollmentEnabled: true, signalUploadEnabled: true, textGenerationEnabled: true,
   audioGenerationEnabled: false, rolloutBasisPoints: 10_000, minimumAppVersion: "2.1.0",
   dailyTextGenerationCap: 2, monthlyTextGenerationCap: 5, dailyAudioGenerationCap: 0,
+  monthlyAudioGenerationCap: 0,
   monthlyBudgetMicros: 1, monthlyTextBudgetMicros: 1, monthlyAudioBudgetMicros: 0,
   maxTextAttempts: 2, maxAudioAttempts: 0, generationVersion: "deterministic-v1",
   signalSchemaVersion: 1, scriptPromptVersion: "deterministic-v1", criticPromptVersion: "none-v1",
-  ttsVersion: "none-v1", updatedAt: now, ...overrides });
+  ttsVersion: "none-v1", humeConfigurationVersion: "none-v1", approvedVoiceKey: "disabled",
+  maximumAudioScriptCharacters: 0, audioRequestTimeoutSeconds: 0,
+  humeCostMicrosPerThousandCharacters: 0, updatedAt: now, ...overrides });
 
 test("internal tester documents and app versions fail closed", () => {
   assert.equal(parseMonthlyStoryInternalTester(null, now), false);
