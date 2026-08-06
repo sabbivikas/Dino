@@ -219,3 +219,20 @@ test("a ready story keeps its generation counters: it consumed a real generation
   assert.equal(firestore.documents.get(MONTH_PATH)?.audioCommittedMicros, 400);
   assert.equal(firestore.documents.get(MONTH_PATH)?.audioReleasedMicros, reservationMicros - 400);
 });
+
+test("markAudioReady issues every read before its first write", async () => {
+  const { firestore, repository } = await leased();
+  const object: MonthlyStoryAudioObject = { path: `monthlyStories/${uid}/${monthKey}/${generationVersion}/story.mp3`,
+    hash: "c".repeat(64), bytes: 1_024, durationMillis: 60_000, generatedAtMillis: nowMillis,
+    providerRequestCount: 1, estimatedCostMicros: 400, ttsVersion: "tts-v1", voiceKey: "voice-1" };
+  await repository.markAudioReady({ uid, monthKey, generationVersion, leaseOwner, object, nowMillis });
+  const firstWrite = firestore.operations.findIndex((operation) => operation.kind !== "get");
+  const lastRead = firestore.operations.map((operation) => operation.kind).lastIndexOf("get");
+  assert.ok(firstWrite > 0, "the transaction writes");
+  assert.ok(lastRead < firstWrite,
+    "Firestore rejects a get() issued after a write inside the same transaction");
+  for (const path of [RESERVATION_PATH, MONTH_PATH]) {
+    assert.ok(firestore.operations.some((operation) => operation.kind === "get" && operation.path === path),
+      `${path} is read inside the transaction that settles it`);
+  }
+});

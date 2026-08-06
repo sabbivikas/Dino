@@ -116,6 +116,17 @@ export class FirestoreMonthlyStoryAudioRepository implements MonthlyStoryAudioRe
           (job.status !== "audioLeased" || job.leaseOwner !== input.leaseOwner)) {
         throw new MonthlyStoryAudioServiceError("persistence-failure");
       }
+      const attempt = Math.max(job.audioAttempts, 1);
+      const reservationId = `${jobId}_audio_${attempt}`;
+      const reservationRef = this.firestore.doc(`monthlyStorySpend/${billingMonth(input.nowMillis)}/reservations/${reservationId}`);
+      const monthRef = this.firestore.doc(`monthlyStorySpend/${billingMonth(input.nowMillis)}`);
+      // Every read is issued BEFORE the first write below: Firestore rejects a get() that follows a
+      // write inside the same transaction, so the reservation and the monthly ledger it settles
+      // against have to be loaded while the transaction is still read-only.
+      const reservation = snapshotData(await transaction.get(reservationRef)) as Record<string, unknown> | null;
+      const settles = reservation !== null && reservation.status === "reserved";
+      const monthly = settles ?
+        snapshotData(await transaction.get(monthRef)) as Record<string, unknown> | null : null;
       const ready: MonthlyStoryPersistedText = { ...story, audioStatus: "ready",
         audioStoragePath: input.object.path, audioFormat: "mp3", audioDurationMillis: input.object.durationMillis,
         audioHash: input.object.hash, audioTtsVersion: input.object.ttsVersion,
@@ -127,13 +138,7 @@ export class FirestoreMonthlyStoryAudioRepository implements MonthlyStoryAudioRe
       transaction.set(jobRef, { ...job, status: "ready", leaseOwner: null, leaseExpiresAtMillis: null,
         audioArtifactHash: input.object.hash, audioTerminal: true, failureCode: null,
         updatedAtMillis: input.nowMillis });
-      const attempt = Math.max(job.audioAttempts, 1);
-      const reservationId = `${jobId}_audio_${attempt}`;
-      const reservationRef = this.firestore.doc(`monthlyStorySpend/${billingMonth(input.nowMillis)}/reservations/${reservationId}`);
-      const reservation = snapshotData(await transaction.get(reservationRef)) as Record<string, unknown> | null;
-      if (reservation && reservation.status === "reserved") {
-        const monthRef = this.firestore.doc(`monthlyStorySpend/${billingMonth(input.nowMillis)}`);
-        const monthly = snapshotData(await transaction.get(monthRef)) as Record<string, unknown> | null;
+      if (reservation && settles) {
         const amount = count(reservation.amountMicros); const actual = input.object.estimatedCostMicros;
         if (actual > amount) throw new MonthlyStoryAudioServiceError("budget-denied");
         transaction.set(monthRef, { ...(monthly ?? {}),
