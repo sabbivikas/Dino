@@ -1,7 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert";
 import { MonthlyStoryBudgetRepository, MonthlyStoryBudgetReservation, MonthlyStoryBudgetTransaction,
-  MonthlyStoryDailySpend, MonthlyStoryMonthlySpend } from "./monthlyStoryBudget";
+  MonthlyStoryDailySpend, MonthlyStoryMonthlySpend,
+  MonthlyStoryReservationRef } from "./monthlyStoryBudget";
 import { MonthlyStoryControl, SAFE_DISABLED_MONTHLY_STORY_CONTROL } from "./monthlyStoryControl";
 import { passingMonthlyStoryCriticResult } from "./monthlyStoryCritic";
 import { FakeMonthlyStoryTextProvider, FailureMonthlyStoryTextProvider,
@@ -16,6 +17,14 @@ class FakeBudgetRepository implements MonthlyStoryBudgetRepository {
   readonly daily = new Map<string, MonthlyStoryDailySpend>();
   readonly reservations = new Map<string, MonthlyStoryBudgetReservation>();
   private queue: Promise<void> = Promise.resolve();
+
+  async listExpiredReservations(input: { nowMillis: number; limit: number }):
+  Promise<MonthlyStoryReservationRef[]> {
+    return Array.from(this.reservations.values())
+      .filter((item) => item.status === "reserved" && item.expiresAtMillis <= input.nowMillis)
+      .slice(0, input.limit)
+      .map(({ reservationId, monthKey, dayKey }) => ({ reservationId, monthKey, dayKey }));
+  }
 
   runTransaction<T>(operation: (transaction: MonthlyStoryBudgetTransaction) => Promise<T>): Promise<T> {
     const run = this.queue.then(async () => {

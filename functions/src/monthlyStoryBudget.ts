@@ -72,7 +72,19 @@ export interface MonthlyStoryBudgetTransaction {
 
 export interface MonthlyStoryBudgetRepository {
   runTransaction<T>(operation: (transaction: MonthlyStoryBudgetTransaction) => Promise<T>): Promise<T>;
+  /**
+   * Reservations still in `status === "reserved"` whose `expiresAtMillis <= nowMillis`,
+   * capped at `limit`. The sweep in `reserveMonthlyStoryBudget` uses this so abandoned
+   * reservations cannot hold micros against the monthly ceiling forever.
+   */
+  listExpiredReservations(input: { nowMillis: number; limit: number }):
+    Promise<MonthlyStoryReservationRef[]>;
 }
+
+export type MonthlyStoryReservationRef = { reservationId: string; monthKey: string; dayKey: string };
+
+/** Bounded work a single reserve is willing to do on behalf of the sweep. */
+export const MONTHLY_STORY_RESERVE_SWEEP_LIMIT = 10;
 
 export class MonthlyStoryBudgetError extends Error {
   constructor(readonly code: "disabled" | "missing-policy" | "monthly-cap" | "stage-cap" |
@@ -172,6 +184,12 @@ function stageCeiling(ledger: MonthlyStoryMonthlySpend, stage: MonthlyStorySpend
   return stage === "text" ? ledger.textCeilingMicros : ledger.audioCeilingMicros;
 }
 
+/** Monthly generation counters are optional on the stored doc; normalize exactly as reserve does. */
+function monthlyGenerationCount(ledger: MonthlyStoryMonthlySpend, stage: MonthlyStorySpendStage): number {
+  const value = stage === "text" ? ledger.textGenerationCount : ledger.audioGenerationCount;
+  return typeof value === "number" && validNonNegative(value) ? value : 0;
+}
+
 export async function reserveMonthlyStoryBudget(
   repository: MonthlyStoryBudgetRepository,
   input: { jobId: string; stage: MonthlyStorySpendStage; attempt: number; monthKey: string; dayKey: string;
@@ -190,6 +208,18 @@ export async function reserveMonthlyStoryBudget(
   const dayKey = requireDayKey(input.dayKey);
   if (!dayKey.startsWith(`${monthKey}-`)) throw new MonthlyStoryBudgetError("ledger-mismatch");
   const reservationId = deterministicMonthlyStoryReservationId(input.jobId, input.stage, input.attempt);
+  // Opportunistic sweep of expired reservations, so micros they still hold are freed
+  // BEFORE this reserve's ceiling/cap checks run. Deliberately OUTSIDE the reserve's
+  // own transaction — reconcile opens its own, and nesting would deadlock. Bounded to
+  // MONTHLY_STORY_RESERVE_SWEEP_LIMIT so a reserve never does unbounded work, and
+  // best-effort: a sweep failure (a missing composite index surfaces as
+  // FAILED_PRECONDITION) must never fail an otherwise-valid reserve.
+  try {
+    await reconcileExpiredMonthlyStoryReservations(repository, null, input.nowMillis,
+      MONTHLY_STORY_RESERVE_SWEEP_LIMIT);
+  } catch {
+    // swallow and continue: the reserve below is authoritative either way.
+  }
   return repository.runTransaction(async (transaction) => {
     const existing = await transaction.getReservation(reservationId);
     if (existing) {
@@ -327,13 +357,23 @@ export async function releaseMonthlyStoryBudget(
     if (monthly.reservedMicros < reservation.amountMicros || stage.reservedMicros < reservation.amountMicros) {
       throw new MonthlyStoryBudgetError("ledger-mismatch");
     }
+    // A job that died before the provider was called must give its generation slot back —
+    // monthly as well as daily. Same guard as the daily refund below: if the provider DID
+    // start, the attempt is spent and both counts stand.
+    const refundsGenerationCount = reservation.providerCallStartedAtMillis === null;
+    const monthlyCount = monthlyGenerationCount(monthly, reservation.stage);
+    if (refundsGenerationCount && monthlyCount < 1) throw new MonthlyStoryBudgetError("ledger-mismatch");
+    // Only the reservation's OWN stage counter moves, and only when refunding — folded into
+    // the single monthly write below so there is never a second setMonthlySpend call.
+    const monthlyCountRefund = refundsGenerationCount ?
+      { [`${reservation.stage}GenerationCount`]: monthlyCount - 1 } : {};
     const updatedStage = { ...stage, reservedMicros: stage.reservedMicros - reservation.amountMicros,
       releasedMicros: stage.releasedMicros + reservation.amountMicros };
-    transaction.setMonthlySpend({ ...monthly,
+    transaction.setMonthlySpend({ ...monthly, ...monthlyCountRefund,
       reservedMicros: monthly.reservedMicros - reservation.amountMicros,
       releasedMicros: monthly.releasedMicros + reservation.amountMicros,
       [reservation.stage]: updatedStage, updatedAtMillis: input.nowMillis } as MonthlyStoryMonthlySpend);
-    if (reservation.providerCallStartedAtMillis === null) {
+    if (refundsGenerationCount) {
       const current = dailyCount(daily, reservation.stage);
       if (current < 1) throw new MonthlyStoryBudgetError("ledger-mismatch");
       transaction.setDailySpend({ ...daily,
@@ -348,13 +388,22 @@ export async function releaseMonthlyStoryBudget(
   });
 }
 
+/**
+ * Releases expired-but-still-reserved reservations. Callers may hand in explicit IDs
+ * (the caller-driven path) or pass `null`/`undefined` to self-sweep via
+ * `repository.listExpiredReservations`. Idempotent either way — every candidate is
+ * re-read inside its own transaction and only released while still `reserved` and
+ * expired — and returns the number actually released.
+ */
 export async function reconcileExpiredMonthlyStoryReservations(
   repository: MonthlyStoryBudgetRepository,
-  inputs: { reservationId: string; monthKey: string; dayKey: string }[],
-  nowMillis: number
+  inputs: MonthlyStoryReservationRef[] | null | undefined,
+  nowMillis: number,
+  limit: number = MONTHLY_STORY_RESERVE_SWEEP_LIMIT
 ): Promise<number> {
+  const targets = inputs ?? await repository.listExpiredReservations({ nowMillis, limit });
   let released = 0;
-  for (const input of inputs) {
+  for (const input of targets) {
     const reservation = await repository.runTransaction((transaction) => transaction.getReservation(input.reservationId));
     if (reservation?.status === "reserved" && reservation.expiresAtMillis <= nowMillis) {
       await releaseMonthlyStoryBudget(repository, { ...input, nowMillis });

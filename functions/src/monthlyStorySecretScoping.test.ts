@@ -33,7 +33,11 @@ const providerBindings = new Map<string, readonly string[]>([
   ["nightlyExpeditionWatch", ["OPENAI_API_KEY", "META_MODEL_API_KEY", "FIRECRAWL_API_KEY"]],
   ["generateComfortRecs", ["OPENAI_API_KEY", "TMDB_API_TOKEN"]],
   ["nightlyPreferenceDistill", ["OPENAI_API_KEY"]],
-  ["startFindingTask", ["OPENAI_API_KEY"]],
+  // startFindingTask runs the AGI browser agent (search phase) AND an OpenAI pick call;
+  // confirmFinding runs only the AGI booking agent. AGI_API_KEY must be a declared secret
+  // on both, not a plain runtime env var.
+  ["startFindingTask", ["OPENAI_API_KEY", "AGI_API_KEY"]],
+  ["confirmFinding", ["AGI_API_KEY"]],
   [monthlyStoryAudioExport, ["HUME_API_KEY"]],
 ]);
 

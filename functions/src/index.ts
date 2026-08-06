@@ -3138,7 +3138,7 @@ async function sendFindingPush(uid: string, title: string, taskId: string): Prom
 }
 
 export const startFindingTask = onCall(
-  { secrets: ["OPENAI_API_KEY"], timeoutSeconds: 540, memory: "512MiB" },
+  { secrets: ["OPENAI_API_KEY", "AGI_API_KEY"], timeoutSeconds: 540, memory: "512MiB" },
   async (request) => {
     if (!request.auth) throw new HttpsError("unauthenticated", "sign in required");
     const gate = starFindingsGate(process.env.STAR_FINDINGS_UIDS, request.auth.uid);
@@ -3375,7 +3375,7 @@ export const getFindingTask = onCall(
 );
 
 export const confirmFinding = onCall(
-  { timeoutSeconds: 540, memory: "512MiB" },
+  { secrets: ["AGI_API_KEY"], timeoutSeconds: 540, memory: "512MiB" },
   async (request) => {
     if (!request.auth) throw new HttpsError("unauthenticated", "sign in required");
     const gate = starFindingsGate(process.env.STAR_FINDINGS_UIDS, request.auth.uid);
