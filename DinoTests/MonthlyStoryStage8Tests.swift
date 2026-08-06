@@ -20,6 +20,28 @@ actor MonthlyStoryFakeCallableTransport: MonthlyStoryCallableTransport {
 
 @MainActor
 final class MonthlyStoryStage8Tests: XCTestCase {
+    func testProductionCallableContractUsesUSCentral1AndApprovedNames() throws {
+        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+        let client = try String(contentsOf: root.appendingPathComponent(
+            "Dino/Services/FirestoreMonthlyStoryClientService.swift"))
+        let audio = try String(contentsOf: root.appendingPathComponent(
+            "Dino/Services/MonthlyStoryAudioService.swift"))
+
+        XCTAssertTrue(client.contains("Functions.functions(region: \"us-central1\")"))
+        for name in [
+            "getMonthlyStoryInternalAvailability",
+            "getMonthlyStoryInternalSettings",
+            "updateMonthlyStoryInternalSettings",
+            "loadMonthlyStoryInternalStory",
+            "generateMonthlyStoryInternal",
+            "deleteMonthlyStoryInternal",
+            "generateMonthlyStoryInternalAudio"
+        ] {
+            XCTAssertTrue((client + audio).contains(name), "missing callable: \(name)")
+        }
+        XCTAssertFalse((client + audio).contains("useEmulator"))
+    }
+
     func testFirebaseServiceIsLazyAndServerAvailabilityControlsVisibility() async throws {
         let transport = MonthlyStoryFakeCallableTransport(responses: [
             "getMonthlyStoryInternalAvailability": availability(),
