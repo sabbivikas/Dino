@@ -1,6 +1,7 @@
 import { MonthlyStoryAudioObject, MonthlyStoryAudioRepository, MonthlyStoryAudioServiceError,
   AudioLeaseResult } from "./monthlyStoryAudioService";
-import { FirestoreMonthlyStoryRepository, MonthlyStoryFirestoreDependency, MonthlyStoryPersistedText,
+import { FirestoreDocument, FirestoreMonthlyStoryRepository, FirestoreTransaction,
+  MonthlyStoryFirestoreDependency, MonthlyStoryPersistedText,
   parseMonthlyStoryPersistedText, snapshotData } from "./monthlyStoryRepository";
 import { deterministicMonthlyStoryJobId, parseMonthlyStoryJob } from "./monthlyStoryJobs";
 import { MONTHLY_STORY_PATHS, parseMonthlyStoryDeletedTombstone, requireGenerationVersion,
@@ -8,8 +9,24 @@ import { MONTHLY_STORY_PATHS, parseMonthlyStoryDeletedTombstone, requireGenerati
 
 const OWNER_KEY_VERSION = "monthly-story-owner-v1";
 
+// The largest timestamp `new Date(...).toISOString()` can render; anything beyond it throws.
+const MAXIMUM_DATE_MILLIS = 8_640_000_000_000_000;
+
 function dayKey(millis: number): string { return new Date(millis).toISOString().slice(0, 10); }
 function billingMonth(millis: number): string { return new Date(millis).toISOString().slice(0, 7); }
+// Day 0 of the current UTC month IS the last day of the previous one, so the UTC Date does the
+// rollover arithmetic itself and 2026-01 yields 2025-12 without any string math.
+function previousBillingMonth(millis: number): string {
+  const current = new Date(millis);
+  return new Date(Date.UTC(current.getUTCFullYear(), current.getUTCMonth(), 0)).toISOString().slice(0, 7);
+}
+// The day the reservation was CREATED, read off the reservation itself, or null when the stored
+// value is missing or unusable as a timestamp.
+function reservationDayKey(reservation: Record<string, unknown>): string | null {
+  const created = Number(reservation.createdAtMillis ?? Number.NaN);
+  if (!Number.isSafeInteger(created) || created <= 0 || created > MAXIMUM_DATE_MILLIS) return null;
+  return dayKey(created);
+}
 function count(value: unknown): number {
   const result = Number(value ?? 0);
   if (!Number.isSafeInteger(result) || result < 0) throw new MonthlyStoryAudioServiceError("persistence-failure");
@@ -29,6 +46,42 @@ export class FirestoreMonthlyStoryAudioRepository implements MonthlyStoryAudioRe
     const tombstone = await this.stories.loadDeletedTombstone(uid, monthKey);
     return tombstone !== null && tombstone.generationVersion === generationVersion &&
       tombstone.expiresAtMillis > nowMillis;
+  }
+
+  // A reservation id is created exactly once, in exactly one billing month: the month that was
+  // current when `acquireAudioLease` ran. Settlement recomputes the month from its own clock, so a
+  // lease taken just before a UTC month boundary would otherwise look for its reservation in the
+  // WRONG month doc, find nothing, silently decline to settle, and strand the original month's
+  // `audioReservedMicros` forever. So probe: the current billing month first, then the previous one.
+  //
+  // Probing exactly ONE month back is sufficient because of the FUNCTION TIMEOUT, not because
+  // "leases are short". The lease duration is remote-controlled —
+  // `Math.max(MONTHLY_STORY_AUDIO_LEASE_MILLIS, control.audioRequestTimeoutSeconds * 1000 + 30_000)`
+  // with `audioRequestTimeoutSeconds` bounded only to 0-300 — so the lease itself guarantees
+  // nothing. The guarantee is that `generateMonthlyStoryInternalAudio` is declared
+  // `timeoutSeconds: 180` (functions/src/index.ts:148), so a lease and its settlement always happen
+  // inside ONE invocation and can therefore span at most one month boundary.
+  //
+  // The probe is keyed on document EXISTENCE, not on status: existence is what LOCATES the
+  // reservation (it lives in exactly one month), and status then decides whether it still settles.
+  // Keying the probe on status instead would let an already-`committed` reservation sitting in the
+  // current month trigger a second lookup in the previous month that could pick up something else.
+  private async probeAudioReservation(transaction: FirestoreTransaction, reservationId: string,
+    nowMillis: number): Promise<{ month: string; reservationRef: FirestoreDocument;
+      reservation: Record<string, unknown> | null }> {
+    const candidates = [billingMonth(nowMillis), previousBillingMonth(nowMillis)];
+    for (const month of candidates) {
+      const reservationRef = this.firestore.doc(`monthlyStorySpend/${month}/reservations/${reservationId}`);
+      const snapshot = await transaction.get(reservationRef);
+      if (snapshot.exists) {
+        return { month, reservationRef,
+          reservation: snapshotData(snapshot) as Record<string, unknown> | null };
+      }
+    }
+    // Found in neither month: nothing settles, and the caller only needs a well-formed ref.
+    const month = candidates[0];
+    return { month, reservation: null,
+      reservationRef: this.firestore.doc(`monthlyStorySpend/${month}/reservations/${reservationId}`) };
   }
 
   async acquireAudioLease(input: { uid: string; monthKey: string; generationVersion: string; nowMillis: number;
@@ -116,16 +169,29 @@ export class FirestoreMonthlyStoryAudioRepository implements MonthlyStoryAudioRe
           (job.status !== "audioLeased" || job.leaseOwner !== input.leaseOwner)) {
         throw new MonthlyStoryAudioServiceError("persistence-failure");
       }
-      const attempt = Math.max(job.audioAttempts, 1);
-      const reservationId = `${jobId}_audio_${attempt}`;
-      const reservationRef = this.firestore.doc(`monthlyStorySpend/${billingMonth(input.nowMillis)}/reservations/${reservationId}`);
-      const monthRef = this.firestore.doc(`monthlyStorySpend/${billingMonth(input.nowMillis)}`);
+      const attempt = job.audioAttempts;
+      // `audioAttempts === 0` means no lease was ever taken, so no reservation exists for this job
+      // and there is nothing to settle. The caller that reaches this state is the
+      // `leaseOwner: "object-reconciliation"` path (monthlyStoryAudioService.ts:78), which runs when
+      // the audio object is already in storage. Fabricating an `_audio_1` id here would either find
+      // nothing or, worse, settle a stale reservation belonging to an unrelated attempt. The skip is
+      // keyed on the ATTEMPT COUNT, not on the lease owner: reconciliation with `audioAttempts >= 1`
+      // (a previous lease that crashed after writing the object) does have a real reservation and
+      // must still settle it. Only the settlement block is skipped — the story and job writes below
+      // and the returned `ready` value are identical either way.
       // Every read is issued BEFORE the first write below: Firestore rejects a get() that follows a
       // write inside the same transaction, so the reservation and the monthly ledger it settles
       // against have to be loaded while the transaction is still read-only.
-      const reservation = snapshotData(await transaction.get(reservationRef)) as Record<string, unknown> | null;
+      const probe = attempt >= 1 ?
+        await this.probeAudioReservation(transaction, `${jobId}_audio_${attempt}`, input.nowMillis) : null;
+      const reservation = probe?.reservation ?? null;
       const settles = reservation !== null && reservation.status === "reserved";
-      const monthly = settles ?
+      // Address the month doc at the month the reservation actually LIVES in, never at
+      // `billingMonth(input.nowMillis)`: a lease that crossed a boundary must credit the month it
+      // reserved against, not the month it happened to finish in.
+      const monthRef = probe !== null && settles ?
+        this.firestore.doc(`monthlyStorySpend/${probe.month}`) : null;
+      const monthly = monthRef !== null ?
         snapshotData(await transaction.get(monthRef)) as Record<string, unknown> | null : null;
       const ready: MonthlyStoryPersistedText = { ...story, audioStatus: "ready",
         audioStoragePath: input.object.path, audioFormat: "mp3", audioDurationMillis: input.object.durationMillis,
@@ -138,7 +204,7 @@ export class FirestoreMonthlyStoryAudioRepository implements MonthlyStoryAudioRe
       transaction.set(jobRef, { ...job, status: "ready", leaseOwner: null, leaseExpiresAtMillis: null,
         audioArtifactHash: input.object.hash, audioTerminal: true, failureCode: null,
         updatedAtMillis: input.nowMillis });
-      if (reservation && settles) {
+      if (probe !== null && monthRef !== null && reservation && settles) {
         const amount = count(reservation.amountMicros); const actual = input.object.estimatedCostMicros;
         if (actual > amount) throw new MonthlyStoryAudioServiceError("budget-denied");
         transaction.set(monthRef, { ...(monthly ?? {}),
@@ -146,7 +212,7 @@ export class FirestoreMonthlyStoryAudioRepository implements MonthlyStoryAudioRe
           audioCommittedMicros: count(monthly?.audioCommittedMicros) + actual,
           audioReleasedMicros: count(monthly?.audioReleasedMicros) + amount - actual,
           updatedAtMillis: input.nowMillis });
-        transaction.set(reservationRef, { ...reservation, status: "committed", committedMicros: actual,
+        transaction.set(probe.reservationRef, { ...reservation, status: "committed", committedMicros: actual,
           updatedAtMillis: input.nowMillis });
       }
       return ready;
@@ -177,18 +243,31 @@ export class FirestoreMonthlyStoryAudioRepository implements MonthlyStoryAudioRe
       if (storyValue === null || jobValue === null) throw new MonthlyStoryAudioServiceError("persistence-failure");
       const story = parseMonthlyStoryPersistedText(storyValue); const job = parseMonthlyStoryJob(jobValue);
       if (job.status !== "audioLeased" || job.leaseOwner !== input.leaseOwner) return;
-      const reservationId = `${jobId}_audio_${job.audioAttempts}`;
-      const reservationRef = this.firestore.doc(`monthlyStorySpend/${billingMonth(input.nowMillis)}/reservations/${reservationId}`);
-      const monthRef = this.firestore.doc(`monthlyStorySpend/${billingMonth(input.nowMillis)}`);
-      const dailyRef = this.firestore.doc(`monthlyStoryDailySpend/${dayKey(input.nowMillis)}`);
       // Every read is issued BEFORE the first write below: Firestore rejects a get() that follows a
       // write inside the same transaction, and the daily doc — untouched by this path until now —
-      // has to be read to refund its counter.
-      const reservation = snapshotData(await transaction.get(reservationRef)) as Record<string, unknown> | null;
+      // has to be read to refund its counter. Order: probe the reservation, then the month doc it
+      // lives in, then the daily doc the probe's `createdAtMillis` points at.
+      const probe = await this.probeAudioReservation(transaction,
+        `${jobId}_audio_${job.audioAttempts}`, input.nowMillis);
+      const reservation = probe.reservation;
       const settles = reservation !== null && reservation.status === "reserved";
-      const monthly = settles ?
+      // The month the reservation LIVES in, not the month this completion happens to land in.
+      const monthRef = settles ? this.firestore.doc(`monthlyStorySpend/${probe.month}`) : null;
+      const monthly = monthRef !== null ?
         snapshotData(await transaction.get(monthRef)) as Record<string, unknown> | null : null;
-      const daily = settles && refundsGenerationCount ?
+      // Same root cause as the month doc above, one level down: `acquireAudioLease` incremented the
+      // daily counter under the day key of the LEASE, so the refund has to land on that same day —
+      // `dayKey(input.nowMillis)` is the completion day and drifts off it whenever a lease crosses a
+      // UTC midnight. The reservation carries `createdAtMillis`, which is exactly the lease instant.
+      // When that value is missing or unusable, SKIP the daily refund rather than throwing away the
+      // whole settlement or guessing a day: a generation counter is a CAP, and leaving it
+      // over-counted costs a user one slot, while decrementing a day that never incremented would
+      // let the cap admit more generations than it is set to — and that costs money.
+      const refundDayKey = settles && refundsGenerationCount && reservation !== null ?
+        reservationDayKey(reservation) : null;
+      const dailyRef = refundDayKey !== null ?
+        this.firestore.doc(`monthlyStoryDailySpend/${refundDayKey}`) : null;
+      const daily = dailyRef !== null ?
         snapshotData(await transaction.get(dailyRef)) as Record<string, unknown> | null : null;
       transaction.set(storyRef, { ...story, audioStatus: "failed", audioTtsVersion: story.audioTtsVersion ?? "failed",
         audioVoiceKey: story.audioVoiceKey ?? "failed", audioProviderRequestCount: job.audioAttempts,
@@ -199,7 +278,7 @@ export class FirestoreMonthlyStoryAudioRepository implements MonthlyStoryAudioRe
         audioTerminal: !input.transient && !input.outcomeUncertain, failureCode: input.outcomeUncertain ?
           "unknownAudioOutcome" : (input.transient ? "transientProvider" : "providerRejected"),
         updatedAtMillis: input.nowMillis });
-      if (reservation && settles) {
+      if (monthRef !== null && reservation && settles) {
         const amount = count(reservation.amountMicros);
         // Both counters are normalized through count(), which fails closed on a corrupt (negative or
         // non-integer) stored value, and the refund clamps at 0 so a counter can never go negative:
@@ -212,12 +291,12 @@ export class FirestoreMonthlyStoryAudioRepository implements MonthlyStoryAudioRe
           audioCommittedMicros: count(monthly?.audioCommittedMicros) + input.billableMicros,
           audioReleasedMicros: count(monthly?.audioReleasedMicros) + amount - input.billableMicros,
           updatedAtMillis: input.nowMillis });
-        if (refundsGenerationCount) {
+        if (refundsGenerationCount && dailyRef !== null) {
           transaction.set(dailyRef, { ...(daily ?? {}),
             audioGenerationCount: Math.max(0, count(daily?.audioGenerationCount) - 1),
             updatedAtMillis: input.nowMillis });
         }
-        transaction.set(reservationRef, { ...reservation,
+        transaction.set(probe.reservationRef, { ...reservation,
           status: input.billableMicros > 0 ? "committed" : "released", committedMicros: input.billableMicros,
           updatedAtMillis: input.nowMillis });
       }

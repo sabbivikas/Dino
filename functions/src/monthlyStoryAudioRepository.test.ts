@@ -25,6 +25,15 @@ const MONTH_PATH = "monthlyStorySpend/2026-07";
 const DAY_PATH = "monthlyStoryDailySpend/2026-07-15";
 const RESERVATION_PATH = `monthlyStorySpend/2026-07/reservations/${jobId}_audio_1`;
 
+// A lease taken minutes before a UTC month boundary and settled minutes after it. `monthKey` is the
+// STORY's month and stays 2026-07; what moves is the billing/day key derived from the wall clock.
+const CROSSING_LEASE_MILLIS = Date.UTC(2026, 6, 31, 23, 55);
+const CROSSING_SETTLE_MILLIS = Date.UTC(2026, 7, 1, 0, 5);
+const NEXT_MONTH_PATH = "monthlyStorySpend/2026-08";
+const NEXT_MONTH_RESERVATION_PATH = `monthlyStorySpend/2026-08/reservations/${jobId}_audio_1`;
+const LEASE_DAY_PATH = "monthlyStoryDailySpend/2026-07-31";
+const SETTLE_DAY_PATH = "monthlyStoryDailySpend/2026-08-01";
+
 type Operation = { kind: "get" | "set" | "create" | "delete"; path: string };
 
 // Real Firestore rejects a get() issued after ANY write inside the same transaction. This fake used
@@ -127,6 +136,28 @@ async function leased(): Promise<{ firestore: FakeFirestore; repository: Firesto
   assert.equal(firestore.documents.get(MONTH_PATH)?.audioGenerationCount, 1);
   firestore.operations = [];
   return { firestore, repository };
+}
+
+// Same fixture as `leased()`, but with the lease instant under the caller's control so a lease can
+// be taken on one side of a UTC month boundary and settled on the other.
+async function leasedAt(leaseMillis: number):
+  Promise<{ firestore: FakeFirestore; repository: FirestoreMonthlyStoryAudioRepository }> {
+  const firestore = new FakeFirestore();
+  firestore.documents.set(STORY_PATH, storyDocument());
+  firestore.documents.set(JOB_PATH, jobDocument());
+  const repository = new FirestoreMonthlyStoryAudioRepository(firestore);
+  const lease = await repository.acquireAudioLease({ uid, monthKey, generationVersion,
+    nowMillis: leaseMillis, leaseOwner, leaseDurationMillis: 60_000, maximumAttempts: 2,
+    reservationMicros, dailyCap: 3, monthlyCap: 5, monthlyBudgetMicros: 10_000 });
+  assert.equal(lease.kind, "acquired");
+  firestore.operations = [];
+  return { firestore, repository };
+}
+
+function audioObject(estimatedCostMicros: number, generatedAtMillis: number): MonthlyStoryAudioObject {
+  return { path: `monthlyStories/${uid}/${monthKey}/${generationVersion}/story.mp3`,
+    hash: "c".repeat(64), bytes: 1_024, durationMillis: 60_000, generatedAtMillis,
+    providerRequestCount: 1, estimatedCostMicros, ttsVersion: "tts-v1", voiceKey: "voice-1" };
 }
 
 function failure(overrides: { outcomeUncertain: boolean; billableMicros: number }) {
@@ -256,4 +287,128 @@ test("markAudioReady issues every read before its first write", async () => {
     assert.ok(firestore.operations.some((operation) => operation.kind === "get" && operation.path === path),
       `${path} is read inside the transaction that settles it`);
   }
+});
+
+// A lease reserves against the billing month current when it is TAKEN; settlement recomputes the
+// month from its own clock. Everything below pins settlement to the month the reservation actually
+// lives in, so a lease that spans a UTC month boundary cannot strand its reserved micros.
+
+test("markAudioReady settles a boundary-crossing lease against the ORIGINAL month", async () => {
+  const { firestore, repository } = await leasedAt(CROSSING_LEASE_MILLIS);
+  assert.equal(firestore.documents.get(MONTH_PATH)?.audioReservedMicros, reservationMicros);
+  const ready = await repository.markAudioReady({ uid, monthKey, generationVersion, leaseOwner,
+    object: audioObject(400, CROSSING_SETTLE_MILLIS), nowMillis: CROSSING_SETTLE_MILLIS });
+  assert.equal(ready.audioStatus, "ready");
+  assert.equal(firestore.documents.get(MONTH_PATH)?.audioReservedMicros, 0,
+    "reserved micros must return to 0 in the month that reserved them");
+  assert.equal(firestore.documents.get(MONTH_PATH)?.audioCommittedMicros, 400);
+  assert.equal(firestore.documents.get(MONTH_PATH)?.audioReleasedMicros, reservationMicros - 400);
+  assert.equal(firestore.documents.get(RESERVATION_PATH)?.status, "committed");
+  assert.equal(firestore.documents.has(NEXT_MONTH_PATH), false,
+    "the completion month must not be credited with spend it never reserved");
+  assert.equal(firestore.documents.has(NEXT_MONTH_RESERVATION_PATH), false);
+});
+
+test("markAudioFailure releases a boundary-crossing lease against the ORIGINAL month", async () => {
+  const { firestore, repository } = await leasedAt(CROSSING_LEASE_MILLIS);
+  await repository.markAudioFailure({ ...failure({ outcomeUncertain: false, billableMicros: 0 }),
+    nowMillis: CROSSING_SETTLE_MILLIS });
+  assert.equal(firestore.documents.get(MONTH_PATH)?.audioReservedMicros, 0,
+    "reserved micros must return to 0 in the month that reserved them");
+  assert.equal(firestore.documents.get(MONTH_PATH)?.audioCommittedMicros, 0);
+  assert.equal(firestore.documents.get(MONTH_PATH)?.audioReleasedMicros, reservationMicros);
+  assert.equal(firestore.documents.get(MONTH_PATH)?.audioGenerationCount, 0);
+  assert.equal(firestore.documents.get(RESERVATION_PATH)?.status, "released");
+  assert.equal(firestore.documents.has(NEXT_MONTH_PATH), false);
+  assert.equal(firestore.documents.has(NEXT_MONTH_RESERVATION_PATH), false);
+});
+
+test("a daily counter is refunded on the day the reservation was CREATED, not the completion day", async () => {
+  const { firestore, repository } = await leasedAt(CROSSING_LEASE_MILLIS);
+  assert.equal(firestore.documents.get(LEASE_DAY_PATH)?.audioGenerationCount, 1);
+  await repository.markAudioFailure({ ...failure({ outcomeUncertain: false, billableMicros: 0 }),
+    nowMillis: CROSSING_SETTLE_MILLIS });
+  assert.equal(firestore.documents.get(LEASE_DAY_PATH)?.audioGenerationCount, 0,
+    "the day that was incremented at lease time is the day that gets the slot back");
+  assert.equal(firestore.documents.has(SETTLE_DAY_PATH), false,
+    "the completion day never incremented, so it must not be decremented");
+  assert.ok(firestore.operations.some((operation) => operation.kind === "get" && operation.path === LEASE_DAY_PATH));
+  assert.ok(firestore.operations.every((operation) => operation.path !== SETTLE_DAY_PATH));
+});
+
+test("the probe rolls the YEAR back too: a Dec-to-Jan lease settles against December", async () => {
+  const leaseMillis = Date.UTC(2025, 11, 31, 23, 55);
+  const settleMillis = Date.UTC(2026, 0, 1, 0, 5);
+  const decemberMonthPath = "monthlyStorySpend/2025-12";
+  const decemberReservationPath = `monthlyStorySpend/2025-12/reservations/${jobId}_audio_1`;
+  const { firestore, repository } = await leasedAt(leaseMillis);
+  assert.equal(firestore.documents.get(decemberMonthPath)?.audioReservedMicros, reservationMicros);
+  await repository.markAudioReady({ uid, monthKey, generationVersion, leaseOwner,
+    object: audioObject(400, settleMillis), nowMillis: settleMillis });
+  assert.equal(firestore.documents.get(decemberMonthPath)?.audioReservedMicros, 0,
+    "2026-01 must probe back to 2025-12, not 2026-00");
+  assert.equal(firestore.documents.get(decemberMonthPath)?.audioCommittedMicros, 400);
+  assert.equal(firestore.documents.get(decemberReservationPath)?.status, "committed");
+  assert.equal(firestore.documents.has("monthlyStorySpend/2026-01"), false);
+});
+
+test("audioAttempts === 0 skips settlement entirely: no reservation is read or written", async () => {
+  const firestore = new FakeFirestore();
+  firestore.documents.set(STORY_PATH, storyDocument());
+  firestore.documents.set(JOB_PATH, jobDocument());
+  const repository = new FirestoreMonthlyStoryAudioRepository(firestore);
+  // The object-reconciliation path: the audio object already exists in storage, so no lease was
+  // ever taken and no reservation exists to settle.
+  const ready = await repository.markAudioReady({ uid, monthKey, generationVersion,
+    leaseOwner: "object-reconciliation", object: audioObject(400, nowMillis), nowMillis });
+  assert.equal(ready.audioStatus, "ready");
+  assert.equal(ready.audioHash, "c".repeat(64));
+  assert.equal(firestore.documents.get(STORY_PATH)?.audioStatus, "ready");
+  assert.equal(firestore.documents.get(JOB_PATH)?.status, "ready");
+  assert.equal(firestore.documents.get(JOB_PATH)?.audioTerminal, true);
+  assert.ok(firestore.operations.every((operation) => !operation.path.includes("/reservations/")),
+    "no reservation id may be fabricated for an attempt that never took a lease");
+  assert.ok(firestore.operations.every((operation) => !operation.path.startsWith("monthlyStorySpend/")),
+    "no ledger doc is touched when there is nothing to settle");
+});
+
+test("an in-month lease settles exactly as before: markAudioReady never probes the previous month", async () => {
+  const { firestore, repository } = await leased();
+  await repository.markAudioReady({ uid, monthKey, generationVersion, leaseOwner,
+    object: audioObject(400, nowMillis), nowMillis });
+  assert.equal(firestore.documents.get(MONTH_PATH)?.audioReservedMicros, 0);
+  assert.equal(firestore.documents.get(MONTH_PATH)?.audioCommittedMicros, 400);
+  assert.equal(firestore.documents.get(MONTH_PATH)?.audioReleasedMicros, reservationMicros - 400);
+  assert.equal(firestore.documents.get(MONTH_PATH)?.audioGenerationCount, 1);
+  assert.equal(firestore.documents.get(DAY_PATH)?.audioGenerationCount, 1);
+  assert.equal(firestore.documents.get(RESERVATION_PATH)?.status, "committed");
+  assert.ok(firestore.operations.every((operation) => !operation.path.includes("2026-06")),
+    "the reservation is found in the current month, so the previous month is never read");
+});
+
+test("an in-month lease settles exactly as before: markAudioFailure never probes the previous month", async () => {
+  const { firestore, repository } = await leased();
+  await repository.markAudioFailure(failure({ outcomeUncertain: false, billableMicros: 0 }));
+  assert.equal(firestore.documents.get(MONTH_PATH)?.audioReservedMicros, 0);
+  assert.equal(firestore.documents.get(MONTH_PATH)?.audioReleasedMicros, reservationMicros);
+  assert.equal(firestore.documents.get(MONTH_PATH)?.audioGenerationCount, 0);
+  assert.equal(firestore.documents.get(DAY_PATH)?.audioGenerationCount, 0);
+  assert.equal(firestore.documents.get(RESERVATION_PATH)?.status, "released");
+  assert.ok(firestore.operations.every((operation) => !operation.path.includes("2026-06")),
+    "the reservation is found in the current month, so the previous month is never read");
+});
+
+test("a reservation with an unusable createdAtMillis skips the daily refund instead of throwing", async () => {
+  const { firestore, repository } = await leased();
+  firestore.documents.set(RESERVATION_PATH,
+    { ...firestore.documents.get(RESERVATION_PATH), createdAtMillis: "not-a-timestamp" });
+  await repository.markAudioFailure(failure({ outcomeUncertain: false, billableMicros: 0 }));
+  // the settlement still completes: micros are released and the monthly counter is refunded
+  assert.equal(firestore.documents.get(MONTH_PATH)?.audioReservedMicros, 0);
+  assert.equal(firestore.documents.get(MONTH_PATH)?.audioReleasedMicros, reservationMicros);
+  assert.equal(firestore.documents.get(MONTH_PATH)?.audioGenerationCount, 0);
+  assert.equal(firestore.documents.get(RESERVATION_PATH)?.status, "released");
+  // but the daily cap is left over-counted rather than decremented against a guessed day
+  assert.equal(firestore.documents.get(DAY_PATH)?.audioGenerationCount, 1);
+  assert.ok(firestore.operations.every((operation) => operation.path !== DAY_PATH));
 });
