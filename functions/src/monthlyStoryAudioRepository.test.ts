@@ -27,7 +27,11 @@ const RESERVATION_PATH = `monthlyStorySpend/2026-07/reservations/${jobId}_audio_
 
 type Operation = { kind: "get" | "set" | "create" | "delete"; path: string };
 
-class FakeFirestore implements MonthlyStoryFirestoreDependency {
+// Real Firestore rejects a get() issued after ANY write inside the same transaction. This fake used
+// to allow it, and that permissiveness is exactly how the markAudioReady read-after-write bug
+// survived a green suite. The rule below is enforced per transaction attempt, so any transaction in
+// any production function driven through this fake is checked for free.
+export class FakeFirestore implements MonthlyStoryFirestoreDependency {
   readonly documents = new Map<string, Record<string, unknown>>();
   operations: Operation[] = [];
 
@@ -45,28 +49,45 @@ class FakeFirestore implements MonthlyStoryFirestoreDependency {
     return { exists: value !== undefined, data: () => structuredClone(value) };
   }
 
-  async runTransaction<T>(operation: (transaction: FirestoreTransaction) => Promise<T>): Promise<T> {
+  // Every attempt gets its own transaction object and its own read-only-phase state, so the rule
+  // resets per transaction — and would reset per retry too, since a retry is just another attempt().
+  runTransaction<T>(operation: (transaction: FirestoreTransaction) => Promise<T>): Promise<T> {
+    return this.attempt(operation);
+  }
+
+  private attempt<T>(operation: (transaction: FirestoreTransaction) => Promise<T>): Promise<T> {
     const pathOf = (reference: unknown): string => (reference as { path: string }).path;
+    // null until this attempt issues its first write; from then on the attempt is write-only.
+    let firstWrite: { kind: "set" | "create" | "delete"; path: string } | null = null;
+    const write = (kind: "set" | "create" | "delete", path: string): void => {
+      this.operations.push({ kind, path });
+      if (firstWrite === null) firstWrite = { kind, path };
+    };
     const transaction: FirestoreTransaction = {
       get: async (reference) => {
         const path = pathOf(reference);
+        // Logged before the throw so `operations` still shows the full attempted sequence.
         this.operations.push({ kind: "get", path });
+        if (firstWrite !== null) {
+          throw new Error("Firestore transactions require all reads to be executed before all writes: " +
+            `get(${path}) was issued after ${firstWrite.kind}(${firstWrite.path})`);
+        }
         return this.snapshot(path);
       },
       create: (reference, data) => {
         const path = pathOf(reference);
-        this.operations.push({ kind: "create", path });
+        write("create", path);
         if (this.documents.has(path)) throw new Error("already-exists");
         this.documents.set(path, structuredClone(data) as Record<string, unknown>);
       },
       set: (reference, data) => {
         const path = pathOf(reference);
-        this.operations.push({ kind: "set", path });
+        write("set", path);
         this.documents.set(path, structuredClone(data) as Record<string, unknown>);
       },
       delete: (reference) => {
         const path = pathOf(reference);
-        this.operations.push({ kind: "delete", path });
+        write("delete", path);
         this.documents.delete(path);
       },
     };
