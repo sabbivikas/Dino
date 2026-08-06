@@ -153,6 +153,18 @@ export class FirestoreMonthlyStoryAudioRepository implements MonthlyStoryAudioRe
     nowMillis: number }): Promise<void> {
     const monthKey = requireMonthKey(input.monthKey);
     const jobId = deterministicMonthlyStoryJobId(input.uid, monthKey, input.generationVersion, OWNER_KEY_VERSION);
+    // `acquireAudioLease` increments BOTH generation counters (daily and monthly); an attempt that
+    // produced nothing and cost nothing has to give both of them back, the same way its micros are
+    // released. The guard is deliberately narrow, because a generation counter is a CAP, not an
+    // accounting record, and a cap has to hold no matter what: over-counting costs a user an
+    // occasional slot on a run that genuinely failed, while under-counting lets the cap admit more
+    // generations than it is set to — and that costs money.
+    // `outcomeUncertain` means the provider (Hume) may have produced audio and may therefore have
+    // billed us, so `billableMicros === 0` alongside it is US NOT KNOWING what was spent, not us
+    // knowing that nothing was. Withholding the refund there also keeps the counters consistent with
+    // the micros: whenever the provider itself reports an uncertain outcome it reports the call as
+    // billable too, so those micros are committed rather than released and the attempt is spent.
+    const refundsGenerationCount = input.billableMicros === 0 && !input.outcomeUncertain;
     await this.firestore.runTransaction(async (transaction) => {
       const storyRef = this.firestore.doc(MONTHLY_STORY_PATHS.story(input.uid, monthKey));
       const jobRef = this.firestore.doc(`monthlyStoryJobs/${jobId}`);
@@ -160,6 +172,19 @@ export class FirestoreMonthlyStoryAudioRepository implements MonthlyStoryAudioRe
       if (storyValue === null || jobValue === null) throw new MonthlyStoryAudioServiceError("persistence-failure");
       const story = parseMonthlyStoryPersistedText(storyValue); const job = parseMonthlyStoryJob(jobValue);
       if (job.status !== "audioLeased" || job.leaseOwner !== input.leaseOwner) return;
+      const reservationId = `${jobId}_audio_${job.audioAttempts}`;
+      const reservationRef = this.firestore.doc(`monthlyStorySpend/${billingMonth(input.nowMillis)}/reservations/${reservationId}`);
+      const monthRef = this.firestore.doc(`monthlyStorySpend/${billingMonth(input.nowMillis)}`);
+      const dailyRef = this.firestore.doc(`monthlyStoryDailySpend/${dayKey(input.nowMillis)}`);
+      // Every read is issued BEFORE the first write below: Firestore rejects a get() that follows a
+      // write inside the same transaction, and the daily doc — untouched by this path until now —
+      // has to be read to refund its counter.
+      const reservation = snapshotData(await transaction.get(reservationRef)) as Record<string, unknown> | null;
+      const settles = reservation !== null && reservation.status === "reserved";
+      const monthly = settles ?
+        snapshotData(await transaction.get(monthRef)) as Record<string, unknown> | null : null;
+      const daily = settles && refundsGenerationCount ?
+        snapshotData(await transaction.get(dailyRef)) as Record<string, unknown> | null : null;
       transaction.set(storyRef, { ...story, audioStatus: "failed", audioTtsVersion: story.audioTtsVersion ?? "failed",
         audioVoiceKey: story.audioVoiceKey ?? "failed", audioProviderRequestCount: job.audioAttempts,
         audioEstimatedCostMicros: input.billableMicros, audioRetryCount: Math.max(0, job.audioAttempts - 1),
@@ -169,18 +194,24 @@ export class FirestoreMonthlyStoryAudioRepository implements MonthlyStoryAudioRe
         audioTerminal: !input.transient && !input.outcomeUncertain, failureCode: input.outcomeUncertain ?
           "unknownAudioOutcome" : (input.transient ? "transientProvider" : "providerRejected"),
         updatedAtMillis: input.nowMillis });
-      const reservationId = `${jobId}_audio_${job.audioAttempts}`;
-      const reservationRef = this.firestore.doc(`monthlyStorySpend/${billingMonth(input.nowMillis)}/reservations/${reservationId}`);
-      const reservation = snapshotData(await transaction.get(reservationRef)) as Record<string, unknown> | null;
-      if (reservation && reservation.status === "reserved") {
-        const monthRef = this.firestore.doc(`monthlyStorySpend/${billingMonth(input.nowMillis)}`);
-        const monthly = snapshotData(await transaction.get(monthRef)) as Record<string, unknown> | null;
+      if (reservation && settles) {
         const amount = count(reservation.amountMicros);
-        transaction.set(monthRef, { ...(monthly ?? {}),
+        // Both counters are normalized through count(), which fails closed on a corrupt (negative or
+        // non-integer) stored value, and the refund clamps at 0 so a counter can never go negative:
+        // a stored 0 simply means there is nothing left to give back, and leaving it at 0 keeps the
+        // cap on the safe side.
+        const monthlyRefund = refundsGenerationCount ?
+          { audioGenerationCount: Math.max(0, count(monthly?.audioGenerationCount) - 1) } : {};
+        transaction.set(monthRef, { ...(monthly ?? {}), ...monthlyRefund,
           audioReservedMicros: count(monthly?.audioReservedMicros) - amount,
           audioCommittedMicros: count(monthly?.audioCommittedMicros) + input.billableMicros,
           audioReleasedMicros: count(monthly?.audioReleasedMicros) + amount - input.billableMicros,
           updatedAtMillis: input.nowMillis });
+        if (refundsGenerationCount) {
+          transaction.set(dailyRef, { ...(daily ?? {}),
+            audioGenerationCount: Math.max(0, count(daily?.audioGenerationCount) - 1),
+            updatedAtMillis: input.nowMillis });
+        }
         transaction.set(reservationRef, { ...reservation,
           status: input.billableMicros > 0 ? "committed" : "released", committedMicros: input.billableMicros,
           updatedAtMillis: input.nowMillis });

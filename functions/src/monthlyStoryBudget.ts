@@ -45,6 +45,18 @@ export type MonthlyStoryDailySpend = {
 };
 
 export type MonthlyStoryBudgetReservation = {
+  /**
+   * Discriminator stamped on every reservation this module creates. `monthlyStoryAudioRepository`
+   * keeps a SEPARATE, differently shaped spend ledger under the very same
+   * `monthlyStorySpend/{month}/reservations/{id}` path, with the same `status: "reserved"` and
+   * `expiresAtMillis` fields, so the collection-group sweep would happily match its documents.
+   * Every sweep query filters on `ledger == "budget"` so it can only ever see this module's rows.
+   * Chosen over a `stage != "audio"` filter deliberately: Firestore allows a range filter on only
+   * one field per query and `!=` is an inequality, so it would collide with the `expiresAtMillis`
+   * range; and `stage == "text"` would silently under-cover if this module's own audio stage is
+   * ever wired up.
+   */
+  ledger: "budget";
   reservationId: string;
   jobId: string;
   monthKey: string;
@@ -76,12 +88,48 @@ export interface MonthlyStoryBudgetRepository {
    * Reservations still in `status === "reserved"` whose `expiresAtMillis <= nowMillis`,
    * capped at `limit`. The sweep in `reserveMonthlyStoryBudget` uses this so abandoned
    * reservations cannot hold micros against the monthly ceiling forever.
+   *
+   * MUST additionally filter on `ledger == "budget"`. The reservation path is shared with the
+   * audio repository's parallel ledger, whose documents carry the same `status`/`expiresAtMillis`
+   * shape but none of this module's fields; releasing one would corrupt a ledger this module does
+   * not own. Implementations that cannot enforce the filter must return nothing.
    */
   listExpiredReservations(input: { nowMillis: number; limit: number }):
     Promise<MonthlyStoryReservationRef[]>;
 }
 
 export type MonthlyStoryReservationRef = { reservationId: string; monthKey: string; dayKey: string };
+
+/** One reservation the sweep could not release, with enough detail to act on it. */
+export type MonthlyStoryReconcileFailure = {
+  reservationId: string;
+  code: string;
+  /**
+   * `true` for outcomes that are NORMAL in a sweep rather than anomalies, so a genuine problem
+   * still stands out. The read-then-release spans two transactions, so a reservation can be
+   * committed in between and the release then throws `reservation-state`; a foreign document that
+   * slipped past the ledger filter throws `ledger-mismatch`. Anything else is unexpected.
+   */
+  expected: boolean;
+};
+
+export type MonthlyStoryReconcileResult = {
+  released: number;
+  failed: number;
+  failures: MonthlyStoryReconcileFailure[];
+};
+
+/**
+ * Optional sink for sweep failures. This module is deliberately PURE (it imports `crypto` and
+ * local modules only, which the secret-scoping test depends on), so it never reaches for the
+ * `firebase-functions` logger; the caller injects one of these, or reads the structured result.
+ */
+export type MonthlyStoryReconcileObserver = (failure: MonthlyStoryReconcileFailure) => void;
+
+const EXPECTED_RECONCILE_FAILURE_CODES: readonly string[] = ["reservation-state", "ledger-mismatch"];
+
+/** Reported instead of a reservation id when the sweep itself (not one row) failed. */
+export const MONTHLY_STORY_SWEEP_FAILURE_ID = "*sweep*";
 
 /** Bounded work a single reserve is willing to do on behalf of the sweep. */
 export const MONTHLY_STORY_RESERVE_SWEEP_LIMIT = 10;
@@ -193,7 +241,8 @@ function monthlyGenerationCount(ledger: MonthlyStoryMonthlySpend, stage: Monthly
 export async function reserveMonthlyStoryBudget(
   repository: MonthlyStoryBudgetRepository,
   input: { jobId: string; stage: MonthlyStorySpendStage; attempt: number; monthKey: string; dayKey: string;
-    amountMicros: number; nowMillis: number; expiresAtMillis: number; policy: MonthlyStoryBudgetPolicy | null }
+    amountMicros: number; nowMillis: number; expiresAtMillis: number; policy: MonthlyStoryBudgetPolicy | null;
+    onSweepFailure?: MonthlyStoryReconcileObserver }
 ): Promise<{ reservation: MonthlyStoryBudgetReservation; duplicate: boolean }> {
   if (!validPolicy(input.policy)) throw new MonthlyStoryBudgetError("missing-policy");
   const policy = input.policy;
@@ -216,9 +265,13 @@ export async function reserveMonthlyStoryBudget(
   // FAILED_PRECONDITION) must never fail an otherwise-valid reserve.
   try {
     await reconcileExpiredMonthlyStoryReservations(repository, null, input.nowMillis,
-      MONTHLY_STORY_RESERVE_SWEEP_LIMIT);
-  } catch {
-    // swallow and continue: the reserve below is authoritative either way.
+      MONTHLY_STORY_RESERVE_SWEEP_LIMIT, input.onSweepFailure);
+  } catch (error) {
+    // Continue — the reserve below is authoritative either way — but do NOT vanish: a sweep that
+    // cannot even list its candidates would otherwise be invisible forever, and every subsequent
+    // reserve would keep skipping reconciliation in silence.
+    input.onSweepFailure?.({ reservationId: MONTHLY_STORY_SWEEP_FAILURE_ID,
+      code: error instanceof MonthlyStoryBudgetError ? error.code : "sweep-failed", expected: false });
   }
   return repository.runTransaction(async (transaction) => {
     const existing = await transaction.getReservation(reservationId);
@@ -259,7 +312,7 @@ export async function reserveMonthlyStoryBudget(
         monthly.audioGenerationCount >= policy.monthlyAudioGenerationCap)) {
       throw new MonthlyStoryBudgetError("monthly-cap");
     }
-    const reservation: MonthlyStoryBudgetReservation = { reservationId, jobId: input.jobId,
+    const reservation: MonthlyStoryBudgetReservation = { ledger: "budget", reservationId, jobId: input.jobId,
       monthKey, dayKey,
       stage: input.stage, attempt: input.attempt, amountMicros: input.amountMicros,
       committedMicros: 0, status: "reserved", providerCallStartedAtMillis: null,
@@ -345,6 +398,9 @@ export async function releaseMonthlyStoryBudget(
   return repository.runTransaction(async (transaction) => {
     const reservation = await transaction.getReservation(input.reservationId);
     if (!reservation) throw new MonthlyStoryBudgetError("reservation-missing");
+    // Belt and braces with the sweep's `ledger == "budget"` filter: a document from the audio
+    // repository's parallel ledger shares this collection path and must never be released here.
+    if (reservation.ledger !== "budget") throw new MonthlyStoryBudgetError("ledger-mismatch");
     if (reservation.monthKey !== monthKey || reservation.dayKey !== dayKey) {
       throw new MonthlyStoryBudgetError("ledger-mismatch");
     }
@@ -393,24 +449,41 @@ export async function releaseMonthlyStoryBudget(
  * (the caller-driven path) or pass `null`/`undefined` to self-sweep via
  * `repository.listExpiredReservations`. Idempotent either way — every candidate is
  * re-read inside its own transaction and only released while still `reserved` and
- * expired — and returns the number actually released.
+ * expired.
+ *
+ * Each reservation is attempted independently: one bad document can never abort the sweep and
+ * strand the ones behind it. Failures are NOT swallowed — every one is counted, tagged with its
+ * reservation id and error code, classified expected-vs-unexpected, returned in the result, and
+ * handed to the optional `onFailure` observer. A failure to LIST candidates still propagates: only
+ * the caller knows whether a sweep that could not start is fatal.
  */
 export async function reconcileExpiredMonthlyStoryReservations(
   repository: MonthlyStoryBudgetRepository,
   inputs: MonthlyStoryReservationRef[] | null | undefined,
   nowMillis: number,
-  limit: number = MONTHLY_STORY_RESERVE_SWEEP_LIMIT
-): Promise<number> {
+  limit: number = MONTHLY_STORY_RESERVE_SWEEP_LIMIT,
+  onFailure: MonthlyStoryReconcileObserver = () => undefined
+): Promise<MonthlyStoryReconcileResult> {
   const targets = inputs ?? await repository.listExpiredReservations({ nowMillis, limit });
+  const failures: MonthlyStoryReconcileFailure[] = [];
   let released = 0;
   for (const input of targets) {
-    const reservation = await repository.runTransaction((transaction) => transaction.getReservation(input.reservationId));
-    if (reservation?.status === "reserved" && reservation.expiresAtMillis <= nowMillis) {
-      await releaseMonthlyStoryBudget(repository, { ...input, nowMillis });
-      released++;
+    try {
+      const reservation = await repository.runTransaction((transaction) =>
+        transaction.getReservation(input.reservationId));
+      if (reservation?.status === "reserved" && reservation.expiresAtMillis <= nowMillis) {
+        await releaseMonthlyStoryBudget(repository, { ...input, nowMillis });
+        released++;
+      }
+    } catch (error) {
+      const code = error instanceof MonthlyStoryBudgetError ? error.code : "unexpected-error";
+      const failure: MonthlyStoryReconcileFailure = { reservationId: input.reservationId, code,
+        expected: EXPECTED_RECONCILE_FAILURE_CODES.includes(code) };
+      failures.push(failure);
+      onFailure(failure);
     }
   }
-  return released;
+  return { released, failed: failures.length, failures };
 }
 
 export const MONTHLY_STORY_SPEND_PATHS = Object.freeze({

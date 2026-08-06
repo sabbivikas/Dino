@@ -21,7 +21,8 @@ class FakeBudgetRepository implements MonthlyStoryBudgetRepository {
   async listExpiredReservations(input: { nowMillis: number; limit: number }):
   Promise<MonthlyStoryReservationRef[]> {
     return Array.from(this.reservations.values())
-      .filter((item) => item.status === "reserved" && item.expiresAtMillis <= input.nowMillis)
+      .filter((item) => item.ledger === "budget" && item.status === "reserved" &&
+        item.expiresAtMillis <= input.nowMillis)
       .slice(0, input.limit)
       .map(({ reservationId, monthKey, dayKey }) => ({ reservationId, monthKey, dayKey }));
   }

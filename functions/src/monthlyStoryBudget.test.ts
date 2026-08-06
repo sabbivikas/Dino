@@ -1,8 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert";
-import { MonthlyStoryBudgetPolicy, MonthlyStoryBudgetRepository, MonthlyStoryBudgetReservation,
+import { MONTHLY_STORY_SWEEP_FAILURE_ID, MonthlyStoryBudgetPolicy, MonthlyStoryBudgetRepository,
+  MonthlyStoryBudgetReservation,
   MonthlyStoryBudgetTransaction, MonthlyStoryDailySpend, MonthlyStoryMonthlySpend,
-  MonthlyStoryReservationRef,
+  MonthlyStoryReconcileFailure, MonthlyStoryReservationRef,
   commitMonthlyStoryBudget, deterministicMonthlyStoryReservationId,
   markMonthlyStoryProviderCallStarted, reconcileExpiredMonthlyStoryReservations,
   releaseMonthlyStoryBudget, reserveMonthlyStoryBudget } from "./monthlyStoryBudget";
@@ -19,8 +20,11 @@ class FakeBudgetRepository implements MonthlyStoryBudgetRepository {
   Promise<MonthlyStoryReservationRef[]> {
     this.listExpiredCalls++;
     if (this.listExpiredThrows) throw new Error("9 FAILED_PRECONDITION: index required");
+    // Mirrors the required composite query: ledger == "budget" AND status == "reserved" AND
+    // expiresAtMillis <= now. A foreign (audio-ledger) document carries no `ledger` field at all.
     return Array.from(this.reservations.values())
-      .filter((item) => item.status === "reserved" && item.expiresAtMillis <= input.nowMillis)
+      .filter((item) => item.ledger === "budget" && item.status === "reserved" &&
+        item.expiresAtMillis <= input.nowMillis)
       .slice(0, input.limit)
       .map(({ reservationId, monthKey, dayKey }) => ({ reservationId, monthKey, dayKey }));
   }
@@ -159,8 +163,10 @@ test("expired reservations can be reconciled idempotently", async () => {
   const repository = new FakeBudgetRepository();
   const { reservation } = await reserveMonthlyStoryBudget(repository, base);
   const inputs = [{ reservationId: reservation.reservationId, monthKey: "2026-07", dayKey: "2026-07-05" }];
-  assert.equal(await reconcileExpiredMonthlyStoryReservations(repository, inputs, 201), 1);
-  assert.equal(await reconcileExpiredMonthlyStoryReservations(repository, inputs, 202), 0);
+  assert.deepEqual(await reconcileExpiredMonthlyStoryReservations(repository, inputs, 201),
+    { released: 1, failed: 0, failures: [] });
+  assert.deepEqual(await reconcileExpiredMonthlyStoryReservations(repository, inputs, 202),
+    { released: 0, failed: 0, failures: [] });
 });
 
 // ── BUG 1: monthly generation counters must be refunded, exactly like the daily ones ──
@@ -246,11 +252,12 @@ test("a second release is a no-op and cannot double-refund the monthly count", a
 test("reconcile self-sweeps expired reservations when no ids are supplied", async () => {
   const repository = new FakeBudgetRepository();
   await reserveMonthlyStoryBudget(repository, base);
-  assert.equal(await reconcileExpiredMonthlyStoryReservations(repository, null, 50), 0,
-    "an unexpired reservation is not swept");
-  assert.equal(await reconcileExpiredMonthlyStoryReservations(repository, null, 201), 1);
-  assert.equal(await reconcileExpiredMonthlyStoryReservations(repository, null, 202), 0,
-    "self-sweep stays idempotent");
+  assert.deepEqual(await reconcileExpiredMonthlyStoryReservations(repository, null, 50),
+    { released: 0, failed: 0, failures: [] }, "an unexpired reservation is not swept");
+  assert.deepEqual(await reconcileExpiredMonthlyStoryReservations(repository, null, 201),
+    { released: 1, failed: 0, failures: [] });
+  assert.deepEqual(await reconcileExpiredMonthlyStoryReservations(repository, null, 202),
+    { released: 0, failed: 0, failures: [] }, "self-sweep stays idempotent");
   assert.equal(repository.monthly.get("2026-07")?.reservedMicros, 0);
   assert.equal(repository.monthly.get("2026-07")?.textGenerationCount, 0);
 });
@@ -287,6 +294,138 @@ test("the reserve sweep is bounded and best-effort", async () => {
   assert.equal(reserved.duplicate, false);
   assert.equal(failing.monthly.get("2026-07")?.reservedMicros, 200);
   assert.equal(failing.listExpiredCalls, 1);
+});
+
+// ── BUG 3: the sweep may only ever see THIS ledger's reservations ──
+
+/** An audio-repository reservation: same collection path, same status/expiry shape, no `ledger`. */
+function foreignAudioReservation(): MonthlyStoryBudgetReservation {
+  return { reservationId: `ms_${"f".repeat(64)}_audio_1`, jobId: `ms_${"f".repeat(64)}`, stage: "audio",
+    attempt: 1, status: "reserved", amountMicros: 500, committedMicros: 0, createdAtMillis: 1,
+    updatedAtMillis: 1, expiresAtMillis: 100 } as unknown as MonthlyStoryBudgetReservation;
+}
+
+test("a foreign audio-ledger reservation is invisible to the sweep and is never released", async () => {
+  const repository = new FakeBudgetRepository();
+  const foreign = foreignAudioReservation();
+  repository.reservations.set(foreign.reservationId, foreign);
+  await reserveMonthlyStoryBudget(repository, base);
+
+  assert.deepEqual(await repository.listExpiredReservations({ nowMillis: 201, limit: 10 }),
+    [{ reservationId: deterministicMonthlyStoryReservationId(jobId, "text", 1),
+      monthKey: "2026-07", dayKey: "2026-07-05" }],
+  "only ledger === budget rows are listed");
+
+  assert.deepEqual(await reconcileExpiredMonthlyStoryReservations(repository, null, 201),
+    { released: 1, failed: 0, failures: [] });
+  assert.equal(repository.reservations.get(foreign.reservationId)?.status, "reserved",
+    "the foreign reservation is untouched by the sweep");
+});
+
+test("an explicitly targeted foreign reservation is refused as an EXPECTED ledger-mismatch", async () => {
+  const repository = new FakeBudgetRepository();
+  const foreign = foreignAudioReservation();
+  repository.reservations.set(foreign.reservationId, foreign);
+  const observed: MonthlyStoryReconcileFailure[] = [];
+  const result = await reconcileExpiredMonthlyStoryReservations(repository,
+    [{ reservationId: foreign.reservationId, monthKey: "2026-07", dayKey: "2026-07-05" }], 201,
+    10, (failure) => observed.push(failure));
+  assert.deepEqual(result, { released: 0, failed: 1,
+    failures: [{ reservationId: foreign.reservationId, code: "ledger-mismatch", expected: true }] });
+  assert.deepEqual(observed, result.failures, "the observer sees exactly the reported failures");
+  assert.equal(repository.reservations.get(foreign.reservationId)?.status, "reserved");
+});
+
+test("every reservation created by reserve carries the budget ledger discriminator", async () => {
+  const repository = new FakeBudgetRepository();
+  const { reservation } = await reserveMonthlyStoryBudget(repository, base);
+  assert.equal(reservation.ledger, "budget");
+  assert.equal(repository.reservations.get(reservation.reservationId)?.ledger, "budget");
+});
+
+// ── BUG 4: one bad reservation cannot abort the sweep, and failures stay visible ──
+
+/** Wraps a repository so a single reservation id throws when read inside a transaction. */
+function failingOnReservation(inner: FakeBudgetRepository, reservationId: string,
+  error: Error): MonthlyStoryBudgetRepository {
+  return {
+    listExpiredReservations: (input) => inner.listExpiredReservations(input),
+    runTransaction: (operation) => inner.runTransaction((transaction) => operation({
+      ...transaction,
+      getReservation: async (id) => {
+        if (id === reservationId) throw error;
+        return transaction.getReservation(id);
+      },
+    })),
+  };
+}
+
+test("one throwing reservation is recorded as UNEXPECTED and never stops the ones behind it", async () => {
+  const inner = new FakeBudgetRepository();
+  const first = await reserveMonthlyStoryBudget(inner, base);
+  const second = await reserveMonthlyStoryBudget(inner, { ...base, jobId: `ms_${"b".repeat(64)}` });
+  const observed: MonthlyStoryReconcileFailure[] = [];
+  const repository = failingOnReservation(inner, first.reservation.reservationId, new Error("boom"));
+
+  const result = await reconcileExpiredMonthlyStoryReservations(repository, null, 201, 10,
+    (failure) => observed.push(failure));
+  assert.deepEqual(result, { released: 1, failed: 1,
+    failures: [{ reservationId: first.reservation.reservationId, code: "unexpected-error", expected: false }] });
+  assert.deepEqual(observed, result.failures);
+  assert.equal(inner.reservations.get(second.reservation.reservationId)?.status, "released",
+    "the reservation behind the throwing one is still released");
+  assert.equal(inner.reservations.get(first.reservation.reservationId)?.status, "reserved");
+});
+
+test("a reservation committed between the read and the release is an EXPECTED reservation-state", async () => {
+  const inner = new FakeBudgetRepository();
+  const { reservation } = await reserveMonthlyStoryBudget(inner, base);
+  await commitMonthlyStoryBudget(inner, { reservationId: reservation.reservationId,
+    monthKey: "2026-07", actualMicros: 150, nowMillis: 150 });
+  // The sweep's read and its release are two separate transactions: model the race by letting the
+  // first read still see "reserved" while the stored document has already been committed.
+  let racedRead = true;
+  const repository: MonthlyStoryBudgetRepository = {
+    listExpiredReservations: (input) => inner.listExpiredReservations(input),
+    runTransaction: (operation) => inner.runTransaction((transaction) => operation({
+      ...transaction,
+      getReservation: async (id) => {
+        const value = await transaction.getReservation(id);
+        if (id !== reservation.reservationId || !value || !racedRead) return value;
+        racedRead = false;
+        return { ...value, status: "reserved" };
+      },
+    })),
+  };
+
+  const result = await reconcileExpiredMonthlyStoryReservations(repository,
+    [{ reservationId: reservation.reservationId, monthKey: "2026-07", dayKey: "2026-07-05" }], 201);
+  assert.deepEqual(result, { released: 0, failed: 1,
+    failures: [{ reservationId: reservation.reservationId, code: "reservation-state", expected: true }] });
+  assert.equal(inner.reservations.get(reservation.reservationId)?.status, "committed");
+  assert.equal(inner.monthly.get("2026-07")?.committedMicros, 150);
+});
+
+test("a sweep that cannot even list its candidates is surfaced, not silently swallowed", async () => {
+  const repository = new FakeBudgetRepository();
+  repository.listExpiredThrows = true;
+  const observed: MonthlyStoryReconcileFailure[] = [];
+  const reserved = await reserveMonthlyStoryBudget(repository,
+    { ...base, onSweepFailure: (failure) => observed.push(failure) });
+  assert.equal(reserved.duplicate, false, "a failed sweep never fails a valid reserve");
+  assert.deepEqual(observed, [{ reservationId: MONTHLY_STORY_SWEEP_FAILURE_ID,
+    code: "sweep-failed", expected: false }]);
+});
+
+test("per-reservation sweep failures reach the reserve call site's observer", async () => {
+  const inner = new FakeBudgetRepository();
+  const first = await reserveMonthlyStoryBudget(inner, base);
+  const observed: MonthlyStoryReconcileFailure[] = [];
+  const repository = failingOnReservation(inner, first.reservation.reservationId, new Error("boom"));
+  await reserveMonthlyStoryBudget(repository, { ...base, jobId: `ms_${"b".repeat(64)}`,
+    nowMillis: 300, expiresAtMillis: 400, onSweepFailure: (failure) => observed.push(failure) });
+  assert.deepEqual(observed, [{ reservationId: first.reservation.reservationId,
+    code: "unexpected-error", expected: false }]);
 });
 
 test("reservation IDs are deterministic per job stage and attempt", () => {
