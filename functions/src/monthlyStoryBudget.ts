@@ -93,6 +93,16 @@ export interface MonthlyStoryBudgetRepository {
    * audio repository's parallel ledger, whose documents carry the same `status`/`expiresAtMillis`
    * shape but none of this module's fields; releasing one would corrupt a ledger this module does
    * not own. Implementations that cannot enforce the filter must return nothing.
+   *
+   * OMITTING THE FILTER FAILS SILENTLY, WHICH IS WHY IT IS CALLED OUT TWICE. The composite index
+   * backing this query is (ledger, status, expiresAtMillis) — see firestore.indexes.json. A query
+   * that filters only on status + expiresAtMillis does not match that index, so Firestore rejects
+   * it with FAILED_PRECONDITION... and the opportunistic sweep in `reserveMonthlyStoryBudget`
+   * catches and swallows exactly that, by design, so a reserve is never failed by a bad sweep.
+   * The result is a sweep that quietly does nothing, forever, with no error surfacing anywhere:
+   * expired reservations accumulate against the monthly ceiling and the only visible symptom is
+   * `monthly-cap` errors that make no sense against the stored numbers. Wire the `ledger` clause
+   * and the index together, or the feature is silently absent rather than loudly broken.
    */
   listExpiredReservations(input: { nowMillis: number; limit: number }):
     Promise<MonthlyStoryReservationRef[]>;
