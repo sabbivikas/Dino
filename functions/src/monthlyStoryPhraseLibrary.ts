@@ -73,7 +73,7 @@ MonthlyStoryPhraseSet>> = Object.freeze({
     ["work seemed to take a lot out of you this month.", "work was one of the heavier parts of the month.",
       "work seemed to carry more pressure than usual."],
     ["the demands around it seemed to stay present even when the day was moving on.",
-      "it took up enough room to deserve a clear place in this reflection.",
+      "it took up enough room in the month to be worth naming on its own.",
       "that pressure mattered without needing to explain every other part of the month."],
     ["work was difficult in its own right, separate from the other parts of the month."]),
   missingHome: phrases(

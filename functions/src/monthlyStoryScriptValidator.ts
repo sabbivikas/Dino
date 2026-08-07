@@ -73,6 +73,61 @@ const META_COMMENTARY = ["the month's shape", "the month’s shape", "the full r
   "it does not need to become a larger story", "neither side needs to cancel the other",
   "both can belong", "this is not a demand", "this leaves a direction",
   "what the month supports", "the month can be named", "the month can close as it was"];
+const RECOMMENDATION_BENEFIT = ["recommendation helped", "movie helped", "show helped", "book helped",
+  "this helped you", "it helped you", "it cheered you up", "it made you feel better"];
+const PROMPT_INJECTION = ["ignore previous", "ignore all instructions", "system prompt",
+  "developer message", "reveal the prompt", "jailbreak"];
+/** Banned outright rather than by count: `occurrences(...) > 0`, so one use is already an error. */
+const REPETITIVE_ANY = ["there can be"];
+
+const PERCENTAGE_PATTERN = /\b\d+(?:\.\d+)?\s*%|\bpercent(?:age)?\b/i;
+const EXACT_COUNT_PATTERN = /\b\d+(?:[.,]\d+)?\b|\b(?:one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty)\s+(?:times|days|entries|moods|hours|minutes|recommendations|sessions|check-ins|meetings|nights|mornings|evenings|moments|practices|messages)\b/i;
+const IDENTIFIER_PATTERN = /\b[\w.+-]+@[\w.-]+\.[a-z]{2,}\b|\buid\b|\bdevice[_ -]?id\b|\b[0-9a-f]{8}-[0-9a-f-]{27,}\b/i;
+const LINK_PATTERN = /\bhttps?:\/\/|\bwww\.|\b[a-z0-9-]+\.(?:com|org|net|io)\b/i;
+const INVENTED_DETAIL_PATTERN = /\b(?:my|your) (?:manager|boss|employer|company|mother|father|sister|brother|partner)\b|\b(?:moved|flew|drove) to [a-z]+\b/i;
+
+/**
+ * Every ban whose MERE PRESENCE is an error, keyed by the code it raises. Exported as the single
+ * source of truth so `monthlyStoryPhraseLibraryConformance.test.ts` can assert that no phrase the
+ * deterministic composer is allowed to emit is a phrase this validator rejects.
+ *
+ * The deterministic composer has no repair step — the Stage 6 generation service treats
+ * `validation-failed` as terminal — so a phrase that trips one of these does not degrade the
+ * story, it destroys it. That is exactly what shipped: the `workPressure` support sentence
+ * contained "this reflection", so every rich July naming work pressure failed permanently.
+ *
+ * Count-based rules ("i noticed" > 2, duplicate sentences, `redundantUncertainty`) are
+ * deliberately NOT here: a single phrase using them is legal, and only repetition is not. They
+ * cannot be checked against one phrase in isolation.
+ */
+export const MONTHLY_STORY_ZERO_TOLERANCE_PHRASES: Readonly<Partial<Record<MonthlyStoryScriptErrorCode,
+readonly string[]>>> = Object.freeze({
+  reportingLanguage: REPORTING,
+  diagnosisOrMedicalAdvice: MEDICAL,
+  sensitiveNarration: SENSITIVE,
+  causalCertainty: CAUSAL,
+  therapistFraming: THERAPIST,
+  motivationalSpeakerFraming: MOTIVATIONAL,
+  appEngagementLanguage: APP,
+  rawTechnicalField: RAW_FIELDS,
+  overlyPoetic: POETIC,
+  essayLikeReflection: ESSAY,
+  genericAdvice: GENERIC_ADVICE,
+  metaCommentary: META_COMMENTARY,
+  recommendationBenefitClaim: RECOMMENDATION_BENEFIT,
+  promptInjection: PROMPT_INJECTION,
+  repetitiveFraming: REPETITIVE_ANY,
+});
+
+/** The pattern-based half of the same contract. See {@link MONTHLY_STORY_ZERO_TOLERANCE_PHRASES}. */
+export const MONTHLY_STORY_ZERO_TOLERANCE_PATTERNS: Readonly<Partial<Record<MonthlyStoryScriptErrorCode,
+RegExp>>> = Object.freeze({
+  percentage: PERCENTAGE_PATTERN,
+  exactCount: EXACT_COUNT_PATTERN,
+  identifier: IDENTIFIER_PATTERN,
+  link: LINK_PATTERN,
+  inventedSpecificDetail: INVENTED_DETAIL_PATTERN,
+});
 
 const REPAIRABLE_CODES = new Set<MonthlyStoryScriptErrorCode>([
   "tooShort", "tooLong", "farBelowTargetLength", "missingDifficultySection", "missingReliefSection",
@@ -181,14 +236,12 @@ export function validateMonthlyStoryScript(input: { script: string; claimedEvide
   push(errors, "farBelowTargetLength", trimmed.length > 0 && wordCount < target.acceptanceMinimum);
   push(errors, "tooLong", wordCount > 300);
   push(errors, "aboveProductionWordRange", wordCount > target.productionMaximum && wordCount <= 300);
-  push(errors, "percentage", /\b\d+(?:\.\d+)?\s*%|\bpercent(?:age)?\b/i.test(trimmed));
-  push(errors, "exactCount", /\b\d+(?:[.,]\d+)?\b|\b(?:one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty)\s+(?:times|days|entries|moods|hours|minutes|recommendations|sessions|check-ins|meetings|nights|mornings|evenings|moments|practices|messages)\b/i.test(trimmed));
+  push(errors, "percentage", PERCENTAGE_PATTERN.test(trimmed));
+  push(errors, "exactCount", EXACT_COUNT_PATTERN.test(trimmed));
   push(errors, "reportingLanguage", includesAny(normalized, REPORTING));
   push(errors, "diagnosisOrMedicalAdvice", includesAny(normalized, MEDICAL));
   push(errors, "causalCertainty", includesAny(normalized, CAUSAL));
-  push(errors, "recommendationBenefitClaim", includesAny(normalized,
-    ["recommendation helped", "movie helped", "show helped", "book helped", "this helped you",
-      "it helped you", "it cheered you up", "it made you feel better"]));
+  push(errors, "recommendationBenefitClaim", includesAny(normalized, RECOMMENDATION_BENEFIT));
   push(errors, "sensitiveNarration", includesAny(normalized, SENSITIVE));
   push(errors, "repeatedSection", repeatedContent(trimmed));
   push(errors, "excessiveINoticed", occurrences(normalized, "i noticed") > 2);
@@ -196,15 +249,14 @@ export function validateMonthlyStoryScript(input: { script: string; claimedEvide
   push(errors, "motivationalSpeakerFraming", includesAny(normalized, MOTIVATIONAL));
   push(errors, "appEngagementLanguage", includesAny(normalized, APP));
   push(errors, "rawTechnicalField", includesAny(normalized, RAW_FIELDS));
-  push(errors, "identifier", /\b[\w.+-]+@[\w.-]+\.[a-z]{2,}\b|\buid\b|\bdevice[_ -]?id\b|\b[0-9a-f]{8}-[0-9a-f-]{27,}\b/i.test(trimmed));
-  push(errors, "link", /\bhttps?:\/\/|\bwww\.|\b[a-z0-9-]+\.(?:com|org|net|io)\b/i.test(trimmed));
-  push(errors, "promptInjection", includesAny(normalized, ["ignore previous", "ignore all instructions",
-    "system prompt", "developer message", "reveal the prompt", "jailbreak"]));
-  push(errors, "inventedSpecificDetail", /\b(?:my|your) (?:manager|boss|employer|company|mother|father|sister|brother|partner)\b|\b(?:moved|flew|drove) to [a-z]+\b/i.test(trimmed));
+  push(errors, "identifier", IDENTIFIER_PATTERN.test(trimmed));
+  push(errors, "link", LINK_PATTERN.test(trimmed));
+  push(errors, "promptInjection", includesAny(normalized, PROMPT_INJECTION));
+  push(errors, "inventedSpecificDetail", INVENTED_DETAIL_PATTERN.test(trimmed));
   push(errors, "overlyPoetic", includesAny(normalized, POETIC));
   push(errors, "repetitiveFraming", occurrences(normalized, "the month felt mixed") > 1 ||
     occurrences(normalized, "there is no need") > 1 || sentenceStartsWithCount(trimmed, "let") > 1 ||
-    occurrences(normalized, "there can be") > 0);
+    includesAny(normalized, REPETITIVE_ANY));
   push(errors, "duplicatedOpeningClosing", openingRepeatedInClosing(trimmed));
   push(errors, "essayLikeReflection", includesAny(normalized, ESSAY));
   push(errors, "genericAdvice", includesAny(normalized, GENERIC_ADVICE));
