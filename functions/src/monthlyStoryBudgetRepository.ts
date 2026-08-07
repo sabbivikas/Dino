@@ -162,10 +162,36 @@ export function parseMonthlyStoryDailySpendDocument(value: unknown): MonthlyStor
 }
 
 /**
+ * SHARED-DOCUMENT `updatedAtMillis` (both serializers below, and the reservation writes further
+ * down). `monthlyStorySpend/{month}`, `monthlyStorySpend/{month}/reservations/{id}` and
+ * `monthlyStoryDailySpend/{day}` are stamped by THREE independent writers: this ledger,
+ * `monthlyStoryAudioRepository`'s audio ledger, and the deterministic generation slot in
+ * `FirestoreMonthlyStoryRepository.reserveDeterministicGenerationSlot`. On these three documents
+ * `updatedAtMillis` is deliberately LAST-WRITER-WINS: it is a touch timestamp and nothing here
+ * reads or branches on it — verified, the only reads of these documents are the shape validation
+ * in the three parsers above, which check it is a non-negative integer and nothing more.
+ *
+ * The SAME field name IS load-bearing on OTHER documents. A future freshness/staleness check on
+ * the spend docs would look like local precedent and would NOT be safe, because the timestamp it
+ * read could have been stamped by any of the three writers:
+ *   monthlyStoryControl.ts:159    staleness gate, fails closed
+ *     (`nowMillis - updatedAtMillis > maximumAgeMillis` -> disabled("stale"))
+ *   monthlyStoryJobs.ts:100       `updatedAtMillis < createdAtMillis` -> throw invalid-job
+ *   monthlyStorySchema.ts:436     `updatedAtMillis < createdAtMillis` -> throw invalid-story-time
+ *   monthlyStoryRepository.ts:151 `storage.updatedAtMillis !== finalizedAtMillis` rejects the document
+ *   monthlyStoryRetention.ts:81   `nowMillis < metadata.updatedAtMillis` -> throw invalid-cleanup-time
+ */
+
+/**
  * The WRITE half of the namespace mapping the two parsers above read. Both destructure the domain
  * counters out by name, so a bare `textGenerationCount`/`audioGenerationCount` can never reach the
  * stored document even though `monthlyStoryBudget.ts` builds its updates with a computed
  * `` `${stage}GenerationCount` `` key.
+ *
+ * Every name these two return lands on a SHARED document. `monthlyStoryBudgetRepository.test.ts`
+ * derives that name set by calling both of these for real and intersects it with
+ * `AUDIO_LEDGER_FIELD_NAMES` from `monthlyStoryAudioRepository`; `updatedAtMillis` is the only
+ * overlap allowed, and any other fails.
  */
 export function serializeMonthlyStoryMonthlySpendDocument(value: MonthlyStoryMonthlySpend):
 Record<string, unknown> {
@@ -322,6 +348,10 @@ export class FirestoreMonthlyStoryBudgetRepository implements MonthlyStoryBudget
         getReservation: async (reservationId, monthKey) =>
           parseMonthlyStoryBudgetReservationDocument(
             await read(reservationPath(monthKey, reservationId)), reservationId),
+        // SHARED-DOCUMENT WRITES. The stored field names are exactly what the two serializers
+        // return; `updatedAtMillis` among them is a deliberately last-writer-wins touch timestamp
+        // that nothing on these documents reads. See the full note above the serializers, which
+        // also lists the five places the same field name IS load-bearing on other documents.
         setMonthlySpend: (value) => mergedSet(monthlyPath(value.monthKey),
           serializeMonthlyStoryMonthlySpendDocument(value)),
         setDailySpend: (value) => mergedSet(dailyPath(value.dayKey),

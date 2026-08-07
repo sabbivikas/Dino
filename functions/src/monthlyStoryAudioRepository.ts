@@ -33,6 +33,30 @@ function count(value: unknown): number {
   return result;
 }
 
+/**
+ * Every field name this repository writes to the two SHARED ledger documents
+ * `monthlyStorySpend/{month}` and `monthlyStoryDailySpend/{day}` — i.e. the month+day writes in
+ * `acquireAudioLease`, `markAudioReady` and `markAudioFailure` in the class immediately below.
+ *
+ * HAND-MAINTAINED. ADD A NAME HERE IN THE SAME CHANGE THAT ADDS THE WRITE.
+ * `monthlyStoryBudgetRepository.test.ts` derives the BUDGET ledger's stored field names for real,
+ * from `serializeMonthlyStoryMonthlySpendDocument`/`serializeMonthlyStoryDailySpendDocument`, and
+ * intersects them with this list; any overlap other than `updatedAtMillis` fails that test, naming
+ * the offending field. That guard is the only thing keeping the two ledgers — which share these
+ * documents and merge onto each other's fields — visible to one another, and it is only as good as
+ * this list: a field added below but not here is exactly the collision it exists to catch.
+ *
+ * Reservation-document fields are deliberately NOT listed. A reservation id belongs outright to one
+ * ledger (`msr_<sha256>` here vs `{jobId}_audio_{attempt}` there), so no reservation doc is shared.
+ */
+export const AUDIO_LEDGER_FIELD_NAMES: readonly string[] = Object.freeze([
+  "audioGenerationCount",
+  "audioReservedMicros",
+  "audioCommittedMicros",
+  "audioReleasedMicros",
+  "updatedAtMillis",
+]);
+
 export class FirestoreMonthlyStoryAudioRepository implements MonthlyStoryAudioRepository {
   private readonly stories: FirestoreMonthlyStoryRepository;
   constructor(private readonly firestore: MonthlyStoryFirestoreDependency) {
@@ -134,6 +158,24 @@ export class FirestoreMonthlyStoryAudioRepository implements MonthlyStoryAudioRe
       if (reserved + committed + input.reservationMicros > input.monthlyBudgetMicros) {
         throw new MonthlyStoryAudioServiceError("budget-denied");
       }
+      // SHARED-DOCUMENT WRITE. `monthlyStorySpend/{month}` and `monthlyStoryDailySpend/{day}` are
+      // written by THREE independent writers: this audio ledger, the budget ledger
+      // (`monthlyStoryBudgetRepository`'s serializers) and the deterministic generation slot
+      // (`FirestoreMonthlyStoryRepository.reserveDeterministicGenerationSlot`). Every field name
+      // written here is listed in AUDIO_LEDGER_FIELD_NAMES above — keep it in step.
+      //
+      // `updatedAtMillis` on these documents is deliberately LAST-WRITER-WINS. It is a touch
+      // timestamp: nothing here reads or branches on it (verified — the only reads of these three
+      // documents are shape validation in the budget parsers, which check it is a non-negative
+      // integer and nothing more). The SAME field name IS load-bearing on OTHER documents, so a
+      // future freshness/staleness check on the spend docs would look like local precedent and
+      // would NOT be safe: the timestamp it read could have been stamped by any of the three.
+      //   monthlyStoryControl.ts:159    staleness gate, fails closed
+      //     (`nowMillis - updatedAtMillis > maximumAgeMillis` -> disabled("stale"))
+      //   monthlyStoryJobs.ts:100       `updatedAtMillis < createdAtMillis` -> throw invalid-job
+      //   monthlyStorySchema.ts:436     `updatedAtMillis < createdAtMillis` -> throw invalid-story-time
+      //   monthlyStoryRepository.ts:151 `storage.updatedAtMillis !== finalizedAtMillis` rejects the doc
+      //   monthlyStoryRetention.ts:81   `nowMillis < metadata.updatedAtMillis` -> throw invalid-cleanup-time
       transaction.set(dailyRef, { ...(daily ?? {}), audioGenerationCount: dailyCount + 1,
         updatedAtMillis: input.nowMillis });
       transaction.set(monthRef, { ...(monthly ?? {}), audioGenerationCount: monthlyCount + 1,
@@ -207,6 +249,11 @@ export class FirestoreMonthlyStoryAudioRepository implements MonthlyStoryAudioRe
       if (probe !== null && monthRef !== null && reservation && settles) {
         const amount = count(reservation.amountMicros); const actual = input.object.estimatedCostMicros;
         if (actual > amount) throw new MonthlyStoryAudioServiceError("budget-denied");
+        // SHARED-DOCUMENT WRITE — three writers touch `monthlyStorySpend/{month}`; every field
+        // name below is listed in AUDIO_LEDGER_FIELD_NAMES. `updatedAtMillis` here is a
+        // deliberately last-writer-wins touch timestamp that nothing on these docs reads; see the
+        // full note (and the five sites where the same name IS load-bearing) at the
+        // `acquireAudioLease` month+day writes above.
         transaction.set(monthRef, { ...(monthly ?? {}),
           audioReservedMicros: count(monthly?.audioReservedMicros) - amount,
           audioCommittedMicros: count(monthly?.audioCommittedMicros) + actual,
@@ -286,6 +333,10 @@ export class FirestoreMonthlyStoryAudioRepository implements MonthlyStoryAudioRe
         // cap on the safe side.
         const monthlyRefund = refundsGenerationCount ?
           { audioGenerationCount: Math.max(0, count(monthly?.audioGenerationCount) - 1) } : {};
+        // SHARED-DOCUMENT WRITES (month here, day below) — three writers touch both; every field
+        // name written is listed in AUDIO_LEDGER_FIELD_NAMES. `updatedAtMillis` is a deliberately
+        // last-writer-wins touch timestamp that nothing on these docs reads; see the full note (and
+        // the five sites where the same name IS load-bearing) at the `acquireAudioLease` writes.
         transaction.set(monthRef, { ...(monthly ?? {}), ...monthlyRefund,
           audioReservedMicros: count(monthly?.audioReservedMicros) - amount,
           audioCommittedMicros: count(monthly?.audioCommittedMicros) + input.billableMicros,

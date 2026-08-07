@@ -7,7 +7,9 @@ import { MONTHLY_STORY_SPEND_PATHS, MonthlyStoryBudgetPolicy, commitMonthlyStory
   reconcileExpiredMonthlyStoryReservations, releaseMonthlyStoryBudget,
   reserveMonthlyStoryBudget } from "./monthlyStoryBudget";
 import { MONTHLY_STORY_EXPIRED_RESERVATION_INDEX, MonthlyStoryBudgetRepositoryError,
-  FirestoreMonthlyStoryBudgetRepository } from "./monthlyStoryBudgetRepository";
+  FirestoreMonthlyStoryBudgetRepository, serializeMonthlyStoryDailySpendDocument,
+  serializeMonthlyStoryMonthlySpendDocument } from "./monthlyStoryBudgetRepository";
+import { AUDIO_LEDGER_FIELD_NAMES } from "./monthlyStoryAudioRepository";
 import { FakeFirestore } from "./monthlyStoryFirestoreFake";
 
 // These tests drive the REAL Firestore code path through the strict FakeFirestore exported by
@@ -401,6 +403,76 @@ test("an absent document reads as null, not as an error", async () => {
     reservation: await transaction.getReservation(reservationId, monthKey),
   }));
   assert.deepEqual(values, { monthly: null, daily: null, reservation: null });
+});
+
+/**
+ * STRUCTURAL GUARD, HALF-DERIVED — read this before trusting it.
+ *
+ * `monthlyStorySpend/{month}` and `monthlyStoryDailySpend/{day}` are written by the budget ledger
+ * AND by `monthlyStoryAudioRepository`'s parallel audio ledger, and both merge onto whatever the
+ * other left behind. A field name written by both is a silent clobber: the value that survives is
+ * whichever transaction committed last, and the losing ledger's accounting is simply wrong with no
+ * error anywhere. `updatedAtMillis` is the ONE name that may collide — it is a touch timestamp that
+ * nothing on these documents reads or branches on.
+ *
+ * BUDGET SIDE: genuinely DERIVED. The names below come from `Object.keys()` of what the two real
+ * serializers actually return, so a field added to `MonthlyStoryMonthlySpend`/`MonthlyStoryDailySpend`
+ * (or a namespaced counter renamed) is picked up here with no test edit.
+ * AUDIO SIDE: NOT derived. It is `AUDIO_LEDGER_FIELD_NAMES`, a hand-maintained constant sitting next
+ * to the audio writes. If someone adds a write there and forgets the constant, this guard does not
+ * see it. The vacuity check below is the partial mitigation: the constant cannot be emptied to make
+ * the intersection pass.
+ */
+function derivedBudgetLedgerFieldNames(): string[] {
+  // Representative, not realistic: every OPTIONAL field is present so the serializers emit the
+  // widest document they can. Both monthly generation counters are numbers on purpose — leaving
+  // them undefined would drop the namespaced counter names the serializer only writes when set.
+  const monthly = serializeMonthlyStoryMonthlySpendDocument({
+    monthKey: "2026-07", ceilingMicros: 1_000, textCeilingMicros: 600, audioCeilingMicros: 400,
+    reservedMicros: 10, committedMicros: 20, releasedMicros: 30,
+    textGenerationCount: 1, audioGenerationCount: 2,
+    text: { reservedMicros: 1, committedMicros: 2, releasedMicros: 3 },
+    audio: { reservedMicros: 4, committedMicros: 5, releasedMicros: 6 },
+    updatedAtMillis: 100 });
+  const daily = serializeMonthlyStoryDailySpendDocument({ dayKey: "2026-07-05",
+    textGenerationCount: 1, audioGenerationCount: 2, updatedAtMillis: 100 });
+  return [...new Set([...Object.keys(monthly), ...Object.keys(daily)])];
+}
+
+test("the budget ledger writes no shared-document field name the audio ledger also writes", () => {
+  const budgetFieldNames = derivedBudgetLedgerFieldNames();
+  assert.ok(budgetFieldNames.includes("updatedAtMillis"),
+    "the derivation is wired up: the serializers really do emit updatedAtMillis");
+  const audioFieldNames = new Set(AUDIO_LEDGER_FIELD_NAMES);
+  const collisions = budgetFieldNames
+    .filter((name) => audioFieldNames.has(name) && name !== "updatedAtMillis")
+    .sort();
+  assert.deepEqual(collisions, [],
+    `the budget ledger and monthlyStoryAudioRepository both write ${collisions.join(", ")} to ` +
+    "monthlyStorySpend/{month} or monthlyStoryDailySpend/{day}; those documents are merged by " +
+    "both writers, so a shared name is a silent last-writer-wins clobber of one ledger's " +
+    "accounting. Namespace the budget side at the storage boundary (see " +
+    "BUDGET_TEXT_GENERATION_COUNT_FIELD) or rename the audio side. Only updatedAtMillis may " +
+    "collide, because nothing on these documents reads it.");
+});
+
+test("AUDIO_LEDGER_FIELD_NAMES still names what the audio repository writes", () => {
+  // Anti-vacuity: emptying or trimming the constant would make the guard above pass by describing
+  // an audio ledger that writes nothing. These five are what `acquireAudioLease`, `markAudioReady`
+  // and `markAudioFailure` write to the two shared documents today.
+  for (const name of ["audioGenerationCount", "audioReservedMicros", "audioCommittedMicros",
+    "audioReleasedMicros", "updatedAtMillis"]) {
+    assert.ok(AUDIO_LEDGER_FIELD_NAMES.includes(name),
+      `AUDIO_LEDGER_FIELD_NAMES must list ${name}, which monthlyStoryAudioRepository writes to a ` +
+      "shared spend document; without it the collision guard passes vacuously");
+  }
+  // The names are also really written by that source file, not just asserted here.
+  const sourceRoot = __dirname.endsWith("lib") ? join(__dirname, "..", "src") : __dirname;
+  const source = readFileSync(join(sourceRoot, "monthlyStoryAudioRepository.ts"), "utf8");
+  for (const name of AUDIO_LEDGER_FIELD_NAMES) {
+    assert.ok(source.includes(`${name}:`),
+      `AUDIO_LEDGER_FIELD_NAMES lists ${name}, but monthlyStoryAudioRepository never writes it`);
+  }
 });
 
 test("the repository derives no month or day from a clock", () => {
