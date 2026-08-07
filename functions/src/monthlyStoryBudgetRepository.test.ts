@@ -185,7 +185,7 @@ test("reserve -> commit writes every document at its MONTHLY_STORY_SPEND_PATHS a
   assert.equal(firestore.documents.get(RESERVATION_PATH)?.status, "reserved");
   assert.equal(firestore.documents.get(RESERVATION_PATH)?.ledger, "budget");
   assert.equal(firestore.documents.get(MONTH_PATH)?.reservedMicros, 200);
-  assert.equal(firestore.documents.get(DAY_PATH)?.textGenerationCount, 1);
+  assert.equal(firestore.documents.get(DAY_PATH)?.budgetTextGenerationCount, 1);
   readsPrecedeWrites(firestore);
 
   await markMonthlyStoryProviderCallStarted(repository, { reservationId, monthKey }, 120);
@@ -199,14 +199,14 @@ test("reserve -> commit writes every document at its MONTHLY_STORY_SPEND_PATHS a
   assert.equal(firestore.documents.get(MONTH_PATH)?.reservedMicros, 0);
   assert.equal(firestore.documents.get(MONTH_PATH)?.committedMicros, 150);
   assert.equal(firestore.documents.get(MONTH_PATH)?.releasedMicros, 50);
-  assert.equal(firestore.documents.get(DAY_PATH)?.textGenerationCount, 1,
+  assert.equal(firestore.documents.get(DAY_PATH)?.budgetTextGenerationCount, 1,
     "a committed generation keeps its daily slot");
 });
 
 test("reserve -> release refunds micros and both generation counters", async () => {
   const { firestore, repository } = setup();
   await reserveMonthlyStoryBudget(repository, base);
-  assert.equal(firestore.documents.get(MONTH_PATH)?.textGenerationCount, 1);
+  assert.equal(firestore.documents.get(MONTH_PATH)?.budgetTextGenerationCount, 1);
   firestore.operations = [];
   const released = await releaseMonthlyStoryBudget(repository,
     { reservationId, monthKey, dayKey, nowMillis: 150 });
@@ -214,8 +214,8 @@ test("reserve -> release refunds micros and both generation counters", async () 
   assert.equal(firestore.documents.get(RESERVATION_PATH)?.status, "released");
   assert.equal(firestore.documents.get(MONTH_PATH)?.reservedMicros, 0);
   assert.equal(firestore.documents.get(MONTH_PATH)?.releasedMicros, 200);
-  assert.equal(firestore.documents.get(MONTH_PATH)?.textGenerationCount, 0);
-  assert.equal(firestore.documents.get(DAY_PATH)?.textGenerationCount, 0);
+  assert.equal(firestore.documents.get(MONTH_PATH)?.budgetTextGenerationCount, 0);
+  assert.equal(firestore.documents.get(DAY_PATH)?.budgetTextGenerationCount, 0);
   readsPrecedeWrites(firestore);
 });
 
@@ -236,8 +236,8 @@ test("a reservation swept AFTER a UTC month boundary settles against its ORIGINA
   assert.equal(firestore.documents.get(crossingMonthPath)?.reservedMicros, 0,
     "reserved micros must return to 0 in the month that reserved them");
   assert.equal(firestore.documents.get(crossingMonthPath)?.releasedMicros, 200);
-  assert.equal(firestore.documents.get(crossingMonthPath)?.textGenerationCount, 0);
-  assert.equal(firestore.documents.get(crossingDayPath)?.textGenerationCount, 0);
+  assert.equal(firestore.documents.get(crossingMonthPath)?.budgetTextGenerationCount, 0);
+  assert.equal(firestore.documents.get(crossingDayPath)?.budgetTextGenerationCount, 0);
   assert.equal(firestore.documents.get(crossingReservationPath)?.status, "released");
   assert.equal(firestore.documents.has(NEXT_MONTH_PATH), false,
     "the settling month must not be credited with spend it never reserved");
@@ -298,7 +298,99 @@ test("a spend document holding only the audio ledger's fields reads as empty, an
       "a budget write must not erase the audio ledger sharing this document");
     assert.equal(firestore.documents.get(MONTH_PATH)?.deterministicGenerationCount, 2);
     assert.equal(firestore.documents.get(DAY_PATH)?.deterministicGenerationCount, 2);
-    assert.equal(firestore.documents.get(DAY_PATH)?.textGenerationCount, 1);
+    assert.equal(firestore.documents.get(DAY_PATH)?.budgetTextGenerationCount, 1);
+    assert.equal(firestore.documents.get(MONTH_PATH)?.audioGenerationCount, 1,
+      "the audio ledger's own counter is namespaced apart and survives too");
+    assert.equal(firestore.documents.get(DAY_PATH)?.audioGenerationCount, 1);
+  });
+
+// ── the cross-ledger FIELD-NAME collision on the shared spend documents ──
+
+/**
+ * REGRESSION TEST for a real, empirically confirmed corruption, not a hypothetical.
+ *
+ * `monthlyStoryAudioRepository` counts ITS generations in a field called `audioGenerationCount` on
+ * `monthlyStorySpend/{month}` and `monthlyStoryDailySpend/{day}`. The budget ledger used to store
+ * its own, unrelated counter of the same name on the very same documents. When the AUDIO ledger
+ * created the document first it carried no `monthKey`/`dayKey`, so this repository's parsers
+ * correctly returned null, `reserveMonthlyStoryBudget` started from `emptyMonthly`/`emptyDaily`
+ * with counters at 0, and wrote BOTH counters unconditionally — and the `{...cachedRaw,
+ * ...budgetValue}` merge cannot protect a field that `budgetValue` itself contains. The audio
+ * ledger's count was silently reset to 0, which hands a user back audio generations their cap had
+ * already spent. It fired for a stage `"text"` reserve, which never touches audio at all.
+ *
+ * The fix is a STORAGE-level namespace: this repository reads and writes
+ * `budgetTextGenerationCount`/`budgetAudioGenerationCount`, so the two ledgers no longer share a
+ * field name. The domain type keeps its `textGenerationCount`/`audioGenerationCount` fields.
+ */
+test("a budget reserve cannot clobber the AUDIO ledger's audioGenerationCount", async () => {
+  const { firestore, repository } = setup();
+  // Audio-ledger-shaped documents, created by acquireAudioLease before the budget ledger ever ran:
+  // its counters, none of the budget ledger's fields, and crucially NO monthKey / NO dayKey.
+  firestore.documents.set(MONTH_PATH,
+    { audioGenerationCount: 3, audioReservedMicros: 500, updatedAtMillis: 1 });
+  firestore.documents.set(DAY_PATH, { audioGenerationCount: 5, updatedAtMillis: 1 });
+
+  // A TEXT reserve. It has no business touching an audio counter at all.
+  await reserveMonthlyStoryBudget(repository, base);
+
+  const month = firestore.documents.get(MONTH_PATH);
+  const day = firestore.documents.get(DAY_PATH);
+  assert.equal(day?.audioGenerationCount, 5,
+    "the audio ledger's DAILY generation count survives a budget reserve");
+  assert.equal(month?.audioGenerationCount, 3,
+    "the audio ledger's MONTHLY generation count survives a budget reserve");
+  assert.equal(month?.audioReservedMicros, 500,
+    "and the audio ledger's micros, which never collided, still survive too");
+  // The budget ledger's own write still landed, under its own names.
+  assert.equal(month?.reservedMicros, 200);
+  assert.equal(month?.budgetTextGenerationCount, 1);
+  assert.equal(day?.budgetTextGenerationCount, 1);
+});
+
+test("the budget ledger's generation counters are stored under NAMESPACED field names", async () => {
+  const { firestore, repository } = setup();
+  await reserveMonthlyStoryBudget(repository, base);
+  const month = firestore.documents.get(MONTH_PATH) as Record<string, unknown>;
+  const day = firestore.documents.get(DAY_PATH) as Record<string, unknown>;
+
+  // Namespaced names are what is stored...
+  assert.equal(month.budgetTextGenerationCount, 1);
+  assert.equal(month.budgetAudioGenerationCount, 0);
+  assert.equal(day.budgetTextGenerationCount, 1);
+  assert.equal(day.budgetAudioGenerationCount, 0);
+  // ...and the bare names, which the AUDIO ledger owns, are not written by this repository at all.
+  // A future refactor that "tidies" the mapping away reintroduces the collision and fails here.
+  assert.equal(Object.keys(month).includes("audioGenerationCount"), false,
+    "audioGenerationCount belongs to monthlyStoryAudioRepository — this ledger must not write it");
+  assert.equal(Object.keys(month).includes("textGenerationCount"), false);
+  assert.equal(Object.keys(day).includes("audioGenerationCount"), false,
+    "audioGenerationCount belongs to monthlyStoryAudioRepository — this ledger must not write it");
+  assert.equal(Object.keys(day).includes("textGenerationCount"), false);
+});
+
+test("the budget ledger reads its own namespaced counters back — write and read cannot disagree",
+  async () => {
+    const { firestore, repository } = setup();
+    await reserveMonthlyStoryBudget(repository, base);
+    // The SECOND reserve has to SEE the first one's stored counters through the namespaced names.
+    // A half-renamed mapping (write namespaced, read bare, or the reverse) reads 0 here and writes
+    // 1 again instead of 2.
+    await reserveMonthlyStoryBudget(repository, { ...base, attempt: 2, nowMillis: 110,
+      expiresAtMillis: 210 });
+    assert.equal(firestore.documents.get(MONTH_PATH)?.budgetTextGenerationCount, 2);
+    assert.equal(firestore.documents.get(DAY_PATH)?.budgetTextGenerationCount, 2);
+
+    // ...and a settlement cycle decrements the same stored fields it incremented.
+    await releaseMonthlyStoryBudget(repository, { reservationId:
+      deterministicMonthlyStoryReservationId(jobId, "text", 2), monthKey, dayKey, nowMillis: 150 });
+    assert.equal(firestore.documents.get(MONTH_PATH)?.budgetTextGenerationCount, 1);
+    assert.equal(firestore.documents.get(DAY_PATH)?.budgetTextGenerationCount, 1);
+    await commitMonthlyStoryBudget(repository,
+      { reservationId, monthKey, actualMicros: 150, nowMillis: 160 });
+    assert.equal(firestore.documents.get(MONTH_PATH)?.budgetTextGenerationCount, 1,
+      "a committed generation keeps its monthly slot");
+    assert.equal(firestore.documents.get(MONTH_PATH)?.reservedMicros, 0);
   });
 
 test("an absent document reads as null, not as an error", async () => {

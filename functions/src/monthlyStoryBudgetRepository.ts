@@ -25,6 +25,16 @@ export const MONTHLY_STORY_EXPIRED_RESERVATION_INDEX =
 /** gRPC status code Firestore raises when a query has no matching composite index. */
 const FAILED_PRECONDITION_CODE = 9;
 
+/**
+ * STORED field names for the budget ledger's two generation counters on the SHARED
+ * `monthlyStorySpend/{month}` and `monthlyStoryDailySpend/{day}` documents. Deliberately not the
+ * domain names: `monthlyStoryAudioRepository` writes a field literally called
+ * `audioGenerationCount` on those same documents for its OWN, differently-refunded ledger. See the
+ * malformed-document policy note below for the full story.
+ */
+export const BUDGET_TEXT_GENERATION_COUNT_FIELD = "budgetTextGenerationCount";
+export const BUDGET_AUDIO_GENERATION_COUNT_FIELD = "budgetAudioGenerationCount";
+
 export type MonthlyStoryBudgetQuery = {
   where(field: string, operation: "==" | "<=", value: unknown): MonthlyStoryBudgetQuery;
   limit(count: number): MonthlyStoryBudgetQuery;
@@ -109,6 +119,18 @@ function optionalCount(value: unknown): number | undefined {
  * `monthlyStoryAudioRepository`'s parallel ledger and by the deterministic generation slot too. A
  * document holding only those foreign fields means this ledger has nothing stored yet, so the
  * discriminator is a field only this ledger writes: `monthKey` for the month, `dayKey` for the day.
+ *
+ * NAMESPACED COUNTERS: because those documents are shared, this ledger's generation counters are
+ * STORED under {@link BUDGET_TEXT_GENERATION_COUNT_FIELD} and
+ * {@link BUDGET_AUDIO_GENERATION_COUNT_FIELD}, never under the bare
+ * `textGenerationCount`/`audioGenerationCount` the DOMAIN type uses. `audioGenerationCount` is a
+ * name `monthlyStoryAudioRepository` also writes, counting a different event under a different
+ * refund rule; sharing the name meant a budget reserve — even a stage `"text"` one — reset the
+ * audio ledger's count to 0, because the merge in `runTransaction` cannot protect a field the
+ * budget's own value explicitly contains. The mapping lives HERE, at the storage boundary, and in
+ * both directions: {@link serializeMonthlyStoryMonthlySpendDocument} and
+ * {@link serializeMonthlyStoryDailySpendDocument} write the namespaced names, the two parsers below
+ * read them, and nothing in `monthlyStoryBudget.ts` changes shape.
  */
 export function parseMonthlyStoryMonthlySpendDocument(value: unknown): MonthlyStoryMonthlySpend | null {
   if (value === null || value === undefined) return null;
@@ -122,8 +144,8 @@ export function parseMonthlyStoryMonthlySpendDocument(value: unknown): MonthlySt
     reservedMicros: nonNegativeInteger(value.reservedMicros),
     committedMicros: nonNegativeInteger(value.committedMicros),
     releasedMicros: nonNegativeInteger(value.releasedMicros),
-    textGenerationCount: optionalCount(value.textGenerationCount),
-    audioGenerationCount: optionalCount(value.audioGenerationCount),
+    textGenerationCount: optionalCount(value[BUDGET_TEXT_GENERATION_COUNT_FIELD]),
+    audioGenerationCount: optionalCount(value[BUDGET_AUDIO_GENERATION_COUNT_FIELD]),
     text: stageTotals(value.text), audio: stageTotals(value.audio),
     updatedAtMillis: nonNegativeInteger(value.updatedAtMillis) };
 }
@@ -134,9 +156,34 @@ export function parseMonthlyStoryDailySpendDocument(value: unknown): MonthlyStor
   if (value.dayKey === undefined) return null;
   if (typeof value.dayKey !== "string") corrupt();
   return { dayKey: value.dayKey,
-    textGenerationCount: nonNegativeInteger(value.textGenerationCount),
-    audioGenerationCount: nonNegativeInteger(value.audioGenerationCount),
+    textGenerationCount: nonNegativeInteger(value[BUDGET_TEXT_GENERATION_COUNT_FIELD]),
+    audioGenerationCount: nonNegativeInteger(value[BUDGET_AUDIO_GENERATION_COUNT_FIELD]),
     updatedAtMillis: nonNegativeInteger(value.updatedAtMillis) };
+}
+
+/**
+ * The WRITE half of the namespace mapping the two parsers above read. Both destructure the domain
+ * counters out by name, so a bare `textGenerationCount`/`audioGenerationCount` can never reach the
+ * stored document even though `monthlyStoryBudget.ts` builds its updates with a computed
+ * `` `${stage}GenerationCount` `` key.
+ */
+export function serializeMonthlyStoryMonthlySpendDocument(value: MonthlyStoryMonthlySpend):
+Record<string, unknown> {
+  const { textGenerationCount, audioGenerationCount, ...stored } = value;
+  // Both are OPTIONAL on the monthly domain type, and Firestore rejects an explicit `undefined`,
+  // so an absent counter stays absent rather than being written as one.
+  return { ...stored,
+    ...(textGenerationCount === undefined ? {} :
+      { [BUDGET_TEXT_GENERATION_COUNT_FIELD]: textGenerationCount }),
+    ...(audioGenerationCount === undefined ? {} :
+      { [BUDGET_AUDIO_GENERATION_COUNT_FIELD]: audioGenerationCount }) };
+}
+
+export function serializeMonthlyStoryDailySpendDocument(value: MonthlyStoryDailySpend):
+Record<string, unknown> {
+  const { textGenerationCount, audioGenerationCount, ...stored } = value;
+  return { ...stored, [BUDGET_TEXT_GENERATION_COUNT_FIELD]: textGenerationCount,
+    [BUDGET_AUDIO_GENERATION_COUNT_FIELD]: audioGenerationCount };
 }
 
 /**
@@ -276,9 +323,9 @@ export class FirestoreMonthlyStoryBudgetRepository implements MonthlyStoryBudget
           parseMonthlyStoryBudgetReservationDocument(
             await read(reservationPath(monthKey, reservationId)), reservationId),
         setMonthlySpend: (value) => mergedSet(monthlyPath(value.monthKey),
-          value as unknown as Record<string, unknown>),
+          serializeMonthlyStoryMonthlySpendDocument(value)),
         setDailySpend: (value) => mergedSet(dailyPath(value.dayKey),
-          value as unknown as Record<string, unknown>),
+          serializeMonthlyStoryDailySpendDocument(value)),
         // A reservation document is owned outright by this ledger (nobody else writes THIS id), so
         // it is created and replaced whole rather than merged.
         createReservation: (value) => firestoreTransaction.create(

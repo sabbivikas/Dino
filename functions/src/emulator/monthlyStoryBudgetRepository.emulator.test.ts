@@ -155,15 +155,64 @@ test("EMULATOR: a budget reserve preserves the foreign fields sharing monthlySto
     assert.deepStrictEqual(month.audioLease, seededMonth.audioLease, "a nested map survives intact");
     assert.deepStrictEqual(month.audioProviderKey, seededMonth.audioProviderKey);
     assert.deepStrictEqual(day.deterministicGenerationCount, seededDay.deterministicGenerationCount);
-    assert.equal(day.textGenerationCount, 1);
+    assert.equal(day.budgetTextGenerationCount, 1);
 
-    // NOT an assertion, a RECORDING: `audioGenerationCount` is a name BOTH ledgers write, so the
-    // merge cannot protect it — the budget ledger's own value wins. Same in the fake; reported so
-    // the owner sees it, not fixed here.
-    console.log("[finding 1] audioGenerationCount month seeded=%o after-reserve=%o; day seeded=%o after=%o",
-      seededMonth.audioGenerationCount, month.audioGenerationCount,
-      seededDay.audioGenerationCount, day.audioGenerationCount);
+    // Was finding 1, now an ASSERTION: `audioGenerationCount` used to be a name BOTH ledgers wrote,
+    // so the merge could not protect it and the budget ledger's own value won. The budget ledger's
+    // counters are namespaced at the storage layer now, so the audio ledger's value survives.
+    assert.equal(month.audioGenerationCount, seededMonth.audioGenerationCount);
+    assert.equal(day.audioGenerationCount, seededDay.audioGenerationCount);
   });
+
+// ── 1b. the cross-ledger field-name collision, against REAL Firestore ──
+
+/**
+ * The permanent guard for a corruption this suite ORIGINALLY DEMONSTRATED here: seeding
+ * `audioGenerationCount: 1` and running a real budget reserve read the counter back as 0, because
+ * both ledgers stored their generation count under that one name on these shared documents.
+ *
+ * Every ingredient is the real thing — real Firestore, real transaction, real merge semantics —
+ * and the reserve is stage `"text"`, which has no business touching an audio counter at all. The
+ * audio ledger's own refund path clamps at 0 while the budget's throws `ledger-mismatch` below 1,
+ * so the two counters can never be collapsed into one; only a namespace can separate them.
+ */
+test("EMULATOR: a budget reserve cannot clobber the AUDIO ledger's audioGenerationCount", async () => {
+  await clearFirestore();
+  const repository = repositoryOn(new AdminBudgetFirestore(db));
+
+  // Audio-ledger-shaped documents, exactly as `acquireAudioLease` leaves them when it runs first:
+  // its counters and micros, and crucially NO monthKey / NO dayKey for the budget's parsers.
+  await db.doc(MONTH_PATH).set({ audioGenerationCount: 3, audioReservedMicros: 500,
+    updatedAtMillis: 1 });
+  await db.doc(DAY_PATH).set({ audioGenerationCount: 5, updatedAtMillis: 1 });
+
+  await reserveMonthlyStoryBudget(repository, base);
+
+  const month = (await db.doc(MONTH_PATH).get()).data() as Record<string, unknown>;
+  const day = (await db.doc(DAY_PATH).get()).data() as Record<string, unknown>;
+  assert.equal(day.audioGenerationCount, 5,
+    "the audio ledger's DAILY generation count survives a real budget reserve");
+  assert.equal(month.audioGenerationCount, 3,
+    "the audio ledger's MONTHLY generation count survives a real budget reserve");
+  assert.equal(month.audioReservedMicros, 500);
+
+  // The budget ledger's own counters landed, under their namespaced names and nowhere else.
+  assert.equal(month.reservedMicros, 200);
+  assert.equal(month.budgetTextGenerationCount, 1);
+  assert.equal(month.budgetAudioGenerationCount, 0);
+  assert.equal(day.budgetTextGenerationCount, 1);
+  assert.equal(Object.keys(month).includes("textGenerationCount"), false,
+    "the un-namespaced names are not written to real Firestore either");
+  assert.equal(Object.keys(day).includes("textGenerationCount"), false);
+
+  // And the round trip: the second reserve READS the first's stored counters back through the
+  // namespaced names, so a half-renamed mapping cannot survive a real Firestore round trip.
+  await reserveMonthlyStoryBudget(repository, { ...base, attempt: 2, nowMillis: 110,
+    expiresAtMillis: 210 });
+  const after = (await db.doc(MONTH_PATH).get()).data() as Record<string, unknown>;
+  assert.equal(after.budgetTextGenerationCount, 2);
+  assert.equal(after.audioGenerationCount, 3, "still untouched by a second reserve");
+});
 
 // ── 2. create() on a duplicate reservationId: real Firestore vs the fake ──
 
@@ -319,8 +368,8 @@ test("EMULATOR: two contending WRITERS of monthlyStorySpend/{month} — a fresh 
 
     const month = (await db.doc(MONTH_PATH).get()).data() as Record<string, unknown>;
     console.log("[finding 4b] month after race=%o", { reservedMicros: month.reservedMicros,
-      committedMicros: month.committedMicros, textGenerationCount: month.textGenerationCount,
-      text: month.text });
+      committedMicros: month.committedMicros,
+      budgetTextGenerationCount: month.budgetTextGenerationCount, text: month.text });
     assert.ok(true);
   });
 
