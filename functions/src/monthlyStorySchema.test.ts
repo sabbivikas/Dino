@@ -156,6 +156,35 @@ test("signal upload contract fails closed and uses authenticated UID", () => {
     { ...validSignal(), uid: "synthetic-user-b" }, enabledControl, settings), /unknown-field/);
 });
 
+// Mirrors the client declaration built by
+// Dino/Services/MonthlyStorySignalCoordinator.swift (`permissions(for:)`), which must equal the
+// stored settings field for field. Same comparison as monthlyStoryGenerationService.ts:215-219.
+test("client permissions mirroring stored settings are accepted, audio on and themes on with no theme evidence",
+  () => {
+    const stored: MonthlyStorySettings = { ...settings, audioEnabled: true, useJournalThemes: true,
+      useHealthPatterns: true };
+    const signal = validSignal();
+    signal.permissions = { featureEnabled: true, journalThemesEnabled: true,
+      healthPatternsEnabled: true, audioEnabled: true };
+    // Theme learning off locally: the permission is granted, but no repeatedTheme evidence exists.
+    signal.evidence = (signal.evidence as Record<string, unknown>[])
+      .filter((item) => (item.value as Record<string, string>).type !== "repeatedTheme");
+    assert.equal((signal.evidence as Record<string, unknown>[]).some((item) =>
+      (item.value as Record<string, string>).type === "repeatedTheme"), false);
+
+    const accepted = validateMonthlyStorySignalUploadContract({ uid: "synthetic-user-a" }, signal,
+      enabledControl, stored);
+    assert.equal(accepted.signal.permissions.audioEnabled, true);
+    assert.equal(accepted.signal.permissions.journalThemesEnabled, true);
+
+    // The shape the client used to send against these settings: hardcoded audio off and journal
+    // themes narrowed by the local learning preference.
+    const drifted = { ...signal, permissions: { featureEnabled: true, journalThemesEnabled: false,
+      healthPatternsEnabled: true, audioEnabled: false } };
+    assert.throws(() => validateMonthlyStorySignalUploadContract({ uid: "synthetic-user-a" }, drifted,
+      enabledControl, stored), /settings-mismatch/);
+  });
+
 test("story and tombstone schemas are metadata-only and strict", () => {
   const storageCleanup = { state: "notRequired", updatedAtMillis: 10 };
   const story = parseMonthlyStoryDocument({ monthKey: "2026-07", generationVersion: "v1",

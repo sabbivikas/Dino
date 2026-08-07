@@ -125,9 +125,7 @@ final class MonthlyStorySignalCoordinator {
         guard let first = day(boundary.start),
               let finalDate = calendar.date(byAdding: .day, value: -1, to: boundary.endExclusive), let last = day(finalDate)
         else { throw MonthlyStorySignalCoordinatorError.monthUnavailable }
-        let permissions = MonthlyStoryPermissions(featureEnabled: true,
-            journalThemesEnabled: settings.useJournalThemes && journalThemeLearningEnabled,
-            healthPatternsEnabled: settings.useHealthPatterns, audioEnabled: false)
+        let permissions = Self.permissions(for: settings)
         let draft = try MonthlyStorySignal(monthKey: monthKey, timeZone: timeZone,
             evidenceStartDay: first, evidenceEndDay: last, usableEvidenceDays: usableDays.sorted(),
             moodEvidenceDays: moodDays, corroboratingEvidenceDays: corroboratingDays.sorted(),
@@ -141,6 +139,22 @@ final class MonthlyStorySignalCoordinator {
             evidenceStartDay: first, evidenceEndDay: last, usableEvidenceDays: usableDays.sorted(),
             moodEvidenceDays: moodDays, corroboratingEvidenceDays: corroboratingDays.sorted(),
             permissions: permissions, isStorySafetyEligible: true, evidence: evidence, eligibility: eligibility)
+    }
+
+    /// Declares what the *stored* settings authorize, field for field.
+    ///
+    /// The server treats this as a consent-integrity guarantee and rejects any signal whose
+    /// permissions (or timeZone) differ from the stored settings document — see
+    /// functions/src/monthlyStoryGenerationService.ts:215-219 and
+    /// functions/src/monthlyStorySchema.ts:385-390. So every field here must mirror the settings
+    /// exactly and must never be narrowed by a local collection preference: whether evidence is
+    /// actually gathered (e.g. journal theme learning) is a separate, client-side question and is
+    /// gated where the evidence is collected, not here.
+    static func permissions(for settings: MonthlyStorySettings) -> MonthlyStoryPermissions {
+        MonthlyStoryPermissions(featureEnabled: settings.enabled,
+                                journalThemesEnabled: settings.useJournalThemes,
+                                healthPatternsEnabled: settings.useHealthPatterns,
+                                audioEnabled: settings.audioEnabled)
     }
 
     private static func bucket(_ values: [Double], restful: Bool) -> MonthlyStorySleepBucket? {
