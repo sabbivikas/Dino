@@ -1,0 +1,36 @@
+{
+  "_comment": "The literal featureFlags/monthlyStory control document, minus updatedAt. parseMonthlyStoryControl (functions/src/monthlyStoryControl.ts) requires EXACTLY these 26 fields plus updatedAt = 27; any extra or missing key is 'malformed' and fails closed to SAFE_DISABLED_MONTHLY_STORY_CONTROL. updatedAt is stamped by apply-monthly-story-config.mjs at write time because the parser rejects any document older than MONTHLY_STORY_CONTROL_MAX_AGE_MS (24h) as 'stale'. This _comment key is stripped before writing.",
+
+  "visible": true,
+  "enrollmentEnabled": true,
+  "signalUploadEnabled": true,
+  "textGenerationEnabled": true,
+  "audioGenerationEnabled": true,
+
+  "rolloutBasisPoints": 10000,
+  "minimumAppVersion": "2.1",
+
+  "dailyTextGenerationCap": 5,
+  "monthlyTextGenerationCap": 10,
+  "dailyAudioGenerationCap": 3,
+  "monthlyAudioGenerationCap": 5,
+
+  "monthlyBudgetMicros": 3000000,
+  "monthlyTextBudgetMicros": 1500000,
+  "monthlyAudioBudgetMicros": 1500000,
+
+  "maxTextAttempts": 3,
+  "maxAudioAttempts": 2,
+
+  "generationVersion": "deterministic-v1",
+  "signalSchemaVersion": 1,
+  "scriptPromptVersion": "deterministic-v1",
+  "criticPromptVersion": "none-v1",
+
+  "ttsVersion": "hume-v1",
+  "humeConfigurationVersion": "hume-internal-v1",
+  "approvedVoiceKey": "6aeed1fe-e68a-4fb2-b760-67172cd526fc",
+  "maximumAudioScriptCharacters": 5000,
+  "audioRequestTimeoutSeconds": 30,
+  "humeCostMicrosPerThousandCharacters": 150000
+}
