@@ -22,6 +22,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # Pinning 17 here is only safe while firebase-rules-tests/package.json keeps
+      # firebase-tools below v14 (currently ^13.35.1, so the caret cannot reach v14).
+      # firebase-tools 15 requires JDK 21+ and fails outright on 17 — see suites.yml,
+      # where that exact pairing broke the first CI run. If this project's
+      # firebase-tools is ever bumped past v13, this java-version must go to 21 too.
       - name: Set up Java (Firestore emulator)
         uses: actions/setup-java@v4
         with:

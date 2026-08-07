@@ -53,11 +53,15 @@ jobs:
             exit 1
           fi
 
+      # JDK 21, NOT 17. firebase-tools 15 (installed below) hard-fails on anything
+      # older: "firebase-tools no longer supports Java version before 21". This was
+      # invisible locally — the dev machine's homebrew JDK is 26 — and only surfaced
+      # on the first CI run, which pinned 17 to match firestore-rules.yml.
       - name: Set up Java (Firestore emulator)
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: "17"
+          java-version: "21"
 
       - name: Set up Node
         uses: actions/setup-node@v4

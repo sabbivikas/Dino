@@ -1,0 +1,28 @@
+name: Xcode probe
+
+# DISPOSABLE — delete this file once a version is pinned in testflight.yml.
+#
+# Reports the macOS runner's Xcode inventory so `maxim-lobanov/setup-xcode` can be
+# given an explicit version. It exists as its own workflow because dispatching
+# testflight.yml to get the same information would run its `deploy` job to
+# completion — writing the App Store Connect key, resolving packages, and running
+# `bundle exec fastlane beta`, which uploads a real build to TestFlight.
+#
+# There are deliberately NO deploy steps here, and no checkout: this reads the
+# runner image, not the repository.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: macos-15
+    timeout-minutes: 10
+    steps:
+      - name: Probe available Xcode versions
+        run: |
+          # shellcheck disable=SC2010 # listing Xcode app bundles by name is the point here
+          ls -1 /Applications | grep -i '^Xcode'
+          xcodebuild -version
