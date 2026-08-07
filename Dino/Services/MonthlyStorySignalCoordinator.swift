@@ -15,20 +15,49 @@ struct MonthlyStoryEligibleSafetyProvider: MonthlyStoryLocalSafetyProviding {
     func decision(for monthKey: MonthlyStoryMonthKey) async -> MonthlyStorySafetyDecision { .eligible }
 }
 
+/// The two local collections `buildSignal` reads, and nothing else.
+///
+/// `SharedDataManager` is a `private init()` singleton bound to the `group.com.vikassabbi.dino`
+/// UserDefaults suite, and every stored property persists through a `didSet`. A test that
+/// populated it would write to the user's real data, so the coordinator depends on this
+/// read-only surface instead of the singleton itself. `SharedDataManager` conforms as-is.
+@MainActor
+protocol MonthlyStoryLocalEvidenceProviding {
+    var moodEntries: [MoodEntry] { get }
+    var themeTags: [ThemeTag] { get }
+}
+
+extension SharedDataManager: MonthlyStoryLocalEvidenceProviding {}
+
+/// The Health reads `buildSignal` performs, and nothing else.
+///
+/// `HealthService` is a concrete `private init()` singleton wrapping `HKHealthStore`, so the
+/// sleep/movement evidence branches are otherwise unreachable from a test. `HealthService`
+/// conforms as-is (its default argument values still satisfy these requirements).
+@MainActor
+protocol MonthlyStoryHealthProviding {
+    var hasRequestedSleep: Bool { get }
+    var hasRequestedSteps: Bool { get }
+    func nightlySleepSeries(nights: Int, now: Date, calendar: Calendar) async -> [(date: Date, hours: Double)]?
+    func dailyStepTotals(days: Int, now: Date, calendar: Calendar) async -> [(date: Date, steps: Double)]?
+}
+
+extension HealthService: MonthlyStoryHealthProviding {}
+
 @MainActor
 final class MonthlyStorySignalCoordinator {
-    private let dataManager: SharedDataManager
+    private let dataManager: any MonthlyStoryLocalEvidenceProviding
     private let journalThemeLearningEnabled: Bool
-    private let health: HealthService
+    private let health: any MonthlyStoryHealthProviding
     private let safety: any MonthlyStoryLocalSafetyProviding
 
-    init(dataManager: SharedDataManager,
+    init(dataManager: any MonthlyStoryLocalEvidenceProviding,
          journalThemeLearningEnabled: Bool,
-         health: HealthService? = nil,
+         health: (any MonthlyStoryHealthProviding)? = nil,
          safety: any MonthlyStoryLocalSafetyProviding = MonthlyStoryEligibleSafetyProvider()) {
         self.dataManager = dataManager
         self.journalThemeLearningEnabled = journalThemeLearningEnabled
-        self.health = health ?? .shared
+        self.health = health ?? HealthService.shared
         self.safety = safety
     }
 
@@ -74,10 +103,10 @@ final class MonthlyStorySignalCoordinator {
             }
             let delta = heavyShare(after) - heavyShare(before)
             let direction: MonthlyStoryMoodDirection = delta > 0.2 ? .heavier : delta < -0.2 ? .brighter : .steady
-            evidence.append(try MonthlyStoryEvidence(id: .init(rawValue: "mood-shape-(monthKey.rawValue)"),
+            evidence.append(try MonthlyStoryEvidence(id: .init(rawValue: "mood-shape-\(monthKey.rawValue)"),
                 value: .emotionalShape(shape, direction), confidence: moodDays.count >= 4 ? .high : .medium,
                 startDay: first, endDay: last, source: .mood, allowedForNarration: true))
-            evidence.append(try MonthlyStoryEvidence(id: .init(rawValue: "mood-rest-(monthKey.rawValue)"),
+            evidence.append(try MonthlyStoryEvidence(id: .init(rawValue: "mood-rest-\(monthKey.rawValue)"),
                 value: .nextMonthSuggestionBasis(.continueRest), confidence: moodDays.count >= 4 ? .high : .medium,
                 startDay: first, endDay: last, source: .deterministicCombination, allowedForNarration: true))
         }
@@ -91,7 +120,11 @@ final class MonthlyStorySignalCoordinator {
             }, by: { $0.0 })
             for (theme, values) in grouped where values.count >= 2 {
                 let days = values.map(\.1).sorted(); usableDays.formUnion(days); corroboratingDays.formUnion(days)
-                evidence.append(try MonthlyStoryEvidence(id: .init(rawValue: "journal-(theme.rawValue)-(monthKey.rawValue)"),
+                // `theme.rawValue` is camelCase (e.g. "workPressure"); MonthlyStoryEvidenceID and the
+                // server's evidenceId(/^[a-z0-9._-]+$/, functions/src/monthlyStorySchema.ts:56-60) both
+                // allow lowercase only, so the token must be folded. The lowercased forms stay unique
+                // across every MonthlyStoryJournalTheme case.
+                evidence.append(try MonthlyStoryEvidence(id: .init(rawValue: "journal-\(theme.rawValue.lowercased())-\(monthKey.rawValue)"),
                     value: .repeatedTheme(theme), confidence: .high, startDay: days.first!, endDay: days.last!,
                     source: .authorizedJournalTheme, allowedForNarration: true))
             }
@@ -104,7 +137,7 @@ final class MonthlyStorySignalCoordinator {
                 let days = values.compactMap { day($0.date) }
                 if values.count >= 4, let bucket = Self.bucket(values.map(\.hours), restful: true) {
                     usableDays.formUnion(days); corroboratingDays.formUnion(days)
-                    evidence.append(try MonthlyStoryEvidence(id: .init(rawValue: "health-sleep-(monthKey.rawValue)"),
+                    evidence.append(try MonthlyStoryEvidence(id: .init(rawValue: "health-sleep-\(monthKey.rawValue)"),
                         value: .sleepPattern(bucket), confidence: .high, startDay: days.min()!, endDay: days.max()!,
                         source: .authorizedHealthSummary, allowedForNarration: true))
                 }
@@ -115,7 +148,7 @@ final class MonthlyStorySignalCoordinator {
                 let days = values.compactMap { day($0.date) }
                 if values.count >= 4, let bucket = Self.movementBucket(values.map(\.steps)) {
                     usableDays.formUnion(days); corroboratingDays.formUnion(days)
-                    evidence.append(try MonthlyStoryEvidence(id: .init(rawValue: "health-movement-(monthKey.rawValue)"),
+                    evidence.append(try MonthlyStoryEvidence(id: .init(rawValue: "health-movement-\(monthKey.rawValue)"),
                         value: .movementPattern(bucket), confidence: .high, startDay: days.min()!, endDay: days.max()!,
                         source: .authorizedHealthSummary, allowedForNarration: true))
                 }

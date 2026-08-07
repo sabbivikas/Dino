@@ -135,17 +135,46 @@ final class MonthlyStoryPermissionsRoundTripTests: XCTestCase {
     }
 
     /// The evidence-collection gate is what keeps theme evidence absent when learning is off.
-    /// It is intentionally *not* part of the permission declaration; assert it is still there,
-    /// since the round-trip tests above would otherwise pass with the gate removed.
-    func testJournalThemeEvidenceCollectionGateStillRequiresLocalLearning() throws {
-        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
-        let source = try String(
-            contentsOf: root.appendingPathComponent("Dino/Services/MonthlyStorySignalCoordinator.swift"),
-            encoding: .utf8)
+    /// It is intentionally *not* part of the permission declaration.
+    ///
+    /// This was a source-text check — it grepped the coordinator for the `if` line — because
+    /// `buildSignal` could not be run at all. It now runs the real thing: journal tags that would
+    /// otherwise be collected are supplied, so the gate is the only thing that can keep
+    /// `repeatedTheme` evidence out of the signal, while the declaration still says
+    /// `journalThemesEnabled: true`. The source assertions are gone: the live run subsumes both,
+    /// and the "declaration is not narrowed" half is separately covered by
+    /// `testJournalThemesDeclarationFollowsSettingsNotLocalLearningPreference` above.
+    func testJournalThemeEvidenceCollectionGateStillRequiresLocalLearning() async throws {
+        let stored = settings(journal: true, health: false, audio: true)
 
-        XCTAssertTrue(source.contains("if settings.useJournalThemes && journalThemeLearningEnabled {"),
-                      "journal theme evidence must stay gated on the local learning preference")
-        XCTAssertFalse(source.contains("journalThemesEnabled: settings.useJournalThemes && journalThemeLearningEnabled"),
-                       "the declared permission must not be narrowed by the local learning preference")
+        // 8 mood days clears the mood-only eligibility floor without any corroboration, so the
+        // absence of theme evidence is the thing under test rather than a reason to bail out.
+        let data = StubMonthlyStoryLocalEvidence(
+            moodEntries: [1, 4, 8, 12, 16, 20, 24, 29].map {
+                MonthlyStoryBuildSignalScenario.mood($0, $0.isMultiple(of: 8) ? .drained : .clear)
+            },
+            // Journal tags that WOULD be collected if the gate were gone.
+            themeTags: [
+                MonthlyStoryBuildSignalScenario.journalTag(4, theme: "work"),
+                MonthlyStoryBuildSignalScenario.journalTag(16, theme: "work"),
+                MonthlyStoryBuildSignalScenario.journalTag(20, theme: "relationships"),
+                MonthlyStoryBuildSignalScenario.journalTag(24, theme: "relationships")
+            ])
+
+        let coordinator = MonthlyStorySignalCoordinator(dataManager: data,
+                                                        journalThemeLearningEnabled: false,
+                                                        health: StubMonthlyStoryHealth())
+
+        let signal = try await coordinator.buildSignal(settings: stored,
+                                                       now: MonthlyStoryBuildSignalScenario.now)
+
+        XCTAssertTrue(signal.permissions.journalThemesEnabled,
+                      "the declared permission must not be narrowed by the local learning preference")
+        XCTAssertFalse(signal.evidence.contains { $0.category == .repeatedTheme },
+                       "journal theme evidence must stay gated on the local learning preference")
+        XCTAssertTrue(signal.corroboratingEvidenceDays.isEmpty)
+        XCTAssertTrue(signal.isUploadable)
+        XCTAssertEqual(signal.eligibility?.code, .eligibleMoodOnly)
+        assertServerAccepts(signal.permissions, timeZone: signal.timeZone.rawValue, for: stored)
     }
 }
