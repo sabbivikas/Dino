@@ -8,10 +8,10 @@ import { MONTHLY_STORY_SPEND_PATHS, MonthlyStoryBudgetPolicy, commitMonthlyStory
   reserveMonthlyStoryBudget } from "./monthlyStoryBudget";
 import { MONTHLY_STORY_EXPIRED_RESERVATION_INDEX, MonthlyStoryBudgetRepositoryError,
   FirestoreMonthlyStoryBudgetRepository } from "./monthlyStoryBudgetRepository";
-import { FakeFirestore } from "./monthlyStoryAudioRepository.test";
+import { FakeFirestore } from "./monthlyStoryFirestoreFake";
 
 // These tests drive the REAL Firestore code path through the strict FakeFirestore exported by
-// monthlyStoryAudioRepository.test.ts — the same fake that enforces "all reads before all writes",
+// monthlyStoryFirestoreFake.ts — the same fake that enforces "all reads before all writes",
 // so every transaction below is checked against that rule for free. No second, permissive fake
 // exists: a repository that reads after a write fails here the way it would fail in production.
 
