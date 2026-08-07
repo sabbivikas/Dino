@@ -37,7 +37,11 @@ class FakeBudgetRepository implements MonthlyStoryBudgetRepository {
       const transaction: MonthlyStoryBudgetTransaction = {
         getMonthlySpend: async (key) => monthly.get(key) ?? null,
         getDailySpend: async (key) => daily.get(key) ?? null,
-        getReservation: async (key) => reservations.get(key) ?? null,
+        // `monthKey` is accepted because the interface is month-partitioned, and deliberately NOT
+        // used to key this flat store: a lookup that quietly missed on a mismatching month would
+        // turn the `reservation.monthKey` guards in commit/release into dead code here. The real
+        // path-addressed behaviour is covered in monthlyStoryBudgetRepository.test.ts.
+        getReservation: async (key, _monthKey) => reservations.get(key) ?? null,
         setMonthlySpend: (value) => monthly.set(value.monthKey, structuredClone(value)),
         setDailySpend: (value) => daily.set(value.dayKey, structuredClone(value)),
         createReservation: (value) => {
@@ -153,7 +157,8 @@ test("reservation cannot mutate a different month or day ledger", async () => {
 test("a started provider attempt retains its daily count when reservation is released", async () => {
   const repository = new FakeBudgetRepository();
   const { reservation } = await reserveMonthlyStoryBudget(repository, base);
-  await markMonthlyStoryProviderCallStarted(repository, reservation.reservationId, 120);
+  await markMonthlyStoryProviderCallStarted(repository,
+    { reservationId: reservation.reservationId, monthKey: "2026-07" }, 120);
   await releaseMonthlyStoryBudget(repository,
     { reservationId: reservation.reservationId, monthKey: "2026-07", dayKey: "2026-07-05", nowMillis: 150 });
   assert.equal(repository.daily.get("2026-07-05")?.textGenerationCount, 1);
@@ -188,7 +193,8 @@ test("release refunds the MONTHLY generation count and micros when the provider 
 test("a started provider attempt keeps its MONTHLY generation count and only refunds micros", async () => {
   const repository = new FakeBudgetRepository();
   const { reservation } = await reserveMonthlyStoryBudget(repository, base);
-  await markMonthlyStoryProviderCallStarted(repository, reservation.reservationId, 120);
+  await markMonthlyStoryProviderCallStarted(repository,
+    { reservationId: reservation.reservationId, monthKey: "2026-07" }, 120);
   await releaseMonthlyStoryBudget(repository,
     { reservationId: reservation.reservationId, monthKey: "2026-07", dayKey: "2026-07-05", nowMillis: 150 });
   const ledger = repository.monthly.get("2026-07")!;
@@ -352,9 +358,9 @@ function failingOnReservation(inner: FakeBudgetRepository, reservationId: string
     listExpiredReservations: (input) => inner.listExpiredReservations(input),
     runTransaction: (operation) => inner.runTransaction((transaction) => operation({
       ...transaction,
-      getReservation: async (id) => {
+      getReservation: async (id, monthKey) => {
         if (id === reservationId) throw error;
-        return transaction.getReservation(id);
+        return transaction.getReservation(id, monthKey);
       },
     })),
   };
@@ -389,8 +395,8 @@ test("a reservation committed between the read and the release is an EXPECTED re
     listExpiredReservations: (input) => inner.listExpiredReservations(input),
     runTransaction: (operation) => inner.runTransaction((transaction) => operation({
       ...transaction,
-      getReservation: async (id) => {
-        const value = await transaction.getReservation(id);
+      getReservation: async (id, monthKey) => {
+        const value = await transaction.getReservation(id, monthKey);
         if (id !== reservation.reservationId || !value || !racedRead) return value;
         racedRead = false;
         return { ...value, status: "reserved" };

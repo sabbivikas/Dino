@@ -139,7 +139,8 @@ Promise<MonthlyStoryWrittenPipelineResult> {
     reservationId = reserved.reservation.reservationId;
     if (reserved.duplicate) throw new MonthlyStoryPipelineError("duplicate-generation");
     reservationCreated = true;
-    await markMonthlyStoryProviderCallStarted(input.budgetRepository, reservationId, input.nowMillis);
+    await markMonthlyStoryProviderCallStarted(input.budgetRepository,
+      { reservationId, monthKey: signal.monthKey }, input.nowMillis);
 
     const writerPrompt = buildMonthlyStoryWriterPrompt(prompt);
     let output = parseMonthlyStoryWriterOutput(await input.provider.generate(

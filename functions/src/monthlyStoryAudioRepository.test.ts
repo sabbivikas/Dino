@@ -6,6 +6,8 @@ import { deterministicMonthlyStoryJobId } from "./monthlyStoryJobs";
 import { FirestoreDocument, FirestoreSnapshot, FirestoreTransaction,
   MONTHLY_STORY_PERSISTENCE_VALIDATION_VERSION,
   MonthlyStoryFirestoreDependency } from "./monthlyStoryRepository";
+import { MonthlyStoryBudgetQuery,
+  MonthlyStoryCollectionGroupDependency } from "./monthlyStoryBudgetRepository";
 
 // The audio repository keeps its own spend ledger on `monthlyStorySpend/{month}` and
 // `monthlyStoryDailySpend/{day}`, so these tests drive the real Firestore code path through a
@@ -36,13 +38,31 @@ const SETTLE_DAY_PATH = "monthlyStoryDailySpend/2026-08-01";
 
 type Operation = { kind: "get" | "set" | "create" | "delete"; path: string };
 
+/** One `where(...)` clause, recorded so a test can assert a query was BUILT with it. */
+export type FakeQueryPredicate = { field: string; operation: "==" | "<="; value: unknown };
+/** A collection-group query as it was built — kept even when its get() is made to throw. */
+export type FakeQuery = { collectionId: string; predicates: FakeQueryPredicate[]; limit: number | null };
+
+function matchesPredicate(data: Record<string, unknown>, predicate: FakeQueryPredicate): boolean {
+  const value = data[predicate.field];
+  // Firestore never matches a document that lacks the filtered field at all — which is precisely
+  // how the `ledger` clause excludes the audio ledger's reservations.
+  if (value === undefined) return false;
+  if (predicate.operation === "==") return value === predicate.value;
+  return typeof value === "number" && typeof predicate.value === "number" && value <= predicate.value;
+}
+
 // Real Firestore rejects a get() issued after ANY write inside the same transaction. This fake used
 // to allow it, and that permissiveness is exactly how the markAudioReady read-after-write bug
 // survived a green suite. The rule below is enforced per transaction attempt, so any transaction in
 // any production function driven through this fake is checked for free.
-export class FakeFirestore implements MonthlyStoryFirestoreDependency {
+export class FakeFirestore implements MonthlyStoryFirestoreDependency, MonthlyStoryCollectionGroupDependency {
   readonly documents = new Map<string, Record<string, unknown>>();
   operations: Operation[] = [];
+  /** Every collection-group query built through this fake, in order, with its clauses. */
+  readonly queries: FakeQuery[] = [];
+  /** When set, every collection-group get() throws it (models a missing composite index). */
+  queryFailure: Error | null = null;
 
   doc(path: string): FirestoreDocument {
     const snapshot = () => this.snapshot(path);
@@ -52,6 +72,29 @@ export class FakeFirestore implements MonthlyStoryFirestoreDependency {
   }
 
   collection(): never { throw new Error("collection queries are unused by these tests"); }
+
+  // Collection-group queries are read-only and never run inside a transaction, so they are
+  // recorded in `queries` rather than in `operations`: the reads-before-writes rule above, and
+  // every existing assertion over `operations`, are untouched by this addition.
+  collectionGroup(collectionId: string): MonthlyStoryBudgetQuery {
+    const record: FakeQuery = { collectionId, predicates: [], limit: null };
+    this.queries.push(record);
+    const query: MonthlyStoryBudgetQuery = {
+      where: (field, operation, value) => { record.predicates.push({ field, operation, value }); return query; },
+      limit: (count) => { record.limit = count; return query; },
+      get: async () => {
+        if (this.queryFailure !== null) throw this.queryFailure;
+        const segments = (path: string): string[] => path.split("/");
+        const matched = [...this.documents.entries()]
+          .filter(([path]) => segments(path).slice(0, -1).at(-1) === record.collectionId)
+          .filter(([, data]) => record.predicates.every((predicate) => matchesPredicate(data, predicate)))
+          .map(([path, data]) => ({ id: segments(path).at(-1) as string,
+            data: () => structuredClone(data) }));
+        return { docs: record.limit === null ? matched : matched.slice(0, record.limit) };
+      },
+    };
+    return query;
+  }
 
   private snapshot(path: string): FirestoreSnapshot {
     const value = this.documents.get(path);

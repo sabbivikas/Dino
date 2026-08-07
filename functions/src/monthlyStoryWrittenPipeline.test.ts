@@ -35,7 +35,10 @@ class FakeBudgetRepository implements MonthlyStoryBudgetRepository {
       const transaction: MonthlyStoryBudgetTransaction = {
         getMonthlySpend: async (key) => monthly.get(key) ?? null,
         getDailySpend: async (key) => daily.get(key) ?? null,
-        getReservation: async (key) => reservations.get(key) ?? null,
+        // Month-partitioned in the interface; this flat fake keys on the id alone, exactly as the
+        // budget module's own fake does. See monthlyStoryBudgetRepository.test.ts for the real,
+        // path-addressed implementation.
+        getReservation: async (key, _monthKey) => reservations.get(key) ?? null,
         setMonthlySpend: (value) => monthly.set(value.monthKey, structuredClone(value)),
         setDailySpend: (value) => daily.set(value.dayKey, structuredClone(value)),
         createReservation: (value) => {

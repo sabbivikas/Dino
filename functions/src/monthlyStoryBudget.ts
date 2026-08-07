@@ -75,7 +75,15 @@ export type MonthlyStoryBudgetReservation = {
 export interface MonthlyStoryBudgetTransaction {
   getMonthlySpend(monthKey: string): Promise<MonthlyStoryMonthlySpend | null>;
   getDailySpend(dayKey: string): Promise<MonthlyStoryDailySpend | null>;
-  getReservation(reservationId: string): Promise<MonthlyStoryBudgetReservation | null>;
+  /**
+   * Reservations are stored MONTH-PARTITIONED at
+   * `monthlyStorySpend/{monthKey}/reservations/{reservationId}`, so an id on its own does not
+   * address a document: every caller hands in the month it believes the reservation lives in, and
+   * a Firestore implementation builds the path from it via `MONTHLY_STORY_SPEND_PATHS.reservation`.
+   * The stored `reservation.monthKey` checks in commit and release are NOT made redundant by this
+   * — they stay as defense in depth against a document that somehow sits under the wrong month.
+   */
+  getReservation(reservationId: string, monthKey: string): Promise<MonthlyStoryBudgetReservation | null>;
   setMonthlySpend(value: MonthlyStoryMonthlySpend): void;
   setDailySpend(value: MonthlyStoryDailySpend): void;
   createReservation(value: MonthlyStoryBudgetReservation): void;
@@ -284,7 +292,7 @@ export async function reserveMonthlyStoryBudget(
       code: error instanceof MonthlyStoryBudgetError ? error.code : "sweep-failed", expected: false });
   }
   return repository.runTransaction(async (transaction) => {
-    const existing = await transaction.getReservation(reservationId);
+    const existing = await transaction.getReservation(reservationId, monthKey);
     if (existing) {
       if (existing.jobId !== input.jobId || existing.stage !== input.stage ||
           existing.attempt !== input.attempt || existing.amountMicros !== input.amountMicros ||
@@ -344,13 +352,19 @@ export async function reserveMonthlyStoryBudget(
   });
 }
 
+/**
+ * Takes an input object rather than a bare id because the reservation cannot be READ without its
+ * month: the document is partitioned under `monthlyStorySpend/{monthKey}/reservations`. `monthKey`
+ * is validated with `requireMonthKey` exactly as the other entry points validate theirs.
+ */
 export async function markMonthlyStoryProviderCallStarted(
   repository: MonthlyStoryBudgetRepository,
-  reservationId: string,
+  input: { reservationId: string; monthKey: string },
   nowMillis: number
 ): Promise<MonthlyStoryBudgetReservation> {
+  const monthKey = requireMonthKey(input.monthKey);
   return repository.runTransaction(async (transaction) => {
-    const reservation = await transaction.getReservation(reservationId);
+    const reservation = await transaction.getReservation(input.reservationId, monthKey);
     if (!reservation) throw new MonthlyStoryBudgetError("reservation-missing");
     if (reservation.status !== "reserved") throw new MonthlyStoryBudgetError("reservation-state");
     if (reservation.expiresAtMillis <= nowMillis) throw new MonthlyStoryBudgetError("reservation-expired");
@@ -368,8 +382,9 @@ export async function commitMonthlyStoryBudget(
   if (!validNonNegative(input.actualMicros)) throw new MonthlyStoryBudgetError("invalid-amount");
   const monthKey = requireMonthKey(input.monthKey);
   return repository.runTransaction(async (transaction) => {
-    const reservation = await transaction.getReservation(input.reservationId);
+    const reservation = await transaction.getReservation(input.reservationId, monthKey);
     if (!reservation) throw new MonthlyStoryBudgetError("reservation-missing");
+    // Defense in depth, NOT the only month check: the read above is already addressed at `monthKey`.
     if (reservation.monthKey !== monthKey) throw new MonthlyStoryBudgetError("ledger-mismatch");
     if (reservation.status === "committed" && reservation.committedMicros === input.actualMicros) return reservation;
     if (reservation.status !== "reserved" || input.actualMicros > reservation.amountMicros) {
@@ -406,11 +421,12 @@ export async function releaseMonthlyStoryBudget(
   const monthKey = requireMonthKey(input.monthKey);
   const dayKey = requireDayKey(input.dayKey);
   return repository.runTransaction(async (transaction) => {
-    const reservation = await transaction.getReservation(input.reservationId);
+    const reservation = await transaction.getReservation(input.reservationId, monthKey);
     if (!reservation) throw new MonthlyStoryBudgetError("reservation-missing");
     // Belt and braces with the sweep's `ledger == "budget"` filter: a document from the audio
     // repository's parallel ledger shares this collection path and must never be released here.
     if (reservation.ledger !== "budget") throw new MonthlyStoryBudgetError("ledger-mismatch");
+    // Defense in depth, NOT the only month check: the read above is already addressed at `monthKey`.
     if (reservation.monthKey !== monthKey || reservation.dayKey !== dayKey) {
       throw new MonthlyStoryBudgetError("ledger-mismatch");
     }
@@ -480,7 +496,7 @@ export async function reconcileExpiredMonthlyStoryReservations(
   for (const input of targets) {
     try {
       const reservation = await repository.runTransaction((transaction) =>
-        transaction.getReservation(input.reservationId));
+        transaction.getReservation(input.reservationId, input.monthKey));
       if (reservation?.status === "reserved" && reservation.expiresAtMillis <= nowMillis) {
         await releaseMonthlyStoryBudget(repository, { ...input, nowMillis });
         released++;
