@@ -6,13 +6,26 @@ on:
   workflow_dispatch:
 
 jobs:
+  # Gate: the upload cannot start unless every suite passed in this same run.
+  suites:
+    uses: ./.github/workflows/suites.yml
+
   deploy:
+    needs: [suites]
     runs-on: macos-15
     timeout-minutes: 60
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      # PROBE ONLY - reports the runner's Xcode inventory so a version can be
+      # pinned in a follow-up. Does not assert or select anything.
+      - name: Probe available Xcode versions
+        run: |
+          # shellcheck disable=SC2010 # listing Xcode app bundles by name is the point here
+          ls -1 /Applications | grep -i '^Xcode'
+          xcodebuild -version
 
       - name: Select Xcode
         run: |

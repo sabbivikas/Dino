@@ -1,0 +1,100 @@
+name: Suites
+
+# Deliberately NO path filters anywhere: every regression found in the last ten
+# rounds was caught by a suite that CI did not execute. This workflow runs on
+# every push and every pull request, and is also callable as a reusable workflow
+# (testflight.yml gates its upload on it via `uses: ./.github/workflows/suites.yml`).
+on:
+  push:
+  pull_request:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  suites:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # FAIL FAST: runs before any toolchain setup or dependency install so an
+      # edit to a crisis-safety file stops the run immediately.
+      - name: Crisis-file integrity
+        run: |
+          set -euo pipefail
+          fail=0
+          check() {
+            file="$1"
+            expected="$2"
+            if [ ! -f "$file" ]; then
+              echo "::error file=$file::crisis file is missing (expected sha256[0:12]=$expected)"
+              fail=1
+              return 0
+            fi
+            actual="$(sha256sum "$file" | cut -c1-12)"
+            if [ "$actual" != "$expected" ]; then
+              echo "::error file=$file::crisis file changed - sha256[0:12] actual=$actual expected=$expected"
+              echo "  actual:   $actual"
+              echo "  expected: $expected"
+              fail=1
+            else
+              echo "ok $file sha256[0:12]=$actual"
+            fi
+            return 0
+          }
+          check "Dino/Services/CrisisResources.swift" "ba2ebd5645e2"
+          check "functions/src/crisisNet.ts" "9bfabc284005"
+          if [ "$fail" -ne 0 ]; then
+            echo "::error::crisis-file integrity check failed - these files must not change"
+            exit 1
+          fi
+
+      - name: Set up Java (Firestore emulator)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          # Two independent lockfiles; both are hashed into the cache key so a
+          # change to either invalidates it and neither is restored stale.
+          cache-dependency-path: |
+            functions/package-lock.json
+            firebase-rules-tests/package-lock.json
+
+      - name: Install functions dependencies
+        working-directory: functions
+        run: npm ci
+
+      - name: Typecheck functions
+        working-directory: functions
+        run: npx tsc --noEmit
+
+      - name: Fast test suite
+        working-directory: functions
+        run: npm test
+
+      # functions/package.json's test:emulator shells out to a global `firebase`
+      # (unlike firebase-rules-tests, which has firebase-tools as a devDependency).
+      - name: Install Firebase CLI
+        run: npm install -g firebase-tools@15
+
+      - name: Emulator test suite
+        working-directory: functions
+        run: npm run test:emulator
+
+      - name: Install firestore rules test dependencies
+        working-directory: firebase-rules-tests
+        run: npm ci
+
+      - name: Firestore rules tests
+        working-directory: firebase-rules-tests
+        run: npm test
