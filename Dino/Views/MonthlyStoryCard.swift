@@ -124,6 +124,7 @@ struct MonthlyStoryCardHost: View {
     @Environment(\.monthlyStoryAudioService) private var audioService
     @State private var snapshot = MonthlyStoryExperienceSnapshot.hidden
     @State private var route: Route?
+    @State private var openStory: MonthlyStoryDocument?
     @State private var isPreparing = false
     #if MONTHLY_STORY_INTERNAL_BUILD
     @State private var internalDiagnostic = "local gate disabled"
@@ -136,16 +137,12 @@ struct MonthlyStoryCardHost: View {
         self.journalThemeLearningEnabled = journalThemeLearningEnabled
     }
 
+    /// Only the settings sheet routes through here now. The story itself opens as a full page
+    /// (`MonthlyStoryPlayerView`) rather than a sheet, so it gets its own presentation below.
     private enum Route: Identifiable {
         case setup
-        case reader(MonthlyStoryDocument)
 
-        var id: String {
-            switch self {
-            case .setup: "setup"
-            case .reader(let story): "reader-\(story.id)"
-            }
-        }
+        var id: String { "setup" }
     }
 
     var body: some View {
@@ -175,21 +172,23 @@ struct MonthlyStoryCardHost: View {
                                                               state: settings.enabled ? .noStory : .settingsDisabled,
                                                               targetMonth: snapshot.targetMonth)
                 }
-            case .reader(let story):
-                MonthlyStoryView(story: story, service: service, audioService: audioService,
-                                 audioOptIn: snapshot.settings.audioEnabled) {
-                    snapshot = MonthlyStoryExperienceSnapshot(isVisible: true,
-                                                              settings: snapshot.settings,
-                                                              state: .deleted,
-                                                              targetMonth: snapshot.targetMonth)
-                }
+            }
+        }
+        .fullScreenCover(item: $openStory, onDismiss: { Task { await refresh() } }) { story in
+            MonthlyStoryPlayerView(story: story, service: service, audioService: audioService,
+                                   audioOptIn: snapshot.settings.audioEnabled) {
+                snapshot = MonthlyStoryExperienceSnapshot(isVisible: true,
+                                                          settings: snapshot.settings,
+                                                          state: .deleted,
+                                                          targetMonth: snapshot.targetMonth)
+                openStory = nil
             }
         }
     }
 
     private func openPrimaryDestination() {
         if case .ready(let story) = snapshot.state {
-            route = .reader(story)
+            openStory = story
         } else if case .noStory = snapshot.state {
             Task { await prepareStory() }
         } else {
