@@ -16,6 +16,26 @@ enum MonthlyStoryAudioStatus: String, Codable, Equatable, Sendable {
     case notRequested, generating, ready, failed, deleted
 }
 
+extension MonthlyStoryMonthKey {
+    /// "July 2026". Formatted in UTC from the key's own year and month, never from the device
+    /// clock, so the label always names the month the key means.
+    var displayName: String {
+        let parts = rawValue.split(separator: "-").compactMap { Int($0) }
+        guard parts.count == 2 else { return rawValue }
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        guard let date = calendar.date(from: DateComponents(year: parts[0], month: parts[1], day: 1)) else {
+            return rawValue
+        }
+        let formatter = DateFormatter()
+        formatter.calendar = calendar
+        formatter.timeZone = calendar.timeZone
+        formatter.locale = .autoupdatingCurrent
+        formatter.setLocalizedDateFormatFromTemplate("MMMM yyyy")
+        return formatter.string(from: date)
+    }
+}
+
 struct MonthlyStoryDocument: Decodable, Equatable, Sendable, Identifiable {
     static let supportedSignalSchemaVersion = 1
 
@@ -46,21 +66,7 @@ struct MonthlyStoryDocument: Decodable, Equatable, Sendable, Identifiable {
     var id: String { "\(monthKey.rawValue)/\(generationVersion)" }
     var audioState: MonthlyStoryAudioStatus { MonthlyStoryAudioStatus(rawValue: audioStatus) ?? .failed }
 
-    var displayMonth: String {
-        let parts = monthKey.rawValue.split(separator: "-").compactMap { Int($0) }
-        guard parts.count == 2 else { return monthKey.rawValue }
-        var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
-        guard let date = calendar.date(from: DateComponents(year: parts[0], month: parts[1], day: 1)) else {
-            return monthKey.rawValue
-        }
-        let formatter = DateFormatter()
-        formatter.calendar = calendar
-        formatter.timeZone = calendar.timeZone
-        formatter.locale = .autoupdatingCurrent
-        formatter.setLocalizedDateFormatFromTemplate("MMMM yyyy")
-        return formatter.string(from: date)
-    }
+    var displayMonth: String { monthKey.displayName }
 
     private enum CodingKeys: String, CodingKey, CaseIterable {
         case monthKey, generationVersion, compositionVersion, signalSchemaVersion, status, script, paragraphs

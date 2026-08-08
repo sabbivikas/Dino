@@ -70,7 +70,7 @@ final class FirestoreMonthlyStoryClientService: MonthlyStoryClientService {
     }
 
     func loadAvailableStory() async throws -> MonthlyStoryStoryLoadResult {
-        let monthKey = try closedMonthKey(timezone: settings.timezone)
+        let monthKey = try closedMonthTarget()
         if let cached = storyCache[monthKey] { return .story(cached) }
         let response = try await invoke("loadMonthlyStoryInternalStory",
                                         fields: ["monthKey": monthKey.rawValue])
@@ -172,14 +172,18 @@ final class FirestoreMonthlyStoryClientService: MonthlyStoryClientService {
             timezoneEffectiveMonth: effective, settingsVersion: version)
     }
 
-    private func closedMonthKey(timezone: String) throws -> MonthlyStoryMonthKey {
-        guard let zone = TimeZone(identifier: timezone) else { throw MonthlyStoryClientError.malformedStory }
-        var calendar = Calendar(identifier: .gregorian); calendar.timeZone = zone
-        guard let prior = calendar.date(byAdding: .month, value: -1, to: Date()) else {
+    /// Previously this subtracted one calendar month from `Date()` and stopped there, which is
+    /// not the same question: for the first three days of a month that month is not closed yet,
+    /// so the card asked for a story the server could never build. The rule now lives in
+    /// `MonthlyStoryCalendar` and is shared with `MonthlyStorySignalCoordinator`.
+    func closedMonthTarget(now: Date) throws -> MonthlyStoryMonthKey {
+        guard let zone = try? MonthlyStoryTimeZone(rawValue: settings.timezone) else {
             throw MonthlyStoryClientError.malformedStory
         }
-        let components = calendar.dateComponents([.year, .month], from: prior)
-        return try MonthlyStoryMonthKey(rawValue: String(format: "%04d-%02d", components.year!, components.month!))
+        guard let key = try? MonthlyStoryCalendar.mostRecentClosedMonth(timeZone: zone, now: now) else {
+            throw MonthlyStoryClientError.malformedStory
+        }
+        return key
     }
 
     private func decodeStory(_ raw: Any) throws -> MonthlyStoryDocument { try Self.decodeStoryValue(raw) }

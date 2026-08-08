@@ -39,6 +39,13 @@ protocol MonthlyStoryClientService: AnyObject {
     func prepareDeterministicStory(signal: MonthlyStorySignal) async throws -> MonthlyStoryDocument
     func deleteStory(monthKey: MonthlyStoryMonthKey) async throws
     func clearLocalStoryCache(monthKey: MonthlyStoryMonthKey) async
+    /// The month every other call on this service is about. Exposed so the card can name it
+    /// even when there is no story to take the name from.
+    func closedMonthTarget(now: Date) throws -> MonthlyStoryMonthKey
+}
+
+extension MonthlyStoryClientService {
+    func closedMonthTarget() throws -> MonthlyStoryMonthKey { try closedMonthTarget(now: Date()) }
 }
 
 @MainActor
@@ -116,6 +123,11 @@ final class InMemoryMonthlyStoryClientService: MonthlyStoryClientService {
     func clearLocalStoryCache(monthKey: MonthlyStoryMonthKey) async {
         cacheClearCount += 1
     }
+
+    func closedMonthTarget(now: Date) throws -> MonthlyStoryMonthKey {
+        try MonthlyStoryCalendar.mostRecentClosedMonth(
+            timeZone: try MonthlyStoryTimeZone(rawValue: settings.timezone), now: now)
+    }
 }
 
 @MainActor
@@ -170,7 +182,8 @@ func resolveMonthlyStoryExperience(localGate: MonthlyStoryInternalGate,
         case .expired: state = .unavailable(.expired)
         case .story(let story): state = .ready(story)
         }
-        return MonthlyStoryExperienceSnapshot(isVisible: true, settings: settings, state: state)
+        return MonthlyStoryExperienceSnapshot(isVisible: true, settings: settings, state: state,
+                                              targetMonth: try? service.closedMonthTarget())
     } catch MonthlyStoryClientError.networkUnavailable {
         return MonthlyStoryExperienceSnapshot(isVisible: true,
                                               settings: .disabled,

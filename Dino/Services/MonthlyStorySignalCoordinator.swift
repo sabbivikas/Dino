@@ -65,11 +65,11 @@ final class MonthlyStorySignalCoordinator {
         guard settings.enabled else { throw MonthlyStorySignalCoordinatorError.settingsDisabled }
         let timeZone = try MonthlyStoryTimeZone(rawValue: settings.timezone)
         var calendar = MonthlyStoryCalendar.calendar(timeZone)
-        guard let prior = calendar.date(byAdding: .month, value: -1, to: now) else {
+        // Same rule the client uses to decide which month it is asking about, so the signal and
+        // the request can never name different months.
+        guard let monthKey = try? MonthlyStoryCalendar.mostRecentClosedMonth(timeZone: timeZone, now: now) else {
             throw MonthlyStorySignalCoordinatorError.monthUnavailable
         }
-        let parts = calendar.dateComponents([.year, .month], from: prior)
-        let monthKey = try MonthlyStoryMonthKey(rawValue: String(format: "%04d-%02d", parts.year!, parts.month!))
         let boundary = try MonthlyStoryCalendar.boundary(for: monthKey, timeZone: timeZone)
         guard boundary.isClosed(at: now), (await safety.decision(for: monthKey)).isStorySafetyEligible else {
             throw MonthlyStorySignalCoordinatorError.safetyHold

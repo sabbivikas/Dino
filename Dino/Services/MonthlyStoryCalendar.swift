@@ -75,6 +75,27 @@ enum MonthlyStoryCalendar {
                                          evidenceFreeze: freeze)
     }
 
+    /// The most recent month whose evidence window has actually CLOSED, in `timeZone`.
+    ///
+    /// Deliberately not "last calendar month". A month stays open until its `evidenceFreeze` —
+    /// day 3 of the following month at 04:00 local — so on 1-3 August the most recent closed
+    /// month is June, not July. Subtracting one month from `now` and stopping there targets a
+    /// month that `buildSignal` then refuses with `safetyHold`, and the card has no way to say
+    /// so; it just fails. Both the story lookup and the signal build resolve the month through
+    /// here so they cannot disagree about which month is being asked for.
+    static func mostRecentClosedMonth(timeZone: MonthlyStoryTimeZone,
+                                      now: Date = Date()) throws -> MonthlyStoryMonthKey {
+        let calendar = calendar(timeZone)
+        // Two steps back is always enough (a month closes 3 days into the next one); the third
+        // is slack so a calendar oddity degrades into a correct answer rather than a throw.
+        for step in 1...3 {
+            guard let candidate = calendar.date(byAdding: .month, value: -step, to: now) else { continue }
+            let key = try monthKey(containing: candidate, timeZone: timeZone)
+            if try boundary(for: key, timeZone: timeZone).isClosed(at: now) { return key }
+        }
+        throw MonthlyStorySchemaError.invalidMonthBoundary
+    }
+
     static func nextMonth(after monthKey: MonthlyStoryMonthKey) throws -> MonthlyStoryMonthKey {
         let utc = try MonthlyStoryTimeZone(rawValue: "UTC")
         let boundary = try boundary(for: monthKey, timeZone: utc)

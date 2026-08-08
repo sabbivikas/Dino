@@ -2,6 +2,9 @@ import SwiftUI
 
 struct MonthlyStoryCard: View {
     let state: MonthlyStoryViewState
+    /// The closed month this card is about, already lowercased for dino's voice ("july 2026").
+    /// Nil only if the month could not be resolved, in which case the copy stays generic.
+    var monthName: String?
     let onOpen: () -> Void
     let onSettings: () -> Void
 
@@ -12,7 +15,18 @@ struct MonthlyStoryCard: View {
         case .settingsDisabled:
             return ("your monthly story", "a private reflection on the month, made only from the parts of dino you choose.", "book.closed")
         case .noStory:
-            return ("your monthly story", "there is not enough of the month yet. your story will appear here when it is ready.", "calendar")
+            // Previously this said "there is not enough of the month yet", which described a
+            // month still in progress. The month IS finished — the story simply has not been
+            // made. Saying otherwise read as a bug and hid the fact that the button works.
+            guard let monthName else {
+                return ("your monthly story", "your story has not been made yet. you can prepare it whenever you like.", "book.closed")
+            }
+            return ("your \(monthName) story", "\(monthName) is complete. you can prepare your story whenever you like.", "book.closed")
+        case .insufficientEvidence:
+            guard let monthName else {
+                return ("your monthly story", "there was not enough of the month to write a story from. nothing has been shared.", "calendar")
+            }
+            return ("your monthly story", "there was not enough of \(monthName) to write a story from. nothing has been shared.", "calendar")
         case .preparing:
             return ("your monthly story", "your private reflection is being prepared.", "hourglass")
         case .ready(let story):
@@ -88,6 +102,7 @@ private extension MonthlyStoryViewState {
         case .ready: "read story"
         case .settingsDisabled: "choose what to include"
         case .noStory: "prepare my story"
+        case .insufficientEvidence: "adjust what's included"
         case .preparing: "preparing…"
         default: "view details"
         }
@@ -96,7 +111,8 @@ private extension MonthlyStoryViewState {
     var openButtonAccessibilityLabel: String {
         switch self {
         case .ready(let story): "read your \(story.displayMonth) story"
-        case .settingsDisabled: "open monthly story choices"
+        case .settingsDisabled, .insufficientEvidence: "open monthly story choices"
+        case .noStory: "prepare your monthly story"
         default: "open monthly story details"
         }
     }
@@ -136,6 +152,7 @@ struct MonthlyStoryCardHost: View {
         VStack(alignment: .leading, spacing: 6) {
             if snapshot.isVisible {
                 MonthlyStoryCard(state: snapshot.state,
+                                 monthName: snapshot.targetMonth?.displayName.lowercased(),
                                  onOpen: openPrimaryDestination,
                                  onSettings: { route = .setup })
                     .transition(.opacity)
@@ -155,14 +172,16 @@ struct MonthlyStoryCardHost: View {
                 MonthlyStorySetupView(service: service, initialSettings: snapshot.settings) { settings in
                     snapshot = MonthlyStoryExperienceSnapshot(isVisible: true,
                                                               settings: settings,
-                                                              state: settings.enabled ? .noStory : .settingsDisabled)
+                                                              state: settings.enabled ? .noStory : .settingsDisabled,
+                                                              targetMonth: snapshot.targetMonth)
                 }
             case .reader(let story):
                 MonthlyStoryView(story: story, service: service, audioService: audioService,
                                  audioOptIn: snapshot.settings.audioEnabled) {
                     snapshot = MonthlyStoryExperienceSnapshot(isVisible: true,
                                                               settings: snapshot.settings,
-                                                              state: .deleted)
+                                                              state: .deleted,
+                                                              targetMonth: snapshot.targetMonth)
                 }
             }
         }
@@ -204,7 +223,8 @@ struct MonthlyStoryCardHost: View {
     private func prepareStory() async {
         guard !isPreparing, let dataManager, snapshot.settings.enabled else { return }
         isPreparing = true
-        snapshot = MonthlyStoryExperienceSnapshot(isVisible: true, settings: snapshot.settings, state: .preparing)
+        snapshot = MonthlyStoryExperienceSnapshot(isVisible: true, settings: snapshot.settings,
+                                                  state: .preparing, targetMonth: snapshot.targetMonth)
         defer { isPreparing = false }
         do {
             let availability = try await service.loadFeatureAvailability()
@@ -215,13 +235,17 @@ struct MonthlyStoryCardHost: View {
             let signal = try await coordinator.buildSignal(settings: snapshot.settings)
             let story = try await service.prepareDeterministicStory(signal: signal)
             snapshot = MonthlyStoryExperienceSnapshot(isVisible: true, settings: snapshot.settings,
-                                                      state: .ready(story))
+                                                      state: .ready(story), targetMonth: story.monthKey)
         } catch MonthlyStorySignalCoordinatorError.insufficientEvidence {
+            // Distinct from `noStory`: the attempt happened and the month was too sparse. Falling
+            // back to `noStory` here is what made the card loop back to "prepare my story" with
+            // no explanation of why nothing appeared.
             snapshot = MonthlyStoryExperienceSnapshot(isVisible: true, settings: snapshot.settings,
-                                                      state: .noStory)
+                                                      state: .insufficientEvidence,
+                                                      targetMonth: snapshot.targetMonth)
         } catch {
             snapshot = MonthlyStoryExperienceSnapshot(isVisible: true, settings: snapshot.settings,
-                                                      state: .failed)
+                                                      state: .failed, targetMonth: snapshot.targetMonth)
         }
     }
 }
